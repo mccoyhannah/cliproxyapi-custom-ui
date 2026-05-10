@@ -17,7 +17,6 @@ import { resolveAuthProvider } from '@/utils/quota';
 import {
   normalizeRecentRequestAuthIndex,
   normalizeRecentRequestBuckets,
-  normalizeUsageTotal,
   statusBarDataFromRecentRequests,
 } from '@/utils/recentRequests';
 import { formatFileSize } from '@/utils/format';
@@ -90,10 +89,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
   } = props;
 
   const recentBuckets = normalizeRecentRequestBuckets(file.recent_requests ?? file.recentRequests);
-  const fileStats = {
-    success: normalizeUsageTotal(file.success),
-    failure: normalizeUsageTotal(file.failed),
-  };
   const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
   const isAistudio = (file.type || '').toLowerCase() === 'aistudio';
   const showModelsButton = !isRuntimeOnly || isAistudio;
@@ -124,6 +119,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const statusData =
     (authIndexKey && statusBarCache.get(authIndexKey)) ||
     statusBarDataFromRecentRequests(recentBuckets);
+  const fileStats = {
+    success: statusData.totalSuccess,
+    failure: statusData.totalFailure,
+  };
   const rawStatusMessage = getAuthFileStatusMessage(file);
   const hasStatusWarning =
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
@@ -300,11 +299,11 @@ export function AuthFileCard(props: AuthFileCardProps) {
           <div className={`${styles.cardInsights} ${compact ? styles.cardInsightsCompact : ''}`}>
             <div className={`${styles.cardStats} ${compact ? styles.cardStatsCompact : ''}`}>
               <div className={`${styles.statPill} ${styles.statSuccess}`}>
-                <span className={styles.statLabel}>{t('stats.success')}</span>
+                <span className={styles.statLabel}>{t('stats.recent_success')}</span>
                 <span className={styles.statValue}>{fileStats.success}</span>
               </div>
               <div className={`${styles.statPill} ${styles.statFailure}`}>
-                <span className={styles.statLabel}>{t('stats.failure')}</span>
+                <span className={styles.statLabel}>{t('stats.recent_failure')}</span>
                 <span className={styles.statValue}>{fileStats.failure}</span>
               </div>
             </div>

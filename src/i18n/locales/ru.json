@@ -938,7 +938,9 @@
   },
   "stats": {
     "success": "Успех",
-    "failure": "Сбой"
+    "failure": "Сбой",
+    "recent_success": "Недавние успехи",
+    "recent_failure": "Недавние сбои"
   },
   "status_bar": {
     "success_short": "✓",
