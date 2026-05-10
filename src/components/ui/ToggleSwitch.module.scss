@@ -2,6 +2,8 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  width: 100%;
+  min-width: 0;
   gap: $spacing-sm;
   cursor: pointer;
 }
@@ -24,6 +26,7 @@
 }
 
 .track {
+  flex: 0 0 44px;
   width: 44px;
   height: 24px;
   background: color-mix(in srgb, var(--border-color) 86%, var(--bg-tertiary));
@@ -63,6 +66,8 @@
 }
 
 .label {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text-primary);
   font-weight: 600;
   font-size: 13px;

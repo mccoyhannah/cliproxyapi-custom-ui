@@ -282,15 +282,12 @@
 
 .filterToggleItem {
   min-width: 0;
-
-  @include tablet {
-    grid-column: 1 / -1;
-  }
+  grid-column: 1 / -1;
 }
 
 .filterToggleGroup {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
   gap: 7px;
   min-height: 0;
 
@@ -302,6 +299,8 @@
 .filterToggleCard {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
   min-height: var(--control-height);
   padding: 0 8px 0 6px;
   border-radius: 8px;
@@ -319,6 +318,8 @@
 .filterToggleLabel {
   display: inline-flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
