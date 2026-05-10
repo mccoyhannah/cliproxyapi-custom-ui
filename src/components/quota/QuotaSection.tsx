@@ -14,6 +14,7 @@ import { getStatusFromError } from '@/utils/quota';
 import { QuotaCard } from './QuotaCard';
 import type { QuotaStatusState } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
+import type { LoadQuotaOptions } from './useQuotaLoader';
 import type { QuotaConfig } from './quotaConfigs';
 import { useGridColumns } from './useGridColumns';
 import { IconRefreshCw } from '@/components/ui/icons';
@@ -27,6 +28,7 @@ type ViewMode = 'paged' | 'all';
 
 const MAX_ITEMS_PER_PAGE = 25;
 const MAX_SHOW_ALL_THRESHOLD = 30;
+const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
 interface QuotaPaginationState<T> {
   pageSize: number;
@@ -114,8 +116,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const setQuota = useQuotaStore((state) => state[config.storeSetter]) as QuotaSetter<
     Record<string, TState>
   >;
+  const quotaRefreshMeta = useQuotaStore((state) => state.quotaRefreshMeta[config.type]);
+  const setQuotaRefreshMeta = useQuotaStore((state) => state.setQuotaRefreshMeta);
 
-  /* Removed useRef */
   const [columns, gridRef] = useGridColumns(380); // Min card width 380px matches SCSS
   const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
@@ -169,7 +172,73 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   const pendingQuotaRefreshRef = useRef(false);
   const prevFilesLoadingRef = useRef(loading);
-  const autoRefreshSignatureRef = useRef('');
+  const quotaRefreshMetaRef = useRef(quotaRefreshMeta);
+  const filesLoadingRef = useRef(loading);
+  const sectionLoadingRef = useRef(sectionLoading);
+  const disabledRef = useRef(disabled);
+
+  const autoRefreshSignature = useMemo(
+    () => filteredFiles.map((file) => file.name).join('|'),
+    [filteredFiles]
+  );
+
+  const hasAnyExistingQuota = useMemo(
+    () =>
+      filteredFiles.some((file) => {
+        const status = quota[file.name]?.status;
+        return status === 'success' || status === 'error';
+      }),
+    [filteredFiles, quota]
+  );
+
+  useEffect(() => {
+    quotaRefreshMetaRef.current = quotaRefreshMeta;
+  }, [quotaRefreshMeta]);
+
+  useEffect(() => {
+    filesLoadingRef.current = loading;
+    sectionLoadingRef.current = sectionLoading;
+    disabledRef.current = disabled;
+  }, [disabled, loading, sectionLoading]);
+
+  const buildTrackedLoadOptions = useCallback(
+    (preserveExisting: boolean): LoadQuotaOptions => ({
+      preserveExisting,
+      onStart: () => {
+        const startedAt = Date.now();
+        setQuotaRefreshMeta(config.type, (prev) => ({
+          signature: autoRefreshSignature,
+          lastStartedAt: startedAt,
+          lastCompletedAt:
+            prev.signature === autoRefreshSignature ? prev.lastCompletedAt : null
+        }));
+      },
+      onComplete: () => {
+        const completedAt = Date.now();
+        setQuotaRefreshMeta(config.type, (prev) => ({
+          signature: autoRefreshSignature,
+          lastStartedAt: prev.lastStartedAt ?? completedAt,
+          lastCompletedAt: completedAt
+        }));
+      }
+    }),
+    [autoRefreshSignature, config.type, setQuotaRefreshMeta]
+  );
+
+  const refreshAutoQuota = useCallback(
+    (preserveExisting: boolean) => {
+      if (!autoRefreshSignature || filteredFiles.length === 0) {
+        return Promise.resolve(false);
+      }
+      return loadQuota(
+        filteredFiles,
+        'all',
+        setLoading,
+        buildTrackedLoadOptions(preserveExisting)
+      );
+    },
+    [autoRefreshSignature, buildTrackedLoadOptions, filteredFiles, loadQuota, setLoading]
+  );
 
   const handleRefresh = useCallback(() => {
     pendingQuotaRefreshRef.current = true;
@@ -188,8 +257,28 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     const scope = effectiveViewMode === 'all' ? 'all' : 'page';
     const targets = effectiveViewMode === 'all' ? filteredFiles : pageItems;
     if (targets.length === 0) return;
-    loadQuota(targets, scope, setLoading);
-  }, [loading, effectiveViewMode, filteredFiles, pageItems, loadQuota, setLoading]);
+    const shouldTrackRefresh =
+      autoRefreshOnReady &&
+      scope === 'all' &&
+      targets.length === filteredFiles.length;
+    void loadQuota(
+      targets,
+      scope,
+      setLoading,
+      shouldTrackRefresh
+        ? buildTrackedLoadOptions(true)
+        : { preserveExisting: true }
+    );
+  }, [
+    autoRefreshOnReady,
+    buildTrackedLoadOptions,
+    effectiveViewMode,
+    filteredFiles,
+    loadQuota,
+    loading,
+    pageItems,
+    setLoading
+  ]);
 
   useEffect(() => {
     if (loading) return;
@@ -209,29 +298,78 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     });
   }, [filteredFiles, loading, setQuota]);
 
-  const autoRefreshSignature = useMemo(
-    () => filteredFiles.map((file) => file.name).join('|'),
-    [filteredFiles]
-  );
-
   useEffect(() => {
     if (!autoRefreshOnReady) return;
     if (disabled || loading || sectionLoading) return;
     if (!autoRefreshSignature || filteredFiles.length === 0) return;
-    if (autoRefreshSignatureRef.current === autoRefreshSignature) return;
 
-    autoRefreshSignatureRef.current = autoRefreshSignature;
-    loadQuota(filteredFiles, 'all', setLoading);
+    const signatureChanged = quotaRefreshMeta?.signature !== autoRefreshSignature;
+    const lastCompletedAt = quotaRefreshMeta?.lastCompletedAt ?? null;
+    const missingSessionRefresh = !lastCompletedAt;
+    const stale =
+      lastCompletedAt !== null && Date.now() - lastCompletedAt >= AUTO_REFRESH_INTERVAL_MS;
+
+    if (!signatureChanged && !missingSessionRefresh && !stale && hasAnyExistingQuota) {
+      return;
+    }
+
+    void refreshAutoQuota(hasAnyExistingQuota);
   }, [
     autoRefreshOnReady,
     autoRefreshSignature,
     disabled,
     filteredFiles,
-    loadQuota,
+    hasAnyExistingQuota,
     loading,
+    quotaRefreshMeta,
+    refreshAutoQuota,
     sectionLoading,
-    setLoading
   ]);
+
+  useEffect(() => {
+    if (!autoRefreshOnReady) return;
+    if (disabled || loading || filteredFiles.length === 0 || !autoRefreshSignature) return;
+
+    const refreshIfStale = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (disabledRef.current || filesLoadingRef.current || sectionLoadingRef.current) return;
+
+      const meta = quotaRefreshMetaRef.current;
+      if (!meta?.lastCompletedAt || meta.signature !== autoRefreshSignature) return;
+      if (Date.now() - meta.lastCompletedAt < AUTO_REFRESH_INTERVAL_MS) return;
+
+      void refreshAutoQuota(true);
+    };
+
+    const intervalId = window.setInterval(refreshIfStale, AUTO_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [
+    autoRefreshOnReady,
+    autoRefreshSignature,
+    disabled,
+    filteredFiles.length,
+    loading,
+    refreshAutoQuota
+  ]);
+
+  useEffect(() => {
+    if (!autoRefreshOnReady) return;
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (disabledRef.current || filesLoadingRef.current || sectionLoadingRef.current) return;
+
+      const meta = quotaRefreshMetaRef.current;
+      if (!meta?.lastCompletedAt || meta.signature !== autoRefreshSignature) return;
+      if (Date.now() - meta.lastCompletedAt < AUTO_REFRESH_INTERVAL_MS) return;
+
+      void refreshAutoQuota(true);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [autoRefreshOnReady, autoRefreshSignature, refreshAutoQuota]);
 
   const refreshQuotaForFile = useCallback(
     async (file: AuthFileItem) => {

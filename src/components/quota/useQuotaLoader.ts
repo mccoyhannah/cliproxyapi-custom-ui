@@ -23,6 +23,13 @@ interface LoadQuotaResult<TData> {
   errorStatus?: number;
 }
 
+export interface LoadQuotaOptions {
+  preserveExisting?: boolean;
+  silent?: boolean;
+  onStart?: () => void;
+  onComplete?: () => void;
+}
+
 export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>) {
   const { t } = useTranslation();
   const quota = useQuotaStore(config.storeSelector);
@@ -37,20 +44,31 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
     async (
       targets: AuthFileItem[],
       scope: QuotaScope,
-      setLoading: (loading: boolean, scope?: QuotaScope | null) => void
-    ) => {
-      if (loadingRef.current) return;
+      setLoading: (loading: boolean, scope?: QuotaScope | null) => void,
+      options: LoadQuotaOptions = {}
+    ): Promise<boolean> => {
+      if (loadingRef.current || targets.length === 0) return false;
+
       loadingRef.current = true;
       const requestId = ++requestIdRef.current;
-      setLoading(true, scope);
+      options.onStart?.();
+      if (!options.silent) {
+        setLoading(true, scope);
+      }
 
       try {
-        if (targets.length === 0) return;
-
         setQuota((prev) => {
           const nextState = { ...prev };
           targets.forEach((file) => {
-            nextState[file.name] = config.buildLoadingState();
+            const currentStatus = (nextState[file.name] as { status?: unknown } | undefined)
+              ?.status;
+            if (
+              !options.preserveExisting ||
+              !nextState[file.name] ||
+              currentStatus === 'idle'
+            ) {
+              nextState[file.name] = config.buildLoadingState();
+            }
           });
           return nextState;
         });
@@ -68,7 +86,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           })
         );
 
-        if (requestId !== requestIdRef.current) return;
+        if (requestId !== requestIdRef.current) return false;
 
         setQuota((prev) => {
           const nextState = { ...prev };
@@ -84,9 +102,13 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           });
           return nextState;
         });
+        return true;
       } finally {
         if (requestId === requestIdRef.current) {
-          setLoading(false);
+          options.onComplete?.();
+          if (!options.silent) {
+            setLoading(false);
+          }
           loadingRef.current = false;
         }
       }
