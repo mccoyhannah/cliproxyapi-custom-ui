@@ -76,6 +76,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  border-radius: var(--radius-card);
 
   @include mobile {
     flex: 0 0 auto;
@@ -154,9 +155,9 @@
   gap: 8px;
   flex: 1 1 100%;
   padding: 8px 10px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: $radius-md;
+  background: var(--surface-panel);
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  border-radius: var(--radius-card);
 }
 
 .filterChipGroup {
@@ -315,12 +316,12 @@
 }
 
 .logPanel {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--bg-secondary) 72%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  border-radius: var(--radius-card);
   flex: 1 1 auto;
   min-height: 280px;
-  max-height: calc(100vh - 320px);
+  max-height: min(760px, calc(100vh - 300px));
   height: auto;
   overflow: auto;
   resize: vertical;
@@ -430,7 +431,7 @@
   grid-template-columns: 170px 1fr;
   gap: $spacing-md;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
   border-left: 3px solid transparent;
   cursor: copy;
   font-family:
@@ -441,7 +442,7 @@
   color: var(--text-primary);
 
   &:hover {
-    background: rgba($primary-color, 0.06);
+    background: color-mix(in srgb, var(--primary-color) 6%, transparent);
   }
 
   @include tablet {

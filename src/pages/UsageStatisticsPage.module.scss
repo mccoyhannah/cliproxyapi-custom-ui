@@ -58,16 +58,8 @@
 
 .metricsGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: $spacing-md;
-
-  @media (max-width: 1280px) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  @media (max-width: $breakpoint-tablet) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 188px), 1fr));
+  gap: 14px;
 
   @include mobile {
     grid-template-columns: 1fr;
@@ -81,8 +73,8 @@
   gap: $spacing-md;
   min-width: 0;
   min-height: 136px;
-  padding: 16px;
-  border-radius: 8px;
+  padding: 15px;
+  border-radius: var(--radius-card);
   overflow: hidden;
 
   &::before {
@@ -90,8 +82,8 @@
     position: absolute;
     inset: 0 0 auto;
     height: 3px;
-    background: linear-gradient(90deg, var(--primary-color), var(--success-color), var(--warning-color));
-    opacity: 0.72;
+    background: linear-gradient(90deg, var(--primary-color), color-mix(in srgb, var(--success-color) 72%, var(--primary-color)));
+    opacity: 0.58;
   }
 }
 
@@ -148,7 +140,7 @@
 
 .chartCard {
   min-width: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .chartHeader {
@@ -200,9 +192,9 @@
   align-items: center;
   width: 100%;
   padding: 9px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-secondary);
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--surface-control);
   color: var(--text-primary);
   cursor: pointer;
   transition:
@@ -212,7 +204,7 @@
 
   &:hover {
     border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
-    background: color-mix(in srgb, var(--primary-color) 5%, var(--bg-secondary));
+    background: var(--surface-control-hover);
     transform: translateY(-1px);
   }
 
@@ -305,7 +297,7 @@
   align-items: flex-end;
   justify-content: center;
   min-height: 150px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background:
     repeating-linear-gradient(
       to top,
@@ -313,7 +305,7 @@
       transparent 29px,
       color-mix(in srgb, var(--border-color) 45%, transparent) 30px
     ),
-    var(--bg-secondary);
+    var(--surface-control);
 }
 
 .stackedBarFill {

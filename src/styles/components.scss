@@ -8,12 +8,30 @@
   gap: $spacing-sm;
   border: 1px solid transparent;
   border-radius: $radius-md;
-  padding: 10px 14px;
+  min-height: var(--control-height);
+  padding: 9px 14px;
   font-weight: 600;
+  font-size: 14px;
+  line-height: 1.2;
   cursor: pointer;
-  transition: all $transition-fast;
-  background-color: var(--bg-secondary);
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast,
+    color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+  background-color: var(--surface-control);
   color: var(--text-primary);
+  box-shadow: var(--shadow-control);
+
+  > span {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+  }
 
   &.btn-primary {
     background-color: var(--primary-color);
@@ -23,17 +41,19 @@
     &:hover {
       background-color: var(--primary-hover);
       border-color: var(--primary-hover);
+      transform: translateY(-1px);
     }
   }
 
   &.btn-secondary {
-    background-color: var(--bg-tertiary);
-    border-color: var(--border-color);
+    background-color: var(--surface-control);
+    border-color: color-mix(in srgb, var(--border-color) 84%, transparent);
     color: var(--text-primary);
 
     &:hover {
-      background-color: var(--bg-hover, var(--bg-tertiary));
+      background-color: var(--surface-control-hover);
       border-color: var(--border-hover);
+      transform: translateY(-1px);
     }
   }
 
@@ -44,7 +64,7 @@
 
     &:hover {
       color: var(--text-primary);
-      background: var(--bg-tertiary);
+      background: color-mix(in srgb, var(--text-primary) 7%, transparent);
     }
   }
 
@@ -55,6 +75,7 @@
 
     &:hover {
       background-color: color.adjust($error-color, $lightness: -5%);
+      transform: translateY(-1px);
     }
   }
 
@@ -63,13 +84,24 @@
   }
 
   &.btn-sm {
-    padding: 8px 10px;
-    font-size: 14px;
+    min-height: var(--control-height-sm);
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-control), var(--focus-ring);
   }
 
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
   }
 }
 
@@ -87,17 +119,32 @@
 .input,
 textarea {
   width: 100%;
-  border: 1px solid var(--border-color);
+  min-height: var(--control-height);
+  border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
   border-radius: $radius-md;
-  padding: 10px 12px;
-  background-color: var(--bg-secondary);
+  padding: 9px 12px;
+  background-color: var(--surface-control);
   color: var(--text-primary);
-  transition: border-color $transition-fast, box-shadow $transition-fast;
+  box-shadow: var(--shadow-control);
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast,
+    background-color $transition-fast;
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background-color: var(--surface-control-hover);
+  }
 
   &:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba($primary-color, 0.18);
+    box-shadow: var(--shadow-control), var(--focus-ring);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.62;
   }
 }
 
@@ -119,11 +166,15 @@ textarea {
 }
 
 .card {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: $radius-lg;
+  background-color: var(--surface-card);
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow);
-  padding: $spacing-lg;
+  padding: 18px;
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    box-shadow $transition-fast;
 }
 
 .card-header {
@@ -145,6 +196,17 @@ textarea {
     font-weight: 700;
     color: var(--text-primary);
   }
+}
+
+.error-box {
+  margin-top: 6px;
+  padding: 7px 9px;
+  border-radius: $radius-md;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 38%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 10%, var(--bg-primary));
+  color: var(--danger-color);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .status-badge {

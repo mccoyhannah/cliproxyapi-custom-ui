@@ -11,6 +11,11 @@
   --bg-hover: var(--bg-tertiary);
   --bg-quinary: #f9faf7;
   --bg-error-light: rgba(209, 67, 67, 0.1);
+  --surface-card: color-mix(in srgb, var(--bg-primary) 88%, var(--bg-secondary));
+  --surface-card-hover: color-mix(in srgb, var(--bg-primary) 96%, var(--primary-color) 2%);
+  --surface-panel: color-mix(in srgb, var(--bg-primary) 78%, var(--bg-secondary));
+  --surface-control: color-mix(in srgb, var(--bg-primary) 88%, var(--bg-secondary));
+  --surface-control-hover: color-mix(in srgb, var(--bg-primary) 94%, var(--primary-color) 3%);
   --floating-surface: #ffffff;
   --floating-border: #d6ddd4;
   --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
@@ -55,8 +60,14 @@
 
   --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
   --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
+  --shadow-control: 0 1px 1px rgb(0 0 0 / 0.04);
+  --shadow-card: 0 14px 38px -32px rgb(0 0 0 / 0.45);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+  --control-height: 38px;
+  --control-height-sm: 32px;
 
   --radius-md: 8px;
+  --radius-card: 8px;
   --accent-tertiary: var(--bg-tertiary);
 
   // Glass effect (blurred surfaces)
@@ -76,6 +87,11 @@
   --bg-hover: var(--bg-tertiary);
   --bg-quinary: #ffffff;
   --bg-error-light: rgba(209, 67, 67, 0.08);
+  --surface-card: color-mix(in srgb, var(--bg-primary) 92%, var(--bg-secondary));
+  --surface-card-hover: color-mix(in srgb, var(--bg-primary) 97%, var(--primary-color) 2%);
+  --surface-panel: color-mix(in srgb, var(--bg-primary) 82%, var(--bg-secondary));
+  --surface-control: color-mix(in srgb, var(--bg-primary) 92%, var(--bg-secondary));
+  --surface-control-hover: color-mix(in srgb, var(--bg-primary) 96%, var(--primary-color) 2%);
   --floating-surface: #ffffff;
   --floating-border: #d7dfd4;
   --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
@@ -120,8 +136,14 @@
 
   --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
   --shadow-lg: 0 10px 18px -3px rgb(0 0 0 / 0.1);
+  --shadow-control: 0 1px 1px rgb(0 0 0 / 0.04);
+  --shadow-card: 0 14px 38px -32px rgb(0 0 0 / 0.42);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+  --control-height: 38px;
+  --control-height-sm: 32px;
 
   --radius-md: 8px;
+  --radius-card: 8px;
   --accent-tertiary: var(--bg-tertiary);
 }
 
@@ -134,6 +156,11 @@
   --bg-hover: #26312b;
   --bg-quinary: #121815;
   --bg-error-light: rgba(209, 67, 67, 0.2);
+  --surface-card: color-mix(in srgb, var(--bg-primary) 88%, #0b0f0d);
+  --surface-card-hover: color-mix(in srgb, var(--bg-primary) 94%, var(--primary-color) 3%);
+  --surface-panel: color-mix(in srgb, var(--bg-primary) 76%, var(--bg-secondary));
+  --surface-control: color-mix(in srgb, var(--bg-primary) 84%, var(--bg-secondary));
+  --surface-control-hover: color-mix(in srgb, var(--bg-primary) 90%, var(--primary-color) 5%);
   --floating-surface: #1f2823;
   --floating-border: #34443c;
   --floating-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
@@ -152,7 +179,7 @@
   --primary-color: #2dd4bf;
   --primary-hover: #5eead4;
   --primary-active: #99f6e4;
-  --primary-contrast: #ffffff;
+  --primary-contrast: #06201c;
 
   --success-color: #10b981;
   --quota-medium-color: #facc15;
@@ -178,8 +205,14 @@
 
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3);
+  --shadow-control: 0 1px 1px rgb(0 0 0 / 0.18);
+  --shadow-card: 0 16px 42px -34px rgb(0 0 0 / 0.72);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary-color) 24%, transparent);
+  --control-height: 38px;
+  --control-height-sm: 32px;
 
   --radius-md: 8px;
+  --radius-card: 8px;
   --accent-tertiary: var(--bg-tertiary);
 
   --glass-border: color-mix(in srgb, var(--border-color) 55%, transparent);
