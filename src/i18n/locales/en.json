@@ -942,8 +942,8 @@
   "stats": {
     "success": "Success",
     "failure": "Failure",
-    "recent_success": "Recent OK",
-    "recent_failure": "Recent Failed"
+    "recent_success": "OK",
+    "recent_failure": "Failed"
   },
   "status_bar": {
     "success_short": "✓",

@@ -942,8 +942,8 @@
   "stats": {
     "success": "成功",
     "failure": "失败",
-    "recent_success": "近期成功",
-    "recent_failure": "近期失败"
+    "recent_success": "成功",
+    "recent_failure": "失败"
   },
   "status_bar": {
     "success_short": "✓",

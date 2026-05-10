@@ -913,9 +913,9 @@
 }
 
 .stateBadgeWarning {
-  color: var(--warning-text);
-  background: var(--warning-bg);
-  border: 1px solid var(--warning-border);
+  color: color-mix(in srgb, var(--warning-text) 84%, var(--text-secondary));
+  background: color-mix(in srgb, var(--warning-bg) 44%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-border) 60%, transparent);
 }
 
 .stateBadgeDisabled {
@@ -1076,6 +1076,37 @@
 .messageIcon {
   flex-shrink: 0;
   margin-top: 1px;
+}
+
+.statusWarningIndicator {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--warning-text) 76%, var(--text-tertiary));
+  background: color-mix(in srgb, var(--warning-bg) 34%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-border) 46%, transparent);
+  opacity: 0.78;
+  cursor: help;
+  transition:
+    opacity $transition-fast,
+    border-color $transition-fast,
+    background-color $transition-fast;
+
+  .messageIcon {
+    margin-top: 0;
+  }
+
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    background: color-mix(in srgb, var(--warning-bg) 58%, transparent);
+    border-color: color-mix(in srgb, var(--warning-border) 72%, transparent);
+    outline: none;
+  }
 }
 
 .cardInsights {
