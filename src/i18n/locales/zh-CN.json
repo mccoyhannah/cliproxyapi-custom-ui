@@ -530,6 +530,8 @@
     "priority_display": "优先级",
     "priority_save_success": "已将 \"{{name}}\" 的优先级设为 {{priority}}",
     "priority_invalid": "优先级必须是整数",
+    "priority_decrease": "降低优先级",
+    "priority_increase": "提高优先级",
     "page_size_label": "单页数量",
     "page_size_unit": "个/页",
     "view_mode_paged": "按页显示",

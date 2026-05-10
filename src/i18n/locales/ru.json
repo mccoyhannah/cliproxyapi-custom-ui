@@ -530,6 +530,8 @@
     "priority_display": "Приоритет",
     "priority_save_success": "Приоритет для \"{{name}}\" установлен на {{priority}}",
     "priority_invalid": "Приоритет должен быть целым числом",
+    "priority_decrease": "Понизить приоритет",
+    "priority_increase": "Повысить приоритет",
     "page_size_label": "На странице",
     "page_size_unit": "элементов",
     "view_mode_paged": "Постранично",

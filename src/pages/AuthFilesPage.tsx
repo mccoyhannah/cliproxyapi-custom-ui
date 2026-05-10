@@ -49,6 +49,7 @@ import { useAuthFilesModels } from '@/features/authFiles/hooks/useAuthFilesModel
 import { useAuthFilesOauth } from '@/features/authFiles/hooks/useAuthFilesOauth';
 import { useAuthFilesPrefixProxyEditor } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
 import { useAuthFilesStatusBarCache } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
+import { useCodexSubscriptionSnapshots } from '@/features/authFiles/hooks/useCodexSubscriptionSnapshots';
 import {
   isAuthFilesSortMode,
   readAuthFilesUiState,
@@ -440,6 +441,7 @@ export function AuthFilesPage() {
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
   const pageItems = sorted.slice(start, start + pageSize);
+  const codexSubscriptionSnapshots = useCodexSubscriptionSnapshots(pageItems);
   const selectablePageItems = useMemo(
     () => pageItems.filter((file) => !isRuntimeOnlyAuthFile(file)),
     [pageItems]
@@ -889,6 +891,7 @@ export function AuthFilesPage() {
                     statusUpdating={statusUpdating}
                     quotaFilterType={quotaFilterType}
                     statusBarCache={statusBarCache}
+                    codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     priorityUpdating={priorityUpdating}
                     onShowModels={showModels}
                     onDownload={handleDownload}

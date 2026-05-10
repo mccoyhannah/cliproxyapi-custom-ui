@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
 import type { AuthFileItem } from '@/types';
-import { resolveAuthProvider } from '@/utils/quota';
+import { resolveAuthProvider, type CodexSubscriptionSnapshot } from '@/utils/quota';
 import {
   normalizeRecentRequestAuthIndex,
   normalizeRecentRequestBuckets,
@@ -49,6 +49,7 @@ export type AuthFileCardProps = {
   priorityUpdating: Record<string, boolean>;
   quotaFilterType: QuotaProviderType | null;
   statusBarCache: Map<string, AuthFileStatusBarData>;
+  codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   onShowModels: (file: AuthFileItem) => void;
   onDownload: (name: string) => void;
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
@@ -78,6 +79,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     priorityUpdating,
     quotaFilterType,
     statusBarCache,
+    codexSubscriptionSnapshot,
     onShowModels,
     onDownload,
     onOpenPrefixProxyEditor,
@@ -141,6 +143,26 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const prioritySaving = priorityUpdating[file.name] === true;
+  const [referenceTimeMs] = useState(() => Date.now());
+  const visibleCodexSubscription =
+    resolveQuotaType(file) === 'codex' &&
+    codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
+    codexSubscriptionSnapshot.subscriptionActiveUntil
+      ? codexSubscriptionSnapshot
+      : null;
+  const subscriptionWarningMs = 7 * 24 * 60 * 60 * 1000;
+  const subscriptionExpiryClass =
+    visibleCodexSubscription?.subscriptionActiveUntilMs !== null &&
+    visibleCodexSubscription?.subscriptionActiveUntilMs !== undefined &&
+    visibleCodexSubscription.subscriptionActiveUntilMs <= referenceTimeMs
+      ? styles.subscriptionExpiryExpired
+      : visibleCodexSubscription?.subscriptionActiveUntilMs !== null &&
+          visibleCodexSubscription?.subscriptionActiveUntilMs !== undefined &&
+          visibleCodexSubscription.subscriptionActiveUntilMs - referenceTimeMs <=
+            subscriptionWarningMs
+        ? styles.subscriptionExpiryWarning
+        : styles.subscriptionExpiryHealthy;
+  const subscriptionExpiryLabel = visibleCodexSubscription?.subscriptionActiveUntil ?? '';
 
   const setPriorityInput = (value: string) => {
     setPriorityDraft({ fileName: file.name, value, dirty: true });
@@ -148,6 +170,17 @@ export function AuthFileCard(props: AuthFileCardProps) {
 
   const resetPriorityInput = () => {
     setPriorityDraft({ fileName: file.name, value: currentPriorityText, dirty: false });
+  };
+
+  const savePriorityValue = (nextPriority: number) => {
+    const currentPriority = priorityValue ?? 0;
+    if (nextPriority === currentPriority) {
+      resetPriorityInput();
+      return;
+    }
+
+    setPriorityDraft({ fileName: file.name, value: String(nextPriority), dirty: false });
+    void onPriorityChange(file, nextPriority);
   };
 
   const commitPriorityInput = () => {
@@ -160,13 +193,13 @@ export function AuthFileCard(props: AuthFileCardProps) {
       return;
     }
 
-    const currentPriority = priorityValue ?? 0;
-    if (nextPriority === currentPriority) {
-      resetPriorityInput();
-      return;
-    }
+    savePriorityValue(nextPriority);
+  };
 
-    void onPriorityChange(file, nextPriority);
+  const stepPriorityInput = (delta: number) => {
+    const draftPriority = parsePriorityValue(priorityInput.trim());
+    const basePriority = draftPriority ?? priorityValue ?? 0;
+    savePriorityValue(basePriority + delta);
   };
 
   const handlePriorityKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -286,21 +319,55 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 <label className={styles.metaLabel} htmlFor={priorityInputId}>
                   {t('auth_files.priority_display')}
                 </label>
-                <input
-                  id={priorityInputId}
-                  className={styles.priorityInlineInput}
-                  type="number"
-                  step={1}
-                  inputMode="numeric"
-                  value={priorityInput}
-                  onChange={(event) => setPriorityInput(event.currentTarget.value)}
-                  onBlur={commitPriorityInput}
-                  onKeyDown={handlePriorityKeyDown}
-                  disabled={disableControls || prioritySaving}
-                  aria-label={t('auth_files.priority_display')}
-                  title={t('auth_files.priority_hint')}
-                />
+                <div className={styles.priorityStepper}>
+                  <button
+                    type="button"
+                    className={styles.priorityStepButton}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => stepPriorityInput(-1)}
+                    disabled={disableControls || prioritySaving}
+                    aria-label={t('auth_files.priority_decrease')}
+                    title={t('auth_files.priority_decrease')}
+                  >
+                    -
+                  </button>
+                  <input
+                    id={priorityInputId}
+                    className={styles.priorityStepperInput}
+                    type="text"
+                    inputMode="numeric"
+                    value={priorityInput}
+                    onChange={(event) => setPriorityInput(event.currentTarget.value)}
+                    onBlur={commitPriorityInput}
+                    onKeyDown={handlePriorityKeyDown}
+                    disabled={disableControls || prioritySaving}
+                    aria-label={t('auth_files.priority_display')}
+                    title={t('auth_files.priority_hint')}
+                  />
+                  <button
+                    type="button"
+                    className={styles.priorityStepButton}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => stepPriorityInput(1)}
+                    disabled={disableControls || prioritySaving}
+                    aria-label={t('auth_files.priority_increase')}
+                    title={t('auth_files.priority_increase')}
+                  >
+                    +
+                  </button>
+                </div>
                 {prioritySaving && <LoadingSpinner size={12} />}
+              </div>
+            )}
+            {visibleCodexSubscription && (
+              <div className={`${styles.metaItem} ${styles.subscriptionExpiryMeta}`}>
+                <span className={styles.metaLabel}>{t('codex_quota.subscription_expiry_label')}</span>
+                <span
+                  className={`${styles.subscriptionExpiryPill} ${subscriptionExpiryClass}`}
+                  title={subscriptionExpiryLabel || undefined}
+                >
+                  {subscriptionExpiryLabel}
+                </span>
               </div>
             )}
           </div>
