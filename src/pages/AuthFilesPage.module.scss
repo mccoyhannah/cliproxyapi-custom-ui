@@ -794,15 +794,60 @@
 }
 
 .fileCardDisabled {
-  background-color: color-mix(in srgb, var(--bg-primary) 78%, var(--bg-secondary));
-  border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
+  background-color: color-mix(in srgb, var(--bg-secondary) 74%, var(--bg-primary));
+  border-color: color-mix(in srgb, var(--text-tertiary) 36%, var(--border-color));
+  border-style: dashed;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--text-tertiary) 28%, transparent);
 
   .providerAvatar,
-  .cardHeaderContent,
+  .typeBadge,
+  .fileName,
+  .noteText,
   .cardMeta,
-  .healthStatusMessage,
+  .healthStatusMessage {
+    filter: grayscale(0.86) saturate(0.28);
+    opacity: 0.58;
+  }
+
   .cardInsights {
-    opacity: 0.72;
+    filter: grayscale(0.76) saturate(0.42);
+    opacity: 0.66;
+  }
+
+  .providerAvatar {
+    background-color: color-mix(in srgb, var(--bg-tertiary) 88%, transparent) !important;
+    border-color: color-mix(in srgb, var(--border-color) 90%, transparent) !important;
+  }
+
+  .typeBadge {
+    background-color: color-mix(in srgb, var(--bg-tertiary) 86%, transparent) !important;
+    color: var(--text-tertiary) !important;
+    border-color: color-mix(in srgb, var(--border-color) 84%, transparent) !important;
+  }
+
+  .fileName {
+    color: color-mix(in srgb, var(--text-secondary) 76%, var(--text-tertiary));
+    font-weight: 700;
+  }
+
+  .metaLabel,
+  .metaValue,
+  .statusPanelLabel {
+    color: color-mix(in srgb, var(--text-tertiary) 88%, transparent);
+  }
+
+  .statPill {
+    background: color-mix(in srgb, var(--bg-tertiary) 72%, transparent);
+    color: color-mix(in srgb, var(--text-secondary) 80%, var(--text-tertiary));
+  }
+
+  .statusBlock:not(.statusBlockIdle) {
+    background-color: color-mix(in srgb, var(--text-tertiary) 30%, var(--border-color));
+  }
+
+  .statusRate {
+    color: color-mix(in srgb, var(--text-secondary) 74%, var(--text-tertiary));
+    background: color-mix(in srgb, var(--bg-tertiary) 78%, transparent);
   }
 
   .cardSelection,
@@ -812,8 +857,8 @@
 
   &:hover {
     transform: none;
-    box-shadow: none;
-    border-color: var(--border-color);
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--text-tertiary) 28%, transparent);
+    border-color: color-mix(in srgb, var(--text-tertiary) 42%, var(--border-color));
   }
 }
 
@@ -1054,9 +1099,10 @@
 }
 
 .stateBadgeDisabled {
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--bg-tertiary) 86%, transparent);
-  border: 1px solid var(--border-color);
+  color: color-mix(in srgb, var(--text-secondary) 86%, var(--text-primary));
+  background: color-mix(in srgb, var(--bg-tertiary) 96%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--text-tertiary) 34%, var(--border-color));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg-primary) 42%, transparent);
 }
 
 .stateBadgeVirtual {
