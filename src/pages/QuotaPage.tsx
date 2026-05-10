@@ -72,6 +72,14 @@ export function QuotaPage() {
       {error && <div className={styles.errorBox}>{error}</div>}
 
       <QuotaSection
+        config={CODEX_CONFIG}
+        files={files}
+        loading={loading}
+        disabled={disableControls}
+        defaultViewMode="all"
+        autoRefreshOnReady
+      />
+      <QuotaSection
         config={CLAUDE_CONFIG}
         files={files}
         loading={loading}
@@ -79,12 +87,6 @@ export function QuotaPage() {
       />
       <QuotaSection
         config={ANTIGRAVITY_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-      />
-      <QuotaSection
-        config={CODEX_CONFIG}
         files={files}
         loading={loading}
         disabled={disableControls}

@@ -11,15 +11,18 @@ import {
   getTypeLabel,
   hasAuthFileStatusMessage,
   isRuntimeOnlyAuthFile,
+  parsePriorityValue,
 } from '@/features/authFiles/constants';
 
 type DeleteAllOptions = {
   filter: string;
   problemOnly: boolean;
   disabledOnly: boolean;
+  enabledOnly: boolean;
   onResetFilterToAll: () => void;
   onResetProblemOnly: () => void;
   onResetDisabledOnly: () => void;
+  onResetEnabledOnly: () => void;
 };
 
 export type UseAuthFilesDataResult = {
@@ -33,6 +36,8 @@ export type UseAuthFilesDataResult = {
   deletingAll: boolean;
   statusUpdating: Record<string, boolean>;
   batchStatusUpdating: boolean;
+  priorityUpdating: Record<string, boolean>;
+  batchPriorityUpdating: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   loadFiles: () => Promise<void>;
   handleUploadClick: () => void;
@@ -41,12 +46,14 @@ export type UseAuthFilesDataResult = {
   handleDeleteAll: (options: DeleteAllOptions) => void;
   handleDownload: (name: string) => Promise<void>;
   handleStatusToggle: (item: AuthFileItem, enabled: boolean) => Promise<void>;
+  handlePriorityChange: (item: AuthFileItem, priority: number) => Promise<void>;
   toggleSelect: (name: string) => void;
   selectAllVisible: (visibleFiles: AuthFileItem[]) => void;
   invertVisibleSelection: (visibleFiles: AuthFileItem[]) => void;
   deselectAll: () => void;
   batchDownload: (names: string[]) => Promise<void>;
   batchSetStatus: (names: string[], enabled: boolean) => Promise<void>;
+  batchSetPriority: (names: string[], priority: number) => Promise<void>;
   batchDelete: (names: string[]) => void;
 };
 
@@ -62,10 +69,13 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [deletingAll, setDeletingAll] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
   const [batchStatusUpdating, setBatchStatusUpdating] = useState(false);
+  const [priorityUpdating, setPriorityUpdating] = useState<Record<string, boolean>>({});
+  const [batchPriorityUpdating, setBatchPriorityUpdating] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const batchStatusPendingRef = useRef(false);
+  const batchPriorityPendingRef = useRef(false);
   const selectionCount = selectedFiles.size;
   const toggleSelect = useCallback((name: string) => {
     setSelectedFiles((prev) => {
@@ -275,16 +285,20 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         filter,
         problemOnly,
         disabledOnly,
+        enabledOnly,
         onResetFilterToAll,
         onResetProblemOnly,
         onResetDisabledOnly,
+        onResetEnabledOnly,
       } = deleteAllOptions;
       const isFiltered = filter !== 'all';
       const isProblemOnly = problemOnly === true;
       const isDisabledOnly = disabledOnly === true;
+      const isEnabledOnly = enabledOnly === true;
+      const isStatusFiltered = isDisabledOnly || isEnabledOnly;
       const typeLabel = isFiltered ? getTypeLabel(t, filter) : t('auth_files.filter_all');
       let confirmMessage = t('auth_files.delete_all_confirm');
-      if (isDisabledOnly) {
+      if (isStatusFiltered) {
         confirmMessage = t('auth_files.delete_filtered_result_confirm');
       } else if (isProblemOnly) {
         confirmMessage = isFiltered
@@ -302,7 +316,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         onConfirm: async () => {
           setDeletingAll(true);
           try {
-            if (!isFiltered && !isProblemOnly && !isDisabledOnly) {
+            if (!isFiltered && !isProblemOnly && !isStatusFiltered) {
               await authFilesApi.deleteAll();
               showNotification(t('auth_files.delete_all_success'), 'success');
               setFiles((prev) => prev.filter((file) => isRuntimeOnlyAuthFile(file)));
@@ -313,12 +327,13 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
                 if (isFiltered && file.type !== filter) return false;
                 if (isProblemOnly && !hasAuthFileStatusMessage(file)) return false;
                 if (isDisabledOnly && file.disabled !== true) return false;
+                if (isEnabledOnly && file.disabled === true) return false;
                 return true;
               });
 
               if (filesToDelete.length === 0) {
                 let emptyMessage = t('auth_files.delete_filtered_none', { type: typeLabel });
-                if (isDisabledOnly) {
+                if (isStatusFiltered) {
                   emptyMessage = t('auth_files.delete_filtered_result_none');
                 } else if (isProblemOnly) {
                   emptyMessage = isFiltered
@@ -338,7 +353,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
 
               applyDeletedFiles(result.files);
 
-              if (failed === 0 && isDisabledOnly) {
+              if (failed === 0 && isStatusFiltered) {
                 showNotification(
                   t('auth_files.delete_filtered_result_success', { count: success }),
                   'success'
@@ -358,7 +373,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
                   t('auth_files.delete_filtered_success', { count: success, type: typeLabel }),
                   'success'
                 );
-              } else if (isDisabledOnly) {
+              } else if (isStatusFiltered) {
                 showNotification(
                   t('auth_files.delete_filtered_result_partial', { success, failed }),
                   'warning'
@@ -389,6 +404,9 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
               }
               if (isDisabledOnly) {
                 onResetDisabledOnly();
+              }
+              if (isEnabledOnly) {
+                onResetEnabledOnly();
               }
             }
           } catch (err: unknown) {
@@ -449,6 +467,38 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         showNotification(`${t('notification.update_failed')}: ${errorMessage}`, 'error');
       } finally {
         setStatusUpdating((prev) => {
+          if (!prev[name]) return prev;
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        });
+      }
+    },
+    [showNotification, t]
+  );
+
+  const handlePriorityChange = useCallback(
+    async (item: AuthFileItem, priority: number) => {
+      const name = item.name;
+      const previousPriority = parsePriorityValue(item.priority ?? item['priority']);
+      if (previousPriority === priority) return;
+
+      setPriorityUpdating((prev) => ({ ...prev, [name]: true }));
+      setFiles((prev) => prev.map((file) => (file.name === name ? { ...file, priority } : file)));
+
+      try {
+        await authFilesApi.patchFields(name, { priority });
+        showNotification(t('auth_files.priority_save_success', { name, priority }), 'success');
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : '';
+        setFiles((prev) =>
+          prev.map((file) =>
+            file.name === name ? { ...file, priority: item.priority ?? item['priority'] } : file
+          )
+        );
+        showNotification(`${t('notification.update_failed')}: ${errorMessage}`, 'error');
+      } finally {
+        setPriorityUpdating((prev) => {
           if (!prev[name]) return prev;
           const next = { ...prev };
           delete next[name];
@@ -551,6 +601,94 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     [deselectAll, files, showNotification, statusUpdating, t]
   );
 
+  const batchSetPriority = useCallback(
+    async (names: string[], priority: number) => {
+      if (batchPriorityPendingRef.current) return;
+
+      const uniqueNames = Array.from(new Set(names));
+      if (uniqueNames.length === 0) return;
+      if (uniqueNames.some((name) => priorityUpdating[name] === true)) return;
+
+      const originalPriorities = new Map(
+        files
+          .filter((file) => uniqueNames.includes(file.name))
+          .map((file) => [file.name, file.priority ?? file['priority']])
+      );
+      const targetNames = new Set(originalPriorities.keys());
+      const targetNameList = Array.from(targetNames);
+      if (targetNameList.length === 0) return;
+
+      batchPriorityPendingRef.current = true;
+      setBatchPriorityUpdating(true);
+      setPriorityUpdating((prev) => {
+        const next = { ...prev };
+        targetNameList.forEach((name) => {
+          next[name] = true;
+        });
+        return next;
+      });
+      setFiles((prev) =>
+        prev.map((file) => (targetNames.has(file.name) ? { ...file, priority } : file))
+      );
+
+      try {
+        const results = await Promise.allSettled(
+          targetNameList.map((name) => authFilesApi.patchFields(name, { priority }))
+        );
+
+        let successCount = 0;
+        let failCount = 0;
+        const failedNames = new Set<string>();
+
+        results.forEach((result, index) => {
+          const name = targetNameList[index];
+          if (result.status === 'fulfilled') {
+            successCount++;
+          } else {
+            failCount++;
+            failedNames.add(name);
+          }
+        });
+
+        setFiles((prev) =>
+          prev.map((file) =>
+            failedNames.has(file.name)
+              ? { ...file, priority: originalPriorities.get(file.name) }
+              : file
+          )
+        );
+
+        if (failCount === 0) {
+          showNotification(
+            t('auth_files.batch_priority_success', { count: successCount, priority }),
+            'success'
+          );
+        } else {
+          showNotification(
+            t('auth_files.batch_priority_partial', {
+              success: successCount,
+              failed: failCount,
+            }),
+            'warning'
+          );
+        }
+
+        deselectAll();
+      } finally {
+        batchPriorityPendingRef.current = false;
+        setBatchPriorityUpdating(false);
+        setPriorityUpdating((prev) => {
+          const next = { ...prev };
+          targetNameList.forEach((name) => {
+            delete next[name];
+          });
+          return next;
+        });
+      }
+    },
+    [deselectAll, files, priorityUpdating, showNotification, t]
+  );
+
   const batchDownload = useCallback(
     async (names: string[]) => {
       const uniqueNames = Array.from(new Set(names));
@@ -639,6 +777,8 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     deletingAll,
     statusUpdating,
     batchStatusUpdating,
+    priorityUpdating,
+    batchPriorityUpdating,
     fileInputRef,
     loadFiles,
     handleUploadClick,
@@ -647,12 +787,14 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     handleDeleteAll,
     handleDownload,
     handleStatusToggle,
+    handlePriorityChange,
     toggleSelect,
     selectAllVisible,
     invertVisibleSelection,
     deselectAll,
     batchDownload,
     batchSetStatus,
+    batchSetPriority,
     batchDelete,
   };
 }

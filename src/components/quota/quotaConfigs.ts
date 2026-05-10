@@ -17,6 +17,7 @@ import type {
   ClaudeUsagePayload,
   CodexRateLimitInfo,
   CodexQuotaState,
+  CodexSubscriptionStatus,
   CodexUsageWindow,
   CodexQuotaWindow,
   CodexUsagePayload,
@@ -50,6 +51,7 @@ import {
   normalizePlanType,
   normalizeQuotaFraction,
   normalizeStringValue,
+  parseIdTokenPayload,
   parseAntigravityPayload,
   parseClaudeUsagePayload,
   parseCodexUsagePayload,
@@ -398,10 +400,230 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
   return windows;
 };
 
+const formatDateValue = (value: unknown): string | null => {
+  if (value === undefined || value === null || typeof value === 'boolean') return null;
+
+  let date: Date | null = null;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const milliseconds = value > 1e12 ? value : value * 1000;
+    date = new Date(milliseconds);
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric) && /^\d+(\.\d+)?$/.test(trimmed)) {
+      const milliseconds = numeric > 1e12 ? numeric : numeric * 1000;
+      date = new Date(milliseconds);
+    } else {
+      date = new Date(trimmed);
+      if (Number.isNaN(date.getTime())) return trimmed;
+    }
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+};
+
+const parseDateMilliseconds = (value: unknown): number | null => {
+  if (value === undefined || value === null || typeof value === 'boolean') return null;
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value > 1e12 ? value : value * 1000;
+  }
+
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric) && /^\d+(\.\d+)?$/.test(trimmed)) {
+    return numeric > 1e12 ? numeric : numeric * 1000;
+  }
+
+  const parsed = new Date(trimmed).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const toRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readFirstDateField = (
+  record: Record<string, unknown> | null,
+  keys: readonly string[]
+): string | null => {
+  if (!record) return null;
+  for (const key of keys) {
+    const label = formatDateValue(record[key]);
+    if (label) return label;
+  }
+  return null;
+};
+
+const findNestedDateField = (
+  record: Record<string, unknown> | null,
+  keys: readonly string[],
+  containers: readonly string[],
+  depth = 0
+): string | null => {
+  if (!record || depth > 3) return null;
+  const direct = readFirstDateField(record, keys);
+  if (direct) return direct;
+
+  for (const container of containers) {
+    const nested = toRecord(record[container]);
+    const label = findNestedDateField(nested, keys, containers, depth + 1);
+    if (label) return label;
+  }
+
+  return null;
+};
+
+const CODEX_AUTH_EXPIRY_KEYS = [
+  'expired',
+  'expires_at',
+  'expiresAt',
+  'expiration',
+  'expiry',
+  'token_expires_at',
+  'tokenExpiresAt',
+] as const;
+
+const resolveCodexAuthExpiry = (file: AuthFileItem): string | null =>
+  findNestedDateField(toRecord(file), CODEX_AUTH_EXPIRY_KEYS, ['metadata', 'attributes']);
+
+const OPENAI_AUTH_CLAIM = 'https://api.openai.com/auth';
+const CODEX_SUBSCRIPTION_ACTIVE_UNTIL_KEYS = [
+  'chatgpt_subscription_active_until',
+  'chatgptSubscriptionActiveUntil',
+  'subscription_active_until',
+  'subscriptionActiveUntil',
+  'active_until',
+  'activeUntil',
+] as const;
+const CODEX_SUBSCRIPTION_LAST_CHECKED_KEYS = [
+  'chatgpt_subscription_last_checked',
+  'chatgptSubscriptionLastChecked',
+  'subscription_last_checked',
+  'subscriptionLastChecked',
+  'last_checked',
+  'lastChecked',
+] as const;
+
+type CodexSubscriptionSnapshot = {
+  subscriptionActiveUntil: string | null;
+  subscriptionActiveUntilMs: number | null;
+  subscriptionLastChecked: string | null;
+  subscriptionStatus: CodexSubscriptionStatus;
+  subscriptionStatusMessage: string | null;
+};
+
+const EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT: CodexSubscriptionSnapshot = {
+  subscriptionActiveUntil: null,
+  subscriptionActiveUntilMs: null,
+  subscriptionLastChecked: null,
+  subscriptionStatus: 'missing',
+  subscriptionStatusMessage: null,
+};
+
+const readFirstDateMeta = (
+  record: Record<string, unknown> | null,
+  keys: readonly string[]
+): { label: string | null; ms: number | null } => {
+  if (!record) return { label: null, ms: null };
+  for (const key of keys) {
+    const label = formatDateValue(record[key]);
+    if (!label) continue;
+    return { label, ms: parseDateMilliseconds(record[key]) };
+  }
+  return { label: null, ms: null };
+};
+
+const readCodexSubscriptionSnapshotFromRecord = (
+  record: Record<string, unknown> | null
+): CodexSubscriptionSnapshot | null => {
+  if (!record) return null;
+  const metadata = toRecord(record.metadata);
+  const attributes = toRecord(record.attributes);
+  const candidates = [
+    record.id_token,
+    record.idToken,
+    record['id_token'],
+    metadata?.id_token,
+    metadata?.idToken,
+    attributes?.id_token,
+    attributes?.idToken,
+  ];
+  let foundTokenPayload = false;
+  let fallbackLastChecked: string | null = null;
+
+  for (const candidate of candidates) {
+    const payload = parseIdTokenPayload(candidate);
+    if (!payload) continue;
+    foundTokenPayload = true;
+    const openAiAuth = toRecord(payload[OPENAI_AUTH_CLAIM]);
+    const source = openAiAuth ?? payload;
+    const activeUntil = readFirstDateMeta(source, CODEX_SUBSCRIPTION_ACTIVE_UNTIL_KEYS);
+    const lastChecked = readFirstDateMeta(source, CODEX_SUBSCRIPTION_LAST_CHECKED_KEYS);
+    fallbackLastChecked ??= lastChecked.label;
+    if (!activeUntil.label) continue;
+
+    return {
+      subscriptionActiveUntil: activeUntil.label,
+      subscriptionActiveUntilMs: activeUntil.ms,
+      subscriptionLastChecked: lastChecked.label,
+      subscriptionStatus: 'found',
+      subscriptionStatusMessage: null,
+    };
+  }
+
+  return foundTokenPayload
+    ? {
+        ...EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT,
+        subscriptionLastChecked: fallbackLastChecked,
+      }
+    : null;
+};
+
+const resolveCodexSubscriptionSnapshot = async (
+  file: AuthFileItem
+): Promise<CodexSubscriptionSnapshot> => {
+  const fromList = readCodexSubscriptionSnapshotFromRecord(toRecord(file));
+  if (fromList) return fromList;
+
+  try {
+    const authJson = await authFilesApi.downloadJsonObject(file.name);
+    return readCodexSubscriptionSnapshotFromRecord(authJson) ?? EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT;
+  } catch (err: unknown) {
+    return {
+      ...EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT,
+      subscriptionStatus: 'read_error',
+      subscriptionStatusMessage: err instanceof Error ? err.message : null,
+    };
+  }
+};
+
 const fetchCodexQuota = async (
   file: AuthFileItem,
   t: TFunction
-): Promise<{ planType: string | null; windows: CodexQuotaWindow[] }> => {
+): Promise<{
+  planType: string | null;
+  windows: CodexQuotaWindow[];
+  authExpiresAt: string | null;
+  subscriptionActiveUntil: string | null;
+  subscriptionActiveUntilMs: number | null;
+  subscriptionLastChecked: string | null;
+  subscriptionStatus: CodexSubscriptionStatus;
+  subscriptionStatusMessage: string | null;
+}> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {
@@ -409,6 +631,7 @@ const fetchCodexQuota = async (
   }
 
   const planTypeFromFile = resolveCodexPlanType(file);
+  const subscriptionSnapshotPromise = resolveCodexSubscriptionSnapshot(file);
   const accountId = resolveCodexChatgptAccountId(file);
   if (!accountId) {
     throw new Error(t('codex_quota.missing_account_id'));
@@ -437,7 +660,14 @@ const fetchCodexQuota = async (
 
   const planTypeFromUsage = normalizePlanType(payload.plan_type ?? payload.planType);
   const windows = buildCodexQuotaWindows(payload, t);
-  return { planType: planTypeFromUsage ?? planTypeFromFile, windows };
+  const authExpiresAt = resolveCodexAuthExpiry(file);
+  const subscriptionSnapshot = await subscriptionSnapshotPromise;
+  return {
+    planType: planTypeFromUsage ?? planTypeFromFile,
+    windows,
+    authExpiresAt,
+    ...subscriptionSnapshot,
+  };
 };
 
 const GEMINI_CLI_G1_CREDIT_TYPE = 'GOOGLE_ONE_AI';
@@ -744,6 +974,9 @@ const renderCodexItems = (
   const { createElement: h, Fragment } = React;
   const windows = quota.windows ?? [];
   const planType = quota.planType ?? null;
+  const subscriptionActiveUntil = quota.subscriptionActiveUntil ?? null;
+  const subscriptionActiveUntilMs = quota.subscriptionActiveUntilMs ?? null;
+  const subscriptionStatus = quota.subscriptionStatus ?? 'missing';
 
   const getPlanLabel = (pt?: string | null): string | null => {
     const normalized = normalizePlanType(pt);
@@ -759,19 +992,62 @@ const renderCodexItems = (
   };
 
   const planLabel = getPlanLabel(planType);
+  const planDisplayValue = planLabel ?? t('codex_quota.plan_unknown');
   const isPremiumPlan = PREMIUM_CODEX_PLAN_TYPES.has(normalizePlanType(planType) ?? '');
   const nodes: ReactNode[] = [];
-
-  if (planLabel) {
-    const valueClass = isPremiumPlan ? styleMap.premiumPlanValue : styleMap.codexPlanValue;
-    nodes.push(
+  const infoRows: ReactNode[] = [];
+  const nowMs = Date.now();
+  const warningMs = 7 * 24 * 60 * 60 * 1000;
+  const subscriptionStatusClass =
+    subscriptionStatus === 'read_error' || subscriptionStatus === 'missing'
+      ? styleMap.codexSubscriptionMuted
+      : subscriptionActiveUntilMs !== null && subscriptionActiveUntilMs <= nowMs
+      ? styleMap.codexSubscriptionExpired
+      : subscriptionActiveUntilMs !== null && subscriptionActiveUntilMs - nowMs <= warningMs
+        ? styleMap.codexSubscriptionWarning
+        : styleMap.codexSubscriptionHealthy;
+  const resolveSubscriptionValue = () => {
+    if (subscriptionStatus === 'found' && subscriptionActiveUntil) return subscriptionActiveUntil;
+    if (subscriptionStatus === 'read_error') return t('codex_quota.subscription_read_error');
+    return t('codex_quota.subscription_not_recorded');
+  };
+  const pushInfoRow = (
+    key: string,
+    labelKey: string,
+    value: ReactNode,
+    valueClassName = styleMap.codexPlanDateValue
+  ) => {
+    if (!value) return;
+    infoRows.push(
       h(
         'div',
-        { key: 'plan', className: styleMap.codexPlan },
-        h('span', { className: styleMap.codexPlanLabel }, t('codex_quota.plan_label')),
-        h('span', { className: valueClass }, planLabel)
+        { key, className: styleMap.codexInfoItem },
+        h('span', { className: styleMap.codexPlanLabel }, t(labelKey)),
+        h('span', { className: valueClassName }, value)
       )
     );
+  };
+
+  const planValueClass = planLabel
+    ? isPremiumPlan
+      ? styleMap.premiumPlanValue
+      : styleMap.codexPlanValue
+    : `${styleMap.codexPlanValue} ${styleMap.codexValueMuted}`;
+  pushInfoRow('plan', 'codex_quota.plan_label', planDisplayValue, planValueClass);
+
+  pushInfoRow(
+    'subscription-expiry',
+    'codex_quota.subscription_expiry_label',
+    resolveSubscriptionValue(),
+    [
+      styleMap.codexPlanDateValue,
+      styleMap.codexSubscriptionValue,
+      subscriptionStatusClass,
+    ].filter(Boolean).join(' '),
+  );
+
+  if (infoRows.length > 0) {
+    nodes.push(h('div', { key: 'codex-info', className: styleMap.codexInfoGrid }, ...infoRows));
   }
 
   if (windows.length === 0) {
@@ -1171,7 +1447,16 @@ export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQ
 
 export const CODEX_CONFIG: QuotaConfig<
   CodexQuotaState,
-  { planType: string | null; windows: CodexQuotaWindow[] }
+  {
+    planType: string | null;
+    windows: CodexQuotaWindow[];
+    authExpiresAt: string | null;
+    subscriptionActiveUntil: string | null;
+    subscriptionActiveUntilMs: number | null;
+    subscriptionLastChecked: string | null;
+    subscriptionStatus: CodexSubscriptionStatus;
+    subscriptionStatusMessage: string | null;
+  }
 > = {
   type: 'codex',
   i18nPrefix: 'codex_quota',
@@ -1185,6 +1470,12 @@ export const CODEX_CONFIG: QuotaConfig<
     status: 'success',
     windows: data.windows,
     planType: data.planType,
+    authExpiresAt: data.authExpiresAt,
+    subscriptionActiveUntil: data.subscriptionActiveUntil,
+    subscriptionActiveUntilMs: data.subscriptionActiveUntilMs,
+    subscriptionLastChecked: data.subscriptionLastChecked,
+    subscriptionStatus: data.subscriptionStatus,
+    subscriptionStatusMessage: data.subscriptionStatusMessage,
   }),
   buildErrorState: (message, status) => ({
     status: 'error',

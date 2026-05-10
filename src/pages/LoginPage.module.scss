@@ -5,6 +5,10 @@
   min-height: 100vh;
   display: flex;
   background: var(--bg-secondary);
+
+  @media (max-width: $breakpoint-mobile) {
+    overflow-x: hidden;
+  }
 }
 
 // 左侧品牌展示区
@@ -92,8 +96,10 @@
   position: relative;
 
   @media (max-width: $breakpoint-mobile) {
-    padding: $spacing-lg;
+    width: 100%;
+    padding: $spacing-xl 20px;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 }
 
@@ -105,6 +111,12 @@
   flex-direction: column;
   align-items: center;
   gap: $spacing-xl;
+
+  @media (max-width: $breakpoint-mobile) {
+    width: min(100%, 300px);
+    max-width: calc(100vw - 64px);
+    gap: $spacing-lg;
+  }
 }
 
 // Logo
@@ -130,7 +142,7 @@
   gap: $spacing-lg;
 
   @media (max-width: $breakpoint-mobile) {
-    padding: $spacing-lg;
+    padding: 0;
     box-shadow: none;
     border: none;
     background: transparent;
@@ -159,6 +171,11 @@
   font-size: 22px;
   font-weight: 800;
   color: var(--text-primary);
+
+  @media (max-width: $breakpoint-mobile) {
+    font-size: 20px;
+    line-height: 1.25;
+  }
 }
 
 // 副标题

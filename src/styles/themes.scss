@@ -4,53 +4,53 @@
 
 // 浅色主题（默认）
 :root {
-  // 极简暖灰：浅色模式
-  --bg-secondary: #faf9f5; // 页面背景（纸感）
-  --bg-primary: #f0eee8; // 容器/卡片背景
-  --bg-tertiary: #e9e6df; // hover/次级背景
+  // 精密本地控制台：浅色模式
+  --bg-secondary: #f5f7f4; // 页面背景
+  --bg-primary: #ffffff; // 容器/卡片背景
+  --bg-tertiary: #eef2ed; // hover/次级背景
   --bg-hover: var(--bg-tertiary);
-  --bg-quinary: #f6f4ee;
-  --bg-error-light: rgba(198, 87, 70, 0.1);
-  --floating-surface: #fffdf9;
-  --floating-border: #d8d3ca;
+  --bg-quinary: #f9faf7;
+  --bg-error-light: rgba(209, 67, 67, 0.1);
+  --floating-surface: #ffffff;
+  --floating-border: #d6ddd4;
   --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.14);
 
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
+  --text-primary: #202520;
+  --text-secondary: #5c655d;
+  --text-tertiary: #8a948c;
+  --text-quaternary: #b6beb7;
   --text-muted: var(--text-tertiary);
 
-  --border-color: #e3e1db; // 边框/分割线
+  --border-color: #dfe6dc; // 边框/分割线
   --border-secondary: var(--border-color);
-  --border-primary: #d5d2cb;
-  --border-hover: #cecac4;
+  --border-primary: #d0dacd;
+  --border-hover: #bdcbbc;
 
-  --primary-color: #8b8680; // 行动色（主色）
-  --primary-hover: #7f7a74;
-  --primary-active: #726d67;
+  --primary-color: #0f766e; // 行动色（主色）
+  --primary-hover: #0b665f;
+  --primary-active: #0a5c56;
   --primary-contrast: #ffffff;
 
   --success-color: #10b981;
-  --quota-medium-color: #e0aa14;
-  --warning-color: #c65746; // 错误/警告色
-  --error-color: #c65746;
+  --quota-medium-color: #b7791f;
+  --warning-color: #b7791f;
+  --error-color: #d14343;
   --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
+  --info-color: #2563eb;
 
-  --warning-bg: rgba(198, 87, 70, 0.12);
-  --warning-border: rgba(198, 87, 70, 0.35);
+  --warning-bg: rgba(183, 121, 31, 0.12);
+  --warning-border: rgba(183, 121, 31, 0.35);
   --warning-text: var(--warning-color);
 
   --success-badge-bg: #d1fae5;
   --success-badge-text: #065f46;
   --success-badge-border: #6ee7b7;
 
-  --failure-badge-bg: rgba(198, 87, 70, 0.14);
-  --failure-badge-text: #8a3a30;
-  --failure-badge-border: rgba(198, 87, 70, 0.35);
+  --failure-badge-bg: rgba(209, 67, 67, 0.14);
+  --failure-badge-text: #9a2f2f;
+  --failure-badge-border: rgba(209, 67, 67, 0.35);
 
-  --count-badge-bg: rgba(139, 134, 128, 0.18);
+  --count-badge-bg: rgba(15, 118, 110, 0.15);
   --count-badge-text: var(--primary-active);
 
   --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
@@ -72,50 +72,50 @@
 [data-theme='white'] {
   --bg-secondary: #ffffff;
   --bg-primary: #ffffff;
-  --bg-tertiary: #f6f6f6;
+  --bg-tertiary: #f3f6f2;
   --bg-hover: var(--bg-tertiary);
   --bg-quinary: #ffffff;
-  --bg-error-light: rgba(198, 87, 70, 0.08);
+  --bg-error-light: rgba(209, 67, 67, 0.08);
   --floating-surface: #ffffff;
-  --floating-border: #d9d9d9;
+  --floating-border: #d7dfd4;
   --floating-shadow: 0 12px 26px rgba(0, 0, 0, 0.12);
 
-  --text-primary: #2d2a26;
-  --text-secondary: #6d6760;
-  --text-tertiary: #a29c95;
-  --text-quaternary: #c0bab3;
+  --text-primary: #202520;
+  --text-secondary: #5c655d;
+  --text-tertiary: #8a948c;
+  --text-quaternary: #b6beb7;
   --text-muted: var(--text-tertiary);
 
-  --border-color: #e5e5e5;
+  --border-color: #e1e7df;
   --border-secondary: var(--border-color);
-  --border-primary: #d9d9d9;
-  --border-hover: #cccccc;
+  --border-primary: #d4ddd2;
+  --border-hover: #c2cfbf;
 
-  --primary-color: #8b8680;
-  --primary-hover: #7f7a74;
-  --primary-active: #726d67;
+  --primary-color: #0f766e;
+  --primary-hover: #0b665f;
+  --primary-active: #0a5c56;
   --primary-contrast: #ffffff;
 
   --success-color: #10b981;
-  --quota-medium-color: #e0aa14;
-  --warning-color: #c65746;
-  --error-color: #c65746;
+  --quota-medium-color: #b7791f;
+  --warning-color: #b7791f;
+  --error-color: #d14343;
   --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
+  --info-color: #2563eb;
 
-  --warning-bg: rgba(198, 87, 70, 0.12);
-  --warning-border: rgba(198, 87, 70, 0.35);
+  --warning-bg: rgba(183, 121, 31, 0.12);
+  --warning-border: rgba(183, 121, 31, 0.35);
   --warning-text: var(--warning-color);
 
   --success-badge-bg: #d1fae5;
   --success-badge-text: #065f46;
   --success-badge-border: #6ee7b7;
 
-  --failure-badge-bg: rgba(198, 87, 70, 0.14);
-  --failure-badge-text: #8a3a30;
-  --failure-badge-border: rgba(198, 87, 70, 0.35);
+  --failure-badge-bg: rgba(209, 67, 67, 0.14);
+  --failure-badge-text: #9a2f2f;
+  --failure-badge-border: rgba(209, 67, 67, 0.35);
 
-  --count-badge-bg: rgba(139, 134, 128, 0.18);
+  --count-badge-bg: rgba(15, 118, 110, 0.15);
   --count-badge-text: var(--primary-active);
 
   --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.08);
@@ -127,53 +127,53 @@
 
 // 深色主题（#191919）
 [data-theme='dark'] {
-  // 极简暖灰：深色模式（提升对比度与层级）
-  --bg-secondary: #151412; // 页面背景
-  --bg-primary: #1d1b18; // 容器/卡片背景
-  --bg-tertiary: #262320; // hover/次级背景
-  --bg-hover: #2e2a26;
-  --bg-quinary: #191714;
-  --bg-error-light: rgba(198, 87, 70, 0.18);
-  --floating-surface: #2a2723;
-  --floating-border: #4a443d;
+  // 精密本地控制台：深色模式
+  --bg-secondary: #101412; // 页面背景
+  --bg-primary: #171d1a; // 容器/卡片背景
+  --bg-tertiary: #202923; // hover/次级背景
+  --bg-hover: #26312b;
+  --bg-quinary: #121815;
+  --bg-error-light: rgba(209, 67, 67, 0.2);
+  --floating-surface: #1f2823;
+  --floating-border: #34443c;
   --floating-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
 
-  --text-primary: #f6f4f1;
-  --text-secondary: #c9c3bb;
-  --text-tertiary: #9c958d;
-  --text-quaternary: #6f6962;
+  --text-primary: #f2f6f3;
+  --text-secondary: #c1ccc4;
+  --text-tertiary: #8b9a90;
+  --text-quaternary: #617168;
   --text-muted: var(--text-tertiary);
 
-  --border-color: #3a3530;
+  --border-color: #2d3a33;
   --border-secondary: var(--border-color);
-  --border-primary: #4a453f;
-  --border-hover: #5a544d;
+  --border-primary: #3b4d44;
+  --border-hover: #496257;
 
-  --primary-color: #8b8680;
-  --primary-hover: #9a948e;
-  --primary-active: #a6a099;
+  --primary-color: #2dd4bf;
+  --primary-hover: #5eead4;
+  --primary-active: #99f6e4;
   --primary-contrast: #ffffff;
 
   --success-color: #10b981;
-  --quota-medium-color: #ffd862;
-  --warning-color: #c65746;
-  --error-color: #c65746;
+  --quota-medium-color: #facc15;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
   --danger-color: var(--error-color);
-  --info-color: var(--primary-color);
+  --info-color: #60a5fa;
 
-  --warning-bg: rgba(198, 87, 70, 0.22);
-  --warning-border: rgba(198, 87, 70, 0.45);
-  --warning-text: #f1b0a6;
+  --warning-bg: rgba(245, 158, 11, 0.18);
+  --warning-border: rgba(245, 158, 11, 0.45);
+  --warning-text: #fbbf24;
 
   --success-badge-bg: rgba(6, 78, 59, 0.3);
   --success-badge-text: #6ee7b7;
   --success-badge-border: #059669;
 
-  --failure-badge-bg: rgba(198, 87, 70, 0.24);
-  --failure-badge-text: #f1b0a6;
-  --failure-badge-border: rgba(198, 87, 70, 0.5);
+  --failure-badge-bg: rgba(239, 68, 68, 0.22);
+  --failure-badge-text: #fca5a5;
+  --failure-badge-border: rgba(239, 68, 68, 0.5);
 
-  --count-badge-bg: rgba(139, 134, 128, 0.28);
+  --count-badge-bg: rgba(45, 212, 191, 0.16);
   --count-badge-text: var(--primary-active);
 
   --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.3);

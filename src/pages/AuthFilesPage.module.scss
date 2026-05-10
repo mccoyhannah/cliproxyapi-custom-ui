@@ -809,6 +809,12 @@
   .statusToggleLabel {
     font-size: 10px;
   }
+
+  .priorityInlineInput {
+    width: 56px;
+    height: 24px;
+    font-size: 11px;
+  }
 }
 
 .fileCardLayout {
@@ -994,6 +1000,37 @@
 
 .priorityValue {
   font-variant-numeric: tabular-nums;
+}
+
+.priorityInlineEditor {
+  align-items: center;
+}
+
+.priorityInlineInput {
+  width: 64px;
+  height: 26px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 76%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 70%, var(--border-color));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
 }
 
 .noteText {
@@ -1567,6 +1604,39 @@
   justify-content: flex-end;
 }
 
+.batchPriorityControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.batchPriorityInput {
+  width: 74px;
+  height: 32px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 86%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 70%, var(--border-color));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
 .batchSelectionText {
   font-size: 13px;
   font-weight: 600;
@@ -1588,6 +1658,11 @@
 
   .batchActionLeft,
   .batchActionRight {
+    justify-content: center;
+  }
+
+  .batchPriorityControl {
+    width: 100%;
     justify-content: center;
   }
 }

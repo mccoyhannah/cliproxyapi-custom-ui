@@ -259,9 +259,34 @@
 }
 
 .codexCard {
-  background-image: linear-gradient(180deg,
-      rgba(234, 231, 255, 0.18),
-      rgba(234, 231, 255, 0));
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 8%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--success-color) 10%, transparent),
+      transparent 42%
+    );
+  border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(
+      180deg,
+      var(--primary-color),
+      color-mix(in srgb, var(--success-color) 78%, var(--primary-color))
+    );
+    opacity: 0.92;
+    pointer-events: none;
+  }
 }
 
 .geminiCliCard {
@@ -289,6 +314,13 @@
   display: flex;
   flex-direction: column;
   gap: $spacing-xs;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+
+  &:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
 }
 
 .quotaRowHeader {
@@ -320,10 +352,11 @@
 }
 
 .quotaBar {
-  height: 8px;
+  height: 7px;
   background-color: var(--bg-tertiary);
-  border-radius: 999px;
+  border-radius: $radius-md;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 50%, transparent);
 }
 
 .quotaBarFill {
@@ -421,14 +454,103 @@
   color: var(--text-secondary);
 }
 
+.codexInfoGrid {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.codexInfoItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: 1 1 184px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  border-radius: $radius-md;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 78%, transparent), transparent),
+    color-mix(in srgb, var(--bg-secondary) 38%, var(--bg-primary));
+
+  &:first-child {
+    flex: 0 1 146px;
+  }
+
+  @include mobile {
+    flex: 1 1 100%;
+  }
+}
+
 .codexPlanLabel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 13px;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: 0;
   color: var(--text-tertiary);
 }
 
 .codexPlanValue {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   text-transform: capitalize;
+}
+
+.codexPlanDateValue {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  word-break: break-word;
+}
+
+.codexValueMuted {
+  color: var(--text-tertiary);
+}
+
+.codexSubscriptionValue {
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: $radius-sm;
+  border: 1px solid color-mix(in srgb, var(--success-color) 28%, var(--border-color));
+  background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
+  white-space: nowrap;
+}
+
+.codexSubscriptionHealthy {
+  color: color-mix(in srgb, var(--success-color) 82%, var(--text-primary));
+}
+
+.codexSubscriptionWarning {
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.codexSubscriptionExpired {
+  color: var(--danger-color);
+  border-color: color-mix(in srgb, var(--danger-color) 50%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 12%, var(--bg-primary));
+}
+
+.codexSubscriptionMuted {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
+  background: transparent;
 }
 
 .premiumPlanValue {

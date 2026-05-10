@@ -16,6 +16,7 @@ codex_usage.json
 style.md
 
 node_modules
+.npm-cache
 dist
 dist-ssr
 *.local

@@ -128,6 +128,7 @@ export interface CodexUsagePayload {
   codeReviewRateLimit?: CodexRateLimitInfo | null;
   additional_rate_limits?: CodexAdditionalRateLimit[] | null;
   additionalRateLimits?: CodexAdditionalRateLimit[] | null;
+  [key: string]: unknown;
 }
 
 // Claude API payload types
@@ -238,10 +239,18 @@ export interface CodexQuotaWindow {
   resetLabel: string;
 }
 
+export type CodexSubscriptionStatus = 'found' | 'missing' | 'read_error';
+
 export interface CodexQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: CodexQuotaWindow[];
   planType?: string | null;
+  authExpiresAt?: string | null;
+  subscriptionActiveUntil?: string | null;
+  subscriptionActiveUntilMs?: number | null;
+  subscriptionLastChecked?: string | null;
+  subscriptionStatus?: CodexSubscriptionStatus | null;
+  subscriptionStatusMessage?: string | null;
   error?: string;
   errorStatus?: number;
 }

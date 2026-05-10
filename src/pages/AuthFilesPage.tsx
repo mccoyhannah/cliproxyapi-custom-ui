@@ -88,6 +88,7 @@ export function AuthFilesPage() {
   const [filter, setFilter] = useState<'all' | string>('all');
   const [problemOnly, setProblemOnly] = useState(false);
   const [disabledOnly, setDisabledOnly] = useState(false);
+  const [enabledOnly, setEnabledOnly] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -99,6 +100,7 @@ export function AuthFilesPage() {
   const [viewMode, setViewMode] = useState<'diagram' | 'list'>('list');
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
   const [batchActionBarVisible, setBatchActionBarVisible] = useState(false);
+  const [batchPriorityInput, setBatchPriorityInput] = useState('');
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
@@ -116,6 +118,8 @@ export function AuthFilesPage() {
     deletingAll,
     statusUpdating,
     batchStatusUpdating,
+    priorityUpdating,
+    batchPriorityUpdating,
     fileInputRef,
     loadFiles,
     handleUploadClick,
@@ -124,12 +128,14 @@ export function AuthFilesPage() {
     handleDeleteAll,
     handleDownload,
     handleStatusToggle,
+    handlePriorityChange,
     toggleSelect,
     selectAllVisible,
     invertVisibleSelection,
     deselectAll,
     batchDownload,
     batchSetStatus,
+    batchSetPriority,
     batchDelete,
   } = useAuthFilesData();
 
@@ -199,9 +205,10 @@ export function AuthFilesPage() {
       if (typeof persisted.problemOnly === 'boolean') {
         setProblemOnly(persisted.problemOnly);
       }
-      if (typeof persisted.disabledOnly === 'boolean') {
-        setDisabledOnly(persisted.disabledOnly);
-      }
+      const persistedDisabledOnly = persisted.disabledOnly === true;
+      const persistedEnabledOnly = persisted.enabledOnly === true && !persistedDisabledOnly;
+      setDisabledOnly(persistedDisabledOnly);
+      setEnabledOnly(persistedEnabledOnly);
       if (
         typeof persistedCompactMode !== 'boolean' &&
         typeof persisted.compactMode === 'boolean'
@@ -245,6 +252,7 @@ export function AuthFilesPage() {
       filter,
       problemOnly,
       disabledOnly,
+      enabledOnly,
       compactMode,
       search,
       page,
@@ -257,6 +265,7 @@ export function AuthFilesPage() {
   }, [
     compactMode,
     disabledOnly,
+    enabledOnly,
     filter,
     page,
     pageSize,
@@ -361,9 +370,10 @@ export function AuthFilesPage() {
       files.filter((file) => {
         if (problemOnly && !hasAuthFileStatusMessage(file)) return false;
         if (disabledOnly && file.disabled !== true) return false;
+        if (enabledOnly && file.disabled === true) return false;
         return true;
       }),
-    [disabledOnly, files, problemOnly]
+    [disabledOnly, enabledOnly, files, problemOnly]
   );
 
   const sortOptions = useMemo(
@@ -443,11 +453,40 @@ export function AuthFilesPage() {
     () => selectedNames.some((name) => statusUpdating[name] === true),
     [selectedNames, statusUpdating]
   );
+  const selectedHasPriorityUpdating = useMemo(
+    () => selectedNames.some((name) => priorityUpdating[name] === true),
+    [priorityUpdating, selectedNames]
+  );
   const batchStatusButtonsDisabled =
     disableControls ||
     selectedNames.length === 0 ||
     batchStatusUpdating ||
     selectedHasStatusUpdating;
+  const batchPriorityButtonDisabled =
+    disableControls ||
+    selectedNames.length === 0 ||
+    batchPriorityUpdating ||
+    selectedHasPriorityUpdating;
+
+  const handlePriorityInvalid = useCallback(() => {
+    showNotification(t('auth_files.priority_invalid'), 'error');
+  }, [showNotification, t]);
+
+  const commitBatchPriority = useCallback(() => {
+    const trimmed = batchPriorityInput.trim();
+    const priority = trimmed ? parsePriorityValue(trimmed) : 0;
+    if (priority === undefined) {
+      handlePriorityInvalid();
+      return;
+    }
+
+    void batchSetPriority(selectedNames, priority).then(() => setBatchPriorityInput(''));
+  }, [
+    batchPriorityInput,
+    batchSetPriority,
+    handlePriorityInvalid,
+    selectedNames,
+  ]);
 
   const copyTextWithNotification = useCallback(
     async (text: string) => {
@@ -642,7 +681,7 @@ export function AuthFilesPage() {
   );
 
   const deleteAllButtonLabel = (() => {
-    if (disabledOnly) {
+    if (disabledOnly || enabledOnly) {
       return t('auth_files.delete_filtered_result_button');
     }
     if (problemOnly) {
@@ -685,9 +724,11 @@ export function AuthFilesPage() {
                   filter,
                   problemOnly,
                   disabledOnly,
+                  enabledOnly,
                   onResetFilterToAll: () => setFilter('all'),
                   onResetProblemOnly: () => setProblemOnly(false),
                   onResetDisabledOnly: () => setDisabledOnly(false),
+                  onResetEnabledOnly: () => setEnabledOnly(false),
                 })
               }
               disabled={disableControls || loading || deletingAll}
@@ -774,9 +815,30 @@ export function AuthFilesPage() {
                     </div>
                     <div className={styles.filterToggleCard}>
                       <ToggleSwitch
+                        checked={enabledOnly}
+                        onChange={(value) => {
+                          setEnabledOnly(value);
+                          if (value) {
+                            setDisabledOnly(false);
+                          }
+                          setPage(1);
+                        }}
+                        ariaLabel={t('auth_files.enabled_filter_only')}
+                        label={
+                          <span className={styles.filterToggleLabel}>
+                            {t('auth_files.enabled_filter_only')}
+                          </span>
+                        }
+                      />
+                    </div>
+                    <div className={styles.filterToggleCard}>
+                      <ToggleSwitch
                         checked={disabledOnly}
                         onChange={(value) => {
                           setDisabledOnly(value);
+                          if (value) {
+                            setEnabledOnly(false);
+                          }
                           setPage(1);
                         }}
                         ariaLabel={t('auth_files.disabled_filter_only')}
@@ -827,11 +889,14 @@ export function AuthFilesPage() {
                     statusUpdating={statusUpdating}
                     quotaFilterType={quotaFilterType}
                     statusBarCache={statusBarCache}
+                    priorityUpdating={priorityUpdating}
                     onShowModels={showModels}
                     onDownload={handleDownload}
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
                     onDelete={handleDelete}
                     onToggleStatus={handleStatusToggle}
+                    onPriorityChange={handlePriorityChange}
+                    onPriorityInvalid={handlePriorityInvalid}
                     onToggleSelect={toggleSelect}
                   />
                 ))}
@@ -978,6 +1043,33 @@ export function AuthFilesPage() {
                   >
                     {t('auth_files.batch_disable')}
                   </Button>
+                  <div className={styles.batchPriorityControl}>
+                    <input
+                      className={styles.batchPriorityInput}
+                      type="number"
+                      step={1}
+                      inputMode="numeric"
+                      value={batchPriorityInput}
+                      onChange={(event) => setBatchPriorityInput(event.currentTarget.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          commitBatchPriority();
+                        }
+                      }}
+                      placeholder={t('auth_files.batch_priority_placeholder')}
+                      aria-label={t('auth_files.batch_priority_placeholder')}
+                      disabled={batchPriorityButtonDisabled}
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={commitBatchPriority}
+                      disabled={batchPriorityButtonDisabled}
+                      loading={batchPriorityUpdating}
+                    >
+                      {t('auth_files.batch_priority')}
+                    </Button>
+                  </div>
                   <Button
                     variant="danger"
                     size="sm"

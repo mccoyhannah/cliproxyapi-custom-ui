@@ -1,3 +1,4 @@
+import { useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -46,6 +47,7 @@ export type AuthFileCardProps = {
   disableControls: boolean;
   deleting: string | null;
   statusUpdating: Record<string, boolean>;
+  priorityUpdating: Record<string, boolean>;
   quotaFilterType: QuotaProviderType | null;
   statusBarCache: Map<string, AuthFileStatusBarData>;
   onShowModels: (file: AuthFileItem) => void;
@@ -53,6 +55,8 @@ export type AuthFileCardProps = {
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
+  onPriorityChange: (file: AuthFileItem, priority: number) => Promise<void>;
+  onPriorityInvalid: () => void;
   onToggleSelect: (name: string) => void;
 };
 
@@ -72,6 +76,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     disableControls,
     deleting,
     statusUpdating,
+    priorityUpdating,
     quotaFilterType,
     statusBarCache,
     onShowModels,
@@ -79,6 +84,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
     onOpenPrefixProxyEditor,
     onDelete,
     onToggleStatus,
+    onPriorityChange,
+    onPriorityInvalid,
     onToggleSelect,
   } = props;
 
@@ -122,7 +129,55 @@ export function AuthFileCard(props: AuthFileCardProps) {
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
+  const currentPriorityText = priorityValue === undefined ? '' : String(priorityValue);
+  const [priorityDraft, setPriorityDraft] = useState({
+    fileName: file.name,
+    value: currentPriorityText,
+    dirty: false,
+  });
+  const priorityInput =
+    priorityDraft.fileName === file.name && priorityDraft.dirty
+      ? priorityDraft.value
+      : currentPriorityText;
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
+  const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const prioritySaving = priorityUpdating[file.name] === true;
+
+  const setPriorityInput = (value: string) => {
+    setPriorityDraft({ fileName: file.name, value, dirty: true });
+  };
+
+  const resetPriorityInput = () => {
+    setPriorityDraft({ fileName: file.name, value: currentPriorityText, dirty: false });
+  };
+
+  const commitPriorityInput = () => {
+    const trimmed = priorityInput.trim();
+    const nextPriority = trimmed ? parsePriorityValue(trimmed) : 0;
+
+    if (nextPriority === undefined) {
+      onPriorityInvalid();
+      resetPriorityInput();
+      return;
+    }
+
+    const currentPriority = priorityValue ?? 0;
+    if (nextPriority === currentPriority) {
+      resetPriorityInput();
+      return;
+    }
+
+    void onPriorityChange(file, nextPriority);
+  };
+
+  const handlePriorityKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+    } else if (event.key === 'Escape') {
+      resetPriorityInput();
+      event.currentTarget.blur();
+    }
+  };
   const stateLabel = isRuntimeOnly
     ? t('auth_files.type_virtual') || '虚拟认证文件'
     : file.disabled
@@ -211,12 +266,26 @@ export function AuthFileCard(props: AuthFileCardProps) {
               <span className={styles.metaLabel}>{t('auth_files.file_modified')}</span>
               <span className={styles.metaValue}>{formatModified(file)}</span>
             </div>
-            {priorityValue !== undefined && (
-              <div className={`${styles.metaItem} ${styles.priorityBadge}`}>
-                <span className={styles.metaLabel}>{t('auth_files.priority_display')}</span>
-                <span className={`${styles.metaValue} ${styles.priorityValue}`}>
-                  {priorityValue}
-                </span>
+            {!isRuntimeOnly && (
+              <div className={`${styles.metaItem} ${styles.priorityInlineEditor}`}>
+                <label className={styles.metaLabel} htmlFor={priorityInputId}>
+                  {t('auth_files.priority_display')}
+                </label>
+                <input
+                  id={priorityInputId}
+                  className={styles.priorityInlineInput}
+                  type="number"
+                  step={1}
+                  inputMode="numeric"
+                  value={priorityInput}
+                  onChange={(event) => setPriorityInput(event.currentTarget.value)}
+                  onBlur={commitPriorityInput}
+                  onKeyDown={handlePriorityKeyDown}
+                  disabled={disableControls || prioritySaving}
+                  aria-label={t('auth_files.priority_display')}
+                  title={t('auth_files.priority_hint')}
+                />
+                {prioritySaving && <LoadingSpinner size={12} />}
               </div>
             )}
           </div>

@@ -96,13 +96,17 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   files: AuthFileItem[];
   loading: boolean;
   disabled: boolean;
+  defaultViewMode?: ViewMode;
+  autoRefreshOnReady?: boolean;
 }
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
   config,
   files,
   loading,
-  disabled
+  disabled,
+  defaultViewMode = 'paged',
+  autoRefreshOnReady = false
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -113,7 +117,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   /* Removed useRef */
   const [columns, gridRef] = useGridColumns(380); // Min card width 380px matches SCSS
-  const [viewMode, setViewMode] = useState<ViewMode>('paged');
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
 
   const filteredFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [
@@ -165,6 +169,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   const pendingQuotaRefreshRef = useRef(false);
   const prevFilesLoadingRef = useRef(loading);
+  const autoRefreshSignatureRef = useRef('');
 
   const handleRefresh = useCallback(() => {
     pendingQuotaRefreshRef.current = true;
@@ -203,6 +208,30 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       return nextState;
     });
   }, [filteredFiles, loading, setQuota]);
+
+  const autoRefreshSignature = useMemo(
+    () => filteredFiles.map((file) => file.name).join('|'),
+    [filteredFiles]
+  );
+
+  useEffect(() => {
+    if (!autoRefreshOnReady) return;
+    if (disabled || loading || sectionLoading) return;
+    if (!autoRefreshSignature || filteredFiles.length === 0) return;
+    if (autoRefreshSignatureRef.current === autoRefreshSignature) return;
+
+    autoRefreshSignatureRef.current = autoRefreshSignature;
+    loadQuota(filteredFiles, 'all', setLoading);
+  }, [
+    autoRefreshOnReady,
+    autoRefreshSignature,
+    disabled,
+    filteredFiles,
+    loadQuota,
+    loading,
+    sectionLoading,
+    setLoading
+  ]);
 
   const refreshQuotaForFile = useCallback(
     async (file: AuthFileItem) => {

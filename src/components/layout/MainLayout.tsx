@@ -21,6 +21,7 @@ import {
   IconSidebarProviders,
   IconSidebarQuota,
   IconSidebarSystem,
+  IconSidebarUsage,
 } from '@/components/ui/icons';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import {
@@ -41,6 +42,7 @@ const sidebarIcons: Record<string, ReactNode> = {
   authFiles: <IconSidebarAuthFiles size={18} />,
   oauth: <IconSidebarOauth size={18} />,
   quota: <IconSidebarQuota size={18} />,
+  usageStatistics: <IconSidebarUsage size={18} />,
   config: <IconSidebarConfig size={18} />,
   logs: <IconSidebarLogs size={18} />,
   system: <IconSidebarSystem size={18} />,
@@ -165,10 +167,10 @@ const THEME_CARDS: Array<{
     labelKey: 'theme.auto',
     colors: {
       bg: 'linear-gradient(135deg, #ffffff 0 50%, #111111 50% 100%)',
-      card: 'linear-gradient(135deg, #ffffff 0 50%, #1a1a1a 50% 100%)',
-      border: '#bdbdbd',
-      text: '#2d2a26',
-      textMuted: 'linear-gradient(135deg, #c9c9c9 0 50%, #5a5a5a 50% 100%)',
+      card: 'linear-gradient(135deg, #ffffff 0 50%, #171d1a 50% 100%)',
+      border: '#b9c7bd',
+      text: '#202520',
+      textMuted: 'linear-gradient(135deg, #9aa69d 0 50%, #617168 50% 100%)',
     },
   },
   {
@@ -177,31 +179,31 @@ const THEME_CARDS: Array<{
     colors: {
       bg: '#ffffff',
       card: '#ffffff',
-      border: '#e5e5e5',
-      text: '#2d2a26',
-      textMuted: '#a29c95',
+      border: '#e1e7df',
+      text: '#202520',
+      textMuted: '#8a948c',
     },
   },
   {
     key: 'light',
     labelKey: 'theme.light',
     colors: {
-      bg: '#faf9f5',
-      card: '#f0eee8',
-      border: '#e3e1db',
-      text: '#2d2a26',
-      textMuted: '#a29c95',
+      bg: '#f5f7f4',
+      card: '#ffffff',
+      border: '#dfe6dc',
+      text: '#202520',
+      textMuted: '#8a948c',
     },
   },
   {
     key: 'dark',
     labelKey: 'theme.dark',
     colors: {
-      bg: '#151412',
-      card: '#1d1b18',
-      border: '#3a3530',
-      text: '#f6f4f1',
-      textMuted: '#9c958d',
+      bg: '#101412',
+      card: '#171d1a',
+      border: '#2d3a33',
+      text: '#f2f6f3',
+      textMuted: '#8b9a90',
     },
   },
 ];
@@ -391,6 +393,11 @@ export function MainLayout() {
     { path: '/auth-files', label: t('nav.auth_files'), icon: sidebarIcons.authFiles },
     { path: '/oauth', label: t('nav.oauth', { defaultValue: 'OAuth' }), icon: sidebarIcons.oauth },
     { path: '/quota', label: t('nav.quota_management'), icon: sidebarIcons.quota },
+    {
+      path: '/usage-statistics',
+      label: t('nav.usage_statistics', { defaultValue: '模型统计' }),
+      icon: sidebarIcons.usageStatistics,
+    },
     ...(config?.loggingToFile
       ? [{ path: '/logs', label: t('nav.logs'), icon: sidebarIcons.logs }]
       : []),
