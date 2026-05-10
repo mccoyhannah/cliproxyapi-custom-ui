@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -10,7 +10,11 @@ import {
 } from '@/components/quota';
 import { useNotificationStore, useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
-import { getStatusFromError } from '@/utils/quota';
+import {
+  formatCodexSubscriptionShortDate,
+  getStatusFromError,
+  type CodexSubscriptionSnapshot,
+} from '@/utils/quota';
 import {
   isRuntimeOnlyAuthFile,
   resolveQuotaErrorMessage,
@@ -33,12 +37,15 @@ export type AuthFileQuotaSectionProps = {
   file: AuthFileItem;
   quotaType: QuotaProviderType;
   disableControls: boolean;
+  compact?: boolean;
+  codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
 };
 
 export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
-  const { file, quotaType, disableControls } = props;
+  const { file, quotaType, disableControls, compact = false, codexSubscriptionSnapshot } = props;
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
+  const [referenceTimeMs] = useState(() => Date.now());
 
   const quota = useQuotaStore((state) => {
     if (quotaType === 'antigravity') return state.antigravityQuota[file.name] as QuotaState;
@@ -106,6 +113,47 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     quota?.errorStatus,
     quota?.error || t('common.unknown_error')
   );
+  const compactCodexExpiry =
+    compact &&
+    quotaType === 'codex' &&
+    codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
+    codexSubscriptionSnapshot.subscriptionActiveUntil
+      ? codexSubscriptionSnapshot
+      : null;
+
+  if (compact) {
+    if (!compactCodexExpiry) return null;
+
+    const expiryMs = compactCodexExpiry.subscriptionActiveUntilMs;
+    const warningMs = 7 * 24 * 60 * 60 * 1000;
+    const expiryClass =
+      expiryMs !== null && expiryMs !== undefined && expiryMs <= referenceTimeMs
+        ? styles.codexSubscriptionExpired
+        : expiryMs !== null && expiryMs !== undefined && expiryMs - referenceTimeMs <= warningMs
+          ? styles.codexSubscriptionWarning
+          : styles.codexSubscriptionHealthy;
+
+    return (
+      <div className={`${styles.quotaSection} ${styles.quotaSectionCompact}`}>
+        <div className={`${styles.codexInfoGrid} ${styles.codexInfoGridCompact}`}>
+          <div className={`${styles.codexInfoItem} ${styles.codexInfoItemCompact}`}>
+            <span className={styles.codexPlanLabel}>
+              {t('auth_files.subscription_expiry_short_label')}
+            </span>
+            <span
+              className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
+              title={compactCodexExpiry.subscriptionActiveUntil || undefined}
+            >
+              {formatCodexSubscriptionShortDate(
+                compactCodexExpiry.subscriptionActiveUntilMs,
+                compactCodexExpiry.subscriptionActiveUntil
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.quotaSection}>
@@ -127,7 +175,12 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
           })}
         </div>
       ) : quota ? (
-        (config.renderQuotaItems(quota, t, { styles, QuotaProgressBar }) as ReactNode)
+        (config.renderQuotaItems(quota, t, {
+          styles,
+          QuotaProgressBar,
+          displayMode: 'auth-card',
+          codexSubscriptionSnapshot,
+        }) as ReactNode)
       ) : (
         <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.idle`)}</div>
       )}

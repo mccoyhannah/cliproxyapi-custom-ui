@@ -35,6 +35,22 @@ export const EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT: CodexSubscriptionSnapshot = {
   subscriptionStatusMessage: null,
 };
 
+export const formatCodexSubscriptionShortDate = (
+  valueMs: number | null | undefined,
+  fallback: string | null | undefined
+): string => {
+  if (valueMs !== null && valueMs !== undefined && Number.isFinite(valueMs)) {
+    return new Date(valueMs).toLocaleString(undefined, {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }
+  return fallback ?? '';
+};
+
 const toRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)

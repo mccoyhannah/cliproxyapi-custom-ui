@@ -59,6 +59,7 @@ import {
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
+import type { AuthFileItem } from '@/types';
 import styles from './AuthFilesPage.module.scss';
 
 const easePower3Out = (progress: number) => 1 - (1 - progress) ** 4;
@@ -75,6 +76,13 @@ const buildWildcardSearch = (value: string): RegExp | null => {
   if (!value.includes('*')) return null;
   const pattern = value.split('*').map(escapeWildcardSearchSegment).join('.*');
   return new RegExp(pattern, 'i');
+};
+
+const comparePriorityThenName = (a: AuthFileItem, b: AuthFileItem): number => {
+  const pa = parsePriorityValue(a.priority ?? a['priority']) ?? 0;
+  const pb = parsePriorityValue(b.priority ?? b['priority']) ?? 0;
+  const priorityCompare = pb - pa;
+  return priorityCompare !== 0 ? priorityCompare : a.name.localeCompare(b.name);
 };
 
 export function AuthFilesPage() {
@@ -382,6 +390,8 @@ export function AuthFilesPage() {
       { value: 'default', label: t('auth_files.sort_default') },
       { value: 'az', label: t('auth_files.sort_az') },
       { value: 'priority', label: t('auth_files.sort_priority') },
+      { value: 'expiry_soon', label: t('auth_files.sort_expiry_soon') },
+      { value: 'expiry_long', label: t('auth_files.sort_expiry_long') },
     ],
     [t]
   );
@@ -414,6 +424,7 @@ export function AuthFilesPage() {
       return matchType && matchSearch;
     });
   }, [filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
+  const codexSubscriptionSnapshots = useCodexSubscriptionSnapshots(filtered);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -428,20 +439,28 @@ export function AuthFilesPage() {
     } else if (sortMode === 'az') {
       copy.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortMode === 'priority') {
+      copy.sort(comparePriorityThenName);
+    } else if (sortMode === 'expiry_soon' || sortMode === 'expiry_long') {
+      const direction = sortMode === 'expiry_soon' ? 1 : -1;
       copy.sort((a, b) => {
-        const pa = parsePriorityValue(a.priority ?? a['priority']) ?? 0;
-        const pb = parsePriorityValue(b.priority ?? b['priority']) ?? 0;
-        return pb - pa; // 高优先级排前面
+        const expiryA = codexSubscriptionSnapshots.get(a.name)?.subscriptionActiveUntilMs ?? null;
+        const expiryB = codexSubscriptionSnapshots.get(b.name)?.subscriptionActiveUntilMs ?? null;
+
+        if (expiryA === null && expiryB === null) return comparePriorityThenName(a, b);
+        if (expiryA === null) return 1;
+        if (expiryB === null) return -1;
+
+        const expiryCompare = (expiryA - expiryB) * direction;
+        return expiryCompare !== 0 ? expiryCompare : comparePriorityThenName(a, b);
       });
     }
     return copy;
-  }, [filtered, sortMode]);
+  }, [codexSubscriptionSnapshots, filtered, sortMode]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
   const pageItems = sorted.slice(start, start + pageSize);
-  const codexSubscriptionSnapshots = useCodexSubscriptionSnapshots(pageItems);
   const selectablePageItems = useMemo(
     () => pageItems.filter((file) => !isRuntimeOnlyAuthFile(file)),
     [pageItems]

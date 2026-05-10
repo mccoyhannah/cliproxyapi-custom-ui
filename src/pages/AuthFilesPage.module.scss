@@ -240,9 +240,9 @@
 
 .filterControls {
   display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) repeat(2, minmax(120px, 0.72fr)) minmax(220px, auto);
+  grid-template-columns: minmax(280px, 1.6fr) minmax(104px, 0.42fr) minmax(178px, 0.78fr) minmax(340px, 1.2fr);
   gap: $spacing-md;
-  align-items: flex-end;
+  align-items: flex-start;
 
   // 修复 Input 组件在 filterItem 中的嵌套样式
   :global(.form-group) {
@@ -255,7 +255,7 @@
   }
 
   @include tablet {
-    grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(140px, 0.8fr));
+    grid-template-columns: minmax(220px, 1fr) minmax(120px, 0.42fr) minmax(180px, 0.74fr);
   }
 
   @include mobile {
@@ -289,16 +289,20 @@
 
 .filterToggleGroup {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  min-height: 40px;
+  min-height: 0;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
 }
 
 .filterToggleCard {
   display: flex;
   align-items: center;
-  min-height: 40px;
-  padding: 0 2px;
+  min-height: 38px;
+  padding: 0 8px 0 6px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
   background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
@@ -307,8 +311,8 @@
 .filterToggle {
   display: flex;
   align-items: center;
-  min-height: 40px;
-  padding-inline: 2px;
+  min-height: 36px;
+  padding-inline: 0;
 }
 
 .filterToggleLabel {
@@ -318,6 +322,8 @@
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pageSizeSelect {
@@ -489,6 +495,13 @@
   border-top: 1px dashed color-mix(in srgb, var(--border-color) 82%, transparent);
 }
 
+.quotaSectionCompact {
+  gap: 4px;
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+
 .quotaRow {
   display: flex;
   flex-direction: column;
@@ -625,14 +638,102 @@
   color: var(--text-secondary);
 }
 
+.codexInfoGrid {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 7px;
+  min-width: 0;
+}
+
+.codexInfoGridAuthCard {
+  padding: 1px 0 0;
+}
+
+.codexInfoGridCompact {
+  gap: 4px;
+}
+
+.codexInfoItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--text-secondary);
+}
+
+.codexInfoItemCompact {
+  font-size: 11px;
+}
+
+.codexInfoDivider {
+  color: color-mix(in srgb, var(--text-tertiary) 82%, transparent);
+  font-size: 12px;
+  line-height: 1;
+}
+
 .codexPlanLabel {
   color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .codexPlanValue {
+  display: inline-flex;
+  align-items: center;
   font-weight: 600;
   color: var(--text-primary);
   text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.codexValueMuted {
+  color: var(--text-tertiary);
+}
+
+.codexPlanDateValue {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.codexSubscriptionValue {
+  width: fit-content;
+  max-width: 170px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.codexSubscriptionHealthy {
+  color: color-mix(in srgb, var(--success-color) 82%, var(--text-primary));
+}
+
+.codexSubscriptionWarning {
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.codexSubscriptionExpired {
+  color: var(--danger-color);
+  border-color: color-mix(in srgb, var(--danger-color) 50%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 12%, var(--bg-primary));
+}
+
+.codexSubscriptionMuted {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
+  background: transparent;
 }
 
 .premiumPlanValue {
@@ -771,7 +872,24 @@
   }
 
   .quotaSection {
-    display: none;
+    gap: 4px;
+    padding-top: 0;
+    margin-top: -1px;
+    border-top: 0;
+  }
+
+  .codexInfoGrid {
+    gap: 4px;
+  }
+
+  .codexPlanLabel,
+  .codexPlanDateValue {
+    font-size: 10px;
+  }
+
+  .codexSubscriptionValue {
+    max-width: 126px;
+    padding: 1px 6px;
   }
 
   .cardActions {
@@ -820,7 +938,14 @@
   }
 
   .subscriptionExpiryMeta {
-    display: none;
+    flex-basis: 100%;
+    gap: 4px;
+  }
+
+  .subscriptionExpiryPill {
+    max-width: 126px;
+    padding: 1px 6px;
+    font-size: 10px;
   }
 }
 
@@ -1589,6 +1714,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
   margin-top: auto;
   padding-top: 8px;
   border-top: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
@@ -1597,13 +1723,16 @@
 .cardActionsMain {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
   min-width: 0;
   flex: 1;
 }
 
 .primaryActionButton:global(.btn.btn-sm) {
-  min-width: 0;
+  flex: 0 1 116px;
+  min-width: 82px;
+  max-width: 120px;
   padding-inline: 10px;
 }
 
@@ -1642,6 +1771,7 @@
 .cardUtilityActions {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 3px;
   padding: 2px;
   border-radius: 8px;
@@ -1653,7 +1783,7 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-left: auto;
+  margin-left: 8px;
 }
 
 .statusToggleLabel {
@@ -1689,6 +1819,7 @@
   .primaryActionButton:global(.btn.btn-sm) {
     flex: 1 1 auto;
     min-width: 0;
+    max-width: none;
   }
 
   .statusToggle {

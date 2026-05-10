@@ -13,7 +13,11 @@ import {
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
 import type { AuthFileItem } from '@/types';
-import { resolveAuthProvider, type CodexSubscriptionSnapshot } from '@/utils/quota';
+import {
+  formatCodexSubscriptionShortDate,
+  resolveAuthProvider,
+  type CodexSubscriptionSnapshot,
+} from '@/utils/quota';
 import {
   normalizeRecentRequestAuthIndex,
   normalizeRecentRequestBuckets,
@@ -101,7 +105,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const quotaType =
     quotaFilterType && resolveQuotaType(file) === quotaFilterType ? quotaFilterType : null;
 
-  const showQuotaLayout = Boolean(quotaType) && !isRuntimeOnly && !compact;
+  const showQuotaLayout =
+    Boolean(quotaType) && !isRuntimeOnly && (!compact || quotaType === 'codex');
 
   const providerCardClass =
     quotaType === 'antigravity'
@@ -163,6 +168,13 @@ export function AuthFileCard(props: AuthFileCardProps) {
         ? styles.subscriptionExpiryWarning
         : styles.subscriptionExpiryHealthy;
   const subscriptionExpiryLabel = visibleCodexSubscription?.subscriptionActiveUntil ?? '';
+  const subscriptionExpiryDisplayLabel = compact
+    ? formatCodexSubscriptionShortDate(
+        visibleCodexSubscription?.subscriptionActiveUntilMs,
+        subscriptionExpiryLabel
+      )
+    : subscriptionExpiryLabel;
+  const showSubscriptionMeta = Boolean(visibleCodexSubscription) && !showQuotaLayout;
 
   const setPriorityInput = (value: string) => {
     setPriorityDraft({ fileName: file.name, value, dirty: true });
@@ -359,14 +371,18 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 {prioritySaving && <LoadingSpinner size={12} />}
               </div>
             )}
-            {visibleCodexSubscription && (
+            {showSubscriptionMeta && (
               <div className={`${styles.metaItem} ${styles.subscriptionExpiryMeta}`}>
-                <span className={styles.metaLabel}>{t('codex_quota.subscription_expiry_label')}</span>
+                <span className={styles.metaLabel}>
+                  {compact
+                    ? t('auth_files.subscription_expiry_short_label')
+                    : t('codex_quota.subscription_expiry_label')}
+                </span>
                 <span
                   className={`${styles.subscriptionExpiryPill} ${subscriptionExpiryClass}`}
                   title={subscriptionExpiryLabel || undefined}
                 >
-                  {subscriptionExpiryLabel}
+                  {subscriptionExpiryDisplayLabel}
                 </span>
               </div>
             )}
@@ -396,6 +412,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 file={file}
                 quotaType={quotaType}
                 disableControls={disableControls}
+                compact={compact}
+                codexSubscriptionSnapshot={codexSubscriptionSnapshot}
               />
             )}
           </div>

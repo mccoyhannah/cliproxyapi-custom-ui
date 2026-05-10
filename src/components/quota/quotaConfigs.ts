@@ -67,6 +67,7 @@ import {
   buildGeminiCliQuotaBuckets,
   buildKimiQuotaRows,
   EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT,
+  formatCodexSubscriptionShortDate,
   readCodexSubscriptionSnapshotFromRecord,
   createStatusError,
   getStatusFromError,
@@ -863,9 +864,22 @@ const renderCodexItems = (
   const { createElement: h, Fragment } = React;
   const windows = quota.windows ?? [];
   const planType = quota.planType ?? null;
-  const subscriptionActiveUntil = quota.subscriptionActiveUntil ?? null;
-  const subscriptionActiveUntilMs = quota.subscriptionActiveUntilMs ?? null;
-  const subscriptionStatus = quota.subscriptionStatus ?? 'missing';
+  const subscriptionSnapshot =
+    helpers.codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
+    helpers.codexSubscriptionSnapshot.subscriptionActiveUntil
+      ? helpers.codexSubscriptionSnapshot
+      : null;
+  const subscriptionActiveUntil =
+    subscriptionSnapshot?.subscriptionActiveUntil ?? quota.subscriptionActiveUntil ?? null;
+  const subscriptionActiveUntilMs =
+    subscriptionSnapshot?.subscriptionActiveUntilMs ?? quota.subscriptionActiveUntilMs ?? null;
+  const subscriptionStatus =
+    subscriptionSnapshot?.subscriptionStatus ?? quota.subscriptionStatus ?? 'missing';
+  const isAuthCard =
+    helpers.displayMode === 'auth-card' || helpers.displayMode === 'auth-card-compact';
+  const isCompactAuthCard = helpers.displayMode === 'auth-card-compact';
+  const hasSubscriptionExpiry =
+    subscriptionStatus === 'found' && Boolean(subscriptionActiveUntil);
 
   const getPlanLabel = (pt?: string | null): string | null => {
     const normalized = normalizePlanType(pt);
@@ -904,7 +918,8 @@ const renderCodexItems = (
     key: string,
     labelKey: string,
     value: ReactNode,
-    valueClassName = styleMap.codexPlanDateValue
+    valueClassName = styleMap.codexPlanDateValue,
+    title?: string | null
   ) => {
     if (!value) return;
     infoRows.push(
@@ -912,7 +927,7 @@ const renderCodexItems = (
         'div',
         { key, className: styleMap.codexInfoItem },
         h('span', { className: styleMap.codexPlanLabel }, t(labelKey)),
-        h('span', { className: valueClassName }, value)
+        h('span', { className: valueClassName, title: title || undefined }, value)
       )
     );
   };
@@ -924,19 +939,52 @@ const renderCodexItems = (
     : `${styleMap.codexPlanValue} ${styleMap.codexValueMuted}`;
   pushInfoRow('plan', 'codex_quota.plan_label', planDisplayValue, planValueClass);
 
-  pushInfoRow(
-    'subscription-expiry',
-    'codex_quota.subscription_expiry_label',
-    resolveSubscriptionValue(),
-    [
-      styleMap.codexPlanDateValue,
-      styleMap.codexSubscriptionValue,
-      subscriptionStatusClass,
-    ].filter(Boolean).join(' '),
-  );
+  if (isAuthCard && hasSubscriptionExpiry) {
+    infoRows.push(
+      h('span', { key: 'subscription-divider', className: styleMap.codexInfoDivider }, '·')
+    );
+  }
+
+  if (!isAuthCard || hasSubscriptionExpiry) {
+    const subscriptionValue =
+      isCompactAuthCard && hasSubscriptionExpiry
+        ? formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil)
+        : resolveSubscriptionValue();
+
+    pushInfoRow(
+      'subscription-expiry',
+      isAuthCard
+        ? 'auth_files.subscription_expiry_short_label'
+        : 'codex_quota.subscription_expiry_label',
+      subscriptionValue,
+      [
+        styleMap.codexPlanDateValue,
+        styleMap.codexSubscriptionValue,
+        subscriptionStatusClass,
+      ].filter(Boolean).join(' '),
+      hasSubscriptionExpiry ? subscriptionActiveUntil : null
+    );
+  }
 
   if (infoRows.length > 0) {
-    nodes.push(h('div', { key: 'codex-info', className: styleMap.codexInfoGrid }, ...infoRows));
+    nodes.push(
+      h(
+        'div',
+        {
+          key: 'codex-info',
+          className: [
+            styleMap.codexInfoGrid,
+            isAuthCard ? styleMap.codexInfoGridAuthCard : '',
+            isCompactAuthCard ? styleMap.codexInfoGridCompact : '',
+          ].filter(Boolean).join(' '),
+        },
+        ...infoRows
+      )
+    );
+  }
+
+  if (isCompactAuthCard) {
+    return h(Fragment, null, ...nodes);
   }
 
   if (windows.length === 0) {
