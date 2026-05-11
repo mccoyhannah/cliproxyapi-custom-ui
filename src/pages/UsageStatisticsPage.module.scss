@@ -5,7 +5,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: 20px;
 }
 
 .pageHeader {
@@ -32,6 +32,7 @@
   color: var(--text-primary);
   font-size: 27px;
   font-weight: 780;
+  line-height: 1.15;
   letter-spacing: 0;
 }
 

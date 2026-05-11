@@ -4,19 +4,20 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: 20px;
 }
 
 .pageHeader {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
+  gap: 6px;
 }
 
 .pageTitle {
   font-size: 28px;
   font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.15;
   margin: 0;
 }
 
