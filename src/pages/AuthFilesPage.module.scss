@@ -657,7 +657,9 @@
 }
 
 .codexQuotaSummaryLine {
+  align-items: center;
   flex-wrap: nowrap;
+  gap: 4px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -665,7 +667,7 @@
   white-space: nowrap;
 
   .codexInfoDivider {
-    flex: 0 0 auto;
+    display: none;
   }
 }
 
@@ -708,26 +710,35 @@
 .codexCompactChip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-secondary) 84%, var(--bg-primary));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
 }
 
 .codexCompactPlanChip {
   flex: 0 0 auto;
-  color: var(--text-primary);
+  color: color-mix(in srgb, var(--text-primary) 88%, var(--text-secondary));
+  background: color-mix(in srgb, var(--bg-tertiary) 72%, var(--bg-primary));
 }
 
 .codexCompactQuotaChip {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
+  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 86%, var(--bg-primary));
 }
 
 .codexValueMuted {
@@ -748,7 +759,8 @@
 .codexSubscriptionValue {
   width: fit-content;
   max-width: 170px;
-  padding: 2px 7px;
+  min-height: 18px;
+  padding: 1px 7px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
   background: color-mix(in srgb, currentColor 8%, transparent);
@@ -969,7 +981,7 @@
   }
 
   .codexQuotaSummaryLine {
-    gap: 3px;
+    gap: 4px;
   }
 
   .codexPlanLabel,

@@ -917,12 +917,7 @@ const renderCodexItems = (
 
   if (isCompactAuthCard) {
     const compactNodes: ReactNode[] = [];
-    const pushDivider = () => {
-      if (compactNodes.length === 0) return;
-      compactNodes.push(
-        h('span', { key: `divider-${compactNodes.length}`, className: styleMap.codexInfoDivider }, '·')
-      );
-    };
+    const compactTitleParts: string[] = [];
     const pushChip = (
       key: string,
       value: ReactNode,
@@ -930,7 +925,11 @@ const renderCodexItems = (
       title?: string | null
     ) => {
       if (!value) return;
-      pushDivider();
+      if (typeof value === 'string') {
+        compactTitleParts.push(value);
+      } else if (title) {
+        compactTitleParts.push(title);
+      }
       compactNodes.push(
         h(
           'span',
@@ -992,6 +991,7 @@ const renderCodexItems = (
           styleMap.codexInfoGridCompact,
           styleMap.codexQuotaSummaryLine,
         ].filter(Boolean).join(' '),
+        title: compactTitleParts.join(' / ') || undefined,
       },
       ...compactNodes
     );
