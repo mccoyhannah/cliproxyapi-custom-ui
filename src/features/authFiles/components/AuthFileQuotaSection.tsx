@@ -38,11 +38,19 @@ export type AuthFileQuotaSectionProps = {
   quotaType: QuotaProviderType;
   disableControls: boolean;
   compact?: boolean;
+  summaryOnly?: boolean;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
 };
 
 export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
-  const { file, quotaType, disableControls, compact = false, codexSubscriptionSnapshot } = props;
+  const {
+    file,
+    quotaType,
+    disableControls,
+    compact = false,
+    summaryOnly = false,
+    codexSubscriptionSnapshot,
+  } = props;
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
   const [referenceTimeMs] = useState(() => Date.now());
@@ -121,7 +129,24 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       ? codexSubscriptionSnapshot
       : null;
 
-  if (compact) {
+  if ((compact || summaryOnly) && quotaType === 'codex') {
+    if (quotaStatus === 'success' && quota) {
+      const content = config.renderQuotaItems(quota, t, {
+        styles,
+        QuotaProgressBar,
+        displayMode: 'auth-card-compact',
+        codexSubscriptionSnapshot,
+      }) as ReactNode;
+
+      if (!content) return null;
+
+      return (
+        <div className={`${styles.quotaSection} ${styles.quotaSectionCompact}`}>
+          {content}
+        </div>
+      );
+    }
+
     if (!compactCodexExpiry) return null;
 
     const expiryMs = compactCodexExpiry.subscriptionActiveUntilMs;
@@ -154,6 +179,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       </div>
     );
   }
+
+  if (compact) return null;
 
   return (
     <div className={styles.quotaSection}>

@@ -535,6 +535,8 @@
     "priority_decrease": "降低优先级",
     "priority_increase": "提高优先级",
     "subscription_expiry_short_label": "有效到",
+    "codex_quota_five_hour_short": "5h",
+    "codex_quota_weekly_short": "周",
     "page_size_label": "单页数量",
     "page_size_unit": "个/页",
     "view_mode_paged": "按页显示",

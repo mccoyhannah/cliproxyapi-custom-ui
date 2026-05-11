@@ -47,9 +47,17 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
       setLoading: (loading: boolean, scope?: QuotaScope | null) => void,
       options: LoadQuotaOptions = {}
     ): Promise<boolean> => {
-      if (loadingRef.current || targets.length === 0) return false;
+      const quotaStore = useQuotaStore.getState();
+      if (
+        loadingRef.current ||
+        quotaStore.quotaRefreshInFlight[config.type] ||
+        targets.length === 0
+      ) {
+        return false;
+      }
 
       loadingRef.current = true;
+      quotaStore.setQuotaRefreshInFlight(config.type, true);
       const requestId = ++requestIdRef.current;
       options.onStart?.();
       if (!options.silent) {
@@ -110,6 +118,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
             setLoading(false);
           }
           loadingRef.current = false;
+          useQuotaStore.getState().setQuotaRefreshInFlight(config.type, false);
         }
       }
     },

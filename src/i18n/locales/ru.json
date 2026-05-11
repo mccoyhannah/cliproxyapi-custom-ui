@@ -535,6 +535,8 @@
     "priority_decrease": "Понизить приоритет",
     "priority_increase": "Повысить приоритет",
     "subscription_expiry_short_label": "Действует до",
+    "codex_quota_five_hour_short": "5ч",
+    "codex_quota_weekly_short": "Нед",
     "page_size_label": "На странице",
     "page_size_unit": "элементов",
     "view_mode_paged": "Постранично",

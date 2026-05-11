@@ -102,11 +102,17 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const typeLabel = getTypeLabel(t, file.type || 'unknown');
   const providerIcon = getAuthFileIcon(file.type || 'unknown', resolvedTheme);
 
-  const quotaType =
-    quotaFilterType && resolveQuotaType(file) === quotaFilterType ? quotaFilterType : null;
+  const resolvedQuotaType = resolveQuotaType(file);
+  const selectedQuotaType =
+    quotaFilterType && resolvedQuotaType === quotaFilterType ? quotaFilterType : null;
+  const quotaType = selectedQuotaType ?? (resolvedQuotaType === 'codex' ? 'codex' : null);
 
   const showQuotaLayout =
-    Boolean(quotaType) && !isRuntimeOnly && (!compact || quotaType === 'codex');
+    Boolean(quotaType) &&
+    !isRuntimeOnly &&
+    (quotaType === 'codex' || (!compact && selectedQuotaType !== null));
+  const showQuotaSummaryOnly =
+    quotaType === 'codex' && (compact || selectedQuotaType !== 'codex');
 
   const providerCardClass =
     quotaType === 'antigravity'
@@ -150,7 +156,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const prioritySaving = priorityUpdating[file.name] === true;
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =
-    resolveQuotaType(file) === 'codex' &&
+    resolvedQuotaType === 'codex' &&
     codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot
@@ -413,6 +419,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 quotaType={quotaType}
                 disableControls={disableControls}
                 compact={compact}
+                summaryOnly={showQuotaSummaryOnly}
                 codexSubscriptionSnapshot={codexSubscriptionSnapshot}
               />
             )}

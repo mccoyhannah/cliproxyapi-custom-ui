@@ -23,6 +23,7 @@ interface QuotaStoreState {
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   quotaRefreshMeta: QuotaRefreshMetaByType;
+  quotaRefreshInFlight: Partial<Record<QuotaRefreshType, boolean>>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
@@ -32,6 +33,7 @@ interface QuotaStoreState {
     type: QuotaRefreshType,
     updater: QuotaUpdater<QuotaRefreshMeta>
   ) => void;
+  setQuotaRefreshInFlight: (type: QuotaRefreshType, inFlight: boolean) => void;
   clearQuotaCache: () => void;
 }
 
@@ -49,6 +51,7 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
   geminiCliQuota: {},
   kimiQuota: {},
   quotaRefreshMeta: {},
+  quotaRefreshInFlight: {},
   setAntigravityQuota: (updater) =>
     set((state) => ({
       antigravityQuota: resolveUpdater(updater, state.antigravityQuota)
@@ -84,6 +87,13 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
         }
       };
     }),
+  setQuotaRefreshInFlight: (type, inFlight) =>
+    set((state) => ({
+      quotaRefreshInFlight: {
+        ...state.quotaRefreshInFlight,
+        [type]: inFlight
+      }
+    })),
   clearQuotaCache: () =>
     set({
       antigravityQuota: {},
@@ -91,6 +101,7 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
       codexQuota: {},
       geminiCliQuota: {},
       kimiQuota: {},
-      quotaRefreshMeta: {}
+      quotaRefreshMeta: {},
+      quotaRefreshInFlight: {}
     })
 }));

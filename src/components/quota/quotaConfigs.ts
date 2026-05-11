@@ -914,6 +914,89 @@ const renderCodexItems = (
     if (subscriptionStatus === 'read_error') return t('codex_quota.subscription_read_error');
     return t('codex_quota.subscription_not_recorded');
   };
+
+  if (isCompactAuthCard) {
+    const compactNodes: ReactNode[] = [];
+    const pushDivider = () => {
+      if (compactNodes.length === 0) return;
+      compactNodes.push(
+        h('span', { key: `divider-${compactNodes.length}`, className: styleMap.codexInfoDivider }, '·')
+      );
+    };
+    const pushChip = (
+      key: string,
+      value: ReactNode,
+      className: string,
+      title?: string | null
+    ) => {
+      if (!value) return;
+      pushDivider();
+      compactNodes.push(
+        h(
+          'span',
+          {
+            key,
+            className: [styleMap.codexCompactChip, className].filter(Boolean).join(' '),
+            title: title || undefined,
+          },
+          value
+        )
+      );
+    };
+    const getCompactWindowLabel = (window: CodexQuotaWindow) => {
+      if (window.id === 'five-hour') return t('auth_files.codex_quota_five_hour_short');
+      if (window.id === 'weekly') return t('auth_files.codex_quota_weekly_short');
+      return window.labelKey
+        ? t(window.labelKey, window.labelParams as Record<string, string | number>)
+        : window.label;
+    };
+
+    if (planLabel) {
+      pushChip('plan', planDisplayValue, styleMap.codexCompactPlanChip, t('codex_quota.plan_label'));
+    }
+
+    windows.slice(0, 2).forEach((window) => {
+      const used = window.usedPercent;
+      const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
+      const remaining = clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
+      const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
+      const label = getCompactWindowLabel(window);
+      pushChip(
+        `window-${window.id}`,
+        `${label} ${percentLabel}`,
+        styleMap.codexCompactQuotaChip,
+        `${window.label} · ${percentLabel} · ${window.resetLabel}`
+      );
+    });
+
+    if (hasSubscriptionExpiry) {
+      pushChip(
+        'subscription-expiry',
+        formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil),
+        [
+          styleMap.codexSubscriptionValue,
+          subscriptionStatusClass,
+        ].filter(Boolean).join(' '),
+        subscriptionActiveUntil
+      );
+    }
+
+    if (compactNodes.length === 0) return null;
+
+    return h(
+      'div',
+      {
+        className: [
+          styleMap.codexInfoGrid,
+          styleMap.codexInfoGridAuthCard,
+          styleMap.codexInfoGridCompact,
+          styleMap.codexQuotaSummaryLine,
+        ].filter(Boolean).join(' '),
+      },
+      ...compactNodes
+    );
+  }
+
   const pushInfoRow = (
     key: string,
     labelKey: string,
@@ -981,10 +1064,6 @@ const renderCodexItems = (
         ...infoRows
       )
     );
-  }
-
-  if (isCompactAuthCard) {
-    return h(Fragment, null, ...nodes);
   }
 
   if (windows.length === 0) {

@@ -656,6 +656,19 @@
   gap: 4px;
 }
 
+.codexQuotaSummaryLine {
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+
+  .codexInfoDivider {
+    flex: 0 0 auto;
+  }
+}
+
 .codexInfoItem {
   display: inline-flex;
   align-items: center;
@@ -690,6 +703,31 @@
   color: var(--text-primary);
   text-transform: capitalize;
   white-space: nowrap;
+}
+
+.codexCompactChip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.codexCompactPlanChip {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+}
+
+.codexCompactQuotaChip {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
 }
 
 .codexValueMuted {
@@ -930,9 +968,25 @@
     gap: 4px;
   }
 
+  .codexQuotaSummaryLine {
+    gap: 3px;
+  }
+
   .codexPlanLabel,
   .codexPlanDateValue {
     font-size: 10px;
+  }
+
+  .codexCompactChip {
+    font-size: 10px;
+  }
+
+  .codexCompactQuotaChip {
+    max-width: 54px;
+  }
+
+  .codexCompactPlanChip {
+    max-width: 48px;
   }
 
   .codexSubscriptionValue {

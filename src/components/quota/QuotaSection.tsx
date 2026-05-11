@@ -190,6 +190,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       }),
     [filteredFiles, quota]
   );
+  const hasEveryExistingQuota = useMemo(
+    () =>
+      filteredFiles.every((file) => {
+        const status = quota[file.name]?.status;
+        return status === 'success' || status === 'error';
+      }),
+    [filteredFiles, quota]
+  );
 
   useEffect(() => {
     quotaRefreshMetaRef.current = quotaRefreshMeta;
@@ -309,7 +317,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     const stale =
       lastCompletedAt !== null && Date.now() - lastCompletedAt >= AUTO_REFRESH_INTERVAL_MS;
 
-    if (!signatureChanged && !missingSessionRefresh && !stale && hasAnyExistingQuota) {
+    if (!signatureChanged && !missingSessionRefresh && !stale && hasEveryExistingQuota) {
       return;
     }
 
@@ -320,6 +328,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     disabled,
     filteredFiles,
     hasAnyExistingQuota,
+    hasEveryExistingQuota,
     loading,
     quotaRefreshMeta,
     refreshAutoQuota,
