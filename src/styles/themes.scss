@@ -227,3 +227,60 @@
     --glass-border: var(--border-color);
   }
 }
+
+// 运维控制台 polish token：在不改变现有 API/组件契约的前提下，为核心界面提供更清晰的状态语义和表面层级。
+:root {
+  --ops-accent: #0f766e;
+  --ops-accent-strong: #0b5f59;
+  --ops-accent-soft: rgba(15, 118, 110, 0.11);
+  --ops-info: #2563eb;
+  --ops-warning: #b7791f;
+  --ops-danger: #d14343;
+  --ops-success: #0f9f72;
+  --ops-ink: #15201d;
+  --ops-ink-muted: #63716a;
+  --ops-surface-1: #ffffff;
+  --ops-surface-2: #f6f9f6;
+  --ops-surface-3: #eef4f0;
+  --ops-border-subtle: #d7e0da;
+  --ops-border-strong: #afc1b8;
+  --ops-panel-shadow: 0 22px 60px -42px rgb(13 32 27 / 0.42);
+  --ops-control-shadow: 0 1px 2px rgb(12 25 21 / 0.08);
+  --ops-brand-panel: #101817;
+  --ops-brand-panel-alt: #172421;
+}
+
+[data-theme='white'] {
+  --ops-accent: #0f766e;
+  --ops-accent-strong: #0a5c56;
+  --ops-accent-soft: rgba(15, 118, 110, 0.09);
+  --ops-surface-1: #ffffff;
+  --ops-surface-2: #f8faf8;
+  --ops-surface-3: #f1f5f1;
+  --ops-border-subtle: #dbe4d8;
+  --ops-border-strong: #bdcab8;
+  --ops-panel-shadow: 0 20px 54px -44px rgb(10 24 20 / 0.38);
+  --ops-brand-panel: #111716;
+  --ops-brand-panel-alt: #1a2422;
+}
+
+[data-theme='dark'] {
+  --ops-accent: #2dd4bf;
+  --ops-accent-strong: #99f6e4;
+  --ops-accent-soft: rgba(45, 212, 191, 0.14);
+  --ops-info: #60a5fa;
+  --ops-warning: #f59e0b;
+  --ops-danger: #f87171;
+  --ops-success: #34d399;
+  --ops-ink: #f3f8f5;
+  --ops-ink-muted: #a9b8af;
+  --ops-surface-1: #171d1a;
+  --ops-surface-2: #1e2722;
+  --ops-surface-3: #26322c;
+  --ops-border-subtle: #334239;
+  --ops-border-strong: #53675d;
+  --ops-panel-shadow: 0 24px 62px -38px rgb(0 0 0 / 0.82);
+  --ops-control-shadow: 0 1px 2px rgb(0 0 0 / 0.28);
+  --ops-brand-panel: #0d1211;
+  --ops-brand-panel-alt: #14201d;
+}
