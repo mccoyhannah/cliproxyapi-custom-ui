@@ -878,6 +878,7 @@ const renderCodexItems = (
   const isAuthCard =
     helpers.displayMode === 'auth-card' || helpers.displayMode === 'auth-card-compact';
   const isCompactAuthCard = helpers.displayMode === 'auth-card-compact';
+  const useCompactCardVisualTone = isCompactAuthCard && helpers.compactAuthCard === true;
   const hasSubscriptionExpiry =
     subscriptionStatus === 'found' && Boolean(subscriptionActiveUntil);
 
@@ -960,6 +961,15 @@ const renderCodexItems = (
         ? t(window.labelKey, window.labelParams as Record<string, string | number>)
         : window.label;
     };
+    const getCompactQuotaToneClass = (remaining: number | null) => {
+      if (!useCompactCardVisualTone) return '';
+      if (remaining === null) return styleMap.codexCompactQuotaUnknown;
+      if (remaining <= 0) return styleMap.codexCompactQuotaEmpty;
+      if (remaining <= 20) return styleMap.codexCompactQuotaCritical;
+      if (remaining <= 40) return styleMap.codexCompactQuotaWarning;
+      if (remaining < 70) return styleMap.codexCompactQuotaNormal;
+      return styleMap.codexCompactQuotaHealthy;
+    };
 
     if (planLabel) {
       pushChip(
@@ -979,7 +989,10 @@ const renderCodexItems = (
       pushChip(
         `window-${window.id}`,
         `${label} ${percentLabel}`,
-        styleMap.codexCompactQuotaChip,
+        [
+          styleMap.codexCompactQuotaChip,
+          getCompactQuotaToneClass(remaining),
+        ].filter(Boolean).join(' '),
         `${window.label} · ${percentLabel} · ${window.resetLabel}`
       );
     });

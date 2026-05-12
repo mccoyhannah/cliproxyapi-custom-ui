@@ -135,6 +135,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         styles,
         QuotaProgressBar,
         displayMode: 'auth-card-compact',
+        compactAuthCard: compact,
         codexSubscriptionSnapshot,
       }) as ReactNode;
 

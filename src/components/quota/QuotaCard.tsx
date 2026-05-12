@@ -55,6 +55,7 @@ export interface QuotaRenderHelpers {
   styles: typeof styles;
   QuotaProgressBar: (props: QuotaProgressBarProps) => ReactElement;
   displayMode?: 'quota-page' | 'auth-card' | 'auth-card-compact';
+  compactAuthCard?: boolean;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
 }
 

@@ -12,9 +12,11 @@ import {
   IconTrash2,
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
+import { useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import {
   formatCodexSubscriptionShortDate,
+  normalizePlanType,
   resolveAuthProvider,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
@@ -113,6 +115,26 @@ export function AuthFileCard(props: AuthFileCardProps) {
     (quotaType === 'codex' || (!compact && selectedQuotaType !== null));
   const showQuotaSummaryOnly =
     quotaType === 'codex' && (compact || selectedQuotaType !== 'codex');
+  const codexQuotaPlanType = useQuotaStore((state) => {
+    if (resolvedQuotaType !== 'codex') return null;
+    const quota = state.codexQuota[file.name] as { status?: string; planType?: string | null } | undefined;
+    return quota?.status === 'success' ? quota.planType ?? null : null;
+  });
+  const compactCodexPlanType =
+    compact && resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
+  const compactCodexPlanToneClass =
+    compactCodexPlanType === 'team'
+      ? styles.fileCardCompactPlanTeam
+      : compactCodexPlanType === 'plus'
+        ? styles.fileCardCompactPlanPlus
+        : compactCodexPlanType === 'free'
+          ? styles.fileCardCompactPlanFree
+          : compactCodexPlanType === 'pro' ||
+              compactCodexPlanType === 'prolite' ||
+              compactCodexPlanType === 'pro-lite' ||
+              compactCodexPlanType === 'pro_lite'
+            ? styles.fileCardCompactPlanPremium
+            : '';
 
   const providerCardClass =
     quotaType === 'antigravity'
@@ -247,7 +269,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
 
   return (
     <div
-      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
+      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${compactCodexPlanToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
       <div className={styles.fileCardLayout}>
         <div className={styles.fileCardMain}>
