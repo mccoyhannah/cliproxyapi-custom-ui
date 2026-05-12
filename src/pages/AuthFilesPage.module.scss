@@ -687,9 +687,14 @@
 }
 
 .codexInfoDivider {
-  color: color-mix(in srgb, var(--text-tertiary) 82%, transparent);
-  font-size: 12px;
-  line-height: 1;
+  width: 1px;
+  height: 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-tertiary) 28%, transparent);
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  flex: 0 0 auto;
 }
 
 .codexPlanLabel {
@@ -706,6 +711,73 @@
   color: var(--text-primary);
   text-transform: capitalize;
   white-space: nowrap;
+}
+
+.codexPlanBadge {
+  position: relative;
+  gap: 4px;
+  width: fit-content;
+  min-height: 19px;
+  padding: 2px 7px 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--codex-plan-border, color-mix(in srgb, var(--border-color) 72%, transparent));
+  background: var(--codex-plan-bg, color-mix(in srgb, var(--bg-secondary) 84%, var(--bg-primary)));
+  color: var(--codex-plan-text, var(--text-primary));
+  box-shadow:
+    0 1px 2px var(--codex-plan-shadow, transparent),
+    0 0 0 1px color-mix(in srgb, #fff 18%, transparent) inset;
+  font-weight: 750;
+  line-height: 1.15;
+}
+
+.codexPlanBadge::before,
+.codexCompactPlanChip::before {
+  content: '';
+  width: 3px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--codex-plan-accent, currentColor);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--codex-plan-accent, currentColor) 18%, transparent);
+  flex: 0 0 auto;
+}
+
+.codexPlanToneTeam {
+  --codex-plan-text: #075766;
+  --codex-plan-bg: linear-gradient(135deg, #e1fbfb 0%, #c8f2f6 100%);
+  --codex-plan-border: rgba(14, 116, 144, 0.38);
+  --codex-plan-accent: #0891b2;
+  --codex-plan-shadow: rgba(8, 145, 178, 0.1);
+}
+
+.codexPlanTonePlus {
+  --codex-plan-text: #8a4b05;
+  --codex-plan-bg: linear-gradient(135deg, #fff7dc 0%, #ffe8a6 100%);
+  --codex-plan-border: rgba(217, 119, 6, 0.34);
+  --codex-plan-accent: #d97706;
+  --codex-plan-shadow: rgba(217, 119, 6, 0.12);
+}
+
+.codexPlanToneFree {
+  --codex-plan-text: #475569;
+  --codex-plan-bg: linear-gradient(135deg, #f8faf7 0%, #eef3ee 100%);
+  --codex-plan-border: rgba(100, 116, 139, 0.26);
+  --codex-plan-accent: #64748b;
+  --codex-plan-shadow: rgba(71, 85, 105, 0.06);
+}
+
+.codexPlanTonePremium {
+  --codex-plan-text: #6b4b00;
+  --codex-plan-bg: linear-gradient(135deg, #fff9e3 0%, #ffe07f 100%);
+  --codex-plan-border: rgba(217, 165, 22, 0.56);
+  --codex-plan-accent: #e0aa14;
+  --codex-plan-shadow: rgba(217, 165, 22, 0.14);
+}
+
+.codexPlanToneUnknown {
+  --codex-plan-text: var(--text-secondary);
+  --codex-plan-bg: color-mix(in srgb, var(--bg-tertiary) 64%, var(--bg-primary));
+  --codex-plan-border: color-mix(in srgb, var(--border-color) 76%, transparent);
+  --codex-plan-accent: var(--text-tertiary);
 }
 
 .codexCompactChip {
@@ -732,8 +804,13 @@
 
 .codexCompactPlanChip {
   flex: 0 0 auto;
-  color: color-mix(in srgb, var(--text-primary) 88%, var(--text-secondary));
-  background: color-mix(in srgb, var(--bg-tertiary) 72%, var(--bg-primary));
+  gap: 4px;
+  color: var(--codex-plan-text, color-mix(in srgb, var(--text-primary) 88%, var(--text-secondary)));
+  border-color: var(--codex-plan-border, color-mix(in srgb, var(--border-color) 74%, transparent));
+  background: var(--codex-plan-bg, color-mix(in srgb, var(--bg-tertiary) 72%, var(--bg-primary)));
+  box-shadow:
+    0 1px 2px var(--codex-plan-shadow, transparent),
+    0 0 0 1px color-mix(in srgb, #fff 14%, transparent) inset;
 }
 
 .codexCompactQuotaChip {
@@ -806,6 +883,38 @@
   background: rgba(226, 180, 50, 0.12);
   border-color: rgba(226, 180, 50, 0.28);
   color: #ffd862;
+}
+
+:global([data-theme='dark']) .codexPlanToneTeam {
+  --codex-plan-text: #8de7f2;
+  --codex-plan-bg: linear-gradient(135deg, rgba(14, 116, 144, 0.26), rgba(8, 145, 178, 0.14));
+  --codex-plan-border: rgba(103, 232, 249, 0.34);
+  --codex-plan-accent: #67e8f9;
+  --codex-plan-shadow: rgba(103, 232, 249, 0.12);
+}
+
+:global([data-theme='dark']) .codexPlanTonePlus {
+  --codex-plan-text: #fcd98b;
+  --codex-plan-bg: linear-gradient(135deg, rgba(146, 64, 14, 0.32), rgba(217, 119, 6, 0.15));
+  --codex-plan-border: rgba(251, 191, 36, 0.34);
+  --codex-plan-accent: #f59e0b;
+  --codex-plan-shadow: rgba(245, 158, 11, 0.12);
+}
+
+:global([data-theme='dark']) .codexPlanToneFree {
+  --codex-plan-text: #cbd5e1;
+  --codex-plan-bg: linear-gradient(135deg, rgba(71, 85, 105, 0.3), rgba(51, 65, 85, 0.18));
+  --codex-plan-border: rgba(148, 163, 184, 0.26);
+  --codex-plan-accent: #94a3b8;
+  --codex-plan-shadow: rgba(148, 163, 184, 0.08);
+}
+
+:global([data-theme='dark']) .codexPlanTonePremium {
+  --codex-plan-text: #fff0a8;
+  --codex-plan-bg: linear-gradient(135deg, #4f3d0b 0%, #8f6d10 100%);
+  --codex-plan-border: rgba(226, 180, 50, 0.58);
+  --codex-plan-accent: #ffd862;
+  --codex-plan-shadow: rgba(255, 196, 44, 0.18);
 }
 
 // 单个认证文件卡片

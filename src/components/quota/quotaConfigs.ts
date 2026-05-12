@@ -896,7 +896,18 @@ const renderCodexItems = (
 
   const planLabel = getPlanLabel(planType);
   const planDisplayValue = planLabel ?? t('codex_quota.plan_unknown');
-  const isPremiumPlan = PREMIUM_CODEX_PLAN_TYPES.has(normalizePlanType(planType) ?? '');
+  const normalizedPlanType = normalizePlanType(planType);
+  const isPremiumPlan = PREMIUM_CODEX_PLAN_TYPES.has(normalizedPlanType ?? '');
+  const planToneClass =
+    normalizedPlanType === 'team'
+      ? styleMap.codexPlanToneTeam
+      : normalizedPlanType === 'plus'
+        ? styleMap.codexPlanTonePlus
+        : normalizedPlanType === 'free'
+          ? styleMap.codexPlanToneFree
+          : isPremiumPlan
+            ? styleMap.codexPlanTonePremium
+            : styleMap.codexPlanToneUnknown;
   const nodes: ReactNode[] = [];
   const infoRows: ReactNode[] = [];
   const nowMs = Date.now();
@@ -951,7 +962,12 @@ const renderCodexItems = (
     };
 
     if (planLabel) {
-      pushChip('plan', planDisplayValue, styleMap.codexCompactPlanChip, t('codex_quota.plan_label'));
+      pushChip(
+        'plan',
+        planDisplayValue,
+        [styleMap.codexCompactPlanChip, planToneClass].filter(Boolean).join(' '),
+        `${t('codex_quota.plan_label')} ${planDisplayValue}`
+      );
     }
 
     windows.slice(0, 2).forEach((window) => {
@@ -1018,13 +1034,26 @@ const renderCodexItems = (
   const planValueClass = planLabel
     ? isPremiumPlan
       ? styleMap.premiumPlanValue
-      : styleMap.codexPlanValue
-    : `${styleMap.codexPlanValue} ${styleMap.codexValueMuted}`;
+      : [styleMap.codexPlanValue, styleMap.codexPlanBadge, planToneClass]
+          .filter(Boolean)
+          .join(' ')
+    : [
+        styleMap.codexPlanValue,
+        styleMap.codexPlanBadge,
+        styleMap.codexPlanToneUnknown,
+        styleMap.codexValueMuted,
+      ]
+        .filter(Boolean)
+        .join(' ');
   pushInfoRow('plan', 'codex_quota.plan_label', planDisplayValue, planValueClass);
 
   if (isAuthCard && hasSubscriptionExpiry) {
     infoRows.push(
-      h('span', { key: 'subscription-divider', className: styleMap.codexInfoDivider }, '·')
+      h('span', {
+        key: 'subscription-divider',
+        className: styleMap.codexInfoDivider,
+        'aria-hidden': true,
+      })
     );
   }
 
