@@ -120,8 +120,11 @@ export function AuthFileCard(props: AuthFileCardProps) {
     const quota = state.codexQuota[file.name] as { status?: string; planType?: string | null } | undefined;
     return quota?.status === 'success' ? quota.planType ?? null : null;
   });
+  const currentCodexPlanType =
+    resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
+  const currentCodexPlanIsFree = currentCodexPlanType === 'free';
   const compactCodexPlanType =
-    compact && resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
+    compact && resolvedQuotaType === 'codex' ? currentCodexPlanType : null;
   const compactCodexPlanToneClass =
     compactCodexPlanType === 'team'
       ? styles.fileCardCompactPlanTeam
@@ -179,6 +182,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =
     resolvedQuotaType === 'codex' &&
+    !currentCodexPlanIsFree &&
     codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot

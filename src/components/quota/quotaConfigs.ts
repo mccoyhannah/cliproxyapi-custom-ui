@@ -879,8 +879,10 @@ const renderCodexItems = (
     helpers.displayMode === 'auth-card' || helpers.displayMode === 'auth-card-compact';
   const isCompactAuthCard = helpers.displayMode === 'auth-card-compact';
   const useCompactCardVisualTone = isCompactAuthCard && helpers.compactAuthCard === true;
+  const normalizedPlanType = normalizePlanType(planType);
+  const currentPlanIsFree = normalizedPlanType === 'free';
   const hasSubscriptionExpiry =
-    subscriptionStatus === 'found' && Boolean(subscriptionActiveUntil);
+    !currentPlanIsFree && subscriptionStatus === 'found' && Boolean(subscriptionActiveUntil);
 
   const getPlanLabel = (pt?: string | null): string | null => {
     const normalized = normalizePlanType(pt);
@@ -897,7 +899,6 @@ const renderCodexItems = (
 
   const planLabel = getPlanLabel(planType);
   const planDisplayValue = planLabel ?? t('codex_quota.plan_unknown');
-  const normalizedPlanType = normalizePlanType(planType);
   const isPremiumPlan = PREMIUM_CODEX_PLAN_TYPES.has(normalizedPlanType ?? '');
   const planToneClass =
     normalizedPlanType === 'team'

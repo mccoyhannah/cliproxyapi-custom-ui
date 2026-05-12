@@ -58,8 +58,9 @@ import {
   writePersistedAuthFilesCompactMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
-import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
-import type { AuthFileItem } from '@/types';
+import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
+import type { AuthFileItem, CodexQuotaState } from '@/types';
+import { normalizePlanType } from '@/utils/quota';
 import styles from './AuthFilesPage.module.scss';
 
 const easePower3Out = (progress: number) => 1 - (1 - progress) ** 4;
@@ -90,6 +91,7 @@ export function AuthFilesPage() {
   const showNotification = useNotificationStore((state) => state.showNotification);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
+  const codexQuota = useQuotaStore((state) => state.codexQuota);
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
@@ -438,6 +440,14 @@ export function AuthFilesPage() {
   const codexSubscriptionSnapshots = useCodexSubscriptionSnapshots(filtered);
 
   const sorted = useMemo(() => {
+    const getEffectiveSubscriptionExpiry = (file: AuthFileItem) => {
+      const quota = codexQuota[file.name] as CodexQuotaState | undefined;
+      const currentPlanType =
+        quota?.status === 'success' ? normalizePlanType(quota.planType) : null;
+      if (currentPlanType === 'free') return null;
+      return codexSubscriptionSnapshots.get(file.name)?.subscriptionActiveUntilMs ?? null;
+    };
+
     const copy = [...filtered];
     if (sortMode === 'default') {
       copy.sort((a, b) => {
@@ -454,8 +464,8 @@ export function AuthFilesPage() {
     } else if (sortMode === 'expiry_soon' || sortMode === 'expiry_long') {
       const direction = sortMode === 'expiry_soon' ? 1 : -1;
       copy.sort((a, b) => {
-        const expiryA = codexSubscriptionSnapshots.get(a.name)?.subscriptionActiveUntilMs ?? null;
-        const expiryB = codexSubscriptionSnapshots.get(b.name)?.subscriptionActiveUntilMs ?? null;
+        const expiryA = getEffectiveSubscriptionExpiry(a);
+        const expiryB = getEffectiveSubscriptionExpiry(b);
 
         if (expiryA === null && expiryB === null) return comparePriorityThenName(a, b);
         if (expiryA === null) return 1;
@@ -466,7 +476,7 @@ export function AuthFilesPage() {
       });
     }
     return copy;
-  }, [codexSubscriptionSnapshots, filtered, sortMode]);
+  }, [codexQuota, codexSubscriptionSnapshots, filtered, sortMode]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
