@@ -12,14 +12,20 @@ function getVersion(): string {
     return process.env.VERSION;
   }
 
-  // 2. Try git tag
-  try {
-    const gitTag = execSync('git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
-    if (gitTag) {
-      return gitTag;
+  // 2. Try git tag. Keep this shell-portable; Windows cmd does not understand
+  // POSIX-style stderr redirects and `|| echo ""` the same way.
+  for (const command of ['git describe --tags --exact-match', 'git describe --tags']) {
+    try {
+      const gitTag = execSync(command, {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      if (gitTag) {
+        return gitTag;
+      }
+    } catch {
+      // Try the next fallback.
     }
-  } catch {
-    // Git not available or no tags
   }
 
   // 3. Fall back to package.json version
@@ -35,16 +41,37 @@ function getVersion(): string {
   return 'dev';
 }
 
+const appVersion = getVersion();
+const customUiBuildId =
+  process.env.CUSTOM_UI_BUILD_ID ||
+  `${appVersion}-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`;
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    {
+      name: 'custom-ui-build-id',
+      transformIndexHtml() {
+        return [
+          {
+            tag: 'meta',
+            attrs: {
+              name: 'custom-ui-build-id',
+              content: customUiBuildId,
+            },
+            injectTo: 'head',
+          },
+        ];
+      },
+    },
     viteSingleFile({
       removeViteModuleLoader: true
     })
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(getVersion())
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __CUSTOM_UI_BUILD_ID__: JSON.stringify(customUiBuildId)
   },
   resolve: {
     alias: {

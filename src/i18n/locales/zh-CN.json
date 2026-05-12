@@ -69,6 +69,12 @@
     "title": "正在自动登录...",
     "message": "正在使用本地保存的连接信息尝试连接服务器"
   },
+  "custom_ui_sync": {
+    "title": "发现新版控制台",
+    "manual_reload": "页面已更新，点一下就同步到新版。",
+    "auto_reload": "页面已更新，正在自动同步。",
+    "reload_now": "立即刷新"
+  },
   "login": {
     "subtitle": "请输入连接信息以访问管理界面",
     "connection_title": "连接地址",
@@ -928,9 +934,14 @@
     "oauth_callback_success": "回调 URL 已提交，请继续等待认证。",
     "oauth_callback_error": "提交回调 URL 失败:",
     "oauth_callback_upgrade_hint": "请更新CLI Proxy API或检查连接",
-    "oauth_callback_status_success": "回调 URL 已提交，等待认证中...",
-    "oauth_callback_status_error": "回调 URL 提交失败:",
-    "missing_state": "无法获取认证状态参数",
+      "oauth_callback_status_success": "回调 URL 已提交，等待认证中...",
+      "oauth_callback_status_error": "回调 URL 提交失败:",
+      "oauth_starting": "正在生成授权链接...",
+      "restart_auth": "重新开始认证",
+      "oauth_countdown": "预计剩余 {{time}}",
+      "oauth_estimate_expired": "已超过预计等待时间，可重新开始认证",
+      "oauth_timeout_message": "认证等待超时，可重新开始认证。",
+      "missing_state": "无法获取认证状态参数",
     "login_another_account": "登录另一个账号",
     "view_auth_files": "查看认证文件",
     "iflow_oauth_title": "iFlow OAuth",

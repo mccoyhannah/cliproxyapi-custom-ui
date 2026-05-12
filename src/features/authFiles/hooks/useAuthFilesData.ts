@@ -25,6 +25,11 @@ type DeleteAllOptions = {
   onResetEnabledOnly: () => void;
 };
 
+export type LoadAuthFilesOptions = {
+  silent?: boolean;
+  preserveExisting?: boolean;
+};
+
 export type UseAuthFilesDataResult = {
   files: AuthFileItem[];
   selectedFiles: Set<string>;
@@ -39,7 +44,7 @@ export type UseAuthFilesDataResult = {
   priorityUpdating: Record<string, boolean>;
   batchPriorityUpdating: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
-  loadFiles: () => Promise<void>;
+  loadFiles: (options?: LoadAuthFilesOptions) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleDelete: (name: string) => void;
@@ -168,8 +173,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     });
   }, [files, selectedFiles.size]);
 
-  const loadFiles = useCallback(async () => {
-    setLoading(true);
+  const loadFiles = useCallback(async (options: LoadAuthFilesOptions = {}) => {
+    if (!options.silent) {
+      setLoading(true);
+    }
     setError('');
     try {
       const data = await authFilesApi.list();
@@ -178,7 +185,9 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      if (!options.silent) {
+        setLoading(false);
+      }
     }
   }, [t]);
 
@@ -234,7 +243,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             `${t('auth_files.upload_success')}${suffix}`,
             result.failed.length ? 'warning' : 'success'
           );
-          await loadFiles();
+          await loadFiles({ preserveExisting: true, silent: true });
         }
 
         if (result.failed.length > 0) {

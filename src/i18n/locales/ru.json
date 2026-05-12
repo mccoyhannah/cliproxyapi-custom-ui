@@ -69,6 +69,12 @@
     "title": "Автовход...",
     "message": "Пытаемся подключиться к серверу, используя сохранённые данные"
   },
+  "custom_ui_sync": {
+    "title": "Доступна новая консоль",
+    "manual_reload": "Страница обновлена. Перезагрузите, чтобы синхронизировать её.",
+    "auto_reload": "Страница обновлена. Синхронизируем автоматически.",
+    "reload_now": "Перезагрузить"
+  },
   "login": {
     "subtitle": "Введите данные подключения, чтобы получить доступ к панели управления",
     "connection_title": "Адрес подключения",
@@ -924,10 +930,15 @@
     "oauth_callback_required": "Сначала вставьте полный URL перенаправления.",
     "oauth_callback_success": "Callback URL отправлен. Продолжайте ожидать аутентификацию.",
     "oauth_callback_error": "Не удалось отправить Callback URL:",
-    "oauth_callback_upgrade_hint": "Обновите CLI Proxy API или проверьте подключение.",
-    "oauth_callback_status_success": "Callback URL отправлен, ожидаем аутентификацию...",
-    "oauth_callback_status_error": "Не удалось отправить Callback URL:",
-    "missing_state": "Не удалось получить параметр состояния аутентификации",
+      "oauth_callback_upgrade_hint": "Обновите CLI Proxy API или проверьте подключение.",
+      "oauth_callback_status_success": "Callback URL отправлен, ожидаем аутентификацию...",
+      "oauth_callback_status_error": "Не удалось отправить Callback URL:",
+      "oauth_starting": "Создаём ссылку авторизации...",
+      "restart_auth": "Начать аутентификацию заново",
+      "oauth_countdown": "Осталось примерно {{time}}",
+      "oauth_estimate_expired": "Ожидаемое время истекло. Можно начать аутентификацию заново.",
+      "oauth_timeout_message": "Ожидание аутентификации истекло. Можно начать заново.",
+      "missing_state": "Не удалось получить параметр состояния аутентификации",
     "login_another_account": "Войти в другой аккаунт",
     "view_auth_files": "Открыть файлы авторизации",
     "iflow_oauth_title": "iFlow OAuth",

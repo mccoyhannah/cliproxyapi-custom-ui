@@ -115,6 +115,8 @@ export function AuthFilesPage() {
   const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
   const previousSelectionCountRef = useRef(0);
   const selectionCountRef = useRef(0);
+  const loadedFilesOnceRef = useRef(false);
+  const filesLengthRef = useRef(0);
 
   const {
     files,
@@ -149,6 +151,10 @@ export function AuthFilesPage() {
   } = useAuthFilesData();
 
   const statusBarCache = useAuthFilesStatusBarCache(files);
+
+  useEffect(() => {
+    filesLengthRef.current = files.length;
+  }, [files.length]);
 
   const {
     excluded,
@@ -339,27 +345,32 @@ export function AuthFilesPage() {
       if (!isAuthFilesSortMode(value) || value === sortMode) return;
       setSortMode(value);
       setPage(1);
-      void loadFiles().catch(() => {});
     },
-    [loadFiles, sortMode]
+    [sortMode]
   );
 
   const handleHeaderRefresh = useCallback(async () => {
-    await Promise.all([loadFiles(), loadExcluded(), loadModelAlias()]);
-  }, [loadFiles, loadExcluded, loadModelAlias]);
+    await Promise.all([
+      loadFiles({ preserveExisting: true, silent: files.length > 0 }),
+      loadExcluded(),
+      loadModelAlias(),
+    ]);
+  }, [files.length, loadFiles, loadExcluded, loadModelAlias]);
 
   useHeaderRefresh(handleHeaderRefresh);
 
   useEffect(() => {
     if (!isCurrentLayer) return;
-    loadFiles();
+    const preserveExisting = loadedFilesOnceRef.current || filesLengthRef.current > 0;
+    loadedFilesOnceRef.current = true;
+    loadFiles({ preserveExisting, silent: preserveExisting });
     loadExcluded();
     loadModelAlias();
   }, [isCurrentLayer, loadFiles, loadExcluded, loadModelAlias]);
 
   useInterval(
     () => {
-      void loadFiles().catch(() => {});
+      void loadFiles({ preserveExisting: true, silent: true }).catch(() => {});
     },
     isCurrentLayer ? 240_000 : null
   );
@@ -887,7 +898,7 @@ export function AuthFilesPage() {
               </div>
             </div>
 
-            {loading ? (
+            {loading && files.length === 0 ? (
               <div className={styles.hint}>{t('common.loading')}</div>
             ) : pageItems.length === 0 ? (
               <EmptyState
@@ -925,7 +936,7 @@ export function AuthFilesPage() {
               </div>
             )}
 
-            {!loading && sorted.length > pageSize && (
+            {sorted.length > pageSize && (
               <div className={styles.pagination}>
                 <Button
                   variant="secondary"

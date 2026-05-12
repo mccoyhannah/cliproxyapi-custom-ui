@@ -22,7 +22,10 @@ interface ProviderState {
   state?: string;
   status?: 'idle' | 'waiting' | 'success' | 'error';
   error?: string;
+  starting?: boolean;
   polling?: boolean;
+  startedAt?: number;
+  expiresAt?: number;
   projectId?: string;
   projectIdError?: string;
   callbackUrl?: string;
@@ -72,6 +75,8 @@ const PROVIDERS: { id: OAuthProvider; titleKey: string; hintKey: string; urlLabe
 
 const CALLBACK_SUPPORTED: OAuthProvider[] = ['codex', 'anthropic', 'antigravity', 'gemini-cli'];
 const SUCCESS_RESET_DELAY_MS = 5000;
+const OAUTH_WAIT_ESTIMATE_MS = 5 * 60 * 1000;
+const OAUTH_WAIT_WARNING_MS = 30 * 1000;
 const getProviderI18nPrefix = (provider: OAuthProvider) => provider.replace('-', '_');
 const getAuthKey = (provider: OAuthProvider, suffix: string) =>
   `auth_login.${getProviderI18nPrefix(provider)}_${suffix}`;
@@ -79,6 +84,18 @@ const getAuthKey = (provider: OAuthProvider, suffix: string) =>
 const getIcon = (icon: string | { light: string; dark: string }, theme: 'light' | 'dark') => {
   return typeof icon === 'string' ? icon : icon[theme];
 };
+
+const formatRemaining = (remainingMs: number) => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+const isTimeoutError = (message?: string) =>
+  Boolean(message && /timeout waiting for oauth callback/i.test(message));
+
+const readCurrentTimeMs = () => Date.now();
 
 export function OAuthPage() {
   const { t } = useTranslation();
@@ -93,7 +110,9 @@ export function OAuthPage() {
   });
   const pollingTimers = useRef<Partial<Record<OAuthProvider, number>>>({});
   const successResetTimers = useRef<Partial<Record<OAuthProvider, number>>>({});
+  const authRequestIdsRef = useRef<Partial<Record<OAuthProvider, number>>>({});
   const vertexFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const clearTimers = useCallback(() => {
     Object.values(pollingTimers.current).forEach((timer) => {
@@ -111,6 +130,16 @@ export function OAuthPage() {
       clearTimers();
     };
   }, [clearTimers]);
+
+  useEffect(() => {
+    const hasWaitingAttempt = Object.values(states).some(
+      (state) => state?.status === 'waiting' && Boolean(state.expiresAt)
+    );
+    if (!hasWaitingAttempt) return;
+
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [states]);
 
   const updateProviderState = (provider: OAuthProvider, next: Partial<ProviderState>) => {
     setStates((prev) => ({
@@ -163,7 +192,10 @@ export function OAuthPage() {
       state: undefined,
       status: 'success',
       error: undefined,
+      starting: false,
       polling: false,
+      startedAt: undefined,
+      expiresAt: undefined,
       callbackUrl: '',
       callbackSubmitting: false,
       callbackStatus: undefined,
@@ -174,16 +206,22 @@ export function OAuthPage() {
     }, SUCCESS_RESET_DELAY_MS);
   };
 
-  const startPolling = (provider: OAuthProvider, state: string) => {
+  const startPolling = (provider: OAuthProvider, state: string, requestId: number) => {
     clearPollingTimer(provider);
     const timer = window.setInterval(async () => {
       try {
         const res = await oauthApi.getAuthStatus(state);
+        if (authRequestIdsRef.current[provider] !== requestId) return;
         if (res.status === 'ok') {
           completeProviderAuth(provider);
           showNotification(t(getAuthKey(provider, 'oauth_status_success')), 'success');
         } else if (res.status === 'error') {
-          updateProviderState(provider, { status: 'error', error: res.error, polling: false });
+          updateProviderState(provider, {
+            status: 'error',
+            error: res.error,
+            starting: false,
+            polling: false,
+          });
           showNotification(
             `${t(getAuthKey(provider, 'oauth_status_error'))} ${res.error || ''}`,
             'error'
@@ -192,7 +230,13 @@ export function OAuthPage() {
           delete pollingTimers.current[provider];
         }
       } catch (err: unknown) {
-        updateProviderState(provider, { status: 'error', error: getErrorMessage(err), polling: false });
+        if (authRequestIdsRef.current[provider] !== requestId) return;
+        updateProviderState(provider, {
+          status: 'error',
+          error: getErrorMessage(err),
+          starting: false,
+          polling: false,
+        });
         window.clearInterval(timer);
         delete pollingTimers.current[provider];
       }
@@ -202,6 +246,9 @@ export function OAuthPage() {
 
   const startAuth = async (provider: OAuthProvider) => {
     clearProviderTimers(provider);
+    const requestId = (authRequestIdsRef.current[provider] ?? 0) + 1;
+    authRequestIdsRef.current[provider] = requestId;
+    const startedAt = readCurrentTimeMs();
     const geminiState = provider === 'gemini-cli' ? states[provider] : undefined;
     const rawProjectId = provider === 'gemini-cli' ? (geminiState?.projectId || '').trim() : '';
     const projectId = rawProjectId
@@ -217,7 +264,10 @@ export function OAuthPage() {
       url: undefined,
       state: undefined,
       status: 'waiting',
-      polling: true,
+      starting: true,
+      polling: false,
+      startedAt,
+      expiresAt: startedAt + OAUTH_WAIT_ESTIMATE_MS,
       error: undefined,
       callbackStatus: undefined,
       callbackError: undefined,
@@ -229,22 +279,37 @@ export function OAuthPage() {
         provider === 'gemini-cli' ? { projectId: projectId || undefined } : undefined
       );
       if (!res.state) {
+        if (authRequestIdsRef.current[provider] !== requestId) return;
         const message = t('auth_login.missing_state');
         updateProviderState(provider, {
           url: res.url,
           state: undefined,
           status: 'error',
           error: message,
+          starting: false,
           polling: false
         });
         showNotification(message, 'error');
         return;
       }
-      updateProviderState(provider, { url: res.url, state: res.state, status: 'waiting', polling: true });
-      startPolling(provider, res.state);
+      if (authRequestIdsRef.current[provider] !== requestId) return;
+      updateProviderState(provider, {
+        url: res.url,
+        state: res.state,
+        status: 'waiting',
+        starting: false,
+        polling: true,
+      });
+      startPolling(provider, res.state, requestId);
     } catch (err: unknown) {
+      if (authRequestIdsRef.current[provider] !== requestId) return;
       const message = getErrorMessage(err);
-      updateProviderState(provider, { status: 'error', error: message, polling: false });
+      updateProviderState(provider, {
+        status: 'error',
+        error: message,
+        starting: false,
+        polling: false,
+      });
       showNotification(
         `${t(getAuthKey(provider, 'oauth_start_error'))}${message ? ` ${message}` : ''}`,
         'error'
@@ -363,17 +428,38 @@ export function OAuthPage() {
         {PROVIDERS.map((provider) => {
           const state = states[provider.id] || {};
           const canSubmitCallback = CALLBACK_SUPPORTED.includes(provider.id) && Boolean(state.url);
+          const isWaiting = state.status === 'waiting';
+          const isError = state.status === 'error';
+          const remainingMs = state.expiresAt
+            ? Math.max(0, state.expiresAt - nowMs)
+            : OAUTH_WAIT_ESTIMATE_MS;
+          const waitingExpired = isWaiting && remainingMs <= 0;
+          const waitingWarning =
+            isWaiting && remainingMs > 0 && remainingMs <= OAUTH_WAIT_WARNING_MS;
+          const originalError = state.error || '';
+          const displayError = isTimeoutError(originalError)
+            ? t('auth_login.oauth_timeout_message')
+            : originalError;
           const loginButtonLabel =
-            state.status === 'success'
+            state.starting
+              ? t('auth_login.oauth_starting')
+              : isWaiting || isError
+                ? t('auth_login.restart_auth')
+                : state.status === 'success'
               ? t('auth_login.login_another_account')
               : t(getAuthKey(provider.id, 'oauth_button'));
-          const statusBadgeClassName = [
-            'status-badge',
-            state.status === 'success' ? 'success' : '',
-            state.status === 'error' ? 'error' : ''
+          const statusLineClassName = [
+            styles.authStatusLine,
+            state.status === 'success' ? styles.authStatusSuccess : '',
+            isError ? styles.authStatusError : '',
+            isWaiting ? styles.authStatusWaiting : '',
+            waitingWarning ? styles.authStatusWarning : '',
+            waitingExpired ? styles.authStatusExpired : ''
           ]
             .filter(Boolean)
             .join(' ');
+          const statusTitle =
+            isError && originalError && displayError !== originalError ? originalError : undefined;
           return (
             <div key={provider.id}>
               <Card
@@ -388,7 +474,7 @@ export function OAuthPage() {
                   </span>
                 }
                 extra={
-                  <Button onClick={() => startAuth(provider.id)} loading={state.polling}>
+                  <Button onClick={() => startAuth(provider.id)} loading={state.starting}>
                     {loginButtonLabel}
                   </Button>
                 }
@@ -402,7 +488,7 @@ export function OAuthPage() {
                         hint={t('auth_login.gemini_cli_project_id_hint')}
                         value={state.projectId || ''}
                         error={state.projectIdError}
-                        disabled={Boolean(state.polling)}
+                        disabled={Boolean(state.starting || state.polling)}
                         onChange={(e) =>
                           updateProviderState(provider.id, {
                             projectId: e.target.value,
@@ -469,12 +555,26 @@ export function OAuthPage() {
                     </div>
                   )}
                   {state.status && state.status !== 'idle' && (
-                    <div className={statusBadgeClassName}>
-                      {state.status === 'success'
-                        ? t(getAuthKey(provider.id, 'oauth_status_success'))
-                        : state.status === 'error'
-                          ? `${t(getAuthKey(provider.id, 'oauth_status_error'))} ${state.error || ''}`
-                          : t(getAuthKey(provider.id, 'oauth_status_waiting'))}
+                    <div className={statusLineClassName} title={statusTitle}>
+                      <span className={styles.authStatusDot} aria-hidden="true" />
+                      <span className={styles.authStatusText}>
+                        {state.status === 'success'
+                          ? t(getAuthKey(provider.id, 'oauth_status_success'))
+                          : isError
+                            ? `${t(getAuthKey(provider.id, 'oauth_status_error'))} ${displayError || t('common.unknown_error')}`
+                            : state.starting
+                              ? t('auth_login.oauth_starting')
+                              : waitingExpired
+                                ? t('auth_login.oauth_estimate_expired')
+                                : t(getAuthKey(provider.id, 'oauth_status_waiting'))}
+                      </span>
+                      {isWaiting && (
+                        <span className={styles.authCountdown}>
+                          {t('auth_login.oauth_countdown', {
+                            time: formatRemaining(remainingMs),
+                          })}
+                        </span>
+                      )}
                     </div>
                   )}
                   {state.status === 'success' && (

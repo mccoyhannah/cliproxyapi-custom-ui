@@ -69,6 +69,12 @@
     "title": "Auto Login in Progress...",
     "message": "Attempting to connect to server using locally saved connection information"
   },
+  "custom_ui_sync": {
+    "title": "New console available",
+    "manual_reload": "The page has been updated. Refresh to sync now.",
+    "auto_reload": "The page has been updated. Syncing automatically.",
+    "reload_now": "Reload now"
+  },
   "login": {
     "subtitle": "Please enter connection information to access the management interface",
     "connection_title": "Connection Address",
@@ -927,10 +933,15 @@
     "oauth_callback_required": "Please paste the full redirect URL first.",
     "oauth_callback_success": "Callback URL submitted. Continue waiting for authentication.",
     "oauth_callback_error": "Failed to submit callback URL:",
-    "oauth_callback_upgrade_hint": "Please update CLI Proxy API or check the connection.",
-    "oauth_callback_status_success": "Callback URL submitted, waiting for authentication...",
-    "oauth_callback_status_error": "Callback URL submission failed:",
-    "missing_state": "Unable to retrieve authentication state parameter",
+      "oauth_callback_upgrade_hint": "Please update CLI Proxy API or check the connection.",
+      "oauth_callback_status_success": "Callback URL submitted, waiting for authentication...",
+      "oauth_callback_status_error": "Callback URL submission failed:",
+      "oauth_starting": "Generating authorization link...",
+      "restart_auth": "Restart authentication",
+      "oauth_countdown": "About {{time}} left",
+      "oauth_estimate_expired": "Estimated wait time passed. You can restart authentication.",
+      "oauth_timeout_message": "Authentication wait timed out. You can restart authentication.",
+      "missing_state": "Unable to retrieve authentication state parameter",
     "login_another_account": "Log in another account",
     "view_auth_files": "View auth files",
     "iflow_oauth_title": "iFlow OAuth",
