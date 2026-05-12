@@ -86,6 +86,18 @@ const comparePriorityThenName = (a: AuthFileItem, b: AuthFileItem): number => {
   return priorityCompare !== 0 ? priorityCompare : a.name.localeCompare(b.name);
 };
 
+const getPrioritySortValue = (file: AuthFileItem): number =>
+  parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+
+const UNKNOWN_QUOTA_PRESSURE_RANK = 4;
+
+const getRemainingQuotaPressureRank = (remaining: number): number => {
+  if (remaining <= 20) return 0;
+  if (remaining <= 40) return 1;
+  if (remaining < 70) return 2;
+  return 3;
+};
+
 export function AuthFilesPage() {
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
@@ -440,12 +452,45 @@ export function AuthFilesPage() {
   const codexSubscriptionSnapshots = useCodexSubscriptionSnapshots(filtered);
 
   const sorted = useMemo(() => {
+    const originalIndexMap = new Map(filtered.map((file, index) => [file.name, index]));
+
     const getEffectiveSubscriptionExpiry = (file: AuthFileItem) => {
       const quota = codexQuota[file.name] as CodexQuotaState | undefined;
       const currentPlanType =
         quota?.status === 'success' ? normalizePlanType(quota.planType) : null;
       if (currentPlanType === 'free') return null;
       return codexSubscriptionSnapshots.get(file.name)?.subscriptionActiveUntilMs ?? null;
+    };
+
+    const getQuotaPressureRank = (file: AuthFileItem) => {
+      const quota = codexQuota[file.name] as CodexQuotaState | undefined;
+      if (quota?.status !== 'success') return UNKNOWN_QUOTA_PRESSURE_RANK;
+
+      const ranks = (quota.windows ?? [])
+        .slice(0, 2)
+        .map((window) => {
+          const used = window.usedPercent;
+          if (used === null || !Number.isFinite(used)) return null;
+          const clampedUsed = Math.max(0, Math.min(100, used));
+          const remaining = Math.max(0, Math.min(100, 100 - clampedUsed));
+          return getRemainingQuotaPressureRank(remaining);
+        })
+        .filter((rank): rank is number => rank !== null);
+
+      return ranks.length > 0 ? Math.min(...ranks) : UNKNOWN_QUOTA_PRESSURE_RANK;
+    };
+
+    const getOriginalIndex = (file: AuthFileItem) =>
+      originalIndexMap.get(file.name) ?? Number.MAX_SAFE_INTEGER;
+
+    const compareExpiryTie = (a: AuthFileItem, b: AuthFileItem) => {
+      const priorityCompare = getPrioritySortValue(b) - getPrioritySortValue(a);
+      if (priorityCompare !== 0) return priorityCompare;
+
+      const quotaPressureCompare = getQuotaPressureRank(a) - getQuotaPressureRank(b);
+      if (quotaPressureCompare !== 0) return quotaPressureCompare;
+
+      return getOriginalIndex(a) - getOriginalIndex(b);
     };
 
     const copy = [...filtered];
@@ -467,12 +512,12 @@ export function AuthFilesPage() {
         const expiryA = getEffectiveSubscriptionExpiry(a);
         const expiryB = getEffectiveSubscriptionExpiry(b);
 
-        if (expiryA === null && expiryB === null) return comparePriorityThenName(a, b);
+        if (expiryA === null && expiryB === null) return compareExpiryTie(a, b);
         if (expiryA === null) return 1;
         if (expiryB === null) return -1;
 
         const expiryCompare = (expiryA - expiryB) * direction;
-        return expiryCompare !== 0 ? expiryCompare : comparePriorityThenName(a, b);
+        return expiryCompare !== 0 ? expiryCompare : compareExpiryTie(a, b);
       });
     }
     return copy;
