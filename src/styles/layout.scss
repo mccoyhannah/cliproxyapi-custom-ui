@@ -8,6 +8,7 @@
   --sidebar-active-width: var(--sidebar-panel-width);
   --sidebar-gap: 32px;
   --floating-control-size: 38px;
+  --sidebar-motion: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .app-shell {
@@ -76,19 +77,26 @@
   border: 0;
 
   .sidebar-toggle-floating {
+    --sidebar-toggle-y: 0px;
+    --sidebar-toggle-scale: 1;
+
     position: absolute;
-    top: 40px;
-    left: calc(var(--shell-gutter) + var(--sidebar-active-width) - 16px);
-    width: 34px;
-    height: 38px;
+    top: 48px;
+    left: var(--shell-gutter);
+    width: 26px;
+    height: 50px;
     padding: 0;
-    border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
-    border-radius: 0 10px 10px 0;
-    background: color-mix(in srgb, var(--surface-card) 82%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+    border-left-color: color-mix(in srgb, var(--border-color) 36%, transparent);
+    border-radius: $radius-full;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0)),
+      color-mix(in srgb, var(--surface-card) 70%, transparent);
     color: var(--text-secondary);
     box-shadow:
-      0 12px 28px rgb(0 0 0 / 0.12),
-      inset 0 1px 0 rgb(255 255 255 / 0.04);
+      0 14px 30px -24px rgb(12 25 21 / 0.35),
+      inset 0 1px 0 rgb(255 255 255 / 0.14),
+      inset 1px 0 0 rgb(255 255 255 / 0.14);
     --glass-blur: 14px;
     backdrop-filter: var(--glass-backdrop-filter);
     -webkit-backdrop-filter: var(--glass-backdrop-filter);
@@ -97,22 +105,40 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    transform: translate3d(calc(var(--sidebar-active-width) - 13px), var(--sidebar-toggle-y), 0)
+      scale(var(--sidebar-toggle-scale));
+    will-change: transform;
     transition:
-      background $transition-fast,
+      background-color $transition-fast,
       border-color $transition-fast,
+      box-shadow $transition-fast,
       color $transition-fast,
-      transform $transition-fast,
-      left $transition-normal;
+      transform var(--sidebar-motion);
+
+    .sidebar-toggle-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(0deg);
+      transition: transform var(--sidebar-motion);
+      will-change: transform;
+    }
+
+    &.is-collapsed .sidebar-toggle-icon {
+      transform: rotate(180deg);
+    }
 
     &:hover {
       background: color-mix(in srgb, var(--surface-card-hover) 92%, transparent);
       border-color: color-mix(in srgb, var(--border-hover) 80%, transparent);
       color: var(--text-primary);
-      transform: translateY(-1px);
+      --sidebar-toggle-y: -1px;
+      --sidebar-toggle-scale: 1.02;
     }
 
     &:active {
-      transform: translateY(0);
+      --sidebar-toggle-y: 0px;
+      --sidebar-toggle-scale: 0.98;
     }
 
     &:focus-visible {
@@ -397,9 +423,10 @@
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   scrollbar-width: none;
   transition:
-    width $transition-normal,
-    transform $transition-normal,
-    padding $transition-normal;
+    width var(--sidebar-motion),
+    transform var(--sidebar-motion),
+    padding var(--sidebar-motion);
+  will-change: width;
 
   @supports (height: 100dvh) {
     height: calc(100dvh - var(--shell-gutter) - var(--shell-gutter));
@@ -417,10 +444,12 @@
       justify-content: center;
       padding-right: 0;
       padding-left: 0;
+      gap: 0;
     }
 
     .nav-item {
       justify-content: center;
+      gap: 0;
       padding: 10px;
     }
   }
@@ -445,6 +474,7 @@
   }
 
   .sidebar-brand-title {
+    max-width: 156px;
     min-width: 0;
     overflow: hidden;
     color: var(--text-primary);
@@ -452,6 +482,11 @@
     font-weight: 800;
     letter-spacing: 0;
     white-space: nowrap;
+    opacity: 1;
+    transition:
+      max-width var(--sidebar-motion),
+      opacity $transition-fast;
+    will-change: max-width, opacity;
   }
 
   .nav-section {
@@ -505,10 +540,16 @@
     }
 
     .nav-label {
+      max-width: 168px;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      opacity: 1;
+      transition:
+        max-width var(--sidebar-motion),
+        opacity $transition-fast;
+      will-change: max-width, opacity;
     }
 
     &:hover {
@@ -701,9 +742,14 @@
       width: var(--sidebar-panel-width);
       padding: 18px 14px;
 
-      .sidebar-brand,
+      .sidebar-brand {
+        justify-content: flex-start;
+        gap: 10px;
+      }
+
       .nav-item {
         justify-content: flex-start;
+        gap: $spacing-sm;
       }
     }
   }
@@ -730,6 +776,7 @@
       overflow: visible;
     }
   }
+
 }
 
 // Operations-console layout polish.
@@ -750,6 +797,24 @@
     box-shadow:
       0 18px 44px rgb(12 25 21 / 0.14),
       inset 0 1px 0 rgb(255 255 255 / 0.18);
+  }
+
+  .sidebar-toggle-floating {
+    border-color: color-mix(in srgb, var(--ops-accent) 18%, transparent);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0)),
+      color-mix(in srgb, var(--ops-accent-soft) 68%, var(--ops-surface-1));
+    box-shadow:
+      0 12px 26px -24px color-mix(in srgb, var(--ops-accent) 54%, transparent),
+      inset 0 1px 0 rgb(255 255 255 / 0.14),
+      inset 1px 0 0 color-mix(in srgb, var(--ops-accent) 16%, transparent);
+
+    &:hover {
+      background:
+        linear-gradient(180deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0)),
+        color-mix(in srgb, var(--ops-accent-soft) 88%, var(--ops-surface-1));
+      color: var(--ops-accent-strong);
+    }
   }
 
   .mobile-sidebar-actions .btn,
@@ -793,7 +858,15 @@
       width: 3px;
       border-radius: $radius-full;
       background: transparent;
-      transition: background $transition-fast, opacity $transition-fast;
+      transition:
+        background $transition-fast,
+        opacity $transition-fast,
+        top var(--sidebar-motion),
+        right var(--sidebar-motion),
+        bottom var(--sidebar-motion),
+        left var(--sidebar-motion),
+        width var(--sidebar-motion),
+        height var(--sidebar-motion);
     }
 
     &:hover {
@@ -826,6 +899,24 @@
         background: color-mix(in srgb, var(--ops-accent) 16%, var(--ops-surface-1));
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ops-accent) 30%, transparent);
       }
+    }
+  }
+
+  &.collapsed:not(.open) {
+    .sidebar-brand-title,
+    .nav-label {
+      max-width: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .nav-item::before {
+      top: auto;
+      right: 18px;
+      bottom: 5px;
+      left: 18px;
+      width: auto;
+      height: 3px;
     }
   }
 }

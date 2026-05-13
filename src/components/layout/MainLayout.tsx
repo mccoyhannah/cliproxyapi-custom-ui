@@ -237,7 +237,7 @@ export function MainLayout() {
   const fullBrandName = 'CLI Proxy API Management Center';
   const abbrBrandName = t('title.abbr');
   const isLogsPage = location.pathname.startsWith('/logs');
-  const showSidebarLabels = !sidebarCollapsed || sidebarOpen;
+  const isSidebarVisuallyCollapsed = sidebarCollapsed && !sidebarOpen;
 
   // 将顶部悬浮控制区高度写入 CSS 变量，供移动端粘性元素和浮层避让。
   useLayoutEffect(() => {
@@ -491,8 +491,10 @@ export function MainLayout() {
       <header className="main-header" ref={headerRef}>
         <button
           type="button"
-          className="sidebar-toggle-floating"
+          className={`sidebar-toggle-floating ${sidebarCollapsed ? 'is-collapsed' : ''}`}
           onClick={() => setSidebarCollapsed((prev) => !prev)}
+          aria-controls="primary-sidebar"
+          aria-expanded={!sidebarCollapsed}
           title={
             sidebarCollapsed
               ? t('sidebar.expand', { defaultValue: '展开' })
@@ -504,7 +506,7 @@ export function MainLayout() {
               : t('sidebar.collapse', { defaultValue: '收起' })
           }
         >
-          {sidebarCollapsed ? headerIcons.chevronRight : headerIcons.chevronLeft}
+          <span className="sidebar-toggle-icon">{headerIcons.chevronLeft}</span>
         </button>
 
         <div className="mobile-sidebar-actions">
@@ -653,11 +655,12 @@ export function MainLayout() {
         />
 
         <aside
+          id="primary-sidebar"
           className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}
         >
           <div className="sidebar-brand" title={fullBrandName}>
             <img src={INLINE_LOGO_JPEG} alt="CPAMC logo" className="sidebar-brand-logo" />
-            {showSidebarLabels && <span className="sidebar-brand-title">{abbrBrandName}</span>}
+            <span className="sidebar-brand-title">{abbrBrandName}</span>
           </div>
 
           <div className="nav-section">
@@ -667,10 +670,10 @@ export function MainLayout() {
                 to={item.path}
                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                 onClick={() => setSidebarOpen(false)}
-                title={showSidebarLabels ? undefined : item.label}
+                title={isSidebarVisuallyCollapsed ? item.label : undefined}
               >
                 <span className="nav-icon">{item.icon}</span>
-                {showSidebarLabels && <span className="nav-label">{item.label}</span>}
+                <span className="nav-label">{item.label}</span>
               </NavLink>
             ))}
           </div>
