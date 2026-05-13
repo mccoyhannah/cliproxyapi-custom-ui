@@ -60,7 +60,11 @@ import {
 } from '@/features/authFiles/uiState';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
-import { normalizePlanType } from '@/utils/quota';
+import {
+  compareCodexMinRemainingPercentAsc,
+  getCodexMinRemainingPercent,
+  normalizePlanType,
+} from '@/utils/quota';
 import styles from './AuthFilesPage.module.scss';
 
 const easePower3Out = (progress: number) => 1 - (1 - progress) ** 4;
@@ -88,15 +92,6 @@ const comparePriorityThenName = (a: AuthFileItem, b: AuthFileItem): number => {
 
 const getPrioritySortValue = (file: AuthFileItem): number =>
   parsePriorityValue(file.priority ?? file['priority']) ?? 0;
-
-const UNKNOWN_QUOTA_PRESSURE_RANK = 4;
-
-const getRemainingQuotaPressureRank = (remaining: number): number => {
-  if (remaining <= 20) return 0;
-  if (remaining <= 40) return 1;
-  if (remaining < 70) return 2;
-  return 3;
-};
 
 export function AuthFilesPage() {
   const { t } = useTranslation();
@@ -462,24 +457,6 @@ export function AuthFilesPage() {
       return codexSubscriptionSnapshots.get(file.name)?.subscriptionActiveUntilMs ?? null;
     };
 
-    const getQuotaPressureRank = (file: AuthFileItem) => {
-      const quota = codexQuota[file.name] as CodexQuotaState | undefined;
-      if (quota?.status !== 'success') return UNKNOWN_QUOTA_PRESSURE_RANK;
-
-      const ranks = (quota.windows ?? [])
-        .slice(0, 2)
-        .map((window) => {
-          const used = window.usedPercent;
-          if (used === null || !Number.isFinite(used)) return null;
-          const clampedUsed = Math.max(0, Math.min(100, used));
-          const remaining = Math.max(0, Math.min(100, 100 - clampedUsed));
-          return getRemainingQuotaPressureRank(remaining);
-        })
-        .filter((rank): rank is number => rank !== null);
-
-      return ranks.length > 0 ? Math.min(...ranks) : UNKNOWN_QUOTA_PRESSURE_RANK;
-    };
-
     const getOriginalIndex = (file: AuthFileItem) =>
       originalIndexMap.get(file.name) ?? Number.MAX_SAFE_INTEGER;
 
@@ -487,10 +464,14 @@ export function AuthFilesPage() {
       const priorityCompare = getPrioritySortValue(b) - getPrioritySortValue(a);
       if (priorityCompare !== 0) return priorityCompare;
 
-      const quotaPressureCompare = getQuotaPressureRank(a) - getQuotaPressureRank(b);
-      if (quotaPressureCompare !== 0) return quotaPressureCompare;
+      const remainingCompare = compareCodexMinRemainingPercentAsc(
+        getCodexMinRemainingPercent(codexQuota[a.name] as CodexQuotaState | undefined),
+        getCodexMinRemainingPercent(codexQuota[b.name] as CodexQuotaState | undefined)
+      );
+      if (remainingCompare !== 0) return remainingCompare;
 
-      return getOriginalIndex(a) - getOriginalIndex(b);
+      const originalCompare = getOriginalIndex(a) - getOriginalIndex(b);
+      return originalCompare !== 0 ? originalCompare : a.name.localeCompare(b.name);
     };
 
     const copy = [...filtered];

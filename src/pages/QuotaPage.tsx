@@ -19,6 +19,8 @@ import type { QuotaDashboardFilter, QuotaItemSignal } from '@/components/quota/Q
 import type { AuthFileItem, CodexQuotaState } from '@/types';
 import { parsePriorityValue } from '@/features/authFiles/constants';
 import {
+  compareCodexMinRemainingPercentAsc,
+  getCodexMinRemainingPercent,
   normalizePlanType,
   readCodexSubscriptionSnapshotFromRecord,
   resolveCodexPlanType,
@@ -39,7 +41,6 @@ type OverviewCounts = Record<QuotaDashboardFilter, number> & {
 };
 
 const SUBSCRIPTION_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
-const UNKNOWN_QUOTA_PRESSURE_RANK = 4;
 
 const getPrioritySortValue = (file: AuthFileItem): number =>
   parsePriorityValue(file.priority ?? file['priority']) ?? 0;
@@ -79,15 +80,6 @@ const getQuotaRemainingValues = (quota?: QuotaStateLike): number[] => {
 const getLowestRemainingPercent = (quota?: QuotaStateLike): number | null => {
   const values = getQuotaRemainingValues(quota);
   return values.length > 0 ? Math.min(...values) : null;
-};
-
-const getQuotaPressureRank = (quota?: QuotaStateLike): number => {
-  const remaining = getLowestRemainingPercent(quota);
-  if (remaining === null) return UNKNOWN_QUOTA_PRESSURE_RANK;
-  if (remaining <= 20) return 0;
-  if (remaining <= 40) return 1;
-  if (remaining < 70) return 2;
-  return 3;
 };
 
 const isQuotaTight = (quota?: QuotaStateLike): boolean => {
@@ -139,8 +131,11 @@ const sortCodexQuotaItems = (
     const priorityCompare = getPrioritySortValue(b) - getPrioritySortValue(a);
     if (priorityCompare !== 0) return priorityCompare;
 
-    const pressureCompare = getQuotaPressureRank(quota[a.name]) - getQuotaPressureRank(quota[b.name]);
-    if (pressureCompare !== 0) return pressureCompare;
+    const remainingCompare = compareCodexMinRemainingPercentAsc(
+      getCodexMinRemainingPercent(quota[a.name]),
+      getCodexMinRemainingPercent(quota[b.name])
+    );
+    if (remainingCompare !== 0) return remainingCompare;
 
     const originalCompare = getOriginalIndex(a) - getOriginalIndex(b);
     return originalCompare !== 0 ? originalCompare : a.name.localeCompare(b.name);
