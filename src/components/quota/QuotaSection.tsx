@@ -12,7 +12,7 @@ import { useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { getStatusFromError } from '@/utils/quota';
 import { QuotaCard } from './QuotaCard';
-import type { QuotaStatusState } from './QuotaCard';
+import type { QuotaCardBadge, QuotaStatusState } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
 import type { LoadQuotaOptions } from './useQuotaLoader';
 import type { QuotaConfig } from './quotaConfigs';
@@ -25,6 +25,22 @@ type QuotaUpdater<T> = T | ((prev: T) => T);
 type QuotaSetter<T> = (updater: QuotaUpdater<T>) => void;
 
 type ViewMode = 'paged' | 'all';
+export type QuotaDashboardFilter =
+  | 'all'
+  | 'available'
+  | 'tight'
+  | 'expiring'
+  | 'free'
+  | 'attention';
+
+export interface QuotaItemSignal {
+  available?: boolean;
+  tight?: boolean;
+  expiring?: boolean;
+  free?: boolean;
+  attention?: boolean;
+  badges?: QuotaCardBadge[];
+}
 
 const MAX_ITEMS_PER_PAGE = 25;
 const MAX_SHOW_ALL_THRESHOLD = 30;
@@ -100,6 +116,9 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   disabled: boolean;
   defaultViewMode?: ViewMode;
   autoRefreshOnReady?: boolean;
+  dashboardFilter?: QuotaDashboardFilter;
+  sortItems?: (items: AuthFileItem[], quota: Record<string, TState>) => AuthFileItem[];
+  getItemSignal?: (item: AuthFileItem, quota: TState | undefined) => QuotaItemSignal;
 }
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
@@ -108,7 +127,10 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   loading,
   disabled,
   defaultViewMode = 'paged',
-  autoRefreshOnReady = false
+  autoRefreshOnReady = false,
+  dashboardFilter = 'all',
+  sortItems,
+  getItemSignal
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -123,11 +145,27 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
 
-  const filteredFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [
-    files,
-    config
-  ]);
-  const showAllAllowed = filteredFiles.length <= MAX_SHOW_ALL_THRESHOLD;
+  const { quota, loadQuota } = useQuotaLoader(config);
+
+  const baseFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
+  const orderedFiles = useMemo(
+    () => (sortItems ? sortItems(baseFiles, quota) : baseFiles),
+    [baseFiles, quota, sortItems]
+  );
+  const displayFiles = useMemo(() => {
+    if (dashboardFilter === 'all' || !getItemSignal) return orderedFiles;
+
+    return orderedFiles.filter((file) => {
+      const signal = getItemSignal(file, quota[file.name]);
+      if (dashboardFilter === 'available') return signal.available === true;
+      if (dashboardFilter === 'tight') return signal.tight === true;
+      if (dashboardFilter === 'expiring') return signal.expiring === true;
+      if (dashboardFilter === 'free') return signal.free === true;
+      if (dashboardFilter === 'attention') return signal.attention === true;
+      return true;
+    });
+  }, [dashboardFilter, getItemSignal, orderedFiles, quota]);
+  const showAllAllowed = displayFiles.length <= MAX_SHOW_ALL_THRESHOLD;
   const effectiveViewMode: ViewMode = viewMode === 'all' && !showAllAllowed ? 'paged' : viewMode;
 
   const {
@@ -140,7 +178,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     goToNext,
     loading: sectionLoading,
     setLoading
-  } = useQuotaPagination(filteredFiles);
+  } = useQuotaPagination(displayFiles);
 
   useEffect(() => {
     if (showAllAllowed) return;
@@ -161,14 +199,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   // Update page size based on view mode and columns
   useEffect(() => {
     if (effectiveViewMode === 'all') {
-      setPageSize(Math.max(1, filteredFiles.length));
+      setPageSize(Math.max(1, displayFiles.length));
     } else {
       // Paged mode: 3 rows * columns, capped to avoid oversized pages.
       setPageSize(Math.min(columns * 3, MAX_ITEMS_PER_PAGE));
     }
-  }, [effectiveViewMode, columns, filteredFiles.length, setPageSize]);
-
-  const { quota, loadQuota } = useQuotaLoader(config);
+  }, [effectiveViewMode, columns, displayFiles.length, setPageSize]);
 
   const pendingQuotaRefreshRef = useRef(false);
   const prevFilesLoadingRef = useRef(loading);
@@ -178,25 +214,25 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const disabledRef = useRef(disabled);
 
   const autoRefreshSignature = useMemo(
-    () => filteredFiles.map((file) => file.name).join('|'),
-    [filteredFiles]
+    () => baseFiles.map((file) => file.name).join('|'),
+    [baseFiles]
   );
 
   const hasAnyExistingQuota = useMemo(
     () =>
-      filteredFiles.some((file) => {
+      baseFiles.some((file) => {
         const status = quota[file.name]?.status;
         return status === 'success' || status === 'error';
       }),
-    [filteredFiles, quota]
+    [baseFiles, quota]
   );
   const hasEveryExistingQuota = useMemo(
     () =>
-      filteredFiles.every((file) => {
+      baseFiles.every((file) => {
         const status = quota[file.name]?.status;
         return status === 'success' || status === 'error';
       }),
-    [filteredFiles, quota]
+    [baseFiles, quota]
   );
 
   useEffect(() => {
@@ -235,17 +271,17 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   const refreshAutoQuota = useCallback(
     (preserveExisting: boolean) => {
-      if (!autoRefreshSignature || filteredFiles.length === 0) {
+      if (!autoRefreshSignature || baseFiles.length === 0) {
         return Promise.resolve(false);
       }
       return loadQuota(
-        filteredFiles,
+        baseFiles,
         'all',
         setLoading,
         buildTrackedLoadOptions(preserveExisting)
       );
     },
-    [autoRefreshSignature, buildTrackedLoadOptions, filteredFiles, loadQuota, setLoading]
+    [autoRefreshSignature, baseFiles, buildTrackedLoadOptions, loadQuota, setLoading]
   );
 
   const handleRefresh = useCallback(() => {
@@ -263,12 +299,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
     pendingQuotaRefreshRef.current = false;
     const scope = effectiveViewMode === 'all' ? 'all' : 'page';
-    const targets = effectiveViewMode === 'all' ? filteredFiles : pageItems;
+    const targets = effectiveViewMode === 'all' ? displayFiles : pageItems;
     if (targets.length === 0) return;
     const shouldTrackRefresh =
       autoRefreshOnReady &&
       scope === 'all' &&
-      targets.length === filteredFiles.length;
+      targets.length === baseFiles.length;
     void loadQuota(
       targets,
       scope,
@@ -281,7 +317,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     autoRefreshOnReady,
     buildTrackedLoadOptions,
     effectiveViewMode,
-    filteredFiles,
+    baseFiles.length,
+    displayFiles,
     loadQuota,
     loading,
     pageItems,
@@ -290,13 +327,13 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   useEffect(() => {
     if (loading) return;
-    if (filteredFiles.length === 0) {
+    if (baseFiles.length === 0) {
       setQuota({});
       return;
     }
     setQuota((prev) => {
       const nextState: Record<string, TState> = {};
-      filteredFiles.forEach((file) => {
+      baseFiles.forEach((file) => {
         const cached = prev[file.name];
         if (cached) {
           nextState[file.name] = cached;
@@ -304,12 +341,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       });
       return nextState;
     });
-  }, [filteredFiles, loading, setQuota]);
+  }, [baseFiles, loading, setQuota]);
 
   useEffect(() => {
     if (!autoRefreshOnReady) return;
     if (disabled || loading || sectionLoading) return;
-    if (!autoRefreshSignature || filteredFiles.length === 0) return;
+    if (!autoRefreshSignature || baseFiles.length === 0) return;
 
     const signatureChanged = quotaRefreshMeta?.signature !== autoRefreshSignature;
     const lastCompletedAt = quotaRefreshMeta?.lastCompletedAt ?? null;
@@ -326,7 +363,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     autoRefreshOnReady,
     autoRefreshSignature,
     disabled,
-    filteredFiles,
+    baseFiles.length,
     hasAnyExistingQuota,
     hasEveryExistingQuota,
     loading,
@@ -337,7 +374,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   useEffect(() => {
     if (!autoRefreshOnReady) return;
-    if (disabled || loading || filteredFiles.length === 0 || !autoRefreshSignature) return;
+    if (disabled || loading || baseFiles.length === 0 || !autoRefreshSignature) return;
 
     const refreshIfStale = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
@@ -355,8 +392,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   }, [
     autoRefreshOnReady,
     autoRefreshSignature,
+    baseFiles.length,
     disabled,
-    filteredFiles.length,
     loading,
     refreshAutoQuota
   ]);
@@ -416,15 +453,18 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const titleNode = (
     <div className={styles.titleWrapper}>
       <span>{t(`${config.i18nPrefix}.title`)}</span>
-      {filteredFiles.length > 0 && (
+      {displayFiles.length > 0 && (
         <span className={styles.countBadge}>
-          {filteredFiles.length}
+          {displayFiles.length}
         </span>
       )}
     </div>
   );
 
   const isRefreshing = sectionLoading || loading;
+  const filterHidesAll = dashboardFilter !== 'all' && baseFiles.length > 0 && displayFiles.length === 0;
+
+  if (filterHidesAll) return null;
 
   return (
     <Card
@@ -449,7 +489,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 effectiveViewMode === 'all' ? styles.viewModeButtonActive : ''
               }`}
               onClick={() => {
-                if (filteredFiles.length > MAX_SHOW_ALL_THRESHOLD) {
+                if (displayFiles.length > MAX_SHOW_ALL_THRESHOLD) {
                   setShowTooManyWarning(true);
                 } else {
                   setViewMode('all');
@@ -475,7 +515,15 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         </div>
       }
     >
-      {filteredFiles.length === 0 ? (
+      {showTooManyWarning && (
+        <div className={styles.inlineWarning} role="status">
+          <span>{t('auth_files.too_many_files_warning')}</span>
+          <Button variant="ghost" size="sm" onClick={() => setShowTooManyWarning(false)}>
+            {t('common.close')}
+          </Button>
+        </div>
+      )}
+      {displayFiles.length === 0 ? (
         <EmptyState
           title={t(`${config.i18nPrefix}.empty_title`)}
           description={t(`${config.i18nPrefix}.empty_desc`)}
@@ -488,6 +536,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 key={item.name}
                 item={item}
                 quota={quota[item.name]}
+                statusBadges={getItemSignal?.(item, quota[item.name]).badges}
                 resolvedTheme={resolvedTheme}
                 i18nPrefix={config.i18nPrefix}
                 cardIdleMessageKey={config.cardIdleMessageKey}
@@ -499,7 +548,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
               />
             ))}
           </div>
-          {filteredFiles.length > pageSize && effectiveViewMode === 'paged' && (
+          {displayFiles.length > pageSize && effectiveViewMode === 'paged' && (
             <div className={styles.pagination}>
               <Button
                 variant="secondary"
@@ -513,7 +562,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 {t('auth_files.pagination_info', {
                   current: currentPage,
                   total: totalPages,
-                  count: filteredFiles.length
+                  count: displayFiles.length
                 })}
               </div>
               <Button
@@ -527,16 +576,6 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             </div>
           )}
         </>
-      )}
-      {showTooManyWarning && (
-        <div className={styles.warningOverlay} onClick={() => setShowTooManyWarning(false)}>
-          <div className={styles.warningModal} onClick={(e) => e.stopPropagation()}>
-            <p>{t('auth_files.too_many_files_warning')}</p>
-            <Button variant="primary" size="sm" onClick={() => setShowTooManyWarning(false)}>
-              {t('common.confirm')}
-            </Button>
-          </div>
-        </div>
       )}
     </Card>
   );

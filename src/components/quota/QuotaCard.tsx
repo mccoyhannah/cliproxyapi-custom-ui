@@ -11,6 +11,18 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
 
+export type QuotaCardBadgeTone =
+  | 'recommended'
+  | 'warning'
+  | 'danger'
+  | 'neutral'
+  | 'info';
+
+export interface QuotaCardBadge {
+  label: string;
+  tone: QuotaCardBadgeTone;
+}
+
 export interface QuotaStatusState {
   status: QuotaStatus;
   error?: string;
@@ -62,6 +74,7 @@ export interface QuotaRenderHelpers {
 interface QuotaCardProps<TState extends QuotaStatusState> {
   item: AuthFileItem;
   quota?: TState;
+  statusBadges?: QuotaCardBadge[];
   resolvedTheme: ResolvedTheme;
   i18nPrefix: string;
   cardIdleMessageKey?: string;
@@ -75,6 +88,7 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
 export function QuotaCard<TState extends QuotaStatusState>({
   item,
   quota,
+  statusBadges = [],
   resolvedTheme,
   i18nPrefix,
   cardIdleMessageKey,
@@ -121,6 +135,31 @@ export function QuotaCard<TState extends QuotaStatusState>({
           {getTypeLabel(displayType)}
         </span>
         <span className={styles.fileName}>{item.name}</span>
+        {statusBadges.length > 0 && (
+          <span className={styles.cardStatusBadges} aria-label={t('quota_management.card_status_badges')}>
+            {statusBadges.map((badge) => {
+              const toneClass =
+                badge.tone === 'recommended'
+                  ? styles.quotaStatusChipRecommended
+                  : badge.tone === 'warning'
+                    ? styles.quotaStatusChipWarning
+                    : badge.tone === 'danger'
+                      ? styles.quotaStatusChipDanger
+                      : badge.tone === 'info'
+                        ? styles.quotaStatusChipInfo
+                        : styles.quotaStatusChipNeutral;
+
+              return (
+                <span
+                  key={`${badge.tone}-${badge.label}`}
+                  className={`${styles.quotaStatusChip} ${toneClass}`}
+                >
+                  {badge.label}
+                </span>
+              );
+            })}
+          </span>
+        )}
       </div>
 
       <div className={styles.quotaSection}>

@@ -922,12 +922,6 @@ const renderCodexItems = (
       : subscriptionActiveUntilMs !== null && subscriptionActiveUntilMs - nowMs <= warningMs
         ? styleMap.codexSubscriptionWarning
         : styleMap.codexSubscriptionHealthy;
-  const resolveSubscriptionValue = () => {
-    if (subscriptionStatus === 'found' && subscriptionActiveUntil) return subscriptionActiveUntil;
-    if (subscriptionStatus === 'read_error') return t('codex_quota.subscription_read_error');
-    return t('codex_quota.subscription_not_recorded');
-  };
-
   if (isCompactAuthCard) {
     const compactNodes: ReactNode[] = [];
     const compactTitleParts: string[] = [];
@@ -1071,11 +1065,10 @@ const renderCodexItems = (
     );
   }
 
-  if (!isAuthCard || hasSubscriptionExpiry) {
-    const subscriptionValue =
-      isCompactAuthCard && hasSubscriptionExpiry
-        ? formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil)
-        : resolveSubscriptionValue();
+  if (hasSubscriptionExpiry) {
+    const subscriptionValue = isCompactAuthCard
+      ? formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil)
+      : subscriptionActiveUntil;
 
     pushInfoRow(
       'subscription-expiry',

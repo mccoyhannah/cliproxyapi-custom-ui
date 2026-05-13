@@ -13,6 +13,8 @@ import type { AuthFileItem } from '@/types';
 import {
   formatCodexSubscriptionShortDate,
   getStatusFromError,
+  normalizePlanType,
+  resolveCodexPlanType,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
 import {
@@ -124,6 +126,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
   const compactCodexExpiry =
     compact &&
     quotaType === 'codex' &&
+    normalizePlanType(resolveCodexPlanType(file)) !== 'free' &&
     codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot
