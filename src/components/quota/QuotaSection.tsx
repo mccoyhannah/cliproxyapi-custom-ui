@@ -105,7 +105,7 @@ const useQuotaPagination = <T,>(items: T[], defaultPageSize = 6): QuotaPaginatio
     goToNext,
     loading,
     loadingScope,
-    setLoading
+    setLoading,
   };
 };
 
@@ -130,7 +130,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   autoRefreshOnReady = false,
   dashboardFilter = 'all',
   sortItems,
-  getItemSignal
+  getItemSignal,
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -177,8 +177,17 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     goToPrev,
     goToNext,
     loading: sectionLoading,
-    setLoading
+    setLoading,
   } = useQuotaPagination(displayFiles);
+  const isRefreshing = sectionLoading || loading;
+  const refreshedCount = useMemo(
+    () =>
+      displayFiles.reduce((count, file) => {
+        const status = quota[file.name]?.status;
+        return status === 'success' || status === 'error' ? count + 1 : count;
+      }, 0),
+    [displayFiles, quota]
+  );
 
   useEffect(() => {
     if (showAllAllowed) return;
@@ -253,8 +262,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         setQuotaRefreshMeta(config.type, (prev) => ({
           signature: autoRefreshSignature,
           lastStartedAt: startedAt,
-          lastCompletedAt:
-            prev.signature === autoRefreshSignature ? prev.lastCompletedAt : null
+          lastCompletedAt: prev.signature === autoRefreshSignature ? prev.lastCompletedAt : null,
         }));
       },
       onComplete: () => {
@@ -262,9 +270,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         setQuotaRefreshMeta(config.type, (prev) => ({
           signature: autoRefreshSignature,
           lastStartedAt: prev.lastStartedAt ?? completedAt,
-          lastCompletedAt: completedAt
+          lastCompletedAt: completedAt,
         }));
-      }
+      },
     }),
     [autoRefreshSignature, config.type, setQuotaRefreshMeta]
   );
@@ -274,12 +282,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       if (!autoRefreshSignature || baseFiles.length === 0) {
         return Promise.resolve(false);
       }
-      return loadQuota(
-        baseFiles,
-        'all',
-        setLoading,
-        buildTrackedLoadOptions(preserveExisting)
-      );
+      return loadQuota(baseFiles, 'all', setLoading, buildTrackedLoadOptions(preserveExisting));
     },
     [autoRefreshSignature, baseFiles, buildTrackedLoadOptions, loadQuota, setLoading]
   );
@@ -302,16 +305,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     const targets = effectiveViewMode === 'all' ? displayFiles : pageItems;
     if (targets.length === 0) return;
     const shouldTrackRefresh =
-      autoRefreshOnReady &&
-      scope === 'all' &&
-      targets.length === baseFiles.length;
+      autoRefreshOnReady && scope === 'all' && targets.length === baseFiles.length;
     void loadQuota(
       targets,
       scope,
       setLoading,
-      shouldTrackRefresh
-        ? buildTrackedLoadOptions(true)
-        : { preserveExisting: true }
+      shouldTrackRefresh ? buildTrackedLoadOptions(true) : { preserveExisting: true }
     );
   }, [
     autoRefreshOnReady,
@@ -322,7 +321,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     loadQuota,
     loading,
     pageItems,
-    setLoading
+    setLoading,
   ]);
 
   useEffect(() => {
@@ -395,7 +394,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     baseFiles.length,
     disabled,
     loading,
-    refreshAutoQuota
+    refreshAutoQuota,
   ]);
 
   useEffect(() => {
@@ -424,14 +423,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
       setQuota((prev) => ({
         ...prev,
-        [file.name]: config.buildLoadingState()
+        [file.name]: config.buildLoadingState(),
       }));
 
       try {
         const data = await config.fetchQuota(file, t);
         setQuota((prev) => ({
           ...prev,
-          [file.name]: config.buildSuccessState(data)
+          [file.name]: config.buildSuccessState(data),
         }));
         showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
       } catch (err: unknown) {
@@ -439,7 +438,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         const status = getStatusFromError(err);
         setQuota((prev) => ({
           ...prev,
-          [file.name]: config.buildErrorState(message, status)
+          [file.name]: config.buildErrorState(message, status),
         }));
         showNotification(
           t('auth_files.quota_refresh_failed', { name: file.name, message }),
@@ -451,23 +450,40 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   );
 
   const titleNode = (
-    <div className={styles.titleWrapper}>
-      <span>{t(`${config.i18nPrefix}.title`)}</span>
-      {displayFiles.length > 0 && (
-        <span className={styles.countBadge}>
-          {displayFiles.length}
-        </span>
-      )}
+    <div className={styles.providerTitleGroup}>
+      <div className={styles.titleWrapper}>
+        <span>{t(`${config.i18nPrefix}.title`)}</span>
+        {displayFiles.length > 0 && (
+          <span className={styles.countBadge}>{displayFiles.length}</span>
+        )}
+      </div>
+      <span
+        className={`${styles.providerRefreshState} ${
+          isRefreshing ? styles.providerRefreshStateActive : ''
+        }`}
+        role={isRefreshing ? 'status' : undefined}
+      >
+        <span aria-hidden="true" />
+        {isRefreshing
+          ? t('quota_management.badge_refreshing')
+          : t('quota_management.section_refresh_progress', {
+              defaultValue: '{{refreshed}}/{{total}} checked',
+              refreshed: refreshedCount,
+              total: displayFiles.length,
+            })}
+      </span>
     </div>
   );
-
-  const isRefreshing = sectionLoading || loading;
-  const filterHidesAll = dashboardFilter !== 'all' && baseFiles.length > 0 && displayFiles.length === 0;
+  const filterHidesAll =
+    dashboardFilter !== 'all' && baseFiles.length > 0 && displayFiles.length === 0;
 
   if (filterHidesAll) return null;
 
   return (
     <Card
+      className={styles.providerSectionCard}
+      headerClassName={styles.providerSectionHeader}
+      density="compact"
       title={titleNode}
       extra={
         <div className={styles.headerActions}>
@@ -525,8 +541,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       )}
       {displayFiles.length === 0 ? (
         <EmptyState
-          title={t(`${config.i18nPrefix}.empty_title`)}
-          description={t(`${config.i18nPrefix}.empty_desc`)}
+          className={styles.quotaEmptyState}
+          variant={loading ? 'loading' : 'neutral'}
+          title={loading ? t('common.loading') : t(`${config.i18nPrefix}.empty_title`)}
+          description={
+            loading ? t(`${config.i18nPrefix}.loading`) : t(`${config.i18nPrefix}.empty_desc`)
+          }
         />
       ) : (
         <>
@@ -550,19 +570,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           </div>
           {displayFiles.length > pageSize && effectiveViewMode === 'paged' && (
             <div className={styles.pagination}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={goToPrev}
-                disabled={currentPage <= 1}
-              >
+              <Button variant="secondary" size="sm" onClick={goToPrev} disabled={currentPage <= 1}>
                 {t('auth_files.pagination_prev')}
               </Button>
               <div className={styles.pageInfo}>
                 {t('auth_files.pagination_info', {
                   current: currentPage,
                   total: totalPages,
-                  count: displayFiles.length
+                  count: displayFiles.length,
                 })}
               </div>
               <Button

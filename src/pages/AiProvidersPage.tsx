@@ -15,6 +15,8 @@ import {
   withDisableAllModelsRule,
   withoutDisableAllModelsRule,
 } from '@/components/providers/utils';
+import { Badge } from '@/components/ui/Badge';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { ampcodeApi, providersApi } from '@/services/api';
@@ -59,6 +61,21 @@ export function AiProvidersPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isSwitching = Boolean(configSwitchingKey);
+  const totalProviderConfigs =
+    geminiKeys.length +
+    codexConfigs.length +
+    claudeConfigs.length +
+    vertexConfigs.length +
+    openaiProviders.length +
+    (config?.ampcode ? 1 : 0);
+  const enabledOpenAiCount = openaiProviders.filter((provider) => !provider.disabled).length;
+  const enabledProviderConfigs =
+    geminiKeys.length +
+    codexConfigs.length +
+    claudeConfigs.length +
+    vertexConfigs.length +
+    enabledOpenAiCount +
+    (config?.ampcode ? 1 : 0);
 
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
@@ -407,9 +424,63 @@ export function AiProvidersPage() {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.pageTitle}>{t('ai_providers.title')}</h1>
+      <div className={styles.pageHeader}>
+        <div>
+          <h1 className={styles.pageTitle}>{t('ai_providers.title')}</h1>
+          <p className={styles.description}>
+            {t('ai_providers.description', {
+              defaultValue: 'Manage upstream model providers, routing keys and compatibility entries.'
+            })}
+          </p>
+        </div>
+        <div className={styles.headerBadges}>
+          <Badge variant={connectionStatus === 'connected' ? 'success' : 'error'} dot>
+            {connectionStatus === 'connected'
+              ? t('common.connected_status')
+              : t('common.disconnected_status')}
+          </Badge>
+          <Badge variant={isSwitching ? 'warning' : 'info'}>
+            {isSwitching
+              ? t('common.update')
+              : t('ai_providers.provider_total', {
+                  count: totalProviderConfigs,
+                  defaultValue: `${totalProviderConfigs} providers`
+                })}
+          </Badge>
+        </div>
+      </div>
       <div className={styles.content}>
         {error && <div className="error-box">{error}</div>}
+
+        <section className={styles.providerConsole} aria-label={t('ai_providers.title')}>
+          {loading && totalProviderConfigs === 0 ? (
+            <>
+              <Skeleton variant="metric" rows={2} />
+              <Skeleton variant="metric" rows={2} />
+              <Skeleton variant="metric" rows={2} />
+              <Skeleton variant="metric" rows={2} />
+            </>
+          ) : (
+            <>
+              <div className={styles.providerMetric}>
+                <span>{t('ai_providers.metric_total', { defaultValue: 'Total configs' })}</span>
+                <strong>{totalProviderConfigs}</strong>
+              </div>
+              <div className={styles.providerMetric}>
+                <span>{t('ai_providers.metric_enabled', { defaultValue: 'Enabled' })}</span>
+                <strong>{enabledProviderConfigs}</strong>
+              </div>
+              <div className={styles.providerMetric}>
+                <span>{t('ai_providers.metric_openai', { defaultValue: 'OpenAI-compatible' })}</span>
+                <strong>{openaiProviders.length}</strong>
+              </div>
+              <div className={styles.providerMetric}>
+                <span>{t('ai_providers.metric_recent', { defaultValue: 'Recent usage' })}</span>
+                <strong>{usageByProvider.size}</strong>
+              </div>
+            </>
+          )}
+        </section>
 
         <div id="provider-gemini">
           <GeminiSection

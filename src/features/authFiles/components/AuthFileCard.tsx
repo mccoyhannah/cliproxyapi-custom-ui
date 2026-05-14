@@ -13,9 +13,17 @@ import {
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
 import { useQuotaStore } from '@/stores';
-import type { AuthFileItem } from '@/types';
+import type {
+  AntigravityQuotaState,
+  AuthFileItem,
+  ClaudeQuotaState,
+  CodexQuotaState,
+  GeminiCliQuotaState,
+  KimiQuotaState,
+} from '@/types';
 import {
   formatCodexSubscriptionShortDate,
+  getCodexMinRemainingPercent,
   normalizePlanType,
   resolveAuthProvider,
   type CodexSubscriptionSnapshot,
@@ -43,6 +51,16 @@ import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQu
 import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
+const QUOTA_WARNING_REMAINING_PERCENT = 30;
+const QUOTA_CRITICAL_REMAINING_PERCENT = 12;
+
+type AuthCardQuotaState =
+  | AntigravityQuotaState
+  | ClaudeQuotaState
+  | CodexQuotaState
+  | GeminiCliQuotaState
+  | KimiQuotaState
+  | undefined;
 
 export type AuthFileCardProps = {
   file: AuthFileItem;
@@ -70,6 +88,69 @@ const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
   const provider = resolveAuthProvider(file);
   if (!QUOTA_PROVIDER_TYPES.has(provider as QuotaProviderType)) return null;
   return provider as QuotaProviderType;
+};
+
+const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
+
+const minFiniteValue = (values: Array<number | null | undefined>): number | null => {
+  const finiteValues = values.filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value)
+  );
+  return finiteValues.length > 0 ? Math.min(...finiteValues) : null;
+};
+
+const usedPercentToRemaining = (value: number | null | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? clampPercent(100 - value) : null;
+
+const quotaFractionToPercent = (value: number | null | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? clampPercent(value * 100) : null;
+
+const getQuotaRemainingPercent = (
+  quotaType: QuotaProviderType | null,
+  quota: AuthCardQuotaState
+): number | null => {
+  if (!quota || quota.status !== 'success') return null;
+
+  if (quotaType === 'codex') {
+    return getCodexMinRemainingPercent(quota as CodexQuotaState);
+  }
+
+  if (quotaType === 'claude') {
+    const claudeQuota = quota as ClaudeQuotaState;
+    return minFiniteValue([
+      ...(claudeQuota.windows ?? []).map((window) => usedPercentToRemaining(window.usedPercent)),
+      claudeQuota.extraUsage?.is_enabled
+        ? usedPercentToRemaining(claudeQuota.extraUsage.utilization)
+        : null,
+    ]);
+  }
+
+  if (quotaType === 'antigravity') {
+    return minFiniteValue(
+      ((quota as AntigravityQuotaState).groups ?? []).map((group) =>
+        quotaFractionToPercent(group.remainingFraction)
+      )
+    );
+  }
+
+  if (quotaType === 'gemini-cli') {
+    return minFiniteValue(
+      ((quota as GeminiCliQuotaState).buckets ?? []).map((bucket) =>
+        quotaFractionToPercent(bucket.remainingFraction)
+      )
+    );
+  }
+
+  if (quotaType === 'kimi') {
+    return minFiniteValue(
+      ((quota as KimiQuotaState).rows ?? []).map((row) => {
+        if (row.limit <= 0) return null;
+        return clampPercent(((row.limit - row.used) / row.limit) * 100);
+      })
+    );
+  }
+
+  return null;
 };
 
 export function AuthFileCard(props: AuthFileCardProps) {
@@ -108,17 +189,36 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const selectedQuotaType =
     quotaFilterType && resolvedQuotaType === quotaFilterType ? quotaFilterType : null;
   const quotaType = selectedQuotaType ?? (resolvedQuotaType === 'codex' ? 'codex' : null);
+  const quotaSnapshot = useQuotaStore((state) => {
+    if (resolvedQuotaType === 'antigravity') return state.antigravityQuota[file.name];
+    if (resolvedQuotaType === 'claude') return state.claudeQuota[file.name];
+    if (resolvedQuotaType === 'codex') return state.codexQuota[file.name];
+    if (resolvedQuotaType === 'gemini-cli') return state.geminiCliQuota[file.name];
+    if (resolvedQuotaType === 'kimi') return state.kimiQuota[file.name];
+    return undefined;
+  }) as AuthCardQuotaState;
+  const quotaRemainingPercent = getQuotaRemainingPercent(resolvedQuotaType, quotaSnapshot);
+  const quotaPressureClass = file.disabled
+    ? ''
+    : quotaSnapshot?.status === 'error'
+      ? styles.fileCardQuotaError
+      : quotaRemainingPercent !== null && quotaRemainingPercent <= QUOTA_CRITICAL_REMAINING_PERCENT
+        ? styles.fileCardQuotaCritical
+        : quotaRemainingPercent !== null && quotaRemainingPercent <= QUOTA_WARNING_REMAINING_PERCENT
+          ? styles.fileCardQuotaWarning
+          : '';
 
   const showQuotaLayout =
     Boolean(quotaType) &&
     !isRuntimeOnly &&
     (quotaType === 'codex' || (!compact && selectedQuotaType !== null));
-  const showQuotaSummaryOnly =
-    quotaType === 'codex' && (compact || selectedQuotaType !== 'codex');
+  const showQuotaSummaryOnly = quotaType === 'codex' && (compact || selectedQuotaType !== 'codex');
   const codexQuotaPlanType = useQuotaStore((state) => {
     if (resolvedQuotaType !== 'codex') return null;
-    const quota = state.codexQuota[file.name] as { status?: string; planType?: string | null } | undefined;
-    return quota?.status === 'success' ? quota.planType ?? null : null;
+    const quota = state.codexQuota[file.name] as
+      | { status?: string; planType?: string | null }
+      | undefined;
+    return quota?.status === 'success' ? (quota.planType ?? null) : null;
   });
   const currentCodexPlanType =
     resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
@@ -188,17 +288,21 @@ export function AuthFileCard(props: AuthFileCardProps) {
       ? codexSubscriptionSnapshot
       : null;
   const subscriptionWarningMs = 7 * 24 * 60 * 60 * 1000;
-  const subscriptionExpiryClass =
-    visibleCodexSubscription?.subscriptionActiveUntilMs !== null &&
-    visibleCodexSubscription?.subscriptionActiveUntilMs !== undefined &&
-    visibleCodexSubscription.subscriptionActiveUntilMs <= referenceTimeMs
-      ? styles.subscriptionExpiryExpired
-      : visibleCodexSubscription?.subscriptionActiveUntilMs !== null &&
-          visibleCodexSubscription?.subscriptionActiveUntilMs !== undefined &&
-          visibleCodexSubscription.subscriptionActiveUntilMs - referenceTimeMs <=
-            subscriptionWarningMs
-        ? styles.subscriptionExpiryWarning
-        : styles.subscriptionExpiryHealthy;
+  const subscriptionExpiryMs = visibleCodexSubscription?.subscriptionActiveUntilMs;
+  const subscriptionExpired =
+    subscriptionExpiryMs !== null &&
+    subscriptionExpiryMs !== undefined &&
+    subscriptionExpiryMs <= referenceTimeMs;
+  const subscriptionExpiringSoon =
+    !subscriptionExpired &&
+    subscriptionExpiryMs !== null &&
+    subscriptionExpiryMs !== undefined &&
+    subscriptionExpiryMs - referenceTimeMs <= subscriptionWarningMs;
+  const subscriptionExpiryClass = subscriptionExpired
+    ? styles.subscriptionExpiryExpired
+    : subscriptionExpiringSoon
+      ? styles.subscriptionExpiryWarning
+      : styles.subscriptionExpiryHealthy;
   const subscriptionExpiryLabel = visibleCodexSubscription?.subscriptionActiveUntil ?? '';
   const subscriptionExpiryDisplayLabel = compact
     ? formatCodexSubscriptionShortDate(
@@ -270,10 +374,24 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : hasStatusWarning
         ? styles.stateBadgeWarning
         : styles.stateBadgeActive;
+  const stateToneClass = isRuntimeOnly
+    ? styles.fileCardVirtual
+    : file.disabled
+      ? ''
+      : hasStatusWarning
+        ? styles.fileCardWarning
+        : styles.fileCardHealthy;
+  const subscriptionToneClass = file.disabled
+    ? ''
+    : subscriptionExpired
+      ? styles.fileCardSubscriptionExpired
+      : subscriptionExpiringSoon
+        ? styles.fileCardSubscriptionWarning
+        : '';
 
   return (
     <div
-      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${compactCodexPlanToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
+      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${compactCodexPlanToneClass} ${stateToneClass} ${subscriptionToneClass} ${quotaPressureClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
       <div className={styles.fileCardLayout}>
         <div className={styles.fileCardMain}>

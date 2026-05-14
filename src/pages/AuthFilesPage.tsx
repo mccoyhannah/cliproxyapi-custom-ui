@@ -74,8 +74,7 @@ const BATCH_BAR_HIDDEN_TRANSFORM = 'translateX(-50%) translateY(56px)';
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
 
-const escapeWildcardSearchSegment = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeWildcardSearchSegment = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const buildWildcardSearch = (value: string): RegExp | null => {
   if (!value.includes('*')) return null;
@@ -233,10 +232,7 @@ export function AuthFilesPage() {
       const persistedEnabledOnly = persisted.enabledOnly === true && !persistedDisabledOnly;
       setDisabledOnly(persistedDisabledOnly);
       setEnabledOnly(persistedEnabledOnly);
-      if (
-        typeof persistedCompactMode !== 'boolean' &&
-        typeof persisted.compactMode === 'boolean'
-      ) {
+      if (typeof persistedCompactMode !== 'boolean' && typeof persisted.compactMode === 'boolean') {
         setCompactMode(persisted.compactMode);
       }
       if (typeof persisted.search === 'string') {
@@ -252,11 +248,11 @@ export function AuthFilesPage() {
       const regularPageSize =
         typeof persisted.regularPageSize === 'number' && Number.isFinite(persisted.regularPageSize)
           ? clampCardPageSize(persisted.regularPageSize)
-          : legacyPageSize ?? DEFAULT_REGULAR_PAGE_SIZE;
+          : (legacyPageSize ?? DEFAULT_REGULAR_PAGE_SIZE);
       const compactPageSize =
         typeof persisted.compactPageSize === 'number' && Number.isFinite(persisted.compactPageSize)
           ? clampCardPageSize(persisted.compactPageSize)
-          : legacyPageSize ?? DEFAULT_COMPACT_PAGE_SIZE;
+          : (legacyPageSize ?? DEFAULT_COMPACT_PAGE_SIZE);
       setPageSizeByMode({
         regular: regularPageSize,
         compact: compactPageSize,
@@ -549,12 +545,7 @@ export function AuthFilesPage() {
     }
 
     void batchSetPriority(selectedNames, priority).then(() => setBatchPriorityInput(''));
-  }, [
-    batchPriorityInput,
-    batchSetPriority,
-    handlePriorityInvalid,
-    selectedNames,
-  ]);
+  }, [batchPriorityInput, batchSetPriority, handlePriorityInvalid, selectedNames]);
 
   const copyTextWithNotification = useCallback(
     async (text: string) => {
@@ -770,6 +761,7 @@ export function AuthFilesPage() {
       </div>
 
       <Card
+        className={styles.authFilesPanel}
         title={titleNode}
         extra={
           <div className={styles.headerActions}>
@@ -941,12 +933,14 @@ export function AuthFilesPage() {
                   defaultValue: '正在读取本地认证文件与运行状态。',
                 })}
                 variant="loading"
+                className={`${styles.authFilesEmptyState} ${styles.authFilesEmptyStateLoading}`}
                 compact
               />
             ) : pageItems.length === 0 ? (
               <EmptyState
                 title={t('auth_files.search_empty_title')}
                 description={t('auth_files.search_empty_desc')}
+                className={styles.authFilesEmptyState}
               />
             ) : (
               <div

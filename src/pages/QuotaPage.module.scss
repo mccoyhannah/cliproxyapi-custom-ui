@@ -57,6 +57,77 @@
   line-height: 24px;
 }
 
+.providerSectionCard:global(.card) {
+  border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 96%, transparent),
+      transparent 42%
+    ),
+    var(--surface-card);
+  box-shadow: 0 18px 36px -34px rgba(15, 23, 42, 0.42);
+}
+
+.providerSectionHeader:global(.card-header) {
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+
+  :global(.title) {
+    min-width: 0;
+  }
+
+  @include mobile {
+    align-items: stretch;
+  }
+}
+
+.providerTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.providerRefreshState {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-tertiary) 56%, var(--bg-primary));
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 740;
+  white-space: nowrap;
+
+  > span {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.62;
+  }
+}
+
+.providerRefreshStateActive {
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary));
+
+  > span {
+    opacity: 1;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color) 13%, transparent);
+  }
+}
+
 .countBadge {
   display: inline-flex;
   align-items: center;
@@ -83,16 +154,27 @@
 
 .quotaConsole {
   display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
-  gap: 12px;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  gap: 14px;
   align-items: stretch;
-  padding: 12px;
+  padding: 16px;
   border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
   border-radius: $radius-lg;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 94%, transparent), var(--bg-primary)),
-    color-mix(in srgb, var(--primary-color) 5%, var(--bg-secondary));
-  box-shadow: 0 12px 32px -30px rgba(15, 23, 42, 0.32);
+    radial-gradient(
+      circle at 0% 0%,
+      color-mix(in srgb, var(--primary-color) 16%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--bg-primary) 96%, transparent),
+      var(--bg-primary) 56%
+    ),
+    color-mix(in srgb, var(--success-color) 7%, var(--bg-secondary));
+  box-shadow:
+    0 22px 46px -40px rgba(15, 23, 42, 0.54),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
 
   @include tablet {
     grid-template-columns: 1fr;
@@ -105,10 +187,112 @@
   }
 }
 
+.quotaConsoleHero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 132px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--primary-color) 15%, transparent),
+      transparent 48%
+    ),
+    color-mix(in srgb, var(--bg-primary) 90%, var(--bg-secondary));
+  box-shadow:
+    0 16px 30px -28px rgba(0, 0, 0, 0.46),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+
+  @include tablet {
+    min-height: 116px;
+  }
+
+  @include mobile {
+    min-height: 106px;
+    padding: 13px;
+  }
+}
+
+.quotaConsoleHeroTopline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+
+  strong {
+    color: var(--text-primary);
+    font-size: 42px;
+    line-height: 0.92;
+    font-weight: 820;
+    font-variant-numeric: tabular-nums;
+
+    @include mobile {
+      font-size: 34px;
+    }
+  }
+}
+
+.quotaConsoleProgress {
+  height: 10px;
+  margin: 18px 0 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border-color) 52%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 56%, transparent);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      var(--primary-color),
+      color-mix(in srgb, var(--success-color) 78%, var(--primary-color))
+    );
+    box-shadow: 0 0 18px color-mix(in srgb, var(--primary-color) 28%, transparent);
+    transition: width 0.25s ease;
+  }
+}
+
+.quotaConsoleHeroMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+
+  span,
+  strong {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 66%, transparent);
+    background: color-mix(in srgb, var(--bg-primary) 74%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  strong {
+    color: var(--warning-text);
+    background: color-mix(in srgb, var(--warning-bg) 78%, transparent);
+    border-color: var(--warning-border);
+  }
+}
+
 .quotaConsoleStats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  min-width: 0;
 
   @include mobile {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -120,11 +304,13 @@
   flex-direction: column;
   justify-content: center;
   min-width: 0;
-  min-height: 58px;
-  padding: 9px 10px;
+  min-height: 62px;
+  padding: 10px 11px;
   border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
   border-radius: $radius-md;
-  background: color-mix(in srgb, var(--bg-secondary) 66%, var(--bg-primary));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 62%, transparent), transparent),
+    color-mix(in srgb, var(--bg-secondary) 70%, var(--bg-primary));
   box-sizing: border-box;
 
   strong {
@@ -153,6 +339,7 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 
   @include tablet {
     justify-content: flex-start;
@@ -174,6 +361,7 @@
   font-size: 12px;
   font-weight: 650;
   cursor: pointer;
+  min-width: 0;
   transition:
     background-color $transition-fast,
     border-color $transition-fast,
@@ -195,6 +383,13 @@
     line-height: 20px;
   }
 
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   &:hover {
     transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--primary-color) 32%, var(--border-color));
@@ -205,6 +400,12 @@
     flex: 1 1 calc(50% - 8px);
     min-width: 0;
   }
+}
+
+:global([data-theme='dark']) .quotaConsole {
+  box-shadow:
+    0 22px 46px -40px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .quotaFilterChipActive {
@@ -255,7 +456,7 @@
 .geminiCliGrid,
 .kimiGrid {
   display: grid;
-  gap: $spacing-md;
+  gap: 12px;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
 
   @include mobile {
@@ -386,15 +587,11 @@
 
 // 卡片渐变背景 — 基于 TYPE_COLORS light.bg 转 rgba
 .claudeCard {
-  background-image: linear-gradient(180deg,
-      rgba(251, 236, 228, 0.18),
-      rgba(251, 236, 228, 0));
+  background-image: linear-gradient(180deg, rgba(251, 236, 228, 0.18), rgba(251, 236, 228, 0));
 }
 
 .antigravityCard {
-  background-image: linear-gradient(180deg,
-      rgba(224, 247, 250, 0.12),
-      rgba(224, 247, 250, 0));
+  background-image: linear-gradient(180deg, rgba(224, 247, 250, 0.12), rgba(224, 247, 250, 0));
 }
 
 .codexCard {
@@ -428,16 +625,18 @@
   }
 }
 
+.quotaEmptyState:global(.empty-state) {
+  min-height: 168px;
+  border: 1px dashed color-mix(in srgb, var(--border-color) 76%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 58%, transparent);
+}
+
 .geminiCliCard {
-  background-image: linear-gradient(180deg,
-      rgba(224, 232, 255, 0.2),
-      rgba(224, 232, 255, 0));
+  background-image: linear-gradient(180deg, rgba(224, 232, 255, 0.2), rgba(224, 232, 255, 0));
 }
 
 .kimiCard {
-  background-image: linear-gradient(180deg,
-      rgba(220, 232, 255, 0.2),
-      rgba(220, 232, 255, 0));
+  background-image: linear-gradient(180deg, rgba(220, 232, 255, 0.2), rgba(220, 232, 255, 0));
 }
 
 .quotaSection {
@@ -676,8 +875,12 @@
   min-height: 20px;
   padding: 2px 8px 2px 7px;
   border-radius: 999px;
-  border: 1px solid var(--codex-plan-border, color-mix(in srgb, var(--border-color) 72%, transparent));
-  background: var(--codex-plan-bg, color-mix(in srgb, var(--surface-control) 84%, var(--bg-primary)));
+  border: 1px solid
+    var(--codex-plan-border, color-mix(in srgb, var(--border-color) 72%, transparent));
+  background: var(
+    --codex-plan-bg,
+    color-mix(in srgb, var(--surface-control) 84%, var(--bg-primary))
+  );
   color: var(--codex-plan-text, var(--text-primary));
   box-shadow:
     0 1px 2px var(--codex-plan-shadow, transparent),
@@ -974,20 +1177,64 @@
 }
 
 .fileCard {
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 78%, transparent),
+      transparent 68%
+    ),
+    var(--bg-primary);
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
   border-radius: $radius-lg;
-  padding: $spacing-md;
+  padding: 13px;
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
-  transition: transform $transition-fast, box-shadow $transition-fast, border-color $transition-fast;
+  gap: 10px;
+  min-width: 0;
+  transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
+    border-color $transition-fast,
+    background-color $transition-fast;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: $shadow-md;
-    border-color: rgba(37, 99, 235, 0.2);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px -28px rgba(15, 23, 42, 0.52);
+    border-color: color-mix(in srgb, var(--primary-color) 26%, var(--border-color));
   }
+}
+
+.fileCardIdle {
+  border-style: dashed;
+}
+
+.fileCardLoading {
+  border-color: color-mix(in srgb, var(--primary-color) 32%, var(--border-color));
+  background:
+    linear-gradient(
+      110deg,
+      transparent 0%,
+      color-mix(in srgb, var(--primary-color) 7%, transparent) 44%,
+      transparent 70%
+    ),
+    var(--bg-primary);
+}
+
+.fileCardSuccess {
+  border-color: color-mix(in srgb, var(--success-color) 20%, var(--border-color));
+}
+
+.fileCardError {
+  border-color: color-mix(in srgb, var(--danger-color) 34%, var(--border-color));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--danger-color) 7%, transparent),
+      transparent 58%
+    ),
+    var(--bg-primary);
 }
 
 .cardHeader {

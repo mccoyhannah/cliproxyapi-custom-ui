@@ -5,6 +5,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-width: 0;
   padding-bottom: calc(
     var(--auth-files-action-bar-height, 0px) + 16px + env(safe-area-inset-bottom)
   );
@@ -30,11 +31,40 @@
   margin: 0;
 }
 
+.authFilesPanel {
+  border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-secondary) 26%, transparent),
+      transparent 220px
+    ),
+    var(--surface-card);
+
+  :global(.card-header) {
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  }
+
+  :global(.title) {
+    min-width: 0;
+  }
+
+  @include mobile {
+    :global(.card-header) {
+      align-items: stretch;
+    }
+  }
+}
+
 .headerActions {
   display: flex;
   gap: $spacing-sm;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   min-width: 0;
   max-width: 100%;
 
@@ -44,6 +74,11 @@
 
   @include mobile {
     width: 100%;
+    justify-content: stretch;
+
+    :global(.btn) {
+      flex: 1 1 calc(50% - 4px);
+    }
   }
 }
 
@@ -83,24 +118,30 @@
 .filterSection {
   display: flex;
   flex-direction: column;
-  gap: $spacing-md;
-  margin-bottom: $spacing-lg;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 18px;
 }
 
 .filterRail {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-control) 74%, transparent),
+    color-mix(in srgb, var(--bg-secondary) 54%, transparent)
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
 
   @include mobile {
-    padding: 10px;
+    padding: 8px;
   }
 }
-
 
 .filterAllIconWrap {
   position: relative;
@@ -120,7 +161,6 @@
   color: color-mix(in srgb, var(--primary-color) 70%, var(--text-primary));
 }
 
-
 .filterContent {
   display: flex;
   flex-direction: column;
@@ -133,38 +173,59 @@
   flex-direction: row;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .filterTag {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
   padding: 7px 12px 7px 8px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.2;
-  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: 0 1px 1px color-mix(in srgb, #000 5%, transparent);
   transition:
+    transform $transition-fast,
+    box-shadow $transition-fast,
     border-color $transition-fast,
     background-color $transition-fast,
     color $transition-fast;
 
   &:hover {
+    transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--filter-color) 40%, var(--border-color));
-    background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+    background: color-mix(in srgb, var(--filter-surface) 12%, var(--surface-control));
     color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--filter-color) 68%, var(--primary-color));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--filter-color) 15%, transparent);
   }
 }
 
 .filterTagActive {
-  border-color: color-mix(in srgb, var(--filter-color) 50%, var(--border-color));
-  background: color-mix(in srgb, var(--filter-surface) 22%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--filter-color) 62%, var(--border-color));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--filter-surface) 34%, var(--bg-secondary)),
+    color-mix(in srgb, var(--filter-surface) 18%, var(--bg-primary))
+  );
   color: var(--text-primary);
+  box-shadow:
+    0 6px 18px -16px color-mix(in srgb, var(--filter-color) 70%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--filter-color) 82%, transparent);
 
   .filterTagIconWrap {
     border-color: color-mix(in srgb, var(--filter-color) 40%, transparent);
@@ -206,6 +267,7 @@
 
 .filterTagText {
   min-width: 0;
+  max-width: 180px;
   color: inherit;
   @include text-ellipsis;
 }
@@ -234,15 +296,24 @@
 
 .filterControlsPanel {
   padding: 12px;
-  border-radius: var(--radius-card);
-  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
-  background: var(--surface-panel);
-  box-shadow: var(--shadow-control);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-panel) 88%, var(--bg-secondary)),
+    color-mix(in srgb, var(--bg-primary) 72%, var(--surface-panel))
+  );
+  box-shadow:
+    var(--shadow-control),
+    inset 0 1px 0 color-mix(in srgb, #fff 13%, transparent);
 }
 
 .filterControls {
   display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) minmax(112px, 0.45fr) minmax(176px, 0.7fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(240px, 1.4fr) minmax(112px, 0.45fr) minmax(176px, 0.7fr) minmax(
+      260px,
+      1fr
+    );
   gap: 12px;
   align-items: flex-start;
 
@@ -294,6 +365,7 @@
 
   @include mobile {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 }
 
@@ -306,7 +378,17 @@
   padding: 0 8px 0 6px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
-  background: var(--surface-control);
+  background: color-mix(in srgb, var(--surface-control) 90%, var(--bg-primary));
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    box-shadow $transition-fast;
+
+  &:has(input:checked) {
+    border-color: color-mix(in srgb, var(--primary-color) 38%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 9%, var(--surface-control));
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary-color) 62%, transparent);
+  }
 }
 
 .filterToggle {
@@ -337,6 +419,8 @@
   background-color: var(--surface-control);
   color: var(--text-primary);
   font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
   cursor: text;
   height: 40px;
   box-sizing: border-box;
@@ -351,8 +435,10 @@
 // 卡片网格
 .fileGrid {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  align-items: stretch;
+  min-width: 0;
 }
 
 .fileGridQuotaManaged {
@@ -361,6 +447,56 @@
 
 .fileGridCompact {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+
+.authFilesEmptyState:global(.empty-state) {
+  min-height: 220px;
+  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--border-color) 86%, transparent);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 7%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--surface-panel) 82%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+}
+
+.authFilesEmptyState:global(.empty-state-compact) {
+  min-height: 160px;
+}
+
+.authFilesEmptyState :global(.empty-content) {
+  justify-content: center;
+  min-width: 0;
+}
+
+.authFilesEmptyState :global(.empty-icon) {
+  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary));
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+}
+
+.authFilesEmptyState :global(.empty-title) {
+  color: var(--text-primary);
+  font-weight: 750;
+}
+
+.authFilesEmptyState :global(.empty-desc) {
+  max-width: 540px;
+}
+
+.authFilesEmptyStateLoading:global(.empty-state) {
+  border-style: solid;
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--primary-color) 8%, transparent),
+      transparent
+    ),
+    color-mix(in srgb, var(--surface-panel) 82%, var(--bg-primary));
 }
 
 .antigravityGrid {
@@ -492,23 +628,51 @@
 .quotaSection {
   display: flex;
   flex-direction: column;
-  gap: $spacing-sm;
-  padding-top: $spacing-sm;
+  gap: 8px;
+  padding: 10px;
   margin-top: 2px;
-  border-top: 1px dashed color-mix(in srgb, var(--border-color) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control) 62%, transparent);
+  box-shadow: inset 3px 0 0 var(--quota-section-accent, transparent);
 }
 
 .quotaSectionCompact {
   gap: 4px;
-  padding-top: 0;
+  padding: 0;
   margin-top: 0;
-  border-top: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.quotaSectionReady {
+  --quota-section-accent: color-mix(in srgb, var(--success-color, #22c55e) 52%, transparent);
+}
+
+.quotaSectionIdle {
+  --quota-section-accent: color-mix(in srgb, var(--text-tertiary) 34%, transparent);
+}
+
+.quotaSectionLoading {
+  --quota-section-accent: color-mix(in srgb, var(--primary-color) 52%, transparent);
+}
+
+.quotaSectionError {
+  --quota-section-accent: color-mix(in srgb, var(--danger-color) 68%, transparent);
+  border-color: color-mix(in srgb, var(--danger-color) 34%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 8%, var(--surface-control));
 }
 
 .quotaRow {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 9px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 54%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 54%, transparent);
 }
 
 .quotaRowHeader {
@@ -526,7 +690,7 @@
 
 .quotaModel {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -540,16 +704,23 @@
 }
 
 .quotaBar {
-  height: 8px;
-  background-color: var(--bg-tertiary);
+  height: 9px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--danger-color) 8%, var(--bg-tertiary)),
+    color-mix(in srgb, var(--warning-bg) 36%, var(--bg-tertiary)),
+    color-mix(in srgb, var(--success-color, #22c55e) 9%, var(--bg-tertiary))
+  );
   border-radius: 999px;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 34%, transparent);
 }
 
 .quotaBarFill {
   height: 100%;
   background-color: var(--success-color, #22c55e);
   transition: width 0.2s ease;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #fff 18%, transparent) inset;
 }
 
 .quotaBarFillHigh {
@@ -567,10 +738,12 @@
 .quotaMeta {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
   font-size: 12px;
   color: var(--text-secondary);
-  white-space: nowrap;
 
   @include mobile {
     justify-content: flex-start;
@@ -578,34 +751,45 @@
 }
 
 .quotaPercent {
-  font-weight: 600;
+  font-weight: 800;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .quotaReset {
+  min-width: 0;
+  max-width: 170px;
   color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .quotaAmount {
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .quotaMessage {
   font-size: 12px;
-  color: var(--text-tertiary);
+  font-weight: 650;
+  color: var(--text-secondary);
   text-align: center;
-  padding: $spacing-sm 0;
+  padding: 8px 0;
 }
 
 .quotaMessageAction {
   width: 100%;
-  border: none;
-  background: none;
+  border: 1px dashed color-mix(in srgb, var(--border-color) 66%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg-primary) 42%, transparent);
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
 
   &:hover:not(:disabled) {
     color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 7%, var(--bg-primary));
   }
 
   &:disabled {
@@ -617,11 +801,13 @@
 
 .quotaError {
   font-size: 12px;
+  font-weight: 650;
   color: var(--danger-color);
-  background-color: rgba($error-color, 0.08);
-  border: 1px solid var(--danger-color);
-  border-radius: $radius-sm;
-  padding: $spacing-xs $spacing-sm;
+  background-color: color-mix(in srgb, var(--danger-color) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger-color) 48%, var(--border-color));
+  border-radius: 7px;
+  padding: 8px 10px;
+  word-break: break-word;
 }
 
 .quotaWarning {
@@ -720,7 +906,8 @@
   min-height: 19px;
   padding: 2px 7px 2px 6px;
   border-radius: 999px;
-  border: 1px solid var(--codex-plan-border, color-mix(in srgb, var(--border-color) 72%, transparent));
+  border: 1px solid
+    var(--codex-plan-border, color-mix(in srgb, var(--border-color) 72%, transparent));
   background: var(--codex-plan-bg, color-mix(in srgb, var(--bg-secondary) 84%, var(--bg-primary)));
   color: var(--codex-plan-text, var(--text-primary));
   box-shadow:
@@ -816,7 +1003,11 @@
 .codexCompactQuotaChip {
   flex: 0 1 auto;
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
-  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 86%, var(--bg-primary));
+  background: color-mix(
+    in srgb,
+    var(--surface-control, var(--bg-secondary)) 86%,
+    var(--bg-primary)
+  );
 }
 
 .codexCompactQuotaHealthy {
@@ -828,7 +1019,11 @@
 .codexCompactQuotaNormal {
   color: color-mix(in srgb, var(--text-secondary) 86%, var(--text-primary));
   border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
-  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 88%, var(--bg-primary));
+  background: color-mix(
+    in srgb,
+    var(--surface-control, var(--bg-secondary)) 88%,
+    var(--bg-primary)
+  );
 }
 
 .codexCompactQuotaWarning {
@@ -1006,6 +1201,8 @@
   position: relative;
   overflow: hidden;
   background-color: var(--surface-card);
+  --file-card-accent: transparent;
+  --file-card-accent-opacity: 0;
   --glass-blur: 8px;
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
@@ -1014,11 +1211,27 @@
   padding: 16px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 100%;
+  box-sizing: border-box;
   transition:
     transform $transition-fast,
     box-shadow $transition-fast,
     border-color $transition-fast;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--file-card-accent) 95%, transparent),
+      color-mix(in srgb, var(--file-card-accent) 45%, transparent)
+    );
+    opacity: var(--file-card-accent-opacity);
+  }
 
   &:hover {
     transform: translateY(-1px);
@@ -1030,14 +1243,77 @@
 
 .fileCardSelected {
   border-color: color-mix(in srgb, var(--primary-color) 60%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary-color) 30%, transparent);
+  --file-card-accent: var(--primary-color);
+  --file-card-accent-opacity: 0.86;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary-color) 30%, transparent),
+    0 12px 32px -28px color-mix(in srgb, var(--primary-color) 72%, transparent);
 
   &:hover {
     border-color: color-mix(in srgb, var(--primary-color) 60%, transparent);
   }
 }
 
+.fileCardHealthy {
+  --file-card-accent: var(--success-color, #22c55e);
+  --file-card-accent-opacity: 0.48;
+}
+
+.fileCardWarning {
+  --file-card-accent: var(--warning-text);
+  --file-card-accent-opacity: 0.95;
+  border-color: color-mix(in srgb, var(--warning-border) 54%, var(--border-color));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warning-bg) 42%, transparent),
+    transparent 44%
+  );
+  box-shadow: 0 14px 34px -30px color-mix(in srgb, var(--warning-text) 70%, transparent);
+}
+
+.fileCardVirtual {
+  --file-card-accent: var(--text-tertiary);
+  --file-card-accent-opacity: 0.62;
+  border-style: dashed;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--bg-tertiary) 72%, transparent),
+    transparent 48%
+  );
+}
+
+.fileCardSubscriptionWarning,
+.fileCardQuotaWarning {
+  --file-card-accent: #d97706;
+  --file-card-accent-opacity: 1;
+  border-color: color-mix(in srgb, var(--warning-border) 66%, var(--border-color));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warning-bg) 56%, transparent),
+    transparent 46%
+  );
+  box-shadow: 0 14px 34px -28px color-mix(in srgb, #d97706 64%, transparent);
+}
+
+.fileCardSubscriptionExpired,
+.fileCardQuotaCritical,
+.fileCardQuotaError {
+  --file-card-accent: var(--danger-color);
+  --file-card-accent-opacity: 1;
+  border-color: color-mix(in srgb, var(--danger-color) 56%, var(--border-color));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--danger-color) 13%, transparent),
+    transparent 46%
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--danger-color) 12%, transparent),
+    0 16px 36px -30px color-mix(in srgb, var(--danger-color) 78%, transparent);
+}
+
 .fileCardDisabled {
+  --file-card-accent: var(--text-tertiary);
+  --file-card-accent-opacity: 0.72;
   background-color: color-mix(in srgb, var(--bg-secondary) 74%, var(--bg-primary));
   border-color: color-mix(in srgb, var(--text-tertiary) 36%, var(--border-color));
   border-style: dashed;
@@ -1292,6 +1568,9 @@
   justify-content: center;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  box-shadow:
+    0 6px 16px -14px currentColor,
+    inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
 }
 
 .providerAvatarImage {
@@ -1332,11 +1611,13 @@
   border: 1px solid transparent;
   white-space: nowrap;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent);
 }
 
 .stateBadge {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   padding: 3px 8px;
   border-radius: 6px;
   font-size: 10px;
@@ -1344,6 +1625,18 @@
   line-height: 1;
   white-space: nowrap;
   letter-spacing: 0;
+  border: 1px solid transparent;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
+
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 13%, transparent);
+    flex: 0 0 auto;
+  }
 }
 
 .stateBadgeActive {
@@ -1353,9 +1646,9 @@
 }
 
 .stateBadgeWarning {
-  color: color-mix(in srgb, var(--warning-text) 84%, var(--text-secondary));
-  background: color-mix(in srgb, var(--warning-bg) 44%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warning-border) 60%, transparent);
+  color: color-mix(in srgb, var(--warning-text) 92%, var(--text-primary));
+  background: color-mix(in srgb, var(--warning-bg) 70%, transparent);
+  border-color: color-mix(in srgb, var(--warning-border) 78%, transparent);
 }
 
 .stateBadgeDisabled {
@@ -1366,16 +1659,18 @@
 }
 
 .stateBadgeVirtual {
-  color: var(--text-secondary);
+  color: color-mix(in srgb, var(--text-secondary) 88%, var(--text-primary));
   background: color-mix(in srgb, var(--bg-tertiary) 82%, transparent);
   border: 1px dashed color-mix(in srgb, var(--border-primary) 90%, transparent);
 }
 
 .fileName {
-  font-size: 14px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
   font-weight: 800;
   color: var(--text-primary);
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   line-height: 1.4;
   display: -webkit-box;
   overflow: hidden;
@@ -1388,7 +1683,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 14px;
+  gap: 6px 8px;
   padding: 0 2px;
 }
 
@@ -1409,9 +1704,11 @@
   align-items: baseline;
   gap: 5px;
   min-width: 0;
-  padding: 0;
-  border: none;
-  background: none;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control) 44%, transparent);
 }
 
 .metaLabel {
@@ -1432,6 +1729,7 @@
   font-weight: 600;
   color: var(--text-secondary);
   line-height: 1.4;
+  overflow-wrap: anywhere;
   word-break: break-word;
 }
 
@@ -1453,7 +1751,7 @@
   align-items: stretch;
   height: 28px;
   border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
-  border-radius: 8px;
+  border-radius: 7px;
   overflow: hidden;
   background: var(--surface-control);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bg-primary) 42%, transparent);
@@ -1563,6 +1861,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
 }
 
 .subscriptionExpiryHealthy {
@@ -1573,11 +1872,13 @@
 .subscriptionExpiryWarning {
   color: var(--warning-text, #92400e);
   background: color-mix(in srgb, var(--warning-bg, #fef3c7) 68%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warning-bg) 32%, transparent);
 }
 
 .subscriptionExpiryExpired {
   color: var(--failure-badge-text);
   background: color-mix(in srgb, var(--failure-badge-bg) 62%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
 .noteText {
@@ -1660,11 +1961,16 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 0 2px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 38%, transparent);
 }
 
 .cardInsightsCompact {
   gap: 6px;
+  padding: 6px;
 }
 
 .cardStats {
@@ -1672,6 +1978,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .cardStatsCompact {
@@ -1697,7 +2004,8 @@
   min-width: 0;
   padding: 4px 10px;
   border-radius: 999px;
-  border: none;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
 .statLabel {
@@ -1719,7 +2027,7 @@
 }
 
 .statFailure {
-  background: color-mix(in srgb, var(--failure-badge-bg) 50%, transparent);
+  background: color-mix(in srgb, var(--failure-badge-bg) 68%, transparent);
   color: var(--failure-badge-text);
 }
 
@@ -1727,6 +2035,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .statusPanelCompact {
@@ -1775,7 +2084,10 @@
   gap: 10px;
   width: 100%;
   min-width: 0;
-  padding: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 38%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 52%, transparent);
   max-width: none;
 
   @include mobile {
@@ -1802,7 +2114,7 @@
 
 .statusBlock {
   width: 100%;
-  height: 6px;
+  height: 7px;
   border-radius: 999px;
   transition:
     transform 0.15s ease,
@@ -1917,6 +2229,7 @@
   border-radius: 999px;
   background: var(--bg-tertiary);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .statusRateHigh {
@@ -2025,8 +2338,8 @@
   gap: 8px;
   min-width: 0;
   margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  padding-top: 9px;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
 }
 
 .cardActionsMain {
@@ -2084,7 +2397,8 @@
   gap: 3px;
   padding: 2px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--bg-tertiary) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 44%, transparent);
+  background: color-mix(in srgb, var(--bg-tertiary) 54%, transparent);
 }
 
 .statusToggle {
@@ -2093,6 +2407,10 @@
   gap: 6px;
   flex-shrink: 0;
   margin-left: 8px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 42%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 48%, transparent);
 }
 
 .statusToggleLabel {
@@ -2116,6 +2434,42 @@
 }
 
 @include mobile {
+  .fileCard {
+    padding: 12px;
+  }
+
+  .cardHeader {
+    gap: 8px;
+  }
+
+  .providerAvatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .providerAvatarImage {
+    width: 18px;
+    height: 18px;
+  }
+
+  .cardBadgeRow {
+    gap: 5px;
+  }
+
+  .fileName {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .cardMeta {
+    gap: 6px;
+  }
+
+  .metaItem {
+    max-width: 100%;
+  }
+
   .cardActions {
     flex-wrap: wrap;
   }
@@ -2134,6 +2488,7 @@
   .statusToggle {
     width: 100%;
     justify-content: space-between;
+    margin-left: 0;
   }
 }
 
@@ -2166,14 +2521,33 @@
   align-items: center;
   justify-content: space-between;
   gap: $spacing-sm;
-  padding: 10px 12px;
-  border-radius: $radius-lg;
-  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
-  background: color-mix(in srgb, var(--bg-primary) 84%, transparent);
-  --glass-blur: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-primary) 92%, transparent),
+    color-mix(in srgb, var(--surface-panel) 86%, transparent)
+  );
+  --glass-blur: 14px;
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    var(--shadow-lg),
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
+    inset 4px 0 0 color-mix(in srgb, var(--primary-color) 62%, transparent);
+
+  :global(.btn) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  :global(.btn-label) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .batchActionLeft,
@@ -2182,6 +2556,7 @@
   align-items: center;
   gap: $spacing-xs;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .batchActionRight {
@@ -2193,6 +2568,10 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 54%, transparent);
 }
 
 .batchPriorityInput {
@@ -2222,10 +2601,18 @@
 }
 
 .batchSelectionText {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 8%, transparent);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 750;
   color: var(--text-primary);
   margin-right: 2px;
+  white-space: nowrap;
 }
 
 @include mobile {
@@ -2238,15 +2625,30 @@
   .batchActionBar {
     flex-direction: column;
     align-items: stretch;
+    max-height: min(62vh, 420px);
+    overflow-y: auto;
   }
 
   .batchActionLeft,
   .batchActionRight {
-    justify-content: center;
+    justify-content: stretch;
+  }
+
+  .batchActionBar :global(.btn) {
+    flex: 1 1 calc(50% - 4px);
   }
 
   .batchPriorityControl {
     width: 100%;
+    justify-content: stretch;
+  }
+
+  .batchPriorityInput {
+    flex: 1 1 84px;
+  }
+
+  .batchSelectionText {
+    flex: 1 1 100%;
     justify-content: center;
   }
 }

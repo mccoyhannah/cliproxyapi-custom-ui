@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  IconKey,
-  IconBot,
-  IconFileText,
-  IconSatellite
-} from '@/components/ui/icons';
+import { IconKey, IconBot, IconFileText, IconSatellite } from '@/components/ui/icons';
 import { useAuthStore, useConfigStore, useModelsStore } from '@/stores';
 import { apiKeysApi, providersApi, authFilesApi } from '@/services/api';
 import styles from './DashboardPage.module.scss';
@@ -54,14 +49,14 @@ export function DashboardPage() {
     authFiles: number | null;
   }>({
     apiKeys: null,
-    authFiles: null
+    authFiles: null,
   });
 
   const [providerStats, setProviderStats] = useState<ProviderStats>({
     gemini: null,
     codex: null,
     claude: null,
-    openai: null
+    openai: null,
   });
 
   const [loading, setLoading] = useState(true);
@@ -151,25 +146,26 @@ export function DashboardPage() {
     const fetchStats = async () => {
       setLoading(true);
       try {
-        const [keysRes, filesRes, geminiRes, codexRes, claudeRes, openaiRes] = await Promise.allSettled([
-          apiKeysApi.list(),
-          authFilesApi.list(),
-          providersApi.getGeminiKeys(),
-          providersApi.getCodexConfigs(),
-          providersApi.getClaudeConfigs(),
-          providersApi.getOpenAIProviders()
-        ]);
+        const [keysRes, filesRes, geminiRes, codexRes, claudeRes, openaiRes] =
+          await Promise.allSettled([
+            apiKeysApi.list(),
+            authFilesApi.list(),
+            providersApi.getGeminiKeys(),
+            providersApi.getCodexConfigs(),
+            providersApi.getClaudeConfigs(),
+            providersApi.getOpenAIProviders(),
+          ]);
 
         setStats({
           apiKeys: keysRes.status === 'fulfilled' ? keysRes.value.length : null,
-          authFiles: filesRes.status === 'fulfilled' ? filesRes.value.files.length : null
+          authFiles: filesRes.status === 'fulfilled' ? filesRes.value.files.length : null,
         });
 
         setProviderStats({
           gemini: geminiRes.status === 'fulfilled' ? geminiRes.value.length : null,
           codex: codexRes.status === 'fulfilled' ? codexRes.value.length : null,
           claude: claudeRes.status === 'fulfilled' ? claudeRes.value.length : null,
-          openai: openaiRes.status === 'fulfilled' ? openaiRes.value.length : null
+          openai: openaiRes.status === 'fulfilled' ? openaiRes.value.length : null,
         });
       } finally {
         setLoading(false);
@@ -209,7 +205,7 @@ export function DashboardPage() {
       icon: <IconKey size={24} />,
       path: '/config',
       loading: loading && stats.apiKeys === null,
-      sublabel: t('nav.config_management')
+      sublabel: t('nav.config_management'),
     },
     {
       label: t('nav.ai_providers'),
@@ -222,9 +218,9 @@ export function DashboardPage() {
             gemini: providerStats.gemini ?? '-',
             codex: providerStats.codex ?? '-',
             claude: providerStats.claude ?? '-',
-            openai: providerStats.openai ?? '-'
+            openai: providerStats.openai ?? '-',
           })
-        : undefined
+        : undefined,
     },
     {
       label: t('nav.auth_files'),
@@ -232,7 +228,7 @@ export function DashboardPage() {
       icon: <IconFileText size={24} />,
       path: '/auth-files',
       loading: loading && stats.authFiles === null,
-      sublabel: t('dashboard.oauth_credentials')
+      sublabel: t('dashboard.oauth_credentials'),
     },
     {
       label: t('dashboard.available_models'),
@@ -240,8 +236,8 @@ export function DashboardPage() {
       icon: <IconSatellite size={24} />,
       path: '/system',
       loading: modelsLoading,
-      sublabel: t('dashboard.available_models_desc')
-    }
+      sublabel: t('dashboard.available_models_desc'),
+    },
   ];
 
   const routingStrategyRaw = config?.routingStrategy?.trim() || '';
@@ -268,13 +264,31 @@ export function DashboardPage() {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   });
 
   const formattedTime = currentTime.toLocaleTimeString(i18n.language, {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   });
+
+  const normalizedServerVersion = serverVersion?.trim().replace(/^[vV]+/, '') || '';
+  const connectionLabel = t(
+    connectionStatus === 'connected'
+      ? 'common.connected'
+      : connectionStatus === 'connecting'
+        ? 'common.connecting'
+        : 'common.disconnected'
+  );
+  const connectionToneClass =
+    connectionStatus === 'connected'
+      ? styles.connectionConnected
+      : connectionStatus === 'connecting'
+        ? styles.connectionConnecting
+        : styles.connectionDisconnected;
+  const formattedBuildDate = serverBuildDate
+    ? new Date(serverBuildDate).toLocaleDateString(i18n.language)
+    : '-';
 
   return (
     <div className={styles.dashboard}>
@@ -287,13 +301,29 @@ export function DashboardPage() {
           <span className={styles.heroGreeting}>{t(greetingKey)}</span>
           <h1 className={styles.heroTitle}>{t('dashboard.welcome_back')}</h1>
           <p className={styles.heroCaring}>{t(caringKey)}</p>
+          <div className={styles.heroSignalGrid}>
+            <div className={styles.heroSignal}>
+              <span className={styles.signalLabel}>API BASE</span>
+              <code className={styles.signalValue}>{apiBase || '-'}</code>
+            </div>
+            <div className={styles.heroSignal}>
+              <span className={styles.signalLabel}>VERSION</span>
+              <code className={styles.signalValue}>
+                {normalizedServerVersion ? `v${normalizedServerVersion}` : '-'}
+              </code>
+            </div>
+            <div className={styles.heroSignal}>
+              <span className={styles.signalLabel}>ROUTING</span>
+              <code className={styles.signalValue}>{routingStrategyDisplay}</code>
+            </div>
+          </div>
         </div>
         <div className={styles.heroMeta}>
           <div className={styles.dateTimeBlock}>
             <span className={styles.time}>{formattedTime}</span>
             <span className={styles.date}>{formattedDate}</span>
           </div>
-          <div className={styles.connectionPill}>
+          <div className={`${styles.connectionPill} ${connectionToneClass}`}>
             <span
               className={`${styles.statusDot} ${
                 connectionStatus === 'connected'
@@ -303,23 +333,12 @@ export function DashboardPage() {
                     : styles.disconnected
               }`}
             />
-            <span className={styles.pillText}>
-              {serverVersion
-                ? `v${serverVersion.trim().replace(/^[vV]+/, '')}`
-                : t(
-                    connectionStatus === 'connected'
-                      ? 'common.connected'
-                      : connectionStatus === 'connecting'
-                        ? 'common.connecting'
-                        : 'common.disconnected'
-                  )}
-            </span>
+            <span className={styles.connectionStateText}>{connectionLabel}</span>
+            {normalizedServerVersion && (
+              <span className={styles.versionText}>v{normalizedServerVersion}</span>
+            )}
           </div>
-          {serverBuildDate && (
-            <span className={styles.buildDate}>
-              {new Date(serverBuildDate).toLocaleDateString(i18n.language)}
-            </span>
-          )}
+          {serverBuildDate && <span className={styles.buildDate}>{formattedBuildDate}</span>}
         </div>
       </section>
 
@@ -333,16 +352,23 @@ export function DashboardPage() {
               to={stat.path}
               className={`${styles.bentoCard} ${index === 0 ? styles.bentoLarge : ''}`}
               style={{ animationDelay: `${index * 80}ms` }}
+              aria-busy={stat.loading || undefined}
             >
               <div className={styles.bentoIcon}>{stat.icon}</div>
               <div className={styles.bentoContent}>
                 <span className={styles.bentoValue}>
-                  {stat.loading ? '...' : stat.value}
+                  {stat.loading ? (
+                    <span className={styles.valueSkeleton} aria-hidden="true" />
+                  ) : (
+                    stat.value
+                  )}
                 </span>
                 <span className={styles.bentoLabel}>{stat.label}</span>
-                {stat.sublabel && !stat.loading && (
+                {stat.loading ? (
+                  <span className={styles.sublabelSkeleton} aria-hidden="true" />
+                ) : stat.sublabel ? (
                   <span className={styles.bentoSublabel}>{stat.sublabel}</span>
-                )}
+                ) : null}
               </div>
             </Link>
           ))}
@@ -356,23 +382,33 @@ export function DashboardPage() {
           <div className={styles.configPillGrid}>
             <div className={styles.configPill}>
               <span className={styles.configPillLabel}>{t('basic_settings.debug_enable')}</span>
-              <span className={`${styles.configPillValue} ${config.debug ? styles.on : styles.off}`}>
+              <span
+                className={`${styles.configPillValue} ${config.debug ? styles.on : styles.off}`}
+              >
                 {config.debug ? t('common.yes') : t('common.no')}
               </span>
             </div>
             <div className={styles.configPill}>
-              <span className={styles.configPillLabel}>{t('basic_settings.logging_to_file_enable')}</span>
-              <span className={`${styles.configPillValue} ${config.loggingToFile ? styles.on : styles.off}`}>
+              <span className={styles.configPillLabel}>
+                {t('basic_settings.logging_to_file_enable')}
+              </span>
+              <span
+                className={`${styles.configPillValue} ${config.loggingToFile ? styles.on : styles.off}`}
+              >
                 {config.loggingToFile ? t('common.yes') : t('common.no')}
               </span>
             </div>
             <div className={styles.configPill}>
-              <span className={styles.configPillLabel}>{t('basic_settings.retry_count_label')}</span>
+              <span className={styles.configPillLabel}>
+                {t('basic_settings.retry_count_label')}
+              </span>
               <span className={styles.configPillValue}>{config.requestRetry ?? 0}</span>
             </div>
             <div className={styles.configPill}>
               <span className={styles.configPillLabel}>{t('basic_settings.ws_auth_enable')}</span>
-              <span className={`${styles.configPillValue} ${config.wsAuth ? styles.on : styles.off}`}>
+              <span
+                className={`${styles.configPillValue} ${config.wsAuth ? styles.on : styles.off}`}
+              >
                 {config.wsAuth ? t('common.yes') : t('common.no')}
               </span>
             </div>
@@ -384,7 +420,9 @@ export function DashboardPage() {
             </div>
             {config.proxyUrl && (
               <div className={`${styles.configPill} ${styles.configPillWide}`}>
-                <span className={styles.configPillLabel}>{t('basic_settings.proxy_url_label')}</span>
+                <span className={styles.configPillLabel}>
+                  {t('basic_settings.proxy_url_label')}
+                </span>
                 <span className={styles.configPillMono}>{config.proxyUrl}</span>
               </div>
             )}

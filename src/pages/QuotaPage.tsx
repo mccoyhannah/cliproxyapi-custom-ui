@@ -13,7 +13,7 @@ import {
   CLAUDE_CONFIG,
   CODEX_CONFIG,
   GEMINI_CLI_CONFIG,
-  KIMI_CONFIG
+  KIMI_CONFIG,
 } from '@/components/quota';
 import type { QuotaDashboardFilter, QuotaItemSignal } from '@/components/quota/QuotaSection';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
@@ -87,19 +87,12 @@ const isQuotaTight = (quota?: QuotaStateLike): boolean => {
   return remaining !== null && remaining <= 20;
 };
 
-const getCodexEffectivePlanType = (
-  file: AuthFileItem,
-  quota?: CodexQuotaState
-): string | null => {
-  const fromQuota =
-    quota?.status === 'success' ? normalizePlanType(quota.planType ?? null) : null;
+const getCodexEffectivePlanType = (file: AuthFileItem, quota?: CodexQuotaState): string | null => {
+  const fromQuota = quota?.status === 'success' ? normalizePlanType(quota.planType ?? null) : null;
   return fromQuota ?? normalizePlanType(resolveCodexPlanType(file));
 };
 
-const getCodexEffectiveExpiryMs = (
-  file: AuthFileItem,
-  quota?: CodexQuotaState
-): number | null => {
+const getCodexEffectiveExpiryMs = (file: AuthFileItem, quota?: CodexQuotaState): number | null => {
   if (getCodexEffectivePlanType(file, quota) === 'free') return null;
 
   if (
@@ -204,8 +197,7 @@ export function QuotaPage() {
       const expiryMs = getCodexEffectiveExpiryMs(file, quota);
       const now = Date.now();
       const expired = !free && expiryMs !== null && expiryMs <= now;
-      const expiring =
-        !free && expiryMs !== null && expiryMs - now <= SUBSCRIPTION_WARNING_MS;
+      const expiring = !free && expiryMs !== null && expiryMs - now <= SUBSCRIPTION_WARNING_MS;
       const tight = isQuotaTight(quota);
       const available = status === 'success' && !tight && !expired;
       const recommended = available && !free && !expiring;
@@ -331,6 +323,11 @@ export function QuotaPage() {
     [overviewCounts, t]
   );
 
+  const refreshedPercent =
+    overviewCounts.total > 0
+      ? Math.round((overviewCounts.refreshed / overviewCounts.total) * 100)
+      : 0;
+
   const loadConfig = useCallback(async () => {
     try {
       await configFileApi.fetchConfigYaml();
@@ -375,6 +372,25 @@ export function QuotaPage() {
       {error && <div className={styles.errorBox}>{error}</div>}
 
       <div className={styles.quotaConsole}>
+        <div className={styles.quotaConsoleHero}>
+          <div className={styles.quotaConsoleHeroTopline}>
+            <span className={styles.quotaConsoleMetricLabel}>
+              {t('quota_management.metric_refreshed')}
+            </span>
+            <strong>{refreshedPercent}%</strong>
+          </div>
+          <div className={styles.quotaConsoleProgress} aria-hidden="true">
+            <span style={{ width: `${refreshedPercent}%` }} />
+          </div>
+          <div className={styles.quotaConsoleHeroMeta}>
+            <span>
+              {overviewCounts.refreshed}/{overviewCounts.total}
+            </span>
+            <span>{t('quota_management.metric_attention')}</span>
+            <strong>{overviewCounts.attention}</strong>
+          </div>
+        </div>
+
         <div className={styles.quotaConsoleStats}>
           <div className={styles.quotaConsoleMetric}>
             <span className={styles.quotaConsoleMetricLabel}>

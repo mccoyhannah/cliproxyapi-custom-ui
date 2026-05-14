@@ -78,6 +78,13 @@
   min-height: 0;
   overflow: hidden;
   border-radius: var(--radius-card);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 94%, transparent),
+      transparent 46%
+    ),
+    var(--surface-card);
 
   @include mobile {
     flex: 0 0 auto;
@@ -317,7 +324,18 @@
 }
 
 .logPanel {
-  background: color-mix(in srgb, var(--bg-secondary) 72%, var(--bg-primary));
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb, var(--primary-color) 10%, transparent),
+      transparent 28%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 88%, transparent),
+      color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-primary))
+    ),
+    var(--bg-primary);
   border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
   border-radius: var(--radius-card);
   flex: 1 1 auto;
@@ -330,6 +348,9 @@
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   overscroll-behavior: contain;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1px color-mix(in srgb, var(--bg-primary) 72%, transparent);
 
   @include tablet {
     min-height: 240px;
@@ -344,6 +365,115 @@
   }
 }
 
+.logPanelEmpty {
+  display: flex;
+  flex-direction: column;
+}
+
+.terminalChrome {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 9px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 94%, transparent),
+      color-mix(in srgb, var(--bg-primary) 82%, transparent)
+    ),
+    color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-primary));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  @include mobile {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.terminalLights {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+
+  span {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--text-tertiary);
+    opacity: 0.55;
+
+    &:nth-child(1) {
+      background: var(--danger-color);
+    }
+
+    &:nth-child(2) {
+      background: var(--warning-color);
+    }
+
+    &:nth-child(3) {
+      background: var(--success-color);
+    }
+  }
+}
+
+.terminalStatusList {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+
+  @include mobile {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
+.terminalStatusPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: $radius-full;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 76%, transparent);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 740;
+  white-space: nowrap;
+}
+
+.terminalStatusPillActive {
+  color: color-mix(in srgb, var(--success-color) 76%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--success-color) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
+}
+
+.terminalStatusPillPaused {
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.logEmptyState:global(.empty-state) {
+  flex: 1 1 auto;
+  margin: 12px;
+  min-height: 210px;
+  border: 1px dashed color-mix(in srgb, var(--border-color) 74%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 68%, transparent);
+}
+
 .errorPanel {
   height: 480px;
   overflow: auto;
@@ -353,19 +483,20 @@
 
 .loadMoreBanner {
   position: sticky;
-  top: 0;
-  z-index: 1;
+  top: 42px;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: $spacing-sm;
   padding: 8px 12px;
   border-bottom: 1px solid var(--border-color);
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--bg-primary) 94%, transparent);
   color: var(--text-secondary);
   font-size: 12px;
 
   @include mobile {
+    top: 86px;
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
@@ -405,16 +536,17 @@
 
 .rawLog {
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px 14px 18px;
   cursor: text;
   user-select: text;
   white-space: pre;
-  color: var(--text-primary);
+  color: color-mix(in srgb, var(--text-primary) 88%, var(--success-color));
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
   font-size: 12.5px;
-  line-height: 1.45;
+  line-height: 1.55;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--success-color) 12%, transparent);
 
   @include tablet {
     padding: 8px 10px;
@@ -441,6 +573,10 @@
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-primary) 34%, transparent);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover {
     background: color-mix(in srgb, var(--primary-color) 6%, transparent);
@@ -490,6 +626,7 @@
 .badge {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 2px 8px;
   border-radius: $radius-full;
   font-size: 12px;
@@ -524,8 +661,9 @@
 }
 
 .requestIdBadge {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   font-size: 11px;
   color: #0891b2;
   background: rgba(8, 145, 178, 0.1);
@@ -534,6 +672,14 @@
 
 .statusBadge {
   font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 18%, transparent);
+}
+
+.statusBadgePrefix {
+  opacity: 0.72;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .statusSuccess {
@@ -606,10 +752,26 @@
 .message {
   color: var(--text-secondary);
   word-break: break-word;
+  min-width: 0;
 
   @include mobile {
     flex-basis: 100%;
   }
+}
+
+:global([data-theme='dark']) .logPanel {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(59, 130, 246, 0.15), transparent 28%),
+    linear-gradient(180deg, rgba(10, 16, 26, 0.98), rgba(5, 9, 16, 0.98));
+  border-color: rgba(148, 163, 184, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+:global([data-theme='dark']) .terminalChrome {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.84)), rgba(2, 6, 23, 0.94);
 }
 
 @media (max-height: 960px) {

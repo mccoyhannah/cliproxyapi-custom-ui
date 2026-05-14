@@ -95,7 +95,7 @@ export function LoginPage() {
     () =>
       LANGUAGE_ORDER.map((lang) => ({
         value: lang,
-        label: t(LANGUAGE_LABEL_KEYS[lang])
+        label: t(LANGUAGE_LABEL_KEYS[lang]),
       })),
     [t]
   );
@@ -149,7 +149,7 @@ export function LoginPage() {
       await login({
         apiBase: baseToUse,
         managementKey: managementKey.trim(),
-        rememberPassword
+        rememberPassword,
       });
       showNotification(t('common.connected_status'), 'success');
       navigate('/', { replace: true });
@@ -160,7 +160,16 @@ export function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }, [apiBase, detectedBase, login, managementKey, navigate, rememberPassword, showNotification, t]);
+  }, [
+    apiBase,
+    detectedBase,
+    login,
+    managementKey,
+    navigate,
+    rememberPassword,
+    showNotification,
+    t,
+  ]);
 
   const handleSubmitKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -188,6 +197,20 @@ export function LoginPage() {
           <span className={styles.brandWord}>CLI</span>
           <span className={styles.brandWord}>PROXY</span>
           <span className={styles.brandWord}>API</span>
+          <div className={styles.brandHud}>
+            <div className={styles.brandHudItem}>
+              <span className={styles.brandHudLabel}>EDGE</span>
+              <span className={styles.brandHudValue}>CONTROL</span>
+            </div>
+            <div className={styles.brandHudItem}>
+              <span className={styles.brandHudLabel}>AUTH</span>
+              <span className={styles.brandHudValue}>LOCKED</span>
+            </div>
+            <div className={styles.brandHudItem}>
+              <span className={styles.brandHudLabel}>BASE</span>
+              <span className={styles.brandHudCode}>{detectedBase}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -212,6 +235,11 @@ export function LoginPage() {
             {/* 登录表单卡片 */}
             <div className={styles.loginCard}>
               <div className={styles.loginHeader}>
+                <div className={styles.loginEyebrow}>
+                  <span className={styles.accessDot} aria-hidden="true" />
+                  <span>CONTROL ACCESS</span>
+                  <span className={styles.accessMode}>LOCAL</span>
+                </div>
                 <div className={styles.titleRow}>
                   <div className={styles.title}>{t('title.login')}</div>
                   <Select
@@ -227,8 +255,16 @@ export function LoginPage() {
               </div>
 
               <div className={styles.connectionBox}>
-                <div className={styles.label}>{t('login.connection_current')}</div>
-                <div className={styles.value}>{apiBase || detectedBase}</div>
+                <div className={styles.connectionBoxHeader}>
+                  <div className={styles.label}>{t('login.connection_current')}</div>
+                  <div className={styles.connectionStatus}>
+                    <span className={styles.connectionDot} aria-hidden="true" />
+                    <span>READY</span>
+                  </div>
+                </div>
+                <div className={`${styles.value} ${styles.endpointValue}`}>
+                  {apiBase || detectedBase}
+                </div>
                 <div className={styles.hint}>{t('login.connection_auto_hint')}</div>
               </div>
 

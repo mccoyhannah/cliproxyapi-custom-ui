@@ -1,4 +1,13 @@
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
@@ -22,6 +31,11 @@ import { configFileApi } from '@/services/api/configFile';
 import styles from './ConfigPage.module.scss';
 
 type ConfigEditorTab = 'visual' | 'source';
+type SourceYamlError = {
+  message: string;
+  line?: number;
+  col?: number;
+};
 
 const LazyYamlEditor = lazy(() => import('@/components/config/YamlEditor'));
 
@@ -33,6 +47,26 @@ function readCommercialModeFromYaml(yamlContent: string): boolean {
   } catch {
     return false;
   }
+}
+
+function getSourceYamlError(yamlContent: string): SourceYamlError | null {
+  let sourceDocument: ReturnType<typeof parseDocument>;
+  try {
+    sourceDocument = parseDocument(yamlContent);
+  } catch (err: unknown) {
+    return {
+      message: err instanceof Error ? err.message : 'Invalid YAML',
+    };
+  }
+
+  const error = sourceDocument.errors[0];
+  if (!error) return null;
+  const firstLinePos = error.linePos?.[0];
+  return {
+    message: error.message,
+    line: firstLinePos?.line,
+    col: firstLinePos?.col,
+  };
 }
 
 export function ConfigPage() {
@@ -88,6 +122,21 @@ export function ConfigPage() {
   const hasVisualValidationErrors =
     activeTab === 'visual' &&
     (Object.values(visualValidationErrors).some(Boolean) || visualHasPayloadValidationErrors);
+  const sourceYamlError = useMemo(
+    () => (activeTab === 'source' ? getSourceYamlError(content) : null),
+    [activeTab, content]
+  );
+  const sourceYamlErrorDetail = sourceYamlError
+    ? sourceYamlError.line && sourceYamlError.col
+      ? t('config_management.source_yaml_invalid_with_position', {
+          defaultValue: 'Line {{line}}, column {{col}}: {{message}}',
+          line: sourceYamlError.line,
+          col: sourceYamlError.col,
+          message: sourceYamlError.message,
+        })
+      : sourceYamlError.message
+    : '';
+  const hasSourceYamlError = activeTab === 'source' && !!sourceYamlError;
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -174,21 +223,15 @@ export function ConfigPage() {
       return;
     }
 
-    if (activeTab === 'source') {
-      const sourceDocument = parseDocument(content);
-      if (sourceDocument.errors.length > 0) {
-        const message =
-          sourceDocument.errors[0]?.message ??
-          t('config_management.visual_mode_save_blocked');
-        showNotification(
-          t('config_management.source_yaml_invalid', {
-            defaultValue: '请先修复 YAML 语法错误再保存：{{message}}',
-            message,
-          }),
-          'error'
-        );
-        return;
-      }
+    if (hasSourceYamlError) {
+      showNotification(
+        t('config_management.source_yaml_invalid', {
+          defaultValue: '请先修复 YAML 语法错误再保存：{{message}}',
+          message: sourceYamlErrorDetail,
+        }),
+        'error'
+      );
+      return;
     }
 
     setSaving(true);
@@ -427,6 +470,10 @@ export function ConfigPage() {
     if (loading) return t('config_management.status_loading');
     if (error) return t('config_management.status_load_failed');
     if (hasVisualModeError) return t('config_management.visual_mode_unavailable');
+    if (hasSourceYamlError)
+      return t('config_management.source_yaml_invalid_status', {
+        defaultValue: 'YAML syntax error',
+      });
     if (hasVisualValidationErrors)
       return t('config_management.visual.validation.validation_blocked');
     if (saving) return t('config_management.status_saving');
@@ -435,7 +482,8 @@ export function ConfigPage() {
   };
 
   const getStatusClass = () => {
-    if (error || hasVisualModeError || hasVisualValidationErrors) return styles.error;
+    if (error || hasVisualModeError || hasSourceYamlError || hasVisualValidationErrors)
+      return styles.error;
     if (isDirty) return styles.modified;
     if (!loading && !saving) return styles.saved;
     return '';
@@ -449,6 +497,8 @@ export function ConfigPage() {
     if (error) return t('config_management.status_load_failed_short', { defaultValue: 'Failed' });
     if (hasVisualModeError)
       return t('config_management.visual_mode_unavailable_short', { defaultValue: 'YAML issue' });
+    if (hasSourceYamlError)
+      return t('config_management.source_yaml_invalid_short', { defaultValue: 'YAML error' });
     if (hasVisualValidationErrors)
       return t('config_management.visual.validation_blocked_short', { defaultValue: 'Fix errors' });
     if (saving) return t('config_management.status_saving_short', { defaultValue: 'Saving' });
@@ -505,12 +555,18 @@ export function ConfigPage() {
             !isDirty ||
             diffModalOpen ||
             hasVisualModeError ||
+            hasSourceYamlError ||
             hasVisualValidationErrors
           }
-          title={t('config_management.save')}
-          aria-label={t('config_management.save')}
+          title={hasSourceYamlError ? sourceYamlErrorDetail : t('config_management.save')}
+          aria-label={hasSourceYamlError ? sourceYamlErrorDetail : t('config_management.save')}
+          aria-busy={saving || undefined}
         >
-          <IconCheck size={16} />
+          {saving ? (
+            <span className="loading-spinner" aria-hidden="true" />
+          ) : (
+            <IconCheck size={16} />
+          )}
           {isDirty && <span className={styles.dirtyDot} aria-hidden="true" />}
         </button>
       </div>
@@ -577,6 +633,15 @@ export function ConfigPage() {
             />
           ) : (
             <div className={styles.sourceWorkspace}>
+              {sourceYamlError && (
+                <div className="error-box" role="alert">
+                  {t('config_management.source_yaml_invalid', {
+                    defaultValue: '请先修复 YAML 语法错误再保存：{{message}}',
+                    message: sourceYamlErrorDetail,
+                  })}
+                </div>
+              )}
+
               <div className={styles.sourceToolbar}>
                 <div className={styles.searchInputWrapper}>
                   <Input
@@ -648,6 +713,9 @@ export function ConfigPage() {
                     theme={resolvedTheme}
                     editable={!disableControls && !loading}
                     placeholder={t('config_management.editor_placeholder')}
+                    diagnosticSourceLabel={t('config_management.yaml_diagnostic_source', {
+                      defaultValue: 'YAML',
+                    })}
                   />
                 </Suspense>
               </div>

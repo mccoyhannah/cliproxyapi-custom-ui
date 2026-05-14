@@ -11,12 +11,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
 
-export type QuotaCardBadgeTone =
-  | 'recommended'
-  | 'warning'
-  | 'danger'
-  | 'neutral'
-  | 'info';
+export type QuotaCardBadgeTone = 'recommended' | 'warning' | 'danger' | 'neutral' | 'info';
 
 export interface QuotaCardBadge {
   label: string;
@@ -38,10 +33,9 @@ export interface QuotaProgressBarProps {
 export function QuotaProgressBar({
   percent,
   highThreshold,
-  mediumThreshold
+  mediumThreshold,
 }: QuotaProgressBarProps) {
-  const clamp = (value: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, value));
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
   const normalized = percent === null ? null : clamp(percent, 0, 100);
   const fillClass =
     normalized === null
@@ -96,7 +90,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   defaultType,
   canRefresh = false,
   onRefresh,
-  renderQuotaItems
+  renderQuotaItems,
 }: QuotaCardProps<TState>) {
   const { t } = useTranslation();
 
@@ -106,12 +100,22 @@ export function QuotaCard<TState extends QuotaStatusState>({
     resolvedTheme === 'dark' && typeColorSet.dark ? typeColorSet.dark : typeColorSet.light;
 
   const quotaStatus = quota?.status ?? 'idle';
+  const statusClass =
+    quotaStatus === 'loading'
+      ? styles.fileCardLoading
+      : quotaStatus === 'error'
+        ? styles.fileCardError
+        : quotaStatus === 'success'
+          ? styles.fileCardSuccess
+          : styles.fileCardIdle;
   const quotaErrorMessage = resolveQuotaErrorMessage(
     t,
     quota?.errorStatus,
     quota?.error || t('common.unknown_error')
   );
-  const idleMessageKey = onRefresh ? `${i18nPrefix}.idle` : (cardIdleMessageKey ?? `${i18nPrefix}.idle`);
+  const idleMessageKey = onRefresh
+    ? `${i18nPrefix}.idle`
+    : (cardIdleMessageKey ?? `${i18nPrefix}.idle`);
 
   const getTypeLabel = (type: string): string => {
     const key = `auth_files.filter_${type}`;
@@ -122,21 +126,27 @@ export function QuotaCard<TState extends QuotaStatusState>({
   };
 
   return (
-    <div className={`${styles.fileCard} ${cardClassName}`}>
+    <div
+      className={`${styles.fileCard} ${statusClass} ${cardClassName}`}
+      data-quota-status={quotaStatus}
+    >
       <div className={styles.cardHeader}>
         <span
           className={styles.typeBadge}
           style={{
             backgroundColor: typeColor.bg,
             color: typeColor.text,
-            ...(typeColor.border ? { border: typeColor.border } : {})
+            ...(typeColor.border ? { border: typeColor.border } : {}),
           }}
         >
           {getTypeLabel(displayType)}
         </span>
         <span className={styles.fileName}>{item.name}</span>
         {statusBadges.length > 0 && (
-          <span className={styles.cardStatusBadges} aria-label={t('quota_management.card_status_badges')}>
+          <span
+            className={styles.cardStatusBadges}
+            aria-label={t('quota_management.card_status_badges')}
+          >
             {statusBadges.map((badge) => {
               const toneClass =
                 badge.tone === 'recommended'
@@ -164,7 +174,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
 
       <div className={styles.quotaSection}>
         {quotaStatus === 'loading' ? (
-          <div className={styles.quotaMessage}>{t(`${i18nPrefix}.loading`)}</div>
+          <div className={styles.quotaMessage} role="status">
+            {t(`${i18nPrefix}.loading`)}
+          </div>
         ) : quotaStatus === 'idle' ? (
           onRefresh ? (
             <button
@@ -181,7 +193,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
         ) : quotaStatus === 'error' ? (
           <div className={styles.quotaError}>
             {t(`${i18nPrefix}.load_failed`, {
-              message: quotaErrorMessage
+              message: quotaErrorMessage,
             })}
           </div>
         ) : quota ? (

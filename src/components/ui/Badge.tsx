@@ -1,6 +1,12 @@
 import type { HTMLAttributes, PropsWithChildren, ReactNode } from 'react';
 
-export type BadgeVariant = 'success' | 'error' | 'warning' | 'info' | 'neutral';
+export type BadgeVariant =
+  | 'success'
+  | 'error'
+  | 'warning'
+  | 'info'
+  | 'neutral'
+  | 'recommended';
 export type BadgeSize = 'sm' | 'md';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

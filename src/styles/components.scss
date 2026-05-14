@@ -424,6 +424,12 @@ textarea {
   --badge-border: var(--status-neutral-border);
 }
 
+.badge-recommended {
+  --badge-bg: var(--status-recommended-bg);
+  --badge-text: var(--status-recommended-text);
+  --badge-border: var(--status-recommended-border);
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -1268,4 +1274,148 @@ textarea {
 
 .hint {
   color: var(--text-secondary);
+}
+
+// Second-round shared control polish.
+.btn,
+.input,
+textarea,
+select {
+  border-radius: var(--radius-md);
+}
+
+.btn {
+  letter-spacing: 0;
+  box-shadow: var(--shadow-control);
+}
+
+.btn.btn-secondary,
+.btn.btn-ghost {
+  backdrop-filter: none;
+}
+
+.card {
+  border: 1px solid var(--border-base);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 92%, transparent), transparent),
+    var(--surface-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.card.card-compact {
+  padding: 16px;
+}
+
+.card-header .title {
+  letter-spacing: 0;
+}
+
+.empty-state {
+  border-style: solid;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--empty-bg) 72%, transparent), transparent 70%),
+    color-mix(in srgb, var(--bg-surface) 84%, var(--bg-body));
+  box-shadow: var(--shadow-control);
+}
+
+.skeleton {
+  --skeleton-a: color-mix(in srgb, var(--text-primary) 7%, var(--bg-surface));
+  --skeleton-b: color-mix(in srgb, var(--primary-color) 10%, var(--bg-surface));
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.skeleton-line,
+.skeleton-table-row span {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--skeleton-a);
+}
+
+.skeleton-line::after,
+.skeleton-table-row span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--skeleton-b) 86%, transparent),
+    transparent
+  );
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.skeleton-text .skeleton-line:nth-child(2n) {
+  width: 82%;
+}
+
+.skeleton-text .skeleton-line:nth-child(3n) {
+  width: 64%;
+}
+
+.skeleton-card {
+  gap: 12px;
+  padding: 18px;
+  min-height: 128px;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-control);
+}
+
+.skeleton-card .skeleton-line:first-child {
+  width: 46%;
+  height: 16px;
+}
+
+.skeleton-card .skeleton-line:nth-child(2) {
+  width: 76%;
+}
+
+.skeleton-card .skeleton-line:nth-child(3) {
+  width: 58%;
+}
+
+.skeleton-metric {
+  gap: 10px;
+}
+
+.skeleton-metric .skeleton-line:first-child {
+  width: 44px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.skeleton-metric .skeleton-line:nth-child(2) {
+  width: 70%;
+}
+
+.skeleton-table {
+  gap: 10px;
+}
+
+.skeleton-table-row {
+  display: grid;
+  grid-template-columns: 1.2fr 0.7fr 0.5fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-card) 82%, var(--bg-body));
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

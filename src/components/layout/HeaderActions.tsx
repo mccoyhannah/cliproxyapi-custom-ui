@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SVGProps } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
 import { isSupportedLanguage } from '@/utils/language';
@@ -13,6 +14,8 @@ interface HeaderActionsProps {
   sidebarCollapsed: boolean;
   language: Language;
   theme: Theme;
+  connectionStatus: string;
+  serverVersion?: string | null;
   onToggleSidebarOpen: () => void;
   onToggleSidebarCollapsed: () => void;
   onRefreshAll: () => void | Promise<void>;
@@ -139,6 +142,8 @@ export function HeaderActions({
   sidebarCollapsed,
   language,
   theme,
+  connectionStatus,
+  serverVersion,
   onToggleSidebarOpen,
   onToggleSidebarCollapsed,
   onRefreshAll,
@@ -159,6 +164,21 @@ export function HeaderActions({
   const desktopSidebarToggleLabel = sidebarCollapsed
     ? t('sidebar.expand', { defaultValue: '展开' })
     : t('sidebar.collapse', { defaultValue: '收起' });
+  const connectionBadgeVariant =
+    connectionStatus === 'connected'
+      ? 'success'
+      : connectionStatus === 'connecting'
+        ? 'warning'
+        : 'error';
+  const connectionLabel =
+    connectionStatus === 'connected'
+      ? t('common.connected_status')
+      : connectionStatus === 'connecting'
+        ? t('common.connecting')
+        : t('common.disconnected_status');
+  const versionLabel = serverVersion
+    ? `v${serverVersion.trim().replace(/^[vV]+/, '')}`
+    : t('common.unknown', { defaultValue: 'Unknown' });
 
   useEffect(() => {
     if (!openMenu) return;
@@ -242,6 +262,17 @@ export function HeaderActions({
       </div>
 
       <div className="header-actions floating-actions">
+        <div
+          className="header-status-cluster"
+          aria-label={t('dashboard.system_status', { defaultValue: 'System status' })}
+        >
+          <Badge variant={connectionBadgeVariant} size="sm" dot>
+            {connectionLabel}
+          </Badge>
+          <Badge variant="neutral" size="sm" mono>
+            {versionLabel}
+          </Badge>
+        </div>
         <Button
           variant="ghost"
           size="sm"

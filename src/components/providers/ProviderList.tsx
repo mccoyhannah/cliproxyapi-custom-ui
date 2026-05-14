@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface ProviderListProps<T> {
   items: T[];
@@ -43,7 +44,7 @@ export function ProviderList<T>({
   const { t } = useTranslation();
 
   if (loading && items.length === 0) {
-    return <EmptyState title={t('common.loading')} variant="loading" compact />;
+    return <Skeleton variant="card" rows={3} />;
   }
 
   if (!items.length) {

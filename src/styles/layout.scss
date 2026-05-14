@@ -782,8 +782,10 @@
 // Operations-console layout polish.
 .app-shell {
   background:
-    radial-gradient(circle at 28% -10%, color-mix(in srgb, var(--ops-accent) 9%, transparent), transparent 32%),
-    linear-gradient(180deg, var(--bg-secondary), var(--bg-quinary, var(--bg-secondary)));
+    linear-gradient(90deg, color-mix(in srgb, var(--border-base) 30%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--border-base) 24%, transparent) 1px, transparent 1px),
+    linear-gradient(180deg, var(--bg-body), var(--bg-quinary, var(--bg-body)));
+  background-size: 36px 36px, 36px 36px, auto;
 }
 
 .main-header {
@@ -795,7 +797,7 @@
       linear-gradient(180deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0)),
       color-mix(in srgb, var(--floating-surface) 88%, transparent);
     box-shadow:
-      0 18px 44px rgb(12 25 21 / 0.14),
+      0 18px 44px rgb(15 23 42 / 0.14),
       inset 0 1px 0 rgb(255 255 255 / 0.18);
   }
 
@@ -826,12 +828,21 @@
       color: var(--ops-accent-strong);
     }
   }
+
+  .header-status-cluster {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0 6px 0 2px;
+    border-right: 1px solid color-mix(in srgb, var(--ops-border-subtle) 74%, transparent);
+  }
 }
 
 .sidebar {
   border-color: color-mix(in srgb, var(--ops-border-subtle) 82%, transparent);
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.34), rgb(255 255 255 / 0)),
+    linear-gradient(180deg, rgb(255 255 255 / 0.28), rgb(255 255 255 / 0)),
     color-mix(in srgb, var(--ops-surface-1) 94%, var(--bg-secondary));
   box-shadow: var(--ops-panel-shadow);
 
@@ -1005,5 +1016,9 @@
 
   .main-content {
     padding-top: calc(var(--header-height) + 18px);
+  }
+
+  .main-header .header-status-cluster {
+    display: none;
   }
 }

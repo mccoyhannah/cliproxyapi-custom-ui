@@ -1,7 +1,7 @@
 import type { PointerEvent as ReactPointerEvent, RefObject, UIEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui/EmptyState';
-import type { LogState, ParsedLogLine } from '@/pages/hooks/logTypes';
+import { resolveStatusGroup, type LogState, type ParsedLogLine } from '@/pages/hooks/logTypes';
 
 type LogViewerStyles = Record<string, string>;
 
@@ -9,6 +9,10 @@ interface LogViewerProps {
   styles: LogViewerStyles;
   loading: boolean;
   logState: LogState;
+  autoRefresh: boolean;
+  followTail: boolean;
+  isSearching: boolean;
+  hasStructuredFilters: boolean;
   filteredLineCount: number;
   removedCount: number;
   canLoadMore: boolean;
@@ -27,6 +31,10 @@ export function LogViewer({
   styles,
   loading,
   logState,
+  autoRefresh,
+  followTail,
+  isSearching,
+  hasStructuredFilters,
   filteredLineCount,
   removedCount,
   canLoadMore,
@@ -41,34 +49,90 @@ export function LogViewer({
   onLongPressMove,
 }: LogViewerProps) {
   const { t } = useTranslation();
+  const renderedCount = showRawLogs
+    ? rawVisibleText.length > 0
+      ? filteredLineCount
+      : 0
+    : parsedVisibleLines.length;
+  const chrome = (
+    <div className={styles.terminalChrome}>
+      <div className={styles.terminalLights} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
+      <div className={styles.terminalStatusList}>
+        <span
+          className={`${styles.terminalStatusPill} ${autoRefresh ? styles.terminalStatusPillActive : ''}`}
+        >
+          {autoRefresh
+            ? t('logs.auto_refresh')
+            : t('logs.auto_refresh_off', { defaultValue: 'Auto refresh off' })}
+        </span>
+        <span
+          className={`${styles.terminalStatusPill} ${followTail ? styles.terminalStatusPillActive : styles.terminalStatusPillPaused}`}
+        >
+          {followTail
+            ? t('logs.auto_scroll_on', { defaultValue: 'Auto-scroll on' })
+            : t('logs.auto_scroll_paused', { defaultValue: 'Auto-scroll paused' })}
+        </span>
+        {(isSearching || hasStructuredFilters) && (
+          <span className={styles.terminalStatusPill}>
+            {t('logs.filtered_lines', { count: removedCount })}
+          </span>
+        )}
+        <span className={styles.terminalStatusPill}>
+          {t('logs.loaded_lines', { count: renderedCount })}
+        </span>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
-      <EmptyState
-        variant="loading"
-        compact
-        title={t('logs.loading')}
-        description={t('logs.loading_desc', { defaultValue: 'Fetching the latest server logs.' })}
-      />
+      <div ref={logViewerRef} className={`${styles.logPanel} ${styles.logPanelEmpty}`}>
+        {chrome}
+        <EmptyState
+          variant="loading"
+          compact
+          className={styles.logEmptyState}
+          title={t('logs.loading')}
+          description={t('logs.loading_desc', { defaultValue: 'Fetching the latest server logs.' })}
+        />
+      </div>
     );
   }
 
   if (logState.buffer.length > 0 && filteredLineCount === 0) {
     return (
-      <EmptyState
-        title={t('logs.search_empty_title')}
-        description={t('logs.search_empty_desc')}
-        variant="info"
-      />
+      <div ref={logViewerRef} className={`${styles.logPanel} ${styles.logPanelEmpty}`}>
+        {chrome}
+        <EmptyState
+          className={styles.logEmptyState}
+          title={t('logs.search_empty_title')}
+          description={t('logs.search_empty_desc')}
+          variant="info"
+        />
+      </div>
     );
   }
 
   if (logState.buffer.length === 0) {
-    return <EmptyState title={t('logs.empty_title')} description={t('logs.empty_desc')} />;
+    return (
+      <div ref={logViewerRef} className={`${styles.logPanel} ${styles.logPanelEmpty}`}>
+        {chrome}
+        <EmptyState
+          className={styles.logEmptyState}
+          title={t('logs.empty_title')}
+          description={t('logs.empty_desc')}
+        />
+      </div>
+    );
   }
 
   return (
     <div ref={logViewerRef} className={styles.logPanel} onScroll={onScroll}>
+      {chrome}
       {canLoadMore && (
         <div className={styles.loadMoreBanner}>
           <span>{t('logs.load_more_hint')}</span>
@@ -119,9 +183,7 @@ export function LogViewer({
                         styles.badge,
                         line.level === 'info' ? styles.levelInfo : '',
                         line.level === 'warn' ? styles.levelWarn : '',
-                        line.level === 'error' || line.level === 'fatal'
-                          ? styles.levelError
-                          : '',
+                        line.level === 'error' || line.level === 'fatal' ? styles.levelError : '',
                         line.level === 'debug' ? styles.levelDebug : '',
                         line.level === 'trace' ? styles.levelTrace : '',
                       ]
@@ -160,7 +222,18 @@ export function LogViewer({
                               ? styles.statusWarn
                               : styles.statusError,
                       ].join(' ')}
+                      title={t('logs.http_status_title', {
+                        defaultValue: 'HTTP {{status}}',
+                        status: line.statusCode,
+                      })}
+                      aria-label={t('logs.http_status_aria', {
+                        defaultValue: 'HTTP status {{status}}',
+                        status: line.statusCode,
+                      })}
                     >
+                      <span className={styles.statusBadgePrefix}>
+                        {resolveStatusGroup(line.statusCode) ?? 'HTTP'}
+                      </span>
                       {line.statusCode}
                     </span>
                   )}

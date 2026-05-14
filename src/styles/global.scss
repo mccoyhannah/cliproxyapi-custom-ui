@@ -10,9 +10,17 @@
 @use './layout.scss';
 
 body {
-  background-color: var(--bg-secondary);
+  background-color: var(--bg-body, var(--bg-secondary));
   color: var(--text-primary);
   transition: background-color $transition-normal, color $transition-normal;
+  font-family: $font-family;
+}
+
+code,
+kbd,
+pre,
+.mono-text {
+  font-family: var(--mono-font, #{$font-mono});
 }
 
 html.modal-open,

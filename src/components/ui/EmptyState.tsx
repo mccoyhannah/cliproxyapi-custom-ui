@@ -10,6 +10,7 @@ interface EmptyStateProps {
   action?: ReactNode;
   icon?: ReactNode;
   variant?: EmptyStateVariant;
+  tone?: EmptyStateVariant;
   compact?: boolean;
   className?: string;
 }
@@ -28,24 +29,27 @@ export function EmptyState({
   action,
   icon,
   variant = 'neutral',
+  tone,
   compact = false,
   className = '',
 }: EmptyStateProps) {
+  const resolvedVariant = tone ?? variant;
   const classes = [
     'empty-state',
-    `empty-state-${variant}`,
+    `empty-state-${resolvedVariant}`,
     compact ? 'empty-state-compact' : '',
     className,
   ]
     .filter(Boolean)
     .join(' ');
-  const role = variant === 'error' ? 'alert' : variant === 'loading' ? 'status' : undefined;
+  const role =
+    resolvedVariant === 'error' ? 'alert' : resolvedVariant === 'loading' ? 'status' : undefined;
 
   return (
     <div className={classes} role={role} aria-live={role ? 'polite' : undefined}>
       <div className="empty-content">
         <div className="empty-icon" aria-hidden="true">
-          {icon ?? getDefaultIcon(variant)}
+          {icon ?? getDefaultIcon(resolvedVariant)}
         </div>
         <div>
           <div className="empty-title">{title}</div>

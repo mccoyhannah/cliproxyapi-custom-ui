@@ -24,6 +24,8 @@ export function MainLayout() {
   const location = useLocation();
 
   const logout = useAuthStore((state) => state.logout);
+  const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const serverVersion = useAuthStore((state) => state.serverVersion);
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
@@ -166,6 +168,8 @@ export function MainLayout() {
           sidebarCollapsed={sidebarCollapsed}
           language={language}
           theme={theme}
+          connectionStatus={connectionStatus}
+          serverVersion={serverVersion}
           onToggleSidebarOpen={handleToggleSidebarOpen}
           onToggleSidebarCollapsed={() => setSidebarCollapsed((prev) => !prev)}
           onRefreshAll={handleRefreshAll}
