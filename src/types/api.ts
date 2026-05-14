@@ -21,6 +21,13 @@ export interface RequestOptions {
   data?: unknown;
 }
 
+export interface ApiRequestMeta {
+  silent?: boolean;
+  toastOnError?: boolean;
+  toastMessage?: string;
+  toastKey?: string;
+}
+
 // 服务器版本信息
 export interface ServerVersion {
   version: string;

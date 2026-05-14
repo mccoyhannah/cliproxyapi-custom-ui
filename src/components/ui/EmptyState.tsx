@@ -1,18 +1,51 @@
 import type { ReactNode } from 'react';
-import { IconInbox } from './icons';
+import { LoadingSpinner } from './LoadingSpinner';
+import { IconCheck, IconInbox, IconInfo, IconX } from './icons';
+
+type EmptyStateVariant = 'neutral' | 'success' | 'error' | 'warning' | 'info' | 'loading';
 
 interface EmptyStateProps {
-  title: string;
-  description?: string;
+  title: ReactNode;
+  description?: ReactNode;
   action?: ReactNode;
+  icon?: ReactNode;
+  variant?: EmptyStateVariant;
+  compact?: boolean;
+  className?: string;
 }
 
-export function EmptyState({ title, description, action }: EmptyStateProps) {
+function getDefaultIcon(variant: EmptyStateVariant) {
+  if (variant === 'loading') return <LoadingSpinner size={18} />;
+  if (variant === 'success') return <IconCheck size={20} />;
+  if (variant === 'error') return <IconX size={20} />;
+  if (variant === 'warning' || variant === 'info') return <IconInfo size={20} />;
+  return <IconInbox size={20} />;
+}
+
+export function EmptyState({
+  title,
+  description,
+  action,
+  icon,
+  variant = 'neutral',
+  compact = false,
+  className = '',
+}: EmptyStateProps) {
+  const classes = [
+    'empty-state',
+    `empty-state-${variant}`,
+    compact ? 'empty-state-compact' : '',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const role = variant === 'error' ? 'alert' : variant === 'loading' ? 'status' : undefined;
+
   return (
-    <div className="empty-state">
+    <div className={classes} role={role} aria-live={role ? 'polite' : undefined}>
       <div className="empty-content">
         <div className="empty-icon" aria-hidden="true">
-          <IconInbox size={20} />
+          {icon ?? getDefaultIcon(variant)}
         </div>
         <div>
           <div className="empty-title">{title}</div>

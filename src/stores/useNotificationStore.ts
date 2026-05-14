@@ -9,6 +9,12 @@ import type { Notification, NotificationType } from '@/types';
 import { generateId } from '@/utils/helpers';
 import { NOTIFICATION_DURATION_MS } from '@/utils/constants';
 
+interface ShowNotificationOptions {
+  dedupeKey?: string;
+  dedupeMs?: number;
+  maxVisible?: number;
+}
+
 interface ConfirmationOptions {
   title?: string;
   message: ReactNode;
@@ -26,13 +32,22 @@ interface NotificationState {
     isLoading: boolean;
     options: ConfirmationOptions | null;
   };
-  showNotification: (message: string, type?: NotificationType, duration?: number) => void;
+  showNotification: (
+    message: string,
+    type?: NotificationType,
+    duration?: number,
+    options?: ShowNotificationOptions
+  ) => void;
   removeNotification: (id: string) => void;
   clearAll: () => void;
   showConfirmation: (options: ConfirmationOptions) => void;
   hideConfirmation: () => void;
   setConfirmationLoading: (loading: boolean) => void;
 }
+
+const DEFAULT_MAX_VISIBLE_NOTIFICATIONS = 4;
+const DEFAULT_DEDUPE_MS = 2500;
+const recentNotificationAt = new Map<string, number>();
 
 export const useNotificationStore = create<NotificationState>((set) => ({
   notifications: [],
@@ -42,7 +57,21 @@ export const useNotificationStore = create<NotificationState>((set) => ({
     options: null
   },
 
-  showNotification: (message, type = 'info', duration = NOTIFICATION_DURATION_MS) => {
+  showNotification: (
+    message,
+    type = 'info',
+    duration = NOTIFICATION_DURATION_MS,
+    options = {}
+  ) => {
+    const dedupeKey = options.dedupeKey ?? `${type}:${message}`;
+    const dedupeMs = options.dedupeMs ?? DEFAULT_DEDUPE_MS;
+    const now = Date.now();
+    const previousAt = recentNotificationAt.get(dedupeKey);
+    if (previousAt && now - previousAt < dedupeMs) {
+      return;
+    }
+    recentNotificationAt.set(dedupeKey, now);
+
     const id = generateId();
     const notification: Notification = {
       id,
@@ -50,9 +79,10 @@ export const useNotificationStore = create<NotificationState>((set) => ({
       type,
       duration
     };
+    const maxVisible = options.maxVisible ?? DEFAULT_MAX_VISIBLE_NOTIFICATIONS;
 
     set((state) => ({
-      notifications: [...state.notifications, notification]
+      notifications: [...state.notifications, notification].slice(-maxVisible)
     }));
 
     // 自动移除通知

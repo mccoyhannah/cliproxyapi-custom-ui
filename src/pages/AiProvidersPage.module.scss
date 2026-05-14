@@ -420,6 +420,12 @@ $openai-toolbar-control-height: 36px;
   padding-top: 4px;
 }
 
+.inlineStatusBadge {
+  margin-top: 8px;
+  margin-bottom: 0;
+  width: fit-content;
+}
+
 .statPill {
   display: inline-flex;
   align-items: center;

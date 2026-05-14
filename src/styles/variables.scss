@@ -35,6 +35,9 @@ $radius-md: 8px;
 $radius-lg: 8px;
 $radius-full: 9999px;
 
+// 状态语义
+$status-tones: success, error, warning, info, neutral;
+
 // 阴影
 $shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 $shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
@@ -61,4 +64,4 @@ $z-notification: 3000;
 $font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Noto Sans SC',
   'Microsoft YaHei UI', sans-serif;
 
-$font-mono: 'Courier New', Courier, monospace;
+$font-mono: 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', monospace;

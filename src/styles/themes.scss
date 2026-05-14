@@ -284,3 +284,68 @@
   --ops-brand-panel: #0d1211;
   --ops-brand-panel-alt: #14201d;
 }
+
+// Unified state tokens for badges, empty states and compact alerts.
+:root {
+  --status-success-bg: rgba(15, 159, 114, 0.12);
+  --status-success-text: #047857;
+  --status-success-border: rgba(15, 159, 114, 0.34);
+  --status-error-bg: rgba(209, 67, 67, 0.1);
+  --status-error-text: #b42323;
+  --status-error-border: rgba(209, 67, 67, 0.34);
+  --status-warning-bg: rgba(183, 121, 31, 0.12);
+  --status-warning-text: #925a13;
+  --status-warning-border: rgba(183, 121, 31, 0.36);
+  --status-info-bg: rgba(37, 99, 235, 0.1);
+  --status-info-text: #1d4ed8;
+  --status-info-border: rgba(37, 99, 235, 0.3);
+  --status-neutral-bg: color-mix(in srgb, var(--text-secondary) 8%, var(--bg-primary));
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-border: color-mix(in srgb, var(--border-color) 86%, transparent);
+
+  --success-badge-bg: var(--status-success-bg);
+  --success-badge-text: var(--status-success-text);
+  --success-badge-border: var(--status-success-border);
+  --failure-badge-bg: var(--status-error-bg);
+  --failure-badge-text: var(--status-error-text);
+  --failure-badge-border: var(--status-error-border);
+  --warning-bg: var(--status-warning-bg);
+  --warning-border: var(--status-warning-border);
+  --warning-text: var(--status-warning-text);
+}
+
+[data-theme='white'] {
+  --status-success-bg: rgba(15, 159, 114, 0.1);
+  --status-success-text: #047857;
+  --status-success-border: rgba(15, 159, 114, 0.3);
+  --status-error-bg: rgba(209, 67, 67, 0.08);
+  --status-error-text: #b42323;
+  --status-error-border: rgba(209, 67, 67, 0.3);
+  --status-warning-bg: rgba(183, 121, 31, 0.1);
+  --status-warning-text: #925a13;
+  --status-warning-border: rgba(183, 121, 31, 0.32);
+  --status-info-bg: rgba(37, 99, 235, 0.08);
+  --status-info-text: #1d4ed8;
+  --status-info-border: rgba(37, 99, 235, 0.26);
+  --status-neutral-bg: color-mix(in srgb, var(--text-secondary) 6%, #ffffff);
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-border: color-mix(in srgb, var(--border-color) 88%, transparent);
+}
+
+[data-theme='dark'] {
+  --status-success-bg: rgba(52, 211, 153, 0.14);
+  --status-success-text: #6ee7b7;
+  --status-success-border: rgba(52, 211, 153, 0.38);
+  --status-error-bg: rgba(248, 113, 113, 0.16);
+  --status-error-text: #fca5a5;
+  --status-error-border: rgba(248, 113, 113, 0.42);
+  --status-warning-bg: rgba(245, 158, 11, 0.16);
+  --status-warning-text: #fbbf24;
+  --status-warning-border: rgba(245, 158, 11, 0.42);
+  --status-info-bg: rgba(96, 165, 250, 0.14);
+  --status-info-text: #93c5fd;
+  --status-info-border: rgba(96, 165, 250, 0.36);
+  --status-neutral-bg: color-mix(in srgb, var(--text-secondary) 12%, var(--bg-primary));
+  --status-neutral-text: var(--text-secondary);
+  --status-neutral-border: color-mix(in srgb, var(--border-color) 86%, transparent);
+}

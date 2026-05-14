@@ -1,6 +1,7 @@
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import iconCodex from '@/assets/icons/codex.svg';
@@ -156,9 +157,9 @@ export function CodexSection({
                   </div>
                 )}
                 {configDisabled && (
-                  <div className="status-badge warning" style={{ marginTop: 8, marginBottom: 0 }}>
+                  <Badge variant="warning" size="sm" className={styles.inlineStatusBadge}>
                     {t('ai_providers.config_disabled_badge')}
-                  </div>
+                  </Badge>
                 )}
                 {item.models?.length ? (
                   <div className={styles.modelTagList}>
@@ -190,12 +191,12 @@ export function CodexSection({
                   </div>
                 ) : null}
                 <div className={styles.cardStats}>
-                  <span className={`${styles.statPill} ${styles.statSuccess}`}>
+                  <Badge variant="success" size="sm">
                     {t('stats.success')}: {stats.success}
-                  </span>
-                  <span className={`${styles.statPill} ${styles.statFailure}`}>
+                  </Badge>
+                  <Badge variant="error" size="sm">
                     {t('stats.failure')}: {stats.failure}
-                  </span>
+                  </Badge>
                 </div>
                 <ProviderStatusBar statusData={statusData} />
               </Fragment>

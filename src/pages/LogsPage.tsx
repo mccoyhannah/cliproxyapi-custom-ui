@@ -3,10 +3,10 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { LogViewer } from '@/components/LogViewer';
 import {
   IconChevronDown,
   IconChevronUp,
@@ -75,6 +75,7 @@ export function LogsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [autoRefresh, setAutoRefresh] = useLocalStorage('logsPage.autoRefresh', false);
+  const [followTail, setFollowTail] = useLocalStorage('logsPage.followTail', true);
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [hideManagementLogs, setHideManagementLogs] = useLocalStorage(
@@ -129,9 +130,9 @@ export function LogsPage() {
 
     try {
       const scrollerInstance = logScrollerRef.current;
-      const stickToBottom =
-        !incremental || isNearBottom(scrollerInstance?.logViewerRef.current ?? null);
-      if (stickToBottom) {
+      const shouldAutoScroll =
+        followTail && (!incremental || isNearBottom(scrollerInstance?.logViewerRef.current ?? null));
+      if (shouldAutoScroll) {
         scrollerInstance?.requestScrollToBottom();
       }
 
@@ -156,7 +157,7 @@ export function LogsPage() {
           let visibleFrom = Math.max(prev.visibleFrom - dropCount, 0);
 
           // 若用户停留在底部（跟随最新日志），则保持“渲染窗口”大小不变，避免无限增长
-          if (stickToBottom) {
+          if (shouldAutoScroll) {
             visibleFrom = Math.max(buffer.length - prevRenderedCount, 0);
           }
 
@@ -278,7 +279,7 @@ export function LogsPage() {
     }, 8000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRefresh, connectionStatus]);
+  }, [autoRefresh, connectionStatus, followTail]);
 
   const visibleLines = useMemo(
     () => logState.buffer.slice(logState.visibleFrom),
@@ -666,6 +667,21 @@ export function LogsPage() {
                     </span>
                   }
                 />
+                <ToggleSwitch
+                  checked={followTail}
+                  onChange={(value) => setFollowTail(value)}
+                  label={
+                    <span
+                      className={styles.switchLabel}
+                      title={t('logs.follow_tail_hint', {
+                        defaultValue: 'Keep the viewer pinned to the latest log line',
+                      })}
+                    >
+                      <IconChevronDown size={16} />
+                      {t('logs.follow_tail', { defaultValue: 'Follow tail' })}
+                    </span>
+                  }
+                />
                 <Button
                   variant="secondary"
                   size="sm"
@@ -693,144 +709,25 @@ export function LogsPage() {
               </div>
             </div>
 
-            {loading ? (
-              <div className="hint">{t('logs.loading')}</div>
-            ) : logState.buffer.length > 0 && filteredLines.length > 0 ? (
-              <div
-                ref={scroller.logViewerRef}
-                className={styles.logPanel}
-                onScroll={scroller.handleLogScroll}
-              >
-                {scroller.canLoadMore && (
-                  <div className={styles.loadMoreBanner}>
-                    <span>{t('logs.load_more_hint')}</span>
-                    <div className={styles.loadMoreStats}>
-                      <span>
-                        {t('logs.loaded_lines', { count: filteredLines.length })}
-                      </span>
-                      {removedCount > 0 && (
-                        <span className={styles.loadMoreCount}>
-                          {t('logs.filtered_lines', { count: removedCount })}
-                        </span>
-                      )}
-                      <span className={styles.loadMoreCount}>
-                        {t('logs.hidden_lines', { count: logState.visibleFrom })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {showRawLogs ? (
-                  <pre className={styles.rawLog} spellCheck={false}>
-                    {rawVisibleText}
-                  </pre>
-                ) : (
-                  <div className={styles.logList}>
-                    {parsedVisibleLines.map((line, index) => {
-                      const rowClassNames = [styles.logRow];
-                      if (line.level === 'warn') rowClassNames.push(styles.rowWarn);
-                      if (line.level === 'error' || line.level === 'fatal')
-                        rowClassNames.push(styles.rowError);
-                      return (
-                        <div
-                          key={`${logState.visibleFrom + index}-${line.raw}`}
-                          className={rowClassNames.join(' ')}
-                          onDoubleClick={() => {
-                            void copyLogLine(line.raw);
-                          }}
-                          onPointerDown={(event) => startLongPress(event, line.requestId)}
-                          onPointerUp={cancelLongPress}
-                          onPointerLeave={cancelLongPress}
-                          onPointerCancel={cancelLongPress}
-                          onPointerMove={handleLongPressMove}
-                          title={t('logs.double_click_copy_hint', {
-                            defaultValue: 'Double-click to copy',
-                          })}
-                        >
-                          <div className={styles.timestamp}>{line.timestamp || ''}</div>
-                          <div className={styles.rowMain}>
-                            {line.level && (
-                              <span
-                                className={[
-                                  styles.badge,
-                                  line.level === 'info' ? styles.levelInfo : '',
-                                  line.level === 'warn' ? styles.levelWarn : '',
-                                  line.level === 'error' || line.level === 'fatal'
-                                    ? styles.levelError
-                                    : '',
-                                  line.level === 'debug' ? styles.levelDebug : '',
-                                  line.level === 'trace' ? styles.levelTrace : '',
-                                ]
-                                  .filter(Boolean)
-                                  .join(' ')}
-                              >
-                                {line.level.toUpperCase()}
-                              </span>
-                            )}
-
-                            {line.source && (
-                              <span className={styles.source} title={line.source}>
-                                {line.source}
-                              </span>
-                            )}
-
-                            {line.requestId && (
-                              <span
-                                className={[styles.badge, styles.requestIdBadge].join(' ')}
-                                title={line.requestId}
-                              >
-                                {line.requestId}
-                              </span>
-                            )}
-
-                            {typeof line.statusCode === 'number' && (
-                              <span
-                                className={[
-                                  styles.badge,
-                                  styles.statusBadge,
-                                  line.statusCode >= 200 && line.statusCode < 300
-                                    ? styles.statusSuccess
-                                    : line.statusCode >= 300 && line.statusCode < 400
-                                      ? styles.statusInfo
-                                      : line.statusCode >= 400 && line.statusCode < 500
-                                        ? styles.statusWarn
-                                        : styles.statusError,
-                                ].join(' ')}
-                              >
-                                {line.statusCode}
-                              </span>
-                            )}
-
-                            {line.latency && <span className={styles.pill}>{line.latency}</span>}
-                            {line.ip && <span className={styles.pill}>{line.ip}</span>}
-
-                            {line.method && (
-                              <span className={[styles.badge, styles.methodBadge].join(' ')}>
-                                {line.method}
-                              </span>
-                            )}
-
-                            {line.path && (
-                              <span className={styles.path} title={line.path}>
-                                {line.path}
-                              </span>
-                            )}
-
-                            {line.message && <span className={styles.message}>{line.message}</span>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : logState.buffer.length > 0 ? (
-              <EmptyState
-                title={t('logs.search_empty_title')}
-                description={t('logs.search_empty_desc')}
-              />
-            ) : (
-              <EmptyState title={t('logs.empty_title')} description={t('logs.empty_desc')} />
-            )}
+            <LogViewer
+              styles={styles}
+              loading={loading}
+              logState={logState}
+              filteredLineCount={filteredLines.length}
+              removedCount={removedCount}
+              canLoadMore={scroller.canLoadMore}
+              showRawLogs={showRawLogs}
+              rawVisibleText={rawVisibleText}
+              parsedVisibleLines={parsedVisibleLines}
+              logViewerRef={scroller.logViewerRef}
+              onScroll={scroller.handleLogScroll}
+              onCopyLine={(raw) => {
+                void copyLogLine(raw);
+              }}
+              onLongPressStart={startLongPress}
+              onLongPressCancel={cancelLongPress}
+              onLongPressMove={handleLongPressMove}
+            />
           </Card>
         )}
 

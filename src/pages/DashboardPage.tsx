@@ -278,12 +278,6 @@ export function DashboardPage() {
 
   return (
     <div className={styles.dashboard}>
-      {/* Decorative background orbs */}
-      <div className={styles.backgroundOrbs} aria-hidden="true">
-        <div className={styles.orb1} />
-        <div className={styles.orb2} />
-      </div>
-
       {/* Hero welcome section */}
       <section className={styles.hero}>
         <span className={styles.heroWatermark} aria-hidden="true">

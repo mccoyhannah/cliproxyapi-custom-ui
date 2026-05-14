@@ -43,11 +43,11 @@ export function ProviderList<T>({
   const { t } = useTranslation();
 
   if (loading && items.length === 0) {
-    return <div className="hint">{t('common.loading')}</div>;
+    return <EmptyState title={t('common.loading')} variant="loading" compact />;
   }
 
   if (!items.length) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} />;
+    return <EmptyState title={emptyTitle} description={emptyDescription} variant="neutral" />;
   }
 
   return (

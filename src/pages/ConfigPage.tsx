@@ -23,7 +23,7 @@ import styles from './ConfigPage.module.scss';
 
 type ConfigEditorTab = 'visual' | 'source';
 
-const LazyConfigSourceEditor = lazy(() => import('@/components/config/ConfigSourceEditor'));
+const LazyYamlEditor = lazy(() => import('@/components/config/YamlEditor'));
 
 function readCommercialModeFromYaml(yamlContent: string): boolean {
   try {
@@ -172,6 +172,23 @@ export function ConfigPage() {
     if (activeTab === 'visual' && visualParseError) {
       showNotification(t('config_management.visual_mode_save_blocked'), 'error');
       return;
+    }
+
+    if (activeTab === 'source') {
+      const sourceDocument = parseDocument(content);
+      if (sourceDocument.errors.length > 0) {
+        const message =
+          sourceDocument.errors[0]?.message ??
+          t('config_management.visual_mode_save_blocked');
+        showNotification(
+          t('config_management.source_yaml_invalid', {
+            defaultValue: '请先修复 YAML 语法错误再保存：{{message}}',
+            message,
+          }),
+          'error'
+        );
+        return;
+      }
     }
 
     setSaving(true);
@@ -624,7 +641,7 @@ export function ConfigPage() {
 
               <div className={styles.editorWrapper}>
                 <Suspense fallback={null}>
-                  <LazyConfigSourceEditor
+                  <LazyYamlEditor
                     editorRef={editorRef}
                     value={content}
                     onChange={handleChange}

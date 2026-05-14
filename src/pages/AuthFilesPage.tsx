@@ -935,7 +935,14 @@ export function AuthFilesPage() {
             </div>
 
             {loading && files.length === 0 ? (
-              <div className={styles.hint}>{t('common.loading')}</div>
+              <EmptyState
+                title={t('common.loading')}
+                description={t('auth_files.loading_desc', {
+                  defaultValue: '正在读取本地认证文件与运行状态。',
+                })}
+                variant="loading"
+                compact
+              />
             ) : pageItems.length === 0 ? (
               <EmptyState
                 title={t('auth_files.search_empty_title')}
