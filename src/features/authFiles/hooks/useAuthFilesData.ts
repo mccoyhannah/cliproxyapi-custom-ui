@@ -522,13 +522,14 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     async (names: string[], enabled: boolean) => {
       if (batchStatusPendingRef.current) return;
 
-      const uniqueNames = Array.from(new Set(names));
+      const uniqueNamesSet = new Set(names);
+      const uniqueNames = Array.from(uniqueNamesSet);
       if (uniqueNames.length === 0) return;
       if (uniqueNames.some((name) => statusUpdating[name] === true)) return;
 
       const originalDisabled = new Map(
         files
-          .filter((file) => uniqueNames.includes(file.name))
+          .filter((file) => uniqueNamesSet.has(file.name))
           .map((file) => [file.name, file.disabled === true])
       );
       const targetNames = new Set(originalDisabled.keys());
@@ -614,13 +615,14 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     async (names: string[], priority: number) => {
       if (batchPriorityPendingRef.current) return;
 
-      const uniqueNames = Array.from(new Set(names));
+      const uniqueNamesSet = new Set(names);
+      const uniqueNames = Array.from(uniqueNamesSet);
       if (uniqueNames.length === 0) return;
       if (uniqueNames.some((name) => priorityUpdating[name] === true)) return;
 
       const originalPriorities = new Map(
         files
-          .filter((file) => uniqueNames.includes(file.name))
+          .filter((file) => uniqueNamesSet.has(file.name))
           .map((file) => [file.name, file.priority ?? file['priority']])
       );
       const targetNames = new Set(originalPriorities.keys());
