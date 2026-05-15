@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IconKey, IconBot, IconFileText, IconSatellite } from '@/components/ui/icons';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuthStore, useConfigStore, useModelsStore } from '@/stores';
 import { apiKeysApi, providersApi, authFilesApi } from '@/services/api';
 import styles from './DashboardPage.module.scss';
@@ -60,6 +61,7 @@ export function DashboardPage() {
   });
 
   const [loading, setLoading] = useState(true);
+  const [statsError, setStatsError] = useState('');
 
   // Time-of-day state for dynamic greeting
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(getTimeOfDay);
@@ -145,6 +147,7 @@ export function DashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       setLoading(true);
+      setStatsError('');
       try {
         const [keysRes, filesRes, geminiRes, codexRes, claudeRes, openaiRes] =
           await Promise.allSettled([
@@ -167,6 +170,13 @@ export function DashboardPage() {
           claude: claudeRes.status === 'fulfilled' ? claudeRes.value.length : null,
           openai: openaiRes.status === 'fulfilled' ? openaiRes.value.length : null,
         });
+
+        const allStatsFailed = [keysRes, filesRes, geminiRes, codexRes, claudeRes, openaiRes].every(
+          (result) => result.status === 'rejected'
+        );
+        if (allStatsFailed) {
+          setStatsError(t('notification.refresh_failed'));
+        }
       } finally {
         setLoading(false);
       }
@@ -177,8 +187,9 @@ export function DashboardPage() {
       fetchModels();
     } else {
       setLoading(false);
+      setStatsError('');
     }
-  }, [connectionStatus, fetchModels]);
+  }, [connectionStatus, fetchModels, t]);
 
   // Calculate total provider keys only when all provider stats are available.
   const providerStatsReady =
@@ -341,6 +352,16 @@ export function DashboardPage() {
           {serverBuildDate && <span className={styles.buildDate}>{formattedBuildDate}</span>}
         </div>
       </section>
+
+      {statsError && (
+        <EmptyState
+          variant="error"
+          compact
+          className={styles.dashboardState}
+          title={t('common.error')}
+          description={statsError}
+        />
+      )}
 
       {/* Bento stats grid */}
       <section className={styles.statsSection}>

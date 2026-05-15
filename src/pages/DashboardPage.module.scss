@@ -12,57 +12,6 @@
   position: relative;
 }
 
-// ─── Decorative Background Orbs ─────────────────────────
-
-.backgroundOrbs {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-  opacity: 0.42;
-  filter: blur(16px);
-}
-
-.orb1 {
-  position: absolute;
-  width: 420px;
-  height: 420px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--primary-color) 6%, transparent),
-    transparent 70%
-  );
-  top: -140px;
-  right: -80px;
-  animation: orbFloat 22s ease-in-out infinite alternate;
-}
-
-.orb2 {
-  position: absolute;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--success-color) 4%, transparent),
-    transparent 70%
-  );
-  bottom: 18%;
-  left: -100px;
-  animation: orbFloat 28s ease-in-out infinite alternate-reverse;
-}
-
-@keyframes orbFloat {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  100% {
-    transform: translate(30px, -20px) scale(1.1);
-  }
-}
-
 // ─── Hero Welcome Section ───────────────────────────────
 
 .hero {
@@ -572,11 +521,6 @@
   gap: clamp($spacing-lg, 2.4vw, $spacing-xl);
 }
 
-.backgroundOrbs {
-  opacity: 0.28;
-  filter: blur(22px);
-}
-
 .hero {
   align-items: center;
   min-height: 178px;
@@ -587,11 +531,7 @@
       color-mix(in srgb, var(--ops-surface-1) 94%, transparent),
       color-mix(in srgb, var(--ops-surface-2) 82%, transparent)
     ),
-    radial-gradient(
-      circle at 94% 10%,
-      color-mix(in srgb, var(--ops-accent) 12%, transparent),
-      transparent 28%
-    );
+    linear-gradient(90deg, color-mix(in srgb, var(--ops-accent) 7%, transparent), transparent 42%);
   border-color: color-mix(in srgb, var(--ops-border-subtle) 78%, transparent);
   box-shadow: var(--ops-panel-shadow);
 
@@ -678,11 +618,7 @@
 
 .bentoLarge {
   background:
-    radial-gradient(
-      circle at 92% 12%,
-      color-mix(in srgb, var(--ops-accent) 14%, transparent),
-      transparent 38%
-    ),
+    linear-gradient(90deg, color-mix(in srgb, var(--ops-accent) 10%, transparent), transparent 48%),
     linear-gradient(
       155deg,
       color-mix(in srgb, var(--ops-accent) 10%, var(--ops-surface-1)),
@@ -1238,5 +1174,71 @@
 
   .configPill {
     min-width: 0;
+  }
+}
+
+// Worker 3 page-level polish: quiet grid, separators and consistent state surface.
+.dashboardState:global(.empty-state) {
+  min-height: 118px;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 30%, var(--border-color));
+  border-left: 3px solid var(--danger-color);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--danger-color) 8%, transparent),
+      transparent 48%
+    ),
+    var(--ops-surface-1);
+  box-shadow: var(--ops-control-shadow);
+}
+
+.dashboardState :global(.empty-content) {
+  min-width: 0;
+}
+
+.dashboardState :global(.empty-icon) {
+  border-color: color-mix(in srgb, var(--danger-color) 28%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 9%, var(--ops-surface-1));
+  color: var(--danger-color);
+}
+
+.heroSignal:nth-child(2) {
+  border-color: color-mix(in srgb, var(--ops-success) 22%, var(--ops-border-subtle));
+  background: color-mix(in srgb, var(--ops-success) 5%, var(--ops-surface-1));
+}
+
+.heroSignal:nth-child(3) {
+  border-color: color-mix(in srgb, var(--ops-warning) 22%, var(--ops-border-subtle));
+  background: color-mix(in srgb, var(--ops-warning) 5%, var(--ops-surface-1));
+}
+
+.bentoCard:nth-child(2)::before {
+  background: linear-gradient(
+    180deg,
+    var(--ops-success),
+    color-mix(in srgb, var(--ops-success) 45%, transparent)
+  );
+}
+
+.bentoCard:nth-child(3)::before {
+  background: linear-gradient(
+    180deg,
+    var(--ops-warning),
+    color-mix(in srgb, var(--ops-warning) 45%, transparent)
+  );
+}
+
+.bentoCard:nth-child(4)::before {
+  background: linear-gradient(
+    180deg,
+    var(--ops-info),
+    color-mix(in srgb, var(--ops-info) 45%, transparent)
+  );
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .dashboardState:global(.empty-state) {
+    min-height: 104px;
   }
 }

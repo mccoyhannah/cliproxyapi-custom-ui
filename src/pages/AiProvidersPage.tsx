@@ -16,6 +16,7 @@ import {
   withoutDisableAllModelsRule,
 } from '@/components/providers/utils';
 import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
@@ -243,11 +244,7 @@ export function AiProvidersPage() {
     }
 
     const source =
-      provider === 'codex'
-        ? codexConfigs
-        : provider === 'claude'
-          ? claudeConfigs
-          : vertexConfigs;
+      provider === 'codex' ? codexConfigs : provider === 'claude' ? claudeConfigs : vertexConfigs;
     const current = source[index];
     if (!current) return;
 
@@ -345,7 +342,9 @@ export function AiProvidersPage() {
     const entry = source[index];
     if (!entry) return;
     showConfirmation({
-      title: t(`ai_providers.${type}_delete_title`, { defaultValue: `Delete ${type === 'codex' ? 'Codex' : 'Claude'} Config` }),
+      title: t(`ai_providers.${type}_delete_title`, {
+        defaultValue: `Delete ${type === 'codex' ? 'Codex' : 'Claude'} Config`,
+      }),
       message: t(`ai_providers.${type}_delete_confirm`),
       variant: 'danger',
       confirmText: t('common.confirm'),
@@ -429,7 +428,8 @@ export function AiProvidersPage() {
           <h1 className={styles.pageTitle}>{t('ai_providers.title')}</h1>
           <p className={styles.description}>
             {t('ai_providers.description', {
-              defaultValue: 'Manage upstream model providers, routing keys and compatibility entries.'
+              defaultValue:
+                'Manage upstream model providers, routing keys and compatibility entries.',
             })}
           </p>
         </div>
@@ -444,13 +444,21 @@ export function AiProvidersPage() {
               ? t('common.update')
               : t('ai_providers.provider_total', {
                   count: totalProviderConfigs,
-                  defaultValue: `${totalProviderConfigs} providers`
+                  defaultValue: `${totalProviderConfigs} providers`,
                 })}
           </Badge>
         </div>
       </div>
       <div className={styles.content}>
-        {error && <div className="error-box">{error}</div>}
+        {error && (
+          <EmptyState
+            title={t('common.error')}
+            description={error}
+            variant="error"
+            className={styles.providerState}
+            compact
+          />
+        )}
 
         <section className={styles.providerConsole} aria-label={t('ai_providers.title')}>
           {loading && totalProviderConfigs === 0 ? (
@@ -471,7 +479,9 @@ export function AiProvidersPage() {
                 <strong>{enabledProviderConfigs}</strong>
               </div>
               <div className={styles.providerMetric}>
-                <span>{t('ai_providers.metric_openai', { defaultValue: 'OpenAI-compatible' })}</span>
+                <span>
+                  {t('ai_providers.metric_openai', { defaultValue: 'OpenAI-compatible' })}
+                </span>
                 <strong>{openaiProviders.length}</strong>
               </div>
               <div className={styles.providerMetric}>

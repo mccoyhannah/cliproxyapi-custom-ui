@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuthStore, useQuotaStore } from '@/stores';
 import { authFilesApi, configFileApi } from '@/services/api';
 import {
@@ -369,7 +370,15 @@ export function QuotaPage() {
         <p className={styles.description}>{t('quota_management.description')}</p>
       </div>
 
-      {error && <div className={styles.errorBox}>{error}</div>}
+      {error && (
+        <EmptyState
+          title={t('common.error')}
+          description={error}
+          variant="error"
+          className={styles.quotaPageState}
+          compact
+        />
+      )}
 
       <div className={styles.quotaConsole}>
         <div className={styles.quotaConsoleHero}>

@@ -61,7 +61,11 @@ $openai-toolbar-control-height: 36px;
   border: 1px solid var(--border-base);
   border-radius: var(--radius-card);
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 58%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 8%, transparent),
+      transparent 58%
+    ),
     var(--surface-panel);
   box-shadow: var(--shadow-card);
 
@@ -1518,5 +1522,196 @@ $openai-toolbar-control-height: 36px;
   .statusRateLow {
     background: rgba($error-color, 0.24);
     color: #f1b0a6;
+  }
+}
+
+// Worker 3 page-level polish.
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+  min-width: 0;
+}
+
+.pageHeader {
+  padding: 2px 0 0;
+}
+
+.headerBadges {
+  min-width: 0;
+
+  :global(.badge) {
+    max-width: 100%;
+  }
+
+  :global(.badge-label) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.providerState:global(.empty-state) {
+  min-height: 118px;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 34%, var(--border-base));
+  border-left: 3px solid var(--danger-color);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--danger-color) 8%, transparent),
+      transparent 48%
+    ),
+    var(--surface-panel);
+  box-shadow: var(--shadow-control);
+}
+
+.providerState :global(.empty-content) {
+  min-width: 0;
+}
+
+.providerState :global(.empty-icon) {
+  border-color: color-mix(in srgb, var(--danger-color) 30%, var(--border-base));
+  background: color-mix(in srgb, var(--danger-color) 9%, var(--surface-panel));
+  color: var(--danger-color);
+}
+
+.content {
+  min-width: 0;
+
+  :global(.card) {
+    min-width: 0;
+    border-color: color-mix(in srgb, var(--border-base) 84%, transparent);
+    box-shadow: var(--shadow-card);
+  }
+
+  :global(.card-header) {
+    gap: 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-base) 68%, transparent);
+  }
+
+  :global(.title) {
+    min-width: 0;
+  }
+
+  :global(.empty-state) {
+    border-radius: var(--radius-card);
+    border: 1px dashed color-mix(in srgb, var(--border-base) 78%, transparent);
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--primary-color) 5%, transparent) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--primary-color) 4%, transparent) 1px,
+        transparent 1px
+      ),
+      color-mix(in srgb, var(--surface-panel) 84%, var(--bg-primary));
+    background-size:
+      30px 30px,
+      30px 30px,
+      auto;
+  }
+
+  :global(.skeleton) {
+    border-radius: var(--radius-card);
+    border: 1px solid color-mix(in srgb, var(--border-base) 76%, transparent);
+    background: color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
+  }
+}
+
+.providerConsole {
+  border-color: color-mix(in srgb, var(--border-base) 86%, transparent);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--success-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    var(--surface-panel);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+}
+
+.providerMetric {
+  border-radius: 8px;
+  box-shadow:
+    var(--shadow-control),
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 36%, transparent);
+}
+
+.providerMetric:nth-child(2) {
+  box-shadow:
+    var(--shadow-control),
+    inset 3px 0 0 color-mix(in srgb, var(--success-color) 42%, transparent);
+}
+
+.providerMetric:nth-child(4) {
+  box-shadow:
+    var(--shadow-control),
+    inset 3px 0 0 color-mix(in srgb, var(--info-color) 42%, transparent);
+}
+
+.openaiProviderCard {
+  border-radius: 8px;
+}
+
+.openaiProviderActions {
+  align-items: center;
+}
+
+@include mobile {
+  .pageHeader {
+    gap: $spacing-sm;
+  }
+
+  .headerBadges {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .providerConsole {
+    padding: 10px;
+  }
+
+  .content :global(.card-header) {
+    align-items: stretch;
+  }
+
+  .cardHeaderActions,
+  .openaiProviderActions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .cardHeaderActions :global(.btn),
+  .openaiProviderActions :global(.btn) {
+    flex: 1 1 auto;
+  }
+
+  .modelMultiSelectWrapper,
+  .modelFilterControl,
+  .sortControls,
+  .sortSelect {
+    width: 100%;
+  }
+
+  .sortControls {
+    height: auto;
+    flex-wrap: wrap;
+  }
+
+  .sortSelect,
+  .sortDirectionButton:global(.btn.btn-secondary) {
+    flex: 1 1 0;
   }
 }

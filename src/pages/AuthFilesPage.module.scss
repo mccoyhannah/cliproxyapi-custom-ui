@@ -2414,9 +2414,16 @@
 }
 
 .statusToggleLabel {
+  flex: 0 0 auto;
   font-size: 11px;
   font-weight: 500;
   color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.statusToggle > :global(label) {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 .iconButton:global(.btn.btn-sm) {
@@ -3045,4 +3052,97 @@
   font-size: 12px;
   color: var(--text-tertiary);
   font-family: inherit;
+}
+
+// Worker 3 page-level polish.
+.authFilesEmptyStateError:global(.empty-state) {
+  min-height: 118px;
+  margin-bottom: $spacing-md;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--danger-color) 34%, var(--border-color));
+  border-left: 3px solid var(--danger-color);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--danger-color) 8%, transparent),
+      transparent 48%
+    ),
+    color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
+}
+
+.authFilesEmptyStateError :global(.empty-icon) {
+  border-color: color-mix(in srgb, var(--danger-color) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 9%, var(--bg-primary));
+  color: var(--danger-color);
+}
+
+.filterRail,
+.filterControlsPanel {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 3%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
+  background-size:
+    28px 28px,
+    28px 28px,
+    auto;
+}
+
+.filterSection {
+  padding-top: 2px;
+}
+
+.filterTags {
+  align-items: center;
+}
+
+.filterTag {
+  min-height: 38px;
+}
+
+.filterControlsPanel {
+  box-shadow:
+    var(--shadow-control),
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 38%, transparent);
+}
+
+.fileGrid {
+  padding-top: 2px;
+}
+
+.pagination {
+  border-top-color: color-mix(in srgb, var(--border-color) 64%, transparent);
+}
+
+@include mobile {
+  .authFilesPanel {
+    :global(.card-header) {
+      gap: 10px;
+    }
+  }
+
+  .filterTag {
+    width: 100%;
+  }
+
+  .filterTagText {
+    max-width: none;
+  }
+
+  .pagination {
+    align-items: stretch;
+
+    :global(.btn) {
+      flex: 1 1 0;
+    }
+  }
 }

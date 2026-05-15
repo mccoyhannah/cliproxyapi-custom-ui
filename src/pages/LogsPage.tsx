@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -471,7 +472,15 @@ export function LogsPage() {
       <div className={styles.content}>
         {activeTab === 'logs' && (
           <Card className={styles.logCard}>
-            {error && <div className="error-box">{error}</div>}
+            {error && (
+              <EmptyState
+                title={t('logs.load_error')}
+                description={error}
+                variant="error"
+                className={styles.logInlineState}
+                compact
+              />
+            )}
 
             <div className={styles.filters}>
               <div className={styles.searchWrapper}>
@@ -746,7 +755,7 @@ export function LogsPage() {
             }
           >
             <div className="stack">
-              <div className="hint">{t('logs.error_logs_description')}</div>
+              <div className={styles.errorLogsHint}>{t('logs.error_logs_description')}</div>
 
               {requestLogEnabled && (
                 <div>
@@ -756,13 +765,30 @@ export function LogsPage() {
                 </div>
               )}
 
-              {errorLogsError && <div className="error-box">{errorLogsError}</div>}
-
               <div className={styles.errorPanel}>
                 {loadingErrors ? (
-                  <div className="hint">{t('common.loading')}</div>
+                  <EmptyState
+                    title={t('common.loading')}
+                    description={t('logs.error_logs_description')}
+                    variant="loading"
+                    className={styles.errorLogsState}
+                    compact
+                  />
+                ) : errorLogsError ? (
+                  <EmptyState
+                    title={t('common.error')}
+                    description={errorLogsError}
+                    variant="error"
+                    className={styles.errorLogsState}
+                    compact
+                  />
                 ) : errorLogs.length === 0 ? (
-                  <div className="hint">{t('logs.error_logs_empty')}</div>
+                  <EmptyState
+                    title={t('logs.error_logs_empty')}
+                    description={t('logs.error_logs_description')}
+                    className={styles.errorLogsState}
+                    compact
+                  />
                 ) : (
                   <div className="item-list">
                     {errorLogs.map((item) => (

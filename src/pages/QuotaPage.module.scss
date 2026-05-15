@@ -1338,3 +1338,113 @@
   background-color: var(--bg-secondary);
   border-radius: $radius-md;
 }
+
+// Worker 3 page-level polish.
+.quotaPageState:global(.empty-state) {
+  min-height: 118px;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 34%, var(--border-color));
+  border-left: 3px solid var(--danger-color);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--danger-color) 8%, transparent),
+      transparent 48%
+    ),
+    var(--surface-panel);
+  box-shadow: var(--shadow-control);
+}
+
+.quotaPageState :global(.empty-content) {
+  min-width: 0;
+}
+
+.quotaPageState :global(.empty-icon) {
+  border-color: color-mix(in srgb, var(--danger-color) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 9%, var(--bg-primary));
+  color: var(--danger-color);
+}
+
+.quotaConsole {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--success-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
+  background-size:
+    34px 34px,
+    34px 34px,
+    auto;
+}
+
+.quotaConsoleHero {
+  border-radius: 8px;
+}
+
+.quotaConsoleMetric {
+  border-radius: 8px;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary-color) 34%, transparent);
+}
+
+.quotaConsoleMetric:nth-child(3) {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--success-color) 42%, transparent);
+}
+
+.quotaConsoleMetric:nth-child(4) {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--warning-color) 42%, transparent);
+}
+
+.quotaFilterChip {
+  border-radius: 8px;
+}
+
+.quotaEmptyState:global(.empty-state) {
+  min-height: 172px;
+  border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 3%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--surface-panel) 84%, var(--bg-primary));
+  background-size:
+    28px 28px,
+    28px 28px,
+    auto;
+}
+
+.quotaEmptyState :global(.empty-content) {
+  min-width: 0;
+}
+
+@include mobile {
+  .quotaConsoleStats {
+    grid-template-columns: 1fr;
+  }
+
+  .quotaFilterChips {
+    align-items: stretch;
+  }
+
+  .quotaFilterChip {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+  }
+}

@@ -807,7 +807,15 @@ export function AuthFilesPage() {
           </div>
         }
       >
-        {error && <div className={styles.errorBox}>{error}</div>}
+        {error && (
+          <EmptyState
+            title={t('common.error')}
+            description={error}
+            variant="error"
+            className={`${styles.authFilesEmptyState} ${styles.authFilesEmptyStateError}`}
+            compact
+          />
+        )}
 
         <div className={styles.filterSection}>
           {renderFilterTags()}

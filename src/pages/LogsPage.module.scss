@@ -886,3 +886,145 @@
     height: 280px;
   }
 }
+
+// Worker 3 page-level polish.
+.logInlineState:global(.empty-state),
+.errorLogsState:global(.empty-state) {
+  min-height: 110px;
+  margin-bottom: $spacing-md;
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--primary-color) 60%, var(--border-color));
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 7%, transparent),
+      transparent 48%
+    ),
+    var(--surface-panel);
+}
+
+.logInlineState:global(.empty-state-error),
+.errorLogsState:global(.empty-state-error) {
+  border-color: color-mix(in srgb, var(--danger-color) 34%, var(--border-color));
+  border-left-color: var(--danger-color);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--danger-color) 8%, transparent),
+      transparent 48%
+    ),
+    var(--surface-panel);
+}
+
+.logInlineState :global(.empty-content),
+.errorLogsState :global(.empty-content) {
+  min-width: 0;
+}
+
+.errorLogsHint {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tabBar {
+  min-width: 0;
+}
+
+.tabItem {
+  border-radius: 8px 8px 0 0;
+}
+
+.filters {
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--success-color) 3%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--surface-panel) 86%, var(--bg-primary));
+  background-size:
+    30px 30px,
+    30px 30px,
+    auto;
+}
+
+.structuredFilters {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary-color) 34%, transparent);
+}
+
+.filterChip {
+  border-radius: 8px;
+}
+
+.logPanel {
+  border-radius: 8px;
+}
+
+.logEmptyState:global(.empty-state) {
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 3%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  background-size:
+    28px 28px,
+    28px 28px,
+    auto;
+}
+
+.errorPanel {
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-panel) 74%, transparent);
+}
+
+@include mobile {
+  .tabBar {
+    overflow-x: auto;
+  }
+
+  .tabItem {
+    flex: 1 0 auto;
+    padding-inline: 14px;
+  }
+
+  .searchWrapper {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+  .toolbar {
+    align-items: stretch;
+
+    :global(.btn) {
+      flex: 1 1 calc(50% - 4px);
+    }
+  }
+
+  .filters {
+    padding: 8px;
+  }
+}
