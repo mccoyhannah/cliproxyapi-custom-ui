@@ -985,13 +985,29 @@
 
 .codexCompactPlanChip {
   flex: 0 0 auto;
-  gap: 4px;
+  gap: 5px;
+  min-height: 22px;
+  padding: 2px 8px 2px 7px;
   color: var(--codex-plan-text, color-mix(in srgb, var(--text-primary) 88%, var(--text-secondary)));
   border-color: var(--codex-plan-border, color-mix(in srgb, var(--border-color) 74%, transparent));
   background: var(--codex-plan-bg, color-mix(in srgb, var(--bg-tertiary) 72%, var(--bg-primary)));
   box-shadow:
     0 1px 2px var(--codex-plan-shadow, transparent),
     0 0 0 1px color-mix(in srgb, #fff 14%, transparent) inset;
+  font-size: 11px;
+  font-weight: 840;
+}
+
+.codexCompactPlanLabel {
+  color: color-mix(in srgb, currentColor 72%, var(--text-primary));
+  font-size: 10px;
+  font-weight: 780;
+}
+
+.codexCompactPlanChip strong {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 860;
 }
 
 .codexCompactQuotaChip {
@@ -1161,6 +1177,41 @@
 .fileCardCompactPlanPremium {
   --compact-plan-card-accent: #e0aa14;
   --compact-plan-card-wash: rgba(224, 170, 20, 0.09);
+}
+
+.fileCard.fileCardCompactPlanTeam,
+.fileCard.fileCardCompactPlanPlus,
+.fileCard.fileCardCompactPlanFree,
+.fileCard.fileCardCompactPlanPremium {
+  border-color: color-mix(
+    in srgb,
+    var(--compact-plan-card-accent, var(--primary-color)) 34%,
+    var(--border-color)
+  );
+  background:
+    linear-gradient(135deg, var(--compact-plan-card-wash, transparent), transparent 56%),
+    var(--surface-card);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(
+      180deg,
+      var(--compact-plan-card-accent, var(--primary-color)),
+      color-mix(in srgb, var(--compact-plan-card-accent, var(--primary-color)) 36%, transparent)
+    );
+    opacity: 0.92;
+  }
+
+  &:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--compact-plan-card-accent, var(--primary-color)) 46%,
+      var(--border-color)
+    );
+  }
 }
 
 // 单个认证文件卡片
@@ -1393,7 +1444,7 @@
   }
 
   .codexCompactPlanChip {
-    max-width: 48px;
+    max-width: 92px;
   }
 
   .codexSubscriptionValue {

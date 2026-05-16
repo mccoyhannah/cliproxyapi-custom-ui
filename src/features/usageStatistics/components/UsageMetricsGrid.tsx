@@ -7,6 +7,7 @@ import {
   IconDollarSign,
   IconEye,
   IconInfo,
+  IconRefreshCw,
   IconTimer,
 } from '@/components/ui/icons';
 import {
@@ -67,27 +68,46 @@ export function UsageMetricsGrid({
         </div>
       </Card>
       <Card className={`${styles.metricCard} ${styles.tokenMetricCard}`}>
-        <div className={styles.metricIcon}>
-          <IconDollarSign size={18} />
+        <div className={styles.tokenMetricHeader}>
+          <div className={styles.metricIcon}>
+            <IconDollarSign size={18} />
+          </div>
+          <div>
+            <div className={styles.metricLabel}>Token 消耗</div>
+            <div className={styles.tokenMetricCoverage}>
+              已解析 {tokenMetrics.parsedRequests} / {tokenMetrics.totalRequests} 条
+            </div>
+          </div>
         </div>
-        <div>
-          <div className={styles.metricLabel}>Token 消耗</div>
-          <div className={styles.metricValue}>
+        <div className={styles.tokenMetricBody}>
+          <div className={styles.tokenMetricTotal}>
             {formatTokenCount(tokenMetrics.total)}
-            <span> / {formatTokenCount(tokenMetrics.averagePerKnown)} 均值</span>
+            <span>总消耗</span>
           </div>
-          <div className={styles.metricHint}>
-            已知 {tokenMetrics.knownRequests} / {tokenMetrics.totalRequests} 条，详情已解析{' '}
-            {tokenMetrics.parsedRequests} 条。
+          <div className={styles.tokenMetricStats}>
+            <span>
+              <b>{formatTokenCount(tokenMetrics.averagePerKnown)}</b>
+              均值
+            </span>
+            <span>
+              <b>
+                {tokenMetrics.knownRequests} / {tokenMetrics.totalRequests}
+              </b>
+              已知请求
+            </span>
           </div>
+        </div>
+        <div className={styles.tokenMetricActionRow}>
+          <div className={styles.tokenMetricHint}>只统计已解析且日志上报 usage 的请求。</div>
           <Button
-            className={styles.metricInlineAction}
+            className={styles.tokenMetricAction}
             type="button"
             variant="secondary"
             size="sm"
             loading={tokenCompletionLoading}
             disabled={tokenCompletionDisabled}
             onClick={onCompleteTokenDetails}
+            leftIcon={<IconRefreshCw size={15} />}
           >
             补全当前筛选 Token
           </Button>

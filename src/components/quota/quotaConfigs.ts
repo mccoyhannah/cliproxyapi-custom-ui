@@ -969,7 +969,12 @@ const renderCodexItems = (
     if (planLabel) {
       pushChip(
         'plan',
-        planDisplayValue,
+        h(
+          Fragment,
+          null,
+          h('span', { className: styleMap.codexCompactPlanLabel }, t('codex_quota.plan_label')),
+          h('strong', null, planDisplayValue)
+        ),
         [styleMap.codexCompactPlanChip, planToneClass].filter(Boolean).join(' '),
         `${t('codex_quota.plan_label')} ${planDisplayValue}`
       );

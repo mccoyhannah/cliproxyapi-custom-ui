@@ -25,6 +25,7 @@ import {
   formatCodexSubscriptionShortDate,
   getCodexMinRemainingPercent,
   normalizePlanType,
+  resolveCodexPlanType,
   resolveAuthProvider,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
@@ -53,6 +54,7 @@ import styles from '@/pages/AuthFilesPage.module.scss';
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
 const QUOTA_WARNING_REMAINING_PERCENT = 30;
 const QUOTA_CRITICAL_REMAINING_PERCENT = 12;
+const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
 
 type AuthCardQuotaState =
   | AntigravityQuotaState
@@ -240,7 +242,21 @@ export function AuthFileCard(props: AuthFileCardProps) {
   });
   const currentCodexPlanType =
     resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
+  const effectiveCodexPlanType =
+    resolvedQuotaType === 'codex'
+      ? currentCodexPlanType ?? normalizePlanType(resolveCodexPlanType(file))
+      : null;
   const currentCodexPlanIsFree = currentCodexPlanType === 'free';
+  const compactPlanToneClass =
+    compact && effectiveCodexPlanType === 'team'
+      ? styles.fileCardCompactPlanTeam
+      : compact && effectiveCodexPlanType === 'plus'
+        ? styles.fileCardCompactPlanPlus
+        : compact && effectiveCodexPlanType === 'free'
+          ? styles.fileCardCompactPlanFree
+          : compact && PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType ?? '')
+            ? styles.fileCardCompactPlanPremium
+            : '';
 
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndexKey = normalizeRecentRequestAuthIndex(rawAuthIndex);
@@ -438,7 +454,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
 
   return (
     <div
-      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${cardToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
+      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${compactPlanToneClass} ${cardToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
       <div className={styles.fileCardLayout}>
         <div className={styles.fileCardMain}>
