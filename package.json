@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,scss}\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "token-ledger": "node scripts/update-token-ledger.mjs",
+    "token-ledger:dry": "node scripts/update-token-ledger.mjs --dry-run"
   },
   "dependencies": {
     "@codemirror/lang-yaml": "^6.1.2",

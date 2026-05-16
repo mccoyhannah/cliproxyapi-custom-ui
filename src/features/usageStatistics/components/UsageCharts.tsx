@@ -112,8 +112,8 @@ export function UsageCharts({
       <Card className={styles.chartCard}>
         <div className={styles.chartHeader}>
           <div>
-            <h2>Token 消耗结构</h2>
-            <p>只统计已解析并上报 usage 的请求；缓存和推理 Token 单独拆出。</p>
+            <h2>Token 消耗结构（当前窗口）</h2>
+            <p>只统计当前已加载日志里已解析并上报 usage 的请求；长期总账看下方台账。</p>
           </div>
           <span>{formatPercent(tokenMetrics.coverageRate)} 覆盖</span>
         </div>

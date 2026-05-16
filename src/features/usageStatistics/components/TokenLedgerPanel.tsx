@@ -1,0 +1,298 @@
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Input } from '@/components/ui/Input';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { IconRefreshCw } from '@/components/ui/icons';
+import type {
+  TokenLedgerEntry,
+  TokenLedgerFilters,
+  TokenLedgerSnapshot,
+} from '@/types/usageStatistics';
+import {
+  DEFAULT_TOKEN_LEDGER_FILTERS,
+  TOKEN_LEDGER_RANGE_OPTIONS,
+  buildTokenLedgerModelUsage,
+  calculateTokenLedgerMetrics,
+  filterTokenLedgerEntries,
+  formatDateTime,
+  formatPercent,
+  formatTokenCount,
+  formatTokenLedgerRangeLabel,
+  formatTokenLedgerSpan,
+  getTokenLedgerEntrySpan,
+  getTokenLedgerRangeWindow,
+} from '../lib';
+import styles from '@/pages/UsageStatisticsPage.module.scss';
+
+interface TokenLedgerPanelProps {
+  error: string;
+  filters: TokenLedgerFilters;
+  ledger: TokenLedgerSnapshot | null;
+  loading: boolean;
+  onRefresh: () => void;
+  refreshing: boolean;
+  setFilterValue: <K extends keyof TokenLedgerFilters>(
+    key: K,
+    value: TokenLedgerFilters[K]
+  ) => void;
+}
+
+const EMPTY_LEDGER_ENTRIES: TokenLedgerEntry[] = [];
+
+const parseDateMs = (value: string | null | undefined): number | null => {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export function TokenLedgerPanel({
+  error,
+  filters,
+  ledger,
+  loading,
+  onRefresh,
+  refreshing,
+  setFilterValue,
+}: TokenLedgerPanelProps) {
+  const { i18n } = useTranslation();
+  const normalizedFilters = useMemo(
+    () => ({ ...DEFAULT_TOKEN_LEDGER_FILTERS, ...filters }),
+    [filters]
+  );
+  const entries = ledger?.entries ?? EMPTY_LEDGER_ENTRIES;
+  const rangeWindow = useMemo(
+    () => getTokenLedgerRangeWindow(normalizedFilters),
+    [normalizedFilters]
+  );
+  const filteredEntries = useMemo(
+    () => filterTokenLedgerEntries(entries, normalizedFilters),
+    [entries, normalizedFilters]
+  );
+  const metrics = useMemo(
+    () => calculateTokenLedgerMetrics(filteredEntries),
+    [filteredEntries]
+  );
+  const modelUsage = useMemo(
+    () => buildTokenLedgerModelUsage(filteredEntries),
+    [filteredEntries]
+  );
+  const selectedSpan = useMemo(
+    () => getTokenLedgerEntrySpan(filteredEntries),
+    [filteredEntries]
+  );
+
+  const generatedAtMs = parseDateMs(ledger?.generatedAt);
+  const coverageStart = ledger?.coverage.earliestTimestampMs ?? null;
+  const coverageEnd = ledger?.coverage.latestTimestampMs ?? null;
+  const coverageSpan = formatTokenLedgerSpan(coverageStart, coverageEnd, i18n.language);
+  const selectedSpanLabel = formatTokenLedgerSpan(
+    selectedSpan.start,
+    selectedSpan.end,
+    i18n.language
+  );
+  const rangeLabel = formatTokenLedgerRangeLabel(normalizedFilters);
+  const rangeOutsideCoverage =
+    Boolean(ledger) &&
+    ((rangeWindow.start !== null && coverageStart !== null && rangeWindow.start < coverageStart) ||
+      (rangeWindow.end !== null && coverageEnd !== null && rangeWindow.end > coverageEnd));
+
+  const tokenSegments = [
+    {
+      label: '新输入',
+      value: Math.max(metrics.input - metrics.cached, 0),
+      className: styles.tokenSegmentInput,
+    },
+    { label: '缓存', value: metrics.cached, className: styles.tokenSegmentCached },
+    {
+      label: '输出',
+      value: Math.max(metrics.output - metrics.reasoning, 0),
+      className: styles.tokenSegmentOutput,
+    },
+    { label: '推理', value: metrics.reasoning, className: styles.tokenSegmentReasoning },
+  ].filter((item) => item.value > 0);
+  const tokenSegmentTotal = Math.max(
+    tokenSegments.reduce((sum, item) => sum + item.value, 0),
+    metrics.total,
+    1
+  );
+
+  return (
+    <Card className={styles.ledgerCard}>
+      <div className={styles.ledgerHeader}>
+        <div>
+          <h2>长期 Token 台账</h2>
+          <p>来自本机详情日志聚合，只保存 Token 摘要和日志文件元信息。</p>
+        </div>
+        <div className={styles.ledgerHeaderActions}>
+          <span>
+            台账覆盖 {coverageSpan}
+            {generatedAtMs !== null ? ` · 更新 ${formatDateTime(generatedAtMs, i18n.language)}` : ''}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            loading={refreshing || loading}
+            onClick={onRefresh}
+            leftIcon={<IconRefreshCw size={15} />}
+          >
+            刷新台账
+          </Button>
+        </div>
+      </div>
+
+      <div className={styles.rangeTabs} role="tablist" aria-label="token ledger range">
+        {TOKEN_LEDGER_RANGE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`${styles.rangeTab} ${
+              normalizedFilters.range === option.value ? styles.rangeTabActive : ''
+            }`}
+            onClick={() => setFilterValue('range', option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {normalizedFilters.range === 'custom' && (
+        <div className={styles.customRange}>
+          <Input
+            type="datetime-local"
+            label="开始时间"
+            value={normalizedFilters.customStart}
+            onChange={(event) => setFilterValue('customStart', event.target.value)}
+          />
+          <Input
+            type="datetime-local"
+            label="结束时间"
+            value={normalizedFilters.customEnd}
+            onChange={(event) => setFilterValue('customEnd', event.target.value)}
+          />
+        </div>
+      )}
+
+      {loading && !ledger ? (
+        <Skeleton variant="card" rows={5} />
+      ) : !ledger ? (
+        <EmptyState
+          title="暂无长期 Token 台账"
+          description={error || '回填脚本生成 token-ledger.json 后，这里会显示最近 30 天和本月总量。'}
+        />
+      ) : (
+        <>
+          <div className={styles.ledgerSummaryGrid}>
+            <div className={styles.ledgerSummaryPrimary}>
+              <span>{rangeLabel}</span>
+              <strong>{formatTokenCount(metrics.total)}</strong>
+              <small>Token 总消耗</small>
+            </div>
+            <div className={styles.ledgerSummaryItem}>
+              <span>已上报 / 已解析</span>
+              <strong>
+                {metrics.knownRequests} / {metrics.parsedRequests}
+              </strong>
+              <small>共 {metrics.totalRequests} 条日志摘要</small>
+            </div>
+            <div className={styles.ledgerSummaryItem}>
+              <span>覆盖率 / 解析率</span>
+              <strong>
+                {formatPercent(metrics.coverageRate)} / {formatPercent(metrics.parsedRate)}
+              </strong>
+              <small>缺 usage 显示为未上报</small>
+            </div>
+            <div className={styles.ledgerSummaryItem}>
+              <span>当前覆盖起止</span>
+              <strong>{selectedSpanLabel}</strong>
+              <small>
+                {rangeOutsideCoverage
+                  ? '当前范围超过台账历史，仅统计已有详情日志'
+                  : '当前范围落在台账覆盖内'}
+              </small>
+            </div>
+          </div>
+
+          {filteredEntries.length === 0 ? (
+            <EmptyState
+              title="当前范围没有 Token 台账"
+              description="换一个区间，或等待计划任务扫描新的详情日志。"
+            />
+          ) : (
+            <div className={styles.ledgerBodyGrid}>
+              <div className={styles.tokenUsagePanel}>
+                <div className={styles.tokenTotalRow}>
+                  <strong>{formatTokenCount(metrics.total)}</strong>
+                  <span>
+                    已知 {metrics.knownRequests} / {metrics.totalRequests} 条 · 未上报{' '}
+                    {metrics.unreportedRequests} 条
+                  </span>
+                </div>
+                <div className={styles.tokenStack} aria-label="长期 Token 消耗结构">
+                  {tokenSegments.map((item) => (
+                    <span
+                      key={item.label}
+                      className={`${styles.tokenSegment} ${item.className}`}
+                      style={{ width: `${Math.max(4, (item.value / tokenSegmentTotal) * 100)}%` }}
+                      title={`${item.label}: ${formatTokenCount(item.value)} Token`}
+                    />
+                  ))}
+                </div>
+                <div className={styles.tokenBreakdownGrid}>
+                  <span>
+                    <b>输入</b>
+                    {formatTokenCount(metrics.input)}
+                  </span>
+                  <span>
+                    <b>缓存</b>
+                    {formatTokenCount(metrics.cached)}
+                  </span>
+                  <span>
+                    <b>输出</b>
+                    {formatTokenCount(metrics.output)}
+                  </span>
+                  <span>
+                    <b>推理</b>
+                    {formatTokenCount(metrics.reasoning)}
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.ledgerModelPanel}>
+                <div className={styles.ledgerSubHeader}>
+                  <h3>模型 Token 占比</h3>
+                  <span>Top {modelUsage.length}</span>
+                </div>
+                {modelUsage.length === 0 ? (
+                  <EmptyState title="暂无模型占比" description="当前范围没有已上报 usage 的请求。" />
+                ) : (
+                  <div className={styles.modelBars}>
+                    {modelUsage.map((item) => (
+                      <div key={item.model} className={styles.modelBarRow}>
+                        <span className={styles.modelBarName} title={item.model}>
+                          {item.model}
+                        </span>
+                        <span className={styles.modelBarTrack}>
+                          <span
+                            className={styles.modelBarFill}
+                            style={{ width: `${Math.max(4, item.percent)}%` }}
+                          />
+                        </span>
+                        <span className={styles.modelBarMeta}>
+                          {item.requests} 次 · {formatTokenCount(item.total)} Token
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}

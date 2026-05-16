@@ -285,6 +285,185 @@
   }
 }
 
+.ledgerCard {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 5%, transparent),
+      color-mix(in srgb, var(--success-color) 4%, transparent)
+    ),
+    var(--surface-card);
+}
+
+.ledgerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-md;
+
+  h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 780;
+  }
+
+  p {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  @include mobile {
+    flex-direction: column;
+  }
+}
+
+.ledgerHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+
+  > span {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 740;
+    line-height: 1.45;
+    text-align: right;
+  }
+
+  @include mobile {
+    width: 100%;
+    justify-content: flex-start;
+
+    > span {
+      text-align: left;
+    }
+  }
+}
+
+.ledgerSummaryGrid {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.15fr) repeat(3, minmax(0, 1fr));
+  gap: 10px;
+
+  @media (max-width: 1180px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ledgerSummaryPrimary,
+.ledgerSummaryItem {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-primary) 66%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+
+  span,
+  small {
+    display: block;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 760;
+    line-height: 1.4;
+  }
+
+  strong {
+    display: block;
+    min-width: 0;
+    margin: 5px 0 4px;
+    color: var(--text-primary);
+    font-weight: 820;
+    line-height: 1.16;
+    word-break: break-word;
+  }
+}
+
+.ledgerSummaryPrimary {
+  border-color: color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 8%, transparent),
+      color-mix(in srgb, var(--success-color) 6%, transparent)
+    ),
+    var(--bg-primary);
+
+  strong {
+    font-size: 30px;
+  }
+}
+
+.ledgerSummaryItem {
+  strong {
+    font-size: 16px;
+  }
+}
+
+.ledgerBodyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: $spacing-md;
+  align-items: stretch;
+
+  @media (max-width: 1180px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ledgerModelPanel {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-primary) 58%, transparent);
+
+  .modelBarRow {
+    cursor: default;
+  }
+
+  .modelBarRow:hover {
+    transform: none;
+  }
+}
+
+.ledgerSubHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+
+  h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 780;
+  }
+
+  span {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 760;
+    white-space: nowrap;
+  }
+}
+
 .chartGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

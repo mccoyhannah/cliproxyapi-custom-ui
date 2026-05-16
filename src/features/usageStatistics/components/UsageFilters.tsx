@@ -181,7 +181,7 @@ export function UsageFilters({
           <strong>{requestLogEnabled ? '请求日志已开启' : '请求日志未开启'}</strong>
           <span>
             {requestLogEnabled
-              ? `首屏自动解析最近 ${AUTO_DETAIL_LIMIT} 条详情；更多请求可以点行按需解析。`
+              ? `首屏自动解析最近 ${AUTO_DETAIL_LIMIT} 条详情；时间筛选只作用于当前已加载日志尾部，长期 Token 看下方台账。`
               : '只能看到后端累计成功/失败；要核验模型路由，需要先开启请求日志。'}
           </span>
         </div>

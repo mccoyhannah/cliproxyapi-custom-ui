@@ -12,10 +12,12 @@ import { IconRefreshCw } from '@/components/ui/icons';
 import {
   AUTO_DETAIL_LIMIT,
   DEFAULT_FILTERS,
+  DEFAULT_TOKEN_LEDGER_FILTERS,
   DETAIL_CONCURRENCY,
   MAX_INDEX_LINES,
   PAGE_SIZE,
   UNPARSED_MODEL_LABEL,
+  TokenLedgerPanel,
   UsageCharts,
   UsageDetailsRail,
   UsageFilters,
@@ -47,10 +49,16 @@ import {
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { apiKeyUsageApi } from '@/services/api/apiKeyUsage';
 import { configApi, logsApi } from '@/services/api';
+import { tokenLedgerApi } from '@/services/runtime/tokenLedger';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { downloadBlob } from '@/utils/download';
 import type { ApiKeyUsageResponse } from '@/utils/recentRequests';
-import type { UsageRequestDetail, UsageStatsFilters } from '@/types/usageStatistics';
+import type {
+  TokenLedgerFilters,
+  TokenLedgerSnapshot,
+  UsageRequestDetail,
+  UsageStatsFilters,
+} from '@/types/usageStatistics';
 import styles from './UsageStatisticsPage.module.scss';
 
 export function UsageStatisticsPage() {
@@ -72,13 +80,21 @@ export function UsageStatisticsPage() {
     'usageStatistics.refreshInterval',
     15000
   );
+  const [tokenLedgerFilters, setTokenLedgerFilters] = useLocalStorage<TokenLedgerFilters>(
+    'usageStatistics.tokenLedgerFilters',
+    DEFAULT_TOKEN_LEDGER_FILTERS
+  );
 
   const [usage, setUsage] = useState<ApiKeyUsageResponse | null>(null);
+  const [tokenLedger, setTokenLedger] = useState<TokenLedgerSnapshot | null>(null);
   const [logLines, setLogLines] = useState<string[]>([]);
   const [requestDetails, setRequestDetails] = useState<Record<string, UsageRequestDetail>>({});
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [tokenLedgerLoading, setTokenLedgerLoading] = useState(false);
+  const [tokenLedgerRefreshing, setTokenLedgerRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [tokenLedgerError, setTokenLedgerError] = useState('');
   const [enablingRequestLog, setEnablingRequestLog] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -88,6 +104,7 @@ export function UsageStatisticsPage() {
   const latestTimestampRef = useRef<number>(0);
   const logRequestInFlightRef = useRef(false);
   const detailInFlightRef = useRef<Set<string>>(new Set());
+  const tokenLedgerLoadedRef = useRef(false);
   const requestDetailsRef = useRef<Record<string, UsageRequestDetail>>({});
 
   useEffect(() => {
@@ -115,6 +132,34 @@ export function UsageStatisticsPage() {
   ) => {
     setFilters((prev) => ({ ...DEFAULT_FILTERS, ...prev, [key]: value }));
   };
+
+  const setTokenLedgerFilterValue = <K extends keyof TokenLedgerFilters>(
+    key: K,
+    value: TokenLedgerFilters[K]
+  ) => {
+    setTokenLedgerFilters((prev) => ({ ...DEFAULT_TOKEN_LEDGER_FILTERS, ...prev, [key]: value }));
+  };
+
+  const loadTokenLedger = useCallback(async (forceNetwork = false) => {
+    const isInitialLoad = !tokenLedgerLoadedRef.current;
+    if (isInitialLoad) {
+      setTokenLedgerLoading(true);
+    } else {
+      setTokenLedgerRefreshing(true);
+    }
+    setTokenLedgerError('');
+
+    try {
+      const snapshot = await tokenLedgerApi.getLedger({ forceNetwork });
+      setTokenLedger(snapshot);
+      tokenLedgerLoadedRef.current = true;
+    } catch (err: unknown) {
+      setTokenLedgerError(getErrorMessage(err) || '长期 Token 台账加载失败');
+    } finally {
+      setTokenLedgerLoading(false);
+      setTokenLedgerRefreshing(false);
+    }
+  }, []);
 
   const loadRequestDetails = useCallback(
     async (ids: string[], force = false) => {
@@ -234,15 +279,17 @@ export function UsageStatisticsPage() {
   useEffect(() => {
     latestTimestampRef.current = 0;
     void loadUsageStats(false);
-  }, [loadUsageStats]);
+    void loadTokenLedger(false);
+  }, [loadTokenLedger, loadUsageStats]);
 
   useEffect(() => {
     if (!autoRefresh || connectionStatus !== 'connected') return;
     const timer = window.setInterval(() => {
       void loadUsageStats(true);
+      void loadTokenLedger(true);
     }, refreshInterval);
     return () => window.clearInterval(timer);
-  }, [autoRefresh, connectionStatus, loadUsageStats, refreshInterval]);
+  }, [autoRefresh, connectionStatus, loadTokenLedger, loadUsageStats, refreshInterval]);
 
   const baseRecords = useMemo(
     () => (requestLogEnabled ? buildRequestRecords(logLines, i18n.language) : []),
@@ -412,8 +459,11 @@ export function UsageStatisticsPage() {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => void loadUsageStats(true)}
-            loading={refreshing}
+            onClick={() => {
+              void loadUsageStats(true);
+              void loadTokenLedger(true);
+            }}
+            loading={refreshing || tokenLedgerRefreshing}
             disabled={connectionStatus !== 'connected'}
           >
             <IconRefreshCw size={16} />
@@ -422,8 +472,11 @@ export function UsageStatisticsPage() {
           <Button
             type="button"
             variant="primary"
-            onClick={() => void loadUsageStats(false)}
-            loading={loading}
+            onClick={() => {
+              void loadUsageStats(false);
+              void loadTokenLedger(true);
+            }}
+            loading={loading || tokenLedgerLoading}
             disabled={connectionStatus !== 'connected'}
           >
             <IconRefreshCw size={16} />
@@ -459,6 +512,16 @@ export function UsageStatisticsPage() {
         tokenMetrics={tokenMetrics}
         timelineBuckets={timelineBuckets}
         timelineMax={timelineMax}
+      />
+
+      <TokenLedgerPanel
+        error={tokenLedgerError}
+        filters={tokenLedgerFilters}
+        ledger={tokenLedger}
+        loading={tokenLedgerLoading}
+        onRefresh={() => void loadTokenLedger(true)}
+        refreshing={tokenLedgerRefreshing}
+        setFilterValue={setTokenLedgerFilterValue}
       />
 
       <UsageFilters
