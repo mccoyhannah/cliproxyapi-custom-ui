@@ -16,9 +16,9 @@ interface PageTransitionProps {
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
-const VERTICAL_TRANSITION_DURATION = 0.35;
-const VERTICAL_TRAVEL_DISTANCE = 60;
-const IOS_TRANSITION_DURATION = 0.42;
+const VERTICAL_TRANSITION_DURATION = 0.4;
+const VERTICAL_TRAVEL_DISTANCE = 40;
+const IOS_TRANSITION_DURATION = 0.45;
 const IOS_ENTER_FROM_X_PERCENT = 100;
 const IOS_EXIT_TO_X_PERCENT_FORWARD = -30;
 const IOS_EXIT_TO_X_PERCENT_BACKWARD = 100;
@@ -27,9 +27,12 @@ const IOS_EXIT_DIM_OPACITY = 0.72;
 const IOS_SHADOW_VALUE = '-14px 0 24px rgba(0, 0, 0, 0.16)';
 
 const easePower2Out = (progress: number) => 1 - (1 - progress) ** 3;
-const easeCircOut = (progress: number) => Math.sqrt(1 - (progress - 1) ** 2);
 
-const buildVerticalTransform = (y: number) => `translate3d(0px, ${y}px, 0px)`;
+// Use a smoother cubic bezier for modern transitions
+const easeCircOut: [number, number, number, number] = [0.25, 1, 0.5, 1]; // standard spring-like deceleration
+
+const buildVerticalTransform = (y: number, scale: number = 1) =>
+  `translate3d(0px, ${y}px, 0px) scale(${scale})`;
 const buildIosTransform = (xPercent: number, y: number) => `translate3d(${xPercent}%, ${y}px, 0px)`;
 
 const clearLayerStyles = (element: HTMLElement | null) => {
@@ -314,16 +317,16 @@ export function PageTransition({
         )
       );
     } else {
-      // Exit animation: fade out with slight movement (runs simultaneously)
+      // Exit animation: fade out with slight movement and scale down (runs simultaneously)
       if (exitingLayerEl) {
-        exitingLayerEl.style.transform = buildVerticalTransform(exitBaseY);
+        exitingLayerEl.style.transform = buildVerticalTransform(exitBaseY, 1);
         activeAnimations.push(
           animate(
             exitingLayerEl,
             {
               transform: [
-                buildVerticalTransform(exitBaseY),
-                buildVerticalTransform(exitBaseY + exitToY),
+                buildVerticalTransform(exitBaseY, 1),
+                buildVerticalTransform(exitBaseY + exitToY, 0.98),
               ],
               opacity: [1, 0],
             },
@@ -335,14 +338,14 @@ export function PageTransition({
         );
       }
 
-      // Enter animation: fade in with slight movement (runs simultaneously)
-      currentLayerEl.style.transform = buildVerticalTransform(enterFromY);
+      // Enter animation: fade in with slight movement and scale up (runs simultaneously)
+      currentLayerEl.style.transform = buildVerticalTransform(enterFromY, 0.98);
       currentLayerEl.style.opacity = '0';
       activeAnimations.push(
         animate(
           currentLayerEl,
           {
-            transform: [buildVerticalTransform(enterFromY), buildVerticalTransform(0)],
+            transform: [buildVerticalTransform(enterFromY, 0.98), buildVerticalTransform(0, 1)],
             opacity: [0, 1],
           },
           {
