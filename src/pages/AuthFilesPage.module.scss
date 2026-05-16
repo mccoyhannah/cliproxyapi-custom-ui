@@ -1322,6 +1322,7 @@
   .providerAvatar,
   .typeBadge,
   .fileName,
+  .fileNameSource,
   .noteText,
   .cardMeta,
   .healthStatusMessage {
@@ -1431,6 +1432,15 @@
     font-size: 13px;
     line-height: 1.3;
     -webkit-line-clamp: 1;
+  }
+
+  .displayNameText {
+    -webkit-line-clamp: 1;
+  }
+
+  .displayNameInput {
+    height: 24px;
+    font-size: 13px;
   }
 
   .healthStatusMessage {
@@ -1679,6 +1689,67 @@
   letter-spacing: 0;
 }
 
+.displayNameButton {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: text;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+
+  &:hover:not(:disabled) .displayNameText {
+    color: color-mix(in srgb, var(--primary-color) 72%, var(--text-primary));
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-radius: 6px;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 16%, transparent);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.displayNameText {
+  @include text-ellipsis-multiline(2);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.displayNameInput {
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 48%, var(--border-color));
+  background: color-mix(in srgb, var(--surface-control) 96%, var(--bg-primary));
+  color: var(--text-primary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 72%, var(--border-color));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+  }
+
+  &::placeholder {
+    color: var(--text-tertiary);
+  }
+}
+
 .cardMeta {
   display: flex;
   flex-wrap: wrap;
@@ -1885,6 +1956,16 @@
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.fileNameSource {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
   display: flex;
   gap: 6px;
   align-items: flex-start;

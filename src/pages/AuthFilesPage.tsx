@@ -139,6 +139,7 @@ export function AuthFilesPage() {
     batchStatusUpdating,
     priorityUpdating,
     batchPriorityUpdating,
+    noteUpdating,
     fileInputRef,
     loadFiles,
     handleUploadClick,
@@ -148,6 +149,7 @@ export function AuthFilesPage() {
     handleDownload,
     handleStatusToggle,
     handlePriorityChange,
+    handleDisplayNameChange,
     toggleSelect,
     selectAllVisible,
     invertVisibleSelection,
@@ -431,7 +433,7 @@ export function AuthFilesPage() {
       const matchType = filter === 'all' || item.type === filter;
       const matchSearch =
         !normalizedSearch ||
-        [item.name, item.type, item.provider].some((value) => {
+        [item.name, item.type, item.provider, item.note].some((value) => {
           const content = (value || '').toString();
           return wildcardSearch
             ? wildcardSearch.test(content)
@@ -968,12 +970,14 @@ export function AuthFilesPage() {
                     statusBarCache={statusBarCache}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     priorityUpdating={priorityUpdating}
+                    noteUpdating={noteUpdating}
                     onShowModels={showModels}
                     onDownload={handleDownload}
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
                     onDelete={handleDelete}
                     onToggleStatus={handleStatusToggle}
                     onPriorityChange={handlePriorityChange}
+                    onDisplayNameChange={handleDisplayNameChange}
                     onPriorityInvalid={handlePriorityInvalid}
                     onToggleSelect={toggleSelect}
                   />

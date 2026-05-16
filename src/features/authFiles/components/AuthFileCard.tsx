@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -71,6 +71,7 @@ export type AuthFileCardProps = {
   deleting: string | null;
   statusUpdating: Record<string, boolean>;
   priorityUpdating: Record<string, boolean>;
+  noteUpdating: Record<string, boolean>;
   quotaFilterType: QuotaProviderType | null;
   statusBarCache: Map<string, AuthFileStatusBarData>;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
@@ -80,6 +81,7 @@ export type AuthFileCardProps = {
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
   onPriorityChange: (file: AuthFileItem, priority: number) => Promise<void>;
+  onDisplayNameChange: (file: AuthFileItem, note: string) => Promise<void>;
   onPriorityInvalid: () => void;
   onToggleSelect: (name: string) => void;
 };
@@ -164,6 +166,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     deleting,
     statusUpdating,
     priorityUpdating,
+    noteUpdating,
     quotaFilterType,
     statusBarCache,
     codexSubscriptionSnapshot,
@@ -173,6 +176,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     onDelete,
     onToggleStatus,
     onPriorityChange,
+    onDisplayNameChange,
     onPriorityInvalid,
     onToggleSelect,
   } = props;
@@ -277,8 +281,21 @@ export function AuthFileCard(props: AuthFileCardProps) {
       ? priorityDraft.value
       : currentPriorityText;
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
+  const displayName = noteValue || file.name;
+  const displayNameTitle = noteValue ? `${noteValue} (${file.name})` : file.name;
+  const displayNameInputId = `auth-display-name-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+  const [displayNameDraft, setDisplayNameDraft] = useState({
+    fileName: file.name,
+    value: noteValue,
+    editing: false,
+  });
+  const displayNameEditing =
+    displayNameDraft.fileName === file.name && displayNameDraft.editing;
+  const displayNameInputRef = useRef<HTMLInputElement | null>(null);
+  const skipDisplayNameBlurRef = useRef(false);
   const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const prioritySaving = priorityUpdating[file.name] === true;
+  const displayNameSaving = noteUpdating[file.name] === true;
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =
     resolvedQuotaType === 'codex' &&
@@ -314,6 +331,53 @@ export function AuthFileCard(props: AuthFileCardProps) {
 
   const setPriorityInput = (value: string) => {
     setPriorityDraft({ fileName: file.name, value, dirty: true });
+  };
+
+  useEffect(() => {
+    if (!displayNameEditing) return;
+    const input = displayNameInputRef.current;
+    input?.focus();
+    input?.select();
+  }, [displayNameEditing, file.name]);
+
+  const startDisplayNameEdit = () => {
+    if (disableControls || isRuntimeOnly || displayNameSaving) return;
+    setDisplayNameDraft({ fileName: file.name, value: noteValue, editing: true });
+  };
+
+  const cancelDisplayNameEdit = () => {
+    setDisplayNameDraft({ fileName: file.name, value: noteValue, editing: false });
+  };
+
+  const commitDisplayNameInput = async () => {
+    if (!displayNameEditing || displayNameSaving) return;
+
+    const nextNote = displayNameDraft.value.trim();
+    if (nextNote === noteValue) {
+      cancelDisplayNameEdit();
+      return;
+    }
+
+    await onDisplayNameChange(file, nextNote);
+    setDisplayNameDraft({ fileName: file.name, value: nextNote, editing: false });
+  };
+
+  const handleDisplayNameBlur = () => {
+    if (skipDisplayNameBlurRef.current) {
+      skipDisplayNameBlurRef.current = false;
+      return;
+    }
+    void commitDisplayNameInput();
+  };
+
+  const handleDisplayNameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+    } else if (event.key === 'Escape') {
+      skipDisplayNameBlurRef.current = true;
+      cancelDisplayNameEdit();
+      event.currentTarget.blur();
+    }
   };
 
   const resetPriorityInput = () => {
@@ -453,13 +517,44 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   </span>
                 )}
               </div>
-              <span className={styles.fileName} title={file.name}>
-                {file.name}
-              </span>
+              {displayNameEditing ? (
+                <input
+                  ref={displayNameInputRef}
+                  id={displayNameInputId}
+                  className={styles.displayNameInput}
+                  type="text"
+                  value={displayNameDraft.value}
+                  placeholder={file.name}
+                  onChange={(event) =>
+                    setDisplayNameDraft({
+                      fileName: file.name,
+                      value: event.currentTarget.value,
+                      editing: true,
+                    })
+                  }
+                  onBlur={handleDisplayNameBlur}
+                  onKeyDown={handleDisplayNameKeyDown}
+                  disabled={disableControls || displayNameSaving}
+                  aria-label={t('auth_files.display_name_edit')}
+                  title={file.name}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className={`${styles.fileName} ${styles.displayNameButton}`}
+                  title={displayNameTitle}
+                  onClick={startDisplayNameEdit}
+                  disabled={disableControls || isRuntimeOnly || displayNameSaving}
+                  aria-label={t('auth_files.display_name_edit')}
+                >
+                  <span className={styles.displayNameText}>{displayName}</span>
+                  {displayNameSaving && <LoadingSpinner size={12} />}
+                </button>
+              )}
               {!compact && noteValue && (
-                <div className={styles.noteText} title={noteValue}>
-                  <span className={styles.noteLabel}>{t('auth_files.note_display')}</span>
-                  <span className={styles.noteValue}>{noteValue}</span>
+                <div className={styles.fileNameSource} title={file.name}>
+                  <span className={styles.noteLabel}>{t('auth_files.file_name_display')}</span>
+                  <span className={styles.noteValue}>{file.name}</span>
                 </div>
               )}
             </div>

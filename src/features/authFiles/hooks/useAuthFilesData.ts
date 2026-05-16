@@ -43,6 +43,7 @@ export type UseAuthFilesDataResult = {
   batchStatusUpdating: boolean;
   priorityUpdating: Record<string, boolean>;
   batchPriorityUpdating: boolean;
+  noteUpdating: Record<string, boolean>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   loadFiles: (options?: LoadAuthFilesOptions) => Promise<void>;
   handleUploadClick: () => void;
@@ -52,6 +53,7 @@ export type UseAuthFilesDataResult = {
   handleDownload: (name: string) => Promise<void>;
   handleStatusToggle: (item: AuthFileItem, enabled: boolean) => Promise<void>;
   handlePriorityChange: (item: AuthFileItem, priority: number) => Promise<void>;
+  handleDisplayNameChange: (item: AuthFileItem, note: string) => Promise<void>;
   toggleSelect: (name: string) => void;
   selectAllVisible: (visibleFiles: AuthFileItem[]) => void;
   invertVisibleSelection: (visibleFiles: AuthFileItem[]) => void;
@@ -76,6 +78,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [batchStatusUpdating, setBatchStatusUpdating] = useState(false);
   const [priorityUpdating, setPriorityUpdating] = useState<Record<string, boolean>>({});
   const [batchPriorityUpdating, setBatchPriorityUpdating] = useState(false);
+  const [noteUpdating, setNoteUpdating] = useState<Record<string, boolean>>({});
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -518,6 +521,44 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     [showNotification, t]
   );
 
+  const handleDisplayNameChange = useCallback(
+    async (item: AuthFileItem, note: string) => {
+      const name = item.name;
+      const previousNote = typeof item.note === 'string' ? item.note : '';
+      const nextNote = note.trim();
+      if (previousNote.trim() === nextNote) return;
+
+      setNoteUpdating((prev) => ({ ...prev, [name]: true }));
+      setFiles((prev) =>
+        prev.map((file) => (file.name === name ? { ...file, note: nextNote } : file))
+      );
+
+      try {
+        await authFilesApi.patchFields(name, { note: nextNote });
+        showNotification(
+          nextNote
+            ? t('auth_files.display_name_save_success', { name })
+            : t('auth_files.display_name_clear_success', { name }),
+          'success'
+        );
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : '';
+        setFiles((prev) =>
+          prev.map((file) => (file.name === name ? { ...file, note: previousNote } : file))
+        );
+        showNotification(`${t('notification.update_failed')}: ${errorMessage}`, 'error');
+      } finally {
+        setNoteUpdating((prev) => {
+          if (!prev[name]) return prev;
+          const next = { ...prev };
+          delete next[name];
+          return next;
+        });
+      }
+    },
+    [showNotification, t]
+  );
+
   const batchSetStatus = useCallback(
     async (names: string[], enabled: boolean) => {
       if (batchStatusPendingRef.current) return;
@@ -788,6 +829,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     batchStatusUpdating,
     priorityUpdating,
     batchPriorityUpdating,
+    noteUpdating,
     fileInputRef,
     loadFiles,
     handleUploadClick,
@@ -797,6 +839,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     handleDownload,
     handleStatusToggle,
     handlePriorityChange,
+    handleDisplayNameChange,
     toggleSelect,
     selectAllVisible,
     invertVisibleSelection,
