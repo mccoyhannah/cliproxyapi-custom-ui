@@ -485,6 +485,16 @@ export function UsageStatisticsPage() {
         </div>
       </div>
 
+      <TokenLedgerPanel
+        error={tokenLedgerError}
+        filters={tokenLedgerFilters}
+        ledger={tokenLedger}
+        loading={tokenLedgerLoading}
+        onRefresh={() => void loadTokenLedger(true)}
+        refreshing={tokenLedgerRefreshing}
+        setFilterValue={setTokenLedgerFilterValue}
+      />
+
       <UsageMetricsGrid
         aggregateTotals={aggregateTotals}
         loading={initialLoading}
@@ -512,16 +522,6 @@ export function UsageStatisticsPage() {
         tokenMetrics={tokenMetrics}
         timelineBuckets={timelineBuckets}
         timelineMax={timelineMax}
-      />
-
-      <TokenLedgerPanel
-        error={tokenLedgerError}
-        filters={tokenLedgerFilters}
-        ledger={tokenLedger}
-        loading={tokenLedgerLoading}
-        onRefresh={() => void loadTokenLedger(true)}
-        refreshing={tokenLedgerRefreshing}
-        setFilterValue={setTokenLedgerFilterValue}
       />
 
       <UsageFilters

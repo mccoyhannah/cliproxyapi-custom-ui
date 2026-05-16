@@ -446,7 +446,7 @@
 }
 
 .fileGridCompact {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
 }
 
 .authFilesEmptyState:global(.empty-state) {
@@ -840,10 +840,10 @@
 .codexQuotaSummaryLine {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   flex-wrap: nowrap;
-  gap: 5px;
-  width: 100%;
+  gap: 3px;
+  width: fit-content;
   max-width: 100%;
   min-width: 0;
   overflow: visible;
@@ -859,34 +859,35 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
 .codexCompactIdentityLine {
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .codexCompactQuotaLine {
   flex-wrap: nowrap;
-  gap: 5px;
-  padding: 3px 5px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
+  gap: 4px;
+  padding: 2px 4px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 38%, transparent);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 46%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
-  overflow: hidden;
+  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 30%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
+  overflow: visible;
 }
 
 .codexCompactQuotaGroupLabel {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  height: 18px;
+  height: 17px;
   padding: 0 2px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 820;
   line-height: 1;
   white-space: nowrap;
@@ -1053,8 +1054,8 @@
 .codexCompactQuotaChip {
   flex: 0 0 auto;
   min-width: 48px;
-  min-height: 22px;
-  padding: 2px 8px;
+  min-height: 20px;
+  padding: 1px 7px;
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
   background: color-mix(
     in srgb,
@@ -1129,13 +1130,13 @@
 }
 
 .codexSubscriptionExpiryChip {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   justify-content: flex-start;
-  gap: 5px;
-  min-height: 22px;
+  gap: 4px;
+  min-height: 20px;
   max-width: 100%;
-  width: auto;
-  padding: 2px 8px;
+  width: fit-content;
+  padding: 1px 7px;
 }
 
 .codexSubscriptionLabel {
@@ -1427,19 +1428,19 @@
 }
 
 .fileCardCompact {
-  padding: 12px;
+  padding: 10px;
   border-radius: var(--radius-card);
 
   .fileCardMain {
-    gap: 8px;
+    gap: 6px;
   }
 
   .cardHeader {
-    gap: 8px;
+    gap: 7px;
   }
 
   .cardSelection {
-    margin-top: 6px;
+    margin-top: 5px;
   }
 
   .providerAvatar {
@@ -1493,18 +1494,18 @@
   }
 
   .quotaSection {
-    gap: 4px;
+    gap: 3px;
     padding-top: 0;
     margin-top: -1px;
     border-top: 0;
   }
 
   .codexInfoGrid {
-    gap: 4px;
+    gap: 3px;
   }
 
   .codexQuotaSummaryLine {
-    gap: 4px;
+    gap: 3px;
   }
 
   .codexPlanLabel,
@@ -1526,16 +1527,18 @@
   }
 
   .codexSubscriptionValue {
-    padding: 1px 6px;
+    padding: 1px 7px;
   }
 
   .codexSubscriptionExpiryChip {
+    flex: 0 0 auto;
+    width: fit-content;
     max-width: none;
   }
 
   .cardActions {
     gap: 6px;
-    padding-top: 6px;
+    padding-top: 5px;
   }
 
   .cardActionsMain {
@@ -1579,7 +1582,7 @@
   }
 
   .subscriptionExpiryMeta {
-    flex-basis: 100%;
+    flex: 0 1 auto;
     gap: 4px;
   }
 
