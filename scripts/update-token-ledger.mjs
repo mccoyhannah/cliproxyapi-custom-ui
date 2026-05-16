@@ -10,6 +10,17 @@ const LOG_FILE_PATTERN =
 const HEAD_BYTES = 64 * 1024;
 const TAIL_BYTES = 256 * 1024;
 const EMBEDDED_LEDGER_ID = 'cpamc-token-ledger';
+const MODEL_NAME_RULES = JSON.parse(
+  await fs.readFile(
+    new URL('../src/features/usageStatistics/lib/modelNameRules.json', import.meta.url),
+    'utf8'
+  )
+);
+const MODEL_VALUE_PATTERN = '[A-Za-z0-9._:/+-]+';
+const BLOCKED_MODEL_WORDS = new Set(MODEL_NAME_RULES.blockedWords.map((item) => item.toLowerCase()));
+const VALID_MODEL_PATTERNS = MODEL_NAME_RULES.validModelPatterns.map(
+  (pattern) => new RegExp(pattern, 'i')
+);
 
 const emptyTokenUsage = (status) => ({
   input: 0,
@@ -115,39 +126,48 @@ const embedLedgerInHtml = async (htmlPath, projection) => {
   return true;
 };
 
-const cleanModelValue = (value) => {
-  if (!value) return null;
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const normalizeModelName = (value) => {
+  if (value === undefined || value === null || typeof value === 'boolean') return null;
   const trimmed = String(value).trim().replace(/^["'`]+|["'`,;}\]]+$/g, '');
-  return trimmed && trimmed !== '-' && trimmed !== 'null' ? trimmed : null;
+  if (!trimmed || trimmed === '-') return null;
+  if (/\s/.test(trimmed)) return null;
+
+  const lower = trimmed.toLowerCase();
+  if (BLOCKED_MODEL_WORDS.has(lower)) return null;
+  return VALID_MODEL_PATTERNS.some((pattern) => pattern.test(trimmed)) ? trimmed : null;
 };
+
+const buildJsonFieldPatterns = (keys) =>
+  keys.map((key) => new RegExp(`"${escapeRegExp(key)}"\\s*:\\s*"([^"]+)"`, 'i'));
 
 const extractFirstModel = (raw, patterns) => {
   for (const pattern of patterns) {
     const match = raw.match(pattern);
-    const value = cleanModelValue(match?.[1]);
+    const value = normalizeModelName(match?.[1]);
     if (value) return value;
   }
   return null;
 };
 
+const CONFIGURED_JSON_PATTERNS = buildJsonFieldPatterns(MODEL_NAME_RULES.configuredModelKeys);
+const ACTUAL_JSON_PATTERNS = buildJsonFieldPatterns(MODEL_NAME_RULES.actualModelKeys);
+const CONFIGURED_TEXT_PATTERNS = [
+  new RegExp(`\\b(?:configured|requested)\\s+model\\s*[:=]\\s*(${MODEL_VALUE_PATTERN})`, 'i'),
+];
+const ACTUAL_TEXT_PATTERNS = [
+  new RegExp(
+    `\\b(?:actual|upstream|routed|selected|target|response)\\s+model\\s*[:=]\\s*(${MODEL_VALUE_PATTERN})`,
+    'i'
+  ),
+];
+
 const extractConfiguredModel = (raw) =>
-  extractFirstModel(raw, [
-    /"configured[_-]?model"\s*:\s*"([^"]+)"/i,
-    /"requested[_-]?model"\s*:\s*"([^"]+)"/i,
-    /\b(?:configured|requested)\s+model\s*[:=]\s*([A-Za-z0-9._:/+-]+)/i,
-    /"model"\s*:\s*"([^"]+)"/i,
-    /\bmodel\s*[:=]\s*([A-Za-z0-9._:/+-]+)/i,
-  ]);
+  extractFirstModel(raw, [...CONFIGURED_JSON_PATTERNS, ...CONFIGURED_TEXT_PATTERNS]);
 
 const extractActualModel = (raw) =>
-  extractFirstModel(raw, [
-    /"actual[_-]?model"\s*:\s*"([^"]+)"/i,
-    /"upstream[_-]?model"\s*:\s*"([^"]+)"/i,
-    /"target[_-]?model"\s*:\s*"([^"]+)"/i,
-    /\b(?:actual|upstream|routed|selected|target)\s+model\s*[:=]\s*([A-Za-z0-9._:/+-]+)/i,
-    /\bmapped\s+(?:to|model)\s*[:=]?\s*([A-Za-z0-9._:/+-]+)/i,
-    /"model"\s*:\s*"([^"]+)"/i,
-  ]);
+  extractFirstModel(raw, [...ACTUAL_JSON_PATTERNS, ...ACTUAL_TEXT_PATTERNS]);
 
 const numberValue = (value) => {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, Math.floor(value));

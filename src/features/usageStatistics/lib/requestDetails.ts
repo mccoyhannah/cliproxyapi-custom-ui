@@ -3,6 +3,7 @@ import type {
   UsageRequestDetail,
   UsageRequestDetailStatus,
 } from '@/types/usageStatistics';
+import { extractActualModel, extractConfiguredModel } from './modelNames';
 
 export const emptyTokenUsage = (status: TokenUsage['status']): TokenUsage => ({
   input: 0,
@@ -46,40 +47,6 @@ export const emptyDetail = (
   errorSummary,
   loadedAt: detailStatus === 'loading' ? null : Date.now(),
 });
-
-const cleanModelValue = (value: string | undefined): string | null => {
-  if (!value) return null;
-  const trimmed = value.trim().replace(/^["'`]+|["'`,;}\]]+$/g, '');
-  return trimmed && trimmed !== '-' && trimmed !== 'null' ? trimmed : null;
-};
-
-const extractFirstModel = (raw: string, patterns: RegExp[]): string | null => {
-  for (const pattern of patterns) {
-    const match = raw.match(pattern);
-    const value = cleanModelValue(match?.[1]);
-    if (value) return value;
-  }
-  return null;
-};
-
-const extractConfiguredModel = (raw: string): string | null =>
-  extractFirstModel(raw, [
-    /"configured[_-]?model"\s*:\s*"([^"]+)"/i,
-    /"requested[_-]?model"\s*:\s*"([^"]+)"/i,
-    /\b(?:configured|requested)\s+model\s*[:=]\s*([A-Za-z0-9._:/+-]+)/i,
-    /"model"\s*:\s*"([^"]+)"/i,
-    /\bmodel\s*[:=]\s*([A-Za-z0-9._:/+-]+)/i,
-  ]);
-
-const extractActualModel = (raw: string): string | null =>
-  extractFirstModel(raw, [
-    /"actual[_-]?model"\s*:\s*"([^"]+)"/i,
-    /"upstream[_-]?model"\s*:\s*"([^"]+)"/i,
-    /"target[_-]?model"\s*:\s*"([^"]+)"/i,
-    /\b(?:actual|upstream|routed|selected|target)\s+model\s*[:=]\s*([A-Za-z0-9._:/+-]+)/i,
-    /\bmapped\s+(?:to|model)\s*[:=]?\s*([A-Za-z0-9._:/+-]+)/i,
-    /"model"\s*:\s*"([^"]+)"/i,
-  ]);
 
 const firstValue = <T,>(values: Array<T | null | undefined>): T | null =>
   values.find((value): value is T => value !== null && value !== undefined) ?? null;

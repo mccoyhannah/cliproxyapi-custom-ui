@@ -144,19 +144,22 @@ export function TokenLedgerPanel({
         </div>
       </div>
 
-      <div className={styles.rangeTabs} role="tablist" aria-label="token ledger range">
-        {TOKEN_LEDGER_RANGE_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`${styles.rangeTab} ${
-              normalizedFilters.range === option.value ? styles.rangeTabActive : ''
-            }`}
-            onClick={() => setFilterValue('range', option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
+      <div className={styles.ledgerControlRow}>
+        <div className={styles.rangeTabs} role="tablist" aria-label="token ledger range">
+          {TOKEN_LEDGER_RANGE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`${styles.rangeTab} ${
+                normalizedFilters.range === option.value ? styles.rangeTabActive : ''
+              }`}
+              onClick={() => setFilterValue('range', option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {ledger && <span className={styles.ledgerRangeNote}>当前范围 {selectedSpanLabel}</span>}
       </div>
 
       {normalizedFilters.range === 'custom' && (

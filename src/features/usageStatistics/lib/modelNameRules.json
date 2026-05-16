@@ -1,0 +1,47 @@
+{
+  "blockedWords": [
+    "a",
+    "an",
+    "and",
+    "false",
+    "model",
+    "none",
+    "null",
+    "optional",
+    "response",
+    "the",
+    "th",
+    "true",
+    "unknown",
+    "xxx"
+  ],
+  "validModelPatterns": [
+    "^(?:[A-Za-z0-9_.-]+[/:])?gpt-[A-Za-z0-9._+-]+$",
+    "^(?:[A-Za-z0-9_.-]+[/:])?o[0-9](?:[-._][A-Za-z0-9]+)*$",
+    "^(?:[A-Za-z0-9_.-]+[/:])?(?:claude-|gemini-|deepseek-|qwen|kimi-|glm-|llama-|mistral-|mixtral-|grok-|doubao-|ernie-|moonshot-|baichuan-|yi-|hunyuan-|command-|codestral-|sonar-|jina-|nova-|rerank-|embed-|embedding-|text-embedding-|text-moderation-|dall-e-|whisper-|tts-|chatgpt-|codex-|computer-use-)[A-Za-z0-9._+-]+$"
+  ],
+  "configuredModelKeys": [
+    "configured_model",
+    "configured-model",
+    "configuredModel",
+    "requested_model",
+    "requested-model",
+    "requestedModel",
+    "model"
+  ],
+  "actualModelKeys": [
+    "actual_model",
+    "actual-model",
+    "actualModel",
+    "upstream_model",
+    "upstream-model",
+    "upstreamModel",
+    "target_model",
+    "target-model",
+    "targetModel",
+    "response_model",
+    "response-model",
+    "responseModel",
+    "model"
+  ]
+}

@@ -286,6 +286,7 @@
 }
 
 .ledgerCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -301,6 +302,7 @@
   box-shadow:
     inset 3px 0 0 color-mix(in srgb, var(--primary-color) 32%, transparent),
     0 14px 28px -28px color-mix(in srgb, var(--primary-color) 44%, transparent);
+  overflow: hidden;
 }
 
 .ledgerHeader {
@@ -352,6 +354,35 @@
       text-align: left;
     }
   }
+}
+
+.ledgerControlRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+
+  @include mobile {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+.ledgerRangeNote {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-primary) 44%, transparent);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ledgerSummaryGrid {
@@ -441,10 +472,29 @@
 
   .modelBarRow {
     cursor: default;
+    grid-template-columns: minmax(112px, 0.85fr) minmax(96px, 1fr) auto;
+    padding: 7px 8px;
+    border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-control) 66%, transparent);
   }
 
   .modelBarRow:hover {
     transform: none;
+  }
+
+  .modelBars {
+    gap: 6px;
+  }
+
+  .modelBarTrack {
+    height: 8px;
+    background: color-mix(in srgb, var(--border-color) 52%, transparent);
+  }
+
+  .modelBarMeta {
+    font-size: 11px;
+    font-weight: 760;
   }
 }
 

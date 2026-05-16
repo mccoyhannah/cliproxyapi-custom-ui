@@ -1053,15 +1053,35 @@
 
 .codexCompactQuotaChip {
   flex: 0 0 auto;
-  min-width: 48px;
+  justify-content: flex-start;
+  gap: 5px;
+  min-width: 56px;
   min-height: 20px;
-  padding: 1px 7px;
+  padding: 1px 7px 1px 6px;
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
   background: color-mix(
     in srgb,
     var(--surface-control, var(--bg-secondary)) 86%,
     var(--bg-primary)
   );
+}
+
+.codexCompactQuotaWindow {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, currentColor 70%, var(--text-secondary));
+  font-size: 10px;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.codexCompactQuotaPercent {
+  flex: 0 0 auto;
+  padding-left: 5px;
+  border-left: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 880;
+  line-height: 1;
 }
 
 .codexCompactQuotaHealthy {
@@ -1518,8 +1538,8 @@
   }
 
   .codexCompactQuotaChip {
-    max-width: 62px;
-    padding-inline: 7px;
+    max-width: 74px;
+    padding-inline: 6px 7px;
   }
 
   .codexCompactPlanChip {

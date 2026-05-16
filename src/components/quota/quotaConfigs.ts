@@ -992,7 +992,12 @@ const renderCodexItems = (
       pushChip(
         quotaNodes,
         `window-${window.id}`,
-        `${label} ${percentLabel}`,
+        h(
+          Fragment,
+          null,
+          h('span', { className: styleMap.codexCompactQuotaWindow }, label),
+          h('strong', { className: styleMap.codexCompactQuotaPercent }, percentLabel)
+        ),
         [
           styleMap.codexCompactQuotaChip,
           getCompactQuotaToneClass(remaining),
