@@ -1077,6 +1077,8 @@
 }
 
 .codexSubscriptionValue {
+  display: inline-flex;
+  align-items: center;
   width: fit-content;
   max-width: 170px;
   min-height: 18px;
@@ -1086,8 +1088,36 @@
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
+.codexSubscriptionExpiryChip {
+  flex: 0 1 auto;
+  justify-content: flex-start;
+  gap: 5px;
+  min-height: 22px;
+  max-width: 138px;
+  padding: 2px 8px;
+}
+
+.codexSubscriptionLabel {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, currentColor 70%, var(--text-secondary));
+  font-size: 10px;
+  font-weight: 780;
+}
+
+.codexSubscriptionDate {
+  min-width: 0;
+  overflow: hidden;
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 820;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .codexSubscriptionHealthy {
-  color: color-mix(in srgb, var(--success-color) 82%, var(--text-primary));
+  color: #2563eb;
+  border-color: color-mix(in srgb, #2563eb 32%, var(--border-color));
+  background: color-mix(in srgb, #2563eb 8%, var(--bg-primary));
 }
 
 .codexSubscriptionWarning {
@@ -1106,6 +1136,12 @@
   color: var(--text-secondary);
   border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
   background: transparent;
+}
+
+:global([data-theme='dark']) .codexSubscriptionHealthy {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.34);
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .premiumPlanValue {

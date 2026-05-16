@@ -1000,9 +1000,23 @@ const renderCodexItems = (
     if (hasSubscriptionExpiry) {
       pushChip(
         'subscription-expiry',
-        formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil),
+        h(
+          Fragment,
+          null,
+          h(
+            'span',
+            { className: styleMap.codexSubscriptionLabel },
+            t('auth_files.subscription_expiry_short_label', { defaultValue: '到期' })
+          ),
+          h(
+            'strong',
+            { className: styleMap.codexSubscriptionDate },
+            formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil)
+          )
+        ),
         [
           styleMap.codexSubscriptionValue,
+          styleMap.codexSubscriptionExpiryChip,
           subscriptionStatusClass,
         ].filter(Boolean).join(' '),
         subscriptionActiveUntil
