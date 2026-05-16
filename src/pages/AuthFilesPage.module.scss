@@ -838,18 +838,58 @@
 }
 
 .codexQuotaSummaryLine {
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   flex-wrap: nowrap;
-  gap: 4px;
+  gap: 5px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
 
   .codexInfoDivider {
     display: none;
   }
+}
+
+.codexCompactIdentityLine,
+.codexCompactQuotaLine {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.codexCompactIdentityLine {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.codexCompactQuotaLine {
+  flex-wrap: nowrap;
+  gap: 5px;
+  padding: 3px 5px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 46%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  overflow: hidden;
+}
+
+.codexCompactQuotaGroupLabel {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 18px;
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 820;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .codexInfoItem {
@@ -1011,7 +1051,7 @@
 }
 
 .codexCompactQuotaChip {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 48px;
   min-height: 22px;
   padding: 2px 8px;
@@ -1089,11 +1129,12 @@
 }
 
 .codexSubscriptionExpiryChip {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   justify-content: flex-start;
   gap: 5px;
   min-height: 22px;
-  max-width: 138px;
+  max-width: 100%;
+  width: auto;
   padding: 2px 8px;
 }
 
@@ -1106,11 +1147,11 @@
 
 .codexSubscriptionDate {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   color: currentColor;
   font-size: 11px;
   font-weight: 820;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
@@ -1485,8 +1526,11 @@
   }
 
   .codexSubscriptionValue {
-    max-width: 126px;
     padding: 1px 6px;
+  }
+
+  .codexSubscriptionExpiryChip {
+    max-width: none;
   }
 
   .cardActions {

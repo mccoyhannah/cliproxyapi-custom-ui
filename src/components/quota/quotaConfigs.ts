@@ -923,9 +923,11 @@ const renderCodexItems = (
         ? styleMap.codexSubscriptionWarning
         : styleMap.codexSubscriptionHealthy;
   if (isCompactAuthCard) {
-    const compactNodes: ReactNode[] = [];
+    const identityNodes: ReactNode[] = [];
+    const quotaNodes: ReactNode[] = [];
     const compactTitleParts: string[] = [];
     const pushChip = (
+      targetNodes: ReactNode[],
       key: string,
       value: ReactNode,
       className: string,
@@ -937,7 +939,7 @@ const renderCodexItems = (
       } else if (title) {
         compactTitleParts.push(title);
       }
-      compactNodes.push(
+      targetNodes.push(
         h(
           'span',
           {
@@ -968,6 +970,7 @@ const renderCodexItems = (
 
     if (planLabel) {
       pushChip(
+        identityNodes,
         'plan',
         h(
           Fragment,
@@ -987,6 +990,7 @@ const renderCodexItems = (
       const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
       const label = getCompactWindowLabel(window);
       pushChip(
+        quotaNodes,
         `window-${window.id}`,
         `${label} ${percentLabel}`,
         [
@@ -999,6 +1003,7 @@ const renderCodexItems = (
 
     if (hasSubscriptionExpiry) {
       pushChip(
+        identityNodes,
         'subscription-expiry',
         h(
           Fragment,
@@ -1023,7 +1028,7 @@ const renderCodexItems = (
       );
     }
 
-    if (compactNodes.length === 0) return null;
+    if (identityNodes.length === 0 && quotaNodes.length === 0) return null;
 
     return h(
       'div',
@@ -1036,7 +1041,25 @@ const renderCodexItems = (
         ].filter(Boolean).join(' '),
         title: compactTitleParts.join(' / ') || undefined,
       },
-      ...compactNodes
+      identityNodes.length > 0
+        ? h(
+            'div',
+            { key: 'identity', className: styleMap.codexCompactIdentityLine },
+            ...identityNodes
+          )
+        : null,
+      quotaNodes.length > 0
+        ? h(
+            'div',
+            { key: 'quota', className: styleMap.codexCompactQuotaLine },
+            h(
+              'span',
+              { className: styleMap.codexCompactQuotaGroupLabel },
+              t('auth_files.quota_group_label', { defaultValue: '限额' })
+            ),
+            ...quotaNodes
+          )
+        : null
     );
   }
 
