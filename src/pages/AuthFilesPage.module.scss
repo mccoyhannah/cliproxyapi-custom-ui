@@ -1719,6 +1719,22 @@
   }
 }
 
+.stateBadgeWithInfo {
+  cursor: help;
+}
+
+.stateBadgeWithInfo:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--warning-border) 28%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
+}
+
+.stateBadgeInfoIcon {
+  flex: 0 0 auto;
+  opacity: 0.82;
+}
+
 .stateBadgeActive {
   color: var(--success-badge-text, #065f46);
   background: var(--success-badge-bg, #d1fae5);

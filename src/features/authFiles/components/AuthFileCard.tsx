@@ -499,22 +499,22 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   {typeLabel}
                 </span>
                 <span
-                  className={`${styles.stateBadge} ${stateBadgeClass}`}
+                  className={[
+                    styles.stateBadge,
+                    stateBadgeClass,
+                    hasStatusWarning ? styles.stateBadgeWithInfo : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   title={hasStatusWarning ? rawStatusMessage : undefined}
+                  aria-label={hasStatusWarning ? `${stateLabel}: ${rawStatusMessage}` : undefined}
+                  tabIndex={hasStatusWarning ? 0 : undefined}
                 >
                   {stateLabel}
+                  {hasStatusWarning && (
+                    <IconInfo className={styles.stateBadgeInfoIcon} size={12} aria-hidden="true" />
+                  )}
                 </span>
-                {hasStatusWarning && (
-                  <span
-                    className={styles.statusWarningIndicator}
-                    title={rawStatusMessage}
-                    aria-label={rawStatusMessage}
-                    role="img"
-                    tabIndex={0}
-                  >
-                    <IconInfo className={styles.messageIcon} size={12} />
-                  </span>
-                )}
                 {quotaSignalLabel && (
                   <span className={`${styles.signalBadge} ${quotaSignalClass}`}>
                     {quotaSignalLabel}
