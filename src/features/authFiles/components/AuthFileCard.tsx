@@ -227,6 +227,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : quotaPressure === 'warning'
         ? styles.signalBadgeWarning
         : '';
+  const showQuotaSignalBadge = !compact && Boolean(quotaSignalLabel);
 
   const showQuotaLayout =
     Boolean(quotaType) &&
@@ -499,12 +500,23 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   {typeLabel}
                 </span>
                 <span
-                  className={`${styles.stateBadge} ${stateBadgeClass}`}
+                  className={[
+                    styles.stateBadge,
+                    stateBadgeClass,
+                    hasStatusWarning ? styles.stateBadgeWithInfo : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   title={hasStatusWarning ? rawStatusMessage : undefined}
+                  aria-label={hasStatusWarning ? `${stateLabel}: ${rawStatusMessage}` : undefined}
+                  tabIndex={hasStatusWarning ? 0 : undefined}
                 >
                   {stateLabel}
+                  {hasStatusWarning && (
+                    <IconInfo className={styles.stateBadgeInfoIcon} size={12} aria-hidden="true" />
+                  )}
                 </span>
-                {quotaSignalLabel && (
+                {showQuotaSignalBadge && (
                   <span className={`${styles.signalBadge} ${quotaSignalClass}`}>
                     {quotaSignalLabel}
                   </span>
@@ -512,17 +524,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 {subscriptionSignalLabel && (
                   <span className={`${styles.signalBadge} ${subscriptionSignalClass}`}>
                     {subscriptionSignalLabel}
-                  </span>
-                )}
-                {hasStatusWarning && (
-                  <span
-                    className={styles.statusWarningIndicator}
-                    title={rawStatusMessage}
-                    aria-label={rawStatusMessage}
-                    role="img"
-                    tabIndex={0}
-                  >
-                    <IconInfo className={styles.messageIcon} size={12} />
                   </span>
                 )}
               </div>
