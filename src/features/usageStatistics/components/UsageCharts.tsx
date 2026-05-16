@@ -4,11 +4,14 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import type { UsageStatsFilters } from '@/types/usageStatistics';
 import {
   formatLatency,
+  formatPercent,
+  formatTokenCount,
   UNPARSED_MODEL_LABEL,
   type ModelMatrixDatum,
   type ModelUsageDatum,
   type RequestMetrics,
   type TimelineBucket,
+  type TokenUsageMetrics,
 } from '../lib';
 import styles from '@/pages/UsageStatisticsPage.module.scss';
 
@@ -21,6 +24,7 @@ interface UsageChartsProps {
   onModelUsageClick: (model: string) => void;
   rangeLabel: string;
   requestMetrics: RequestMetrics;
+  tokenMetrics: TokenUsageMetrics;
   timelineBuckets: TimelineBucket[];
   timelineMax: number;
 }
@@ -36,9 +40,30 @@ export function UsageCharts({
   onModelUsageClick,
   rangeLabel,
   requestMetrics,
+  tokenMetrics,
   timelineBuckets,
   timelineMax,
 }: UsageChartsProps) {
+  const tokenSegments = [
+    {
+      label: '新输入',
+      value: Math.max(tokenMetrics.input - tokenMetrics.cached, 0),
+      className: styles.tokenSegmentInput,
+    },
+    { label: '缓存', value: tokenMetrics.cached, className: styles.tokenSegmentCached },
+    {
+      label: '输出',
+      value: Math.max(tokenMetrics.output - tokenMetrics.reasoning, 0),
+      className: styles.tokenSegmentOutput,
+    },
+    { label: '推理', value: tokenMetrics.reasoning, className: styles.tokenSegmentReasoning },
+  ].filter((item) => item.value > 0);
+  const tokenSegmentTotal = Math.max(
+    tokenSegments.reduce((total, item) => total + item.value, 0),
+    tokenMetrics.total,
+    1
+  );
+
   return (
     <div className={styles.chartGrid}>
       <Card className={styles.chartCard}>
@@ -75,11 +100,64 @@ export function UsageCharts({
                     <span className={styles.modelBarFill} style={{ width: `${item.percent}%` }} />
                   </span>
                   <span className={styles.modelBarMeta}>
-                    {item.total} 次 · 错误 {item.failure}
+                    {item.total} 次 · {formatTokenCount(item.tokenTotal)} Token
                   </span>
                 </button>
               );
             })}
+          </div>
+        )}
+      </Card>
+
+      <Card className={styles.chartCard}>
+        <div className={styles.chartHeader}>
+          <div>
+            <h2>Token 消耗结构</h2>
+            <p>只统计已解析并上报 usage 的请求；缓存和推理 Token 单独拆出。</p>
+          </div>
+          <span>{formatPercent(tokenMetrics.coverageRate)} 覆盖</span>
+        </div>
+        {loading ? (
+          renderChartSkeleton()
+        ) : tokenMetrics.knownRequests === 0 ? (
+          <EmptyState title="暂无 Token 数据" description="解析详情后会显示 Token 消耗结构。" />
+        ) : (
+          <div className={styles.tokenUsagePanel}>
+            <div className={styles.tokenTotalRow}>
+              <strong>{formatTokenCount(tokenMetrics.total)}</strong>
+              <span>
+                已知 {tokenMetrics.knownRequests} / {tokenMetrics.totalRequests} 条 · 未上报{' '}
+                {tokenMetrics.unreportedRequests} 条
+              </span>
+            </div>
+            <div className={styles.tokenStack} aria-label="Token 消耗结构">
+              {tokenSegments.map((item) => (
+                <span
+                  key={item.label}
+                  className={`${styles.tokenSegment} ${item.className}`}
+                  style={{ width: `${Math.max(4, (item.value / tokenSegmentTotal) * 100)}%` }}
+                  title={`${item.label}: ${formatTokenCount(item.value)} Token`}
+                />
+              ))}
+            </div>
+            <div className={styles.tokenBreakdownGrid}>
+              <span>
+                <b>输入</b>
+                {formatTokenCount(tokenMetrics.input)}
+              </span>
+              <span>
+                <b>缓存</b>
+                {formatTokenCount(tokenMetrics.cached)}
+              </span>
+              <span>
+                <b>输出</b>
+                {formatTokenCount(tokenMetrics.output)}
+              </span>
+              <span>
+                <b>推理</b>
+                {formatTokenCount(tokenMetrics.reasoning)}
+              </span>
+            </div>
           </div>
         )}
       </Card>

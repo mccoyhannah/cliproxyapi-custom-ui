@@ -29,6 +29,7 @@ import {
   buildTimelineBuckets,
   calculateAggregateTotals,
   calculateRequestMetrics,
+  calculateTokenUsageMetrics,
   emptyDetail,
   enrichRecord,
   filterUsageRecords,
@@ -82,6 +83,7 @@ export function UsageStatisticsPage() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [tokenCompletionLoading, setTokenCompletionLoading] = useState(false);
 
   const latestTimestampRef = useRef<number>(0);
   const logRequestInFlightRef = useRef(false);
@@ -291,6 +293,10 @@ export function UsageStatisticsPage() {
     () => calculateRequestMetrics(filteredRecords),
     [filteredRecords]
   );
+  const tokenMetrics = useMemo(
+    () => calculateTokenUsageMetrics(filteredRecords),
+    [filteredRecords]
+  );
   const rangeLabel = formatRangePlainLabel(normalizedFilters);
   const modelUsage = useMemo(() => buildModelUsage(filteredRecords), [filteredRecords]);
   const timelineBuckets = useMemo(
@@ -358,6 +364,30 @@ export function UsageStatisticsPage() {
     });
   };
 
+  const handleCompleteTokenDetails = async () => {
+    const candidates = Array.from(
+      new Set(
+        filteredRecords
+          .filter((record) => record.requestId && record.detailStatus === 'pending')
+          .map((record) => record.requestId)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+
+    if (candidates.length === 0) {
+      showNotification('当前筛选范围没有需要补全的 Token 详情', 'info');
+      return;
+    }
+
+    setTokenCompletionLoading(true);
+    try {
+      await loadRequestDetails(candidates);
+      showNotification(`已提交 ${candidates.length} 条请求详情解析`, 'success');
+    } finally {
+      setTokenCompletionLoading(false);
+    }
+  };
+
   const handleSelectRecord = useCallback(
     (requestId: string) => {
       setSelectedRequestId(requestId);
@@ -405,8 +435,16 @@ export function UsageStatisticsPage() {
       <UsageMetricsGrid
         aggregateTotals={aggregateTotals}
         loading={initialLoading}
+        onCompleteTokenDetails={() => void handleCompleteTokenDetails()}
         rangeLabel={rangeLabel}
         requestMetrics={requestMetrics}
+        tokenCompletionDisabled={
+          tokenCompletionLoading ||
+          connectionStatus !== 'connected' ||
+          filteredRecords.every((record) => record.detailStatus !== 'pending')
+        }
+        tokenCompletionLoading={tokenCompletionLoading}
+        tokenMetrics={tokenMetrics}
       />
 
       <UsageCharts
@@ -418,6 +456,7 @@ export function UsageStatisticsPage() {
         onModelUsageClick={handleModelUsageClick}
         rangeLabel={rangeLabel}
         requestMetrics={requestMetrics}
+        tokenMetrics={tokenMetrics}
         timelineBuckets={timelineBuckets}
         timelineMax={timelineMax}
       />

@@ -1,8 +1,10 @@
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
 import {
   IconChartLine,
   IconCheck,
+  IconDollarSign,
   IconEye,
   IconInfo,
   IconTimer,
@@ -10,28 +12,38 @@ import {
 import {
   formatLatency,
   formatPercent,
+  formatTokenCount,
   type AggregateTotals,
   type RequestMetrics,
+  type TokenUsageMetrics,
 } from '../lib';
 import styles from '@/pages/UsageStatisticsPage.module.scss';
 
 interface UsageMetricsGridProps {
   aggregateTotals: AggregateTotals;
   loading: boolean;
+  onCompleteTokenDetails: () => void;
   rangeLabel: string;
   requestMetrics: RequestMetrics;
+  tokenCompletionDisabled: boolean;
+  tokenCompletionLoading: boolean;
+  tokenMetrics: TokenUsageMetrics;
 }
 
 export function UsageMetricsGrid({
   aggregateTotals,
   loading,
+  onCompleteTokenDetails,
   rangeLabel,
   requestMetrics,
+  tokenCompletionDisabled,
+  tokenCompletionLoading,
+  tokenMetrics,
 }: UsageMetricsGridProps) {
   if (loading) {
     return (
       <div className={styles.metricsGrid}>
-        {Array.from({ length: 5 }).map((_, index) => (
+        {Array.from({ length: 6 }).map((_, index) => (
           <Card className={styles.metricCard} key={index}>
             <Skeleton variant="metric" rows={3} />
           </Card>
@@ -52,6 +64,33 @@ export function UsageMetricsGrid({
           <div className={styles.metricHint}>
             {rangeLabel}里一共发起 {requestMetrics.total} 次模型请求。
           </div>
+        </div>
+      </Card>
+      <Card className={`${styles.metricCard} ${styles.tokenMetricCard}`}>
+        <div className={styles.metricIcon}>
+          <IconDollarSign size={18} />
+        </div>
+        <div>
+          <div className={styles.metricLabel}>Token 消耗</div>
+          <div className={styles.metricValue}>
+            {formatTokenCount(tokenMetrics.total)}
+            <span> / {formatTokenCount(tokenMetrics.averagePerKnown)} 均值</span>
+          </div>
+          <div className={styles.metricHint}>
+            已知 {tokenMetrics.knownRequests} / {tokenMetrics.totalRequests} 条，详情已解析{' '}
+            {tokenMetrics.parsedRequests} 条。
+          </div>
+          <Button
+            className={styles.metricInlineAction}
+            type="button"
+            variant="secondary"
+            size="sm"
+            loading={tokenCompletionLoading}
+            disabled={tokenCompletionDisabled}
+            onClick={onCompleteTokenDetails}
+          >
+            补全当前筛选 Token
+          </Button>
         </div>
       </Card>
       <Card className={styles.metricCard}>

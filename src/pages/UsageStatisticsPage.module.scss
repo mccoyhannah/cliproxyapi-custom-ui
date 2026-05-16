@@ -129,6 +129,14 @@
   line-height: 1.45;
 }
 
+.tokenMetricCard {
+  min-height: 156px;
+}
+
+.metricInlineAction {
+  margin-top: 10px;
+}
+
 .chartGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -378,6 +386,103 @@
 
 .legendP95 {
   color: var(--warning-color);
+}
+
+.tokenUsagePanel {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.tokenTotalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: $spacing-md;
+
+  strong {
+    color: var(--text-primary);
+    font-size: 28px;
+    font-weight: 780;
+    line-height: 1;
+  }
+
+  span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  @include mobile {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+
+    span {
+      text-align: left;
+    }
+  }
+}
+
+.tokenStack {
+  display: flex;
+  width: 100%;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border-color) 60%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 72%, transparent);
+}
+
+.tokenSegment {
+  min-width: 4px;
+  height: 100%;
+}
+
+.tokenSegmentInput {
+  background: color-mix(in srgb, var(--primary-color) 72%, var(--success-color));
+}
+
+.tokenSegmentCached {
+  background: color-mix(in srgb, var(--success-color) 68%, var(--bg-secondary));
+}
+
+.tokenSegmentOutput {
+  background: var(--primary-active);
+}
+
+.tokenSegmentReasoning {
+  background: var(--warning-color);
+}
+
+.tokenBreakdownGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+
+  span {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-control);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 760;
+  }
+
+  b {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 760;
+  }
+
+  @include mobile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .latencyTrack {
@@ -720,7 +825,7 @@
 
 .usageTable {
   width: 100%;
-  min-width: 1060px;
+  min-width: 1160px;
   border-collapse: collapse;
   background: var(--bg-primary);
 
@@ -800,6 +905,21 @@
     margin-top: 2px;
     color: var(--text-tertiary);
     font-size: 11px;
+  }
+}
+
+.tokenCell {
+  min-width: 82px;
+  color: var(--text-primary);
+  font-family: $font-mono;
+  font-weight: 760;
+  white-space: nowrap;
+
+  small {
+    color: var(--text-tertiary);
+    font-family: $font-family;
+    font-size: 12px;
+    font-weight: 700;
   }
 }
 
@@ -941,6 +1061,66 @@
     font-size: 13px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.tokenDetailPanel {
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 7%, transparent),
+      color-mix(in srgb, var(--success-color) 5%, transparent)
+    ),
+    var(--bg-primary);
+}
+
+.tokenDetailHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+
+  span {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 780;
+  }
+
+  strong {
+    color: var(--text-primary);
+    font-family: $font-mono;
+    font-size: 16px;
+    line-height: 1;
+  }
+}
+
+.tokenDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
+
+  span {
+    min-width: 0;
+    padding: 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bg-secondary) 78%, transparent);
+    color: var(--text-primary);
+    font-family: $font-mono;
+    font-size: 12px;
+    font-weight: 760;
+  }
+
+  b {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--text-tertiary);
+    font-family: $font-family;
+    font-size: 10px;
+    font-weight: 760;
   }
 }
 

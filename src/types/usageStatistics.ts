@@ -14,6 +14,23 @@ export type UsageRequestDetailStatus =
 
 export type ModelMatchStatus = 'match' | 'mismatch' | 'pending' | 'missing' | 'unavailable';
 
+export type TokenUsageStatus =
+  | 'pending'
+  | 'loading'
+  | 'available'
+  | 'unreported'
+  | 'unavailable'
+  | 'error';
+
+export interface TokenUsage {
+  input: number;
+  output: number;
+  cached: number;
+  reasoning: number;
+  total: number;
+  status: TokenUsageStatus;
+}
+
 export interface UsageStatsFilters {
   range: UsageStatsRangePreset;
   customStart: string;
@@ -30,6 +47,7 @@ export interface UsageStatsFilters {
 export interface UsageRequestDetail {
   requestId: string;
   detailStatus: UsageRequestDetailStatus;
+  tokenUsage: TokenUsage;
   configuredModel: string | null;
   upstreamModel: string | null;
   responseModel: string | null;
@@ -67,5 +85,6 @@ export interface EnrichedUsageStatsRecord extends UsageStatsRecord {
   actualModel: string | null;
   detailStatus: UsageRequestDetailStatus;
   modelMatch: ModelMatchStatus;
+  tokenUsage: TokenUsage;
   detail?: UsageRequestDetail;
 }

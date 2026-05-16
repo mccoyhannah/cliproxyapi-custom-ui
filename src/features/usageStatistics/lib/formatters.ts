@@ -1,5 +1,6 @@
 import type {
   ModelMatchStatus,
+  TokenUsageStatus,
   UsageRequestDetailStatus,
   UsageRequestStatus,
   UsageStatsFilters,
@@ -53,6 +54,13 @@ export const formatLatency = (latencyMs: number | null): string => {
   return `${Math.round(latencyMs)}ms`;
 };
 
+export const formatTokenCount = (value: number | null): string => {
+  if (value === null || value <= 0) return '-';
+  if (value >= 1_000_000) return `${Math.round((value / 1_000_000) * 10) / 10}M`;
+  if (value >= 1_000) return `${Math.round((value / 1_000) * 10) / 10}K`;
+  return String(value);
+};
+
 export const formatPercent = (value: number): string => `${Math.round(value * 10) / 10}%`;
 
 export const formatRangePlainLabel = (filters: UsageStatsFilters): string => {
@@ -98,6 +106,15 @@ export const getDetailStatusLabel = (status: UsageRequestDetailStatus): string =
   if (status === 'unavailable') return '无详情';
   if (status === 'error') return '详情错误';
   return '还没核验';
+};
+
+export const getTokenStatusLabel = (status: TokenUsageStatus): string => {
+  if (status === 'available') return '已上报';
+  if (status === 'loading') return '正在解析';
+  if (status === 'unreported') return '未上报';
+  if (status === 'unavailable') return '无详情';
+  if (status === 'error') return '解析错误';
+  return '待解析';
 };
 
 export const getStatusLabel = (

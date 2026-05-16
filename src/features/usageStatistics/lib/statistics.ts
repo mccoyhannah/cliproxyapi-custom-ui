@@ -5,6 +5,7 @@ import {
 } from '@/utils/recentRequests';
 import type {
   EnrichedUsageStatsRecord,
+  TokenUsage,
   UsageRequestDetail,
   UsageRequestStatus,
   UsageStatsFilters,
@@ -25,6 +26,7 @@ import {
   parseTimestampMs,
   resolveModelMatch,
 } from './formatters';
+import { emptyTokenUsage } from './requestDetails';
 
 export interface AggregateTotals {
   success: number;
@@ -49,7 +51,26 @@ export interface ModelUsageDatum {
   total: number;
   success: number;
   failure: number;
+  tokenTotal: number;
   percent: number;
+}
+
+export interface TokenUsageMetrics {
+  totalRequests: number;
+  parsedRequests: number;
+  knownRequests: number;
+  unreportedRequests: number;
+  input: number;
+  output: number;
+  cached: number;
+  reasoning: number;
+  total: number;
+  averagePerKnown: number | null;
+  maxTotal: number;
+  maxRequestId: string | null;
+  maxModel: string | null;
+  coverageRate: number;
+  parsedRate: number;
 }
 
 export interface TimelineBucket {
@@ -83,6 +104,13 @@ const isModelRequestLog = (raw: string, path?: string): boolean => {
 const statusFromCode = (statusCode?: number): UsageRequestStatus => {
   if (!statusCode) return 'unknown';
   return statusCode >= 200 && statusCode < 300 ? 'success' : 'failure';
+};
+
+const pendingTokenUsage = (detailStatus: UsageRequestDetail['detailStatus']): TokenUsage => {
+  if (detailStatus === 'loading') return emptyTokenUsage('loading');
+  if (detailStatus === 'error') return emptyTokenUsage('error');
+  if (detailStatus === 'unavailable') return emptyTokenUsage('unavailable');
+  return emptyTokenUsage('pending');
 };
 
 export const buildRequestRecords = (
@@ -142,6 +170,7 @@ export const enrichRecord = (
   const configuredModel = detail?.configuredModel ?? null;
   const upstreamModel = detail?.upstreamModel ?? null;
   const actualModel = detail?.actualModel ?? null;
+  const tokenUsage = detail?.tokenUsage ?? pendingTokenUsage(detailStatus);
 
   return {
     ...record,
@@ -150,6 +179,7 @@ export const enrichRecord = (
     actualModel,
     detailStatus,
     modelMatch: resolveModelMatch(detailStatus, configuredModel, actualModel),
+    tokenUsage,
     detail,
   };
 };
@@ -319,6 +349,59 @@ export const calculateRequestMetrics = (
   };
 };
 
+export const calculateTokenUsageMetrics = (
+  records: EnrichedUsageStatsRecord[]
+): TokenUsageMetrics => {
+  let input = 0;
+  let output = 0;
+  let cached = 0;
+  let reasoning = 0;
+  let total = 0;
+  let maxTotal = 0;
+  let maxRequestId: string | null = null;
+  let maxModel: string | null = null;
+
+  const totalRequests = records.length;
+  const parsedRequests = records.filter(
+    (record) => record.detailStatus !== 'pending' && record.detailStatus !== 'loading'
+  ).length;
+  const knownRecords = records.filter((record) => record.tokenUsage.status === 'available');
+
+  knownRecords.forEach((record) => {
+    input += record.tokenUsage.input;
+    output += record.tokenUsage.output;
+    cached += record.tokenUsage.cached;
+    reasoning += record.tokenUsage.reasoning;
+    total += record.tokenUsage.total;
+    if (record.tokenUsage.total > maxTotal) {
+      maxTotal = record.tokenUsage.total;
+      maxRequestId = record.requestId;
+      maxModel = record.actualModel ?? record.configuredModel;
+    }
+  });
+
+  const knownRequests = knownRecords.length;
+  const unreportedRequests = records.filter((record) => record.tokenUsage.status === 'unreported').length;
+
+  return {
+    totalRequests,
+    parsedRequests,
+    knownRequests,
+    unreportedRequests,
+    input,
+    output,
+    cached,
+    reasoning,
+    total,
+    averagePerKnown: knownRequests > 0 ? total / knownRequests : null,
+    maxTotal,
+    maxRequestId,
+    maxModel,
+    coverageRate: totalRequests > 0 ? (knownRequests / totalRequests) * 100 : 0,
+    parsedRate: totalRequests > 0 ? (parsedRequests / totalRequests) * 100 : 0,
+  };
+};
+
 export const buildModelUsage = (
   records: EnrichedUsageStatsRecord[]
 ): ModelUsageDatum[] => {
@@ -326,10 +409,11 @@ export const buildModelUsage = (
 
   records.forEach((record) => {
     const model = record.configuredModel ?? UNPARSED_MODEL_LABEL;
-    const current = groups.get(model) ?? { model, total: 0, success: 0, failure: 0 };
+    const current = groups.get(model) ?? { model, total: 0, success: 0, failure: 0, tokenTotal: 0 };
     current.total += 1;
     if (record.status === 'success') current.success += 1;
     if (record.status === 'failure') current.failure += 1;
+    if (record.tokenUsage.status === 'available') current.tokenTotal += record.tokenUsage.total;
     groups.set(model, current);
   });
 

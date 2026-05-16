@@ -3,7 +3,13 @@ import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { EnrichedUsageStatsRecord } from '@/types/usageStatistics';
-import { getDetailStatusLabel, getMatchLabel, getStatusLabel } from '../lib';
+import {
+  formatTokenCount,
+  getDetailStatusLabel,
+  getMatchLabel,
+  getStatusLabel,
+  getTokenStatusLabel,
+} from '../lib';
 import styles from '@/pages/UsageStatisticsPage.module.scss';
 
 interface UsageRequestsTableProps {
@@ -68,6 +74,7 @@ export function UsageRequestsTable({
                   <th>实际模型</th>
                   <th>状态</th>
                   <th>延迟</th>
+                  <th>Token</th>
                   <th>是否改写</th>
                   <th>详情</th>
                 </tr>
@@ -99,6 +106,15 @@ export function UsageRequestsTable({
                       </span>
                     </td>
                     <td>{record.latency ?? '-'}</td>
+                    <td className={styles.tokenCell}>
+                      {record.tokenUsage.status === 'available' ? (
+                        <span title={`输入 ${record.tokenUsage.input} / 输出 ${record.tokenUsage.output}`}>
+                          {formatTokenCount(record.tokenUsage.total)}
+                        </span>
+                      ) : (
+                        <small>{getTokenStatusLabel(record.tokenUsage.status)}</small>
+                      )}
+                    </td>
                     <td>
                       <span className={`${styles.matchPill} ${styles[`match_${record.modelMatch}`]}`}>
                         {getMatchLabel(record.modelMatch)}

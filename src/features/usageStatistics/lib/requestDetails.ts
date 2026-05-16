@@ -1,7 +1,17 @@
 import type {
+  TokenUsage,
   UsageRequestDetail,
   UsageRequestDetailStatus,
 } from '@/types/usageStatistics';
+
+export const emptyTokenUsage = (status: TokenUsage['status']): TokenUsage => ({
+  input: 0,
+  output: 0,
+  cached: 0,
+  reasoning: 0,
+  total: 0,
+  status,
+});
 
 export const emptyDetail = (
   requestId: string,
@@ -10,6 +20,17 @@ export const emptyDetail = (
 ): UsageRequestDetail => ({
   requestId,
   detailStatus,
+  tokenUsage: emptyTokenUsage(
+    detailStatus === 'loading'
+      ? 'loading'
+      : detailStatus === 'pending'
+        ? 'pending'
+        : detailStatus === 'error'
+          ? 'error'
+          : detailStatus === 'unavailable'
+            ? 'unavailable'
+            : 'unreported'
+  ),
   configuredModel: null,
   upstreamModel: null,
   responseModel: null,
@@ -62,6 +83,120 @@ const extractActualModel = (raw: string): string | null =>
 
 const firstValue = <T,>(values: Array<T | null | undefined>): T | null =>
   values.find((value): value is T => value !== null && value !== undefined) ?? null;
+
+const numberValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, Math.floor(value));
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Math.max(0, Math.floor(parsed));
+  }
+  return null;
+};
+
+const recordValue = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+
+const firstNumber = (values: unknown[]): number | null => {
+  for (const value of values) {
+    const parsed = numberValue(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+};
+
+const extractJsonObjectAt = (text: string, start: number): string | null => {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = start; index < text.length; index++) {
+    const char = text[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === '{') depth++;
+    if (char === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, index + 1);
+    }
+  }
+
+  return null;
+};
+
+const extractUsageObjects = (text: string): Record<string, unknown>[] => {
+  const results: Record<string, unknown>[] = [];
+  const usagePattern = /"usage"\s*:\s*\{/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = usagePattern.exec(text)) !== null) {
+    const objectStart = match.index + match[0].lastIndexOf('{');
+    const rawObject = extractJsonObjectAt(text, objectStart);
+    if (!rawObject) continue;
+
+    try {
+      const parsed = JSON.parse(rawObject);
+      const record = recordValue(parsed);
+      if (record) results.push(record);
+    } catch {
+      // Ignore malformed streaming fragments and keep looking for later completed usage blocks.
+    }
+  }
+
+  return results;
+};
+
+const normalizeTokenUsage = (usage: Record<string, unknown>): TokenUsage => {
+  const inputDetails = recordValue(usage.input_tokens_details) ?? recordValue(usage.prompt_tokens_details);
+  const outputDetails =
+    recordValue(usage.output_tokens_details) ?? recordValue(usage.completion_tokens_details);
+  const input = firstNumber([usage.input_tokens, usage.prompt_tokens]) ?? 0;
+  const output = firstNumber([usage.output_tokens, usage.completion_tokens]) ?? 0;
+  const cached =
+    firstNumber([
+      usage.cached_tokens,
+      usage.input_cached_tokens,
+      inputDetails?.cached_tokens,
+      inputDetails?.cache_read_input_tokens,
+    ]) ?? 0;
+  const reasoning =
+    firstNumber([
+      usage.reasoning_tokens,
+      usage.output_reasoning_tokens,
+      outputDetails?.reasoning_tokens,
+    ]) ?? 0;
+  const explicitTotal = firstNumber([usage.total_tokens]);
+  const total = explicitTotal ?? input + output;
+
+  return {
+    input,
+    output,
+    cached,
+    reasoning,
+    total,
+    status: total > 0 || input > 0 || output > 0 || cached > 0 || reasoning > 0 ? 'available' : 'unreported',
+  };
+};
+
+const extractTokenUsage = (text: string): TokenUsage => {
+  const candidates = extractUsageObjects(text).map(normalizeTokenUsage);
+  const usable = candidates.filter((item) => item.status === 'available');
+  return usable.length > 0 ? usable[usable.length - 1] : emptyTokenUsage('unreported');
+};
 
 const extractField = (raw: string, name: string): string | null => {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -174,6 +309,7 @@ export const parseDetailLog = (requestId: string, text: string): UsageRequestDet
   return {
     requestId,
     detailStatus,
+    tokenUsage: extractTokenUsage(text),
     configuredModel,
     upstreamModel,
     responseModel,

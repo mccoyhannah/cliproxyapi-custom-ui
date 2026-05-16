@@ -4,8 +4,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { IconDownload, IconEye, IconSlidersHorizontal } from '@/components/ui/icons';
 import type { EnrichedUsageStatsRecord } from '@/types/usageStatistics';
 import {
+  formatTokenCount,
   getDetailStatusLabel,
   getStatusLabel,
+  getTokenStatusLabel,
   maskSecret,
   type ModelMatrixDatum,
 } from '../lib';
@@ -61,6 +63,35 @@ export function UsageDetailsRail({
               <div>
                 <span>返回模型</span>
                 <strong>{selectedRecord.actualModel ?? '还没核验'}</strong>
+              </div>
+            </div>
+
+            <div className={styles.tokenDetailPanel}>
+              <div className={styles.tokenDetailHeader}>
+                <span>Token 消耗</span>
+                <strong>
+                  {selectedRecord.tokenUsage.status === 'available'
+                    ? formatTokenCount(selectedRecord.tokenUsage.total)
+                    : getTokenStatusLabel(selectedRecord.tokenUsage.status)}
+                </strong>
+              </div>
+              <div className={styles.tokenDetailGrid}>
+                <span>
+                  <b>输入</b>
+                  {formatTokenCount(selectedRecord.tokenUsage.input)}
+                </span>
+                <span>
+                  <b>缓存</b>
+                  {formatTokenCount(selectedRecord.tokenUsage.cached)}
+                </span>
+                <span>
+                  <b>输出</b>
+                  {formatTokenCount(selectedRecord.tokenUsage.output)}
+                </span>
+                <span>
+                  <b>推理</b>
+                  {formatTokenCount(selectedRecord.tokenUsage.reasoning)}
+                </span>
               </div>
             </div>
 
