@@ -202,15 +202,29 @@ export function AuthFileCard(props: AuthFileCardProps) {
     return undefined;
   }) as AuthCardQuotaState;
   const quotaRemainingPercent = getQuotaRemainingPercent(resolvedQuotaType, quotaSnapshot);
-  const quotaPressureClass = file.disabled
-    ? ''
+  const quotaPressure = file.disabled
+    ? null
     : quotaSnapshot?.status === 'error'
-      ? styles.fileCardQuotaError
+      ? 'error'
       : quotaRemainingPercent !== null && quotaRemainingPercent <= QUOTA_CRITICAL_REMAINING_PERCENT
-        ? styles.fileCardQuotaCritical
+        ? 'critical'
         : quotaRemainingPercent !== null && quotaRemainingPercent <= QUOTA_WARNING_REMAINING_PERCENT
-          ? styles.fileCardQuotaWarning
+          ? 'warning'
+          : null;
+  const quotaSignalLabel =
+    quotaPressure === 'error'
+      ? t('auth_files.quota_signal_error', { defaultValue: '额度异常' })
+      : quotaPressure === 'critical'
+        ? t('auth_files.quota_signal_critical', { defaultValue: '额度紧张' })
+        : quotaPressure === 'warning'
+          ? t('auth_files.quota_signal_warning', { defaultValue: '额度偏低' })
           : '';
+  const quotaSignalClass =
+    quotaPressure === 'error' || quotaPressure === 'critical'
+      ? styles.signalBadgeDanger
+      : quotaPressure === 'warning'
+        ? styles.signalBadgeWarning
+        : '';
 
   const showQuotaLayout =
     Boolean(quotaType) &&
@@ -227,34 +241,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const currentCodexPlanType =
     resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
   const currentCodexPlanIsFree = currentCodexPlanType === 'free';
-  const compactCodexPlanType =
-    compact && resolvedQuotaType === 'codex' ? currentCodexPlanType : null;
-  const compactCodexPlanToneClass =
-    compactCodexPlanType === 'team'
-      ? styles.fileCardCompactPlanTeam
-      : compactCodexPlanType === 'plus'
-        ? styles.fileCardCompactPlanPlus
-        : compactCodexPlanType === 'free'
-          ? styles.fileCardCompactPlanFree
-          : compactCodexPlanType === 'pro' ||
-              compactCodexPlanType === 'prolite' ||
-              compactCodexPlanType === 'pro-lite' ||
-              compactCodexPlanType === 'pro_lite'
-            ? styles.fileCardCompactPlanPremium
-            : '';
-
-  const providerCardClass =
-    quotaType === 'antigravity'
-      ? styles.antigravityCard
-      : quotaType === 'claude'
-        ? styles.claudeCard
-        : quotaType === 'codex'
-          ? styles.codexCard
-          : quotaType === 'gemini-cli'
-            ? styles.geminiCliCard
-            : quotaType === 'kimi'
-              ? styles.kimiCard
-              : '';
 
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndexKey = normalizeRecentRequestAuthIndex(rawAuthIndex);
@@ -320,6 +306,16 @@ export function AuthFileCard(props: AuthFileCardProps) {
     : subscriptionExpiringSoon
       ? styles.subscriptionExpiryWarning
       : styles.subscriptionExpiryHealthy;
+  const subscriptionSignalLabel = subscriptionExpired
+    ? t('auth_files.subscription_signal_expired', { defaultValue: '订阅到期' })
+    : subscriptionExpiringSoon
+      ? t('auth_files.subscription_signal_warning', { defaultValue: '订阅将到期' })
+      : '';
+  const subscriptionSignalClass = subscriptionExpired
+    ? styles.signalBadgeDanger
+    : subscriptionExpiringSoon
+      ? styles.signalBadgeWarning
+      : '';
   const subscriptionExpiryLabel = visibleCodexSubscription?.subscriptionActiveUntil ?? '';
   const subscriptionExpiryDisplayLabel = compact
     ? formatCodexSubscriptionShortDate(
@@ -438,24 +434,11 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : hasStatusWarning
         ? styles.stateBadgeWarning
         : styles.stateBadgeActive;
-  const stateToneClass = isRuntimeOnly
-    ? styles.fileCardVirtual
-    : file.disabled
-      ? ''
-      : hasStatusWarning
-        ? styles.fileCardWarning
-        : styles.fileCardHealthy;
-  const subscriptionToneClass = file.disabled
-    ? ''
-    : subscriptionExpired
-      ? styles.fileCardSubscriptionExpired
-      : subscriptionExpiringSoon
-        ? styles.fileCardSubscriptionWarning
-        : '';
+  const cardToneClass = isRuntimeOnly ? styles.fileCardVirtual : '';
 
   return (
     <div
-      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${providerCardClass} ${compactCodexPlanToneClass} ${stateToneClass} ${subscriptionToneClass} ${quotaPressureClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
+      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${cardToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
       <div className={styles.fileCardLayout}>
         <div className={styles.fileCardMain}>
@@ -505,6 +488,16 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 >
                   {stateLabel}
                 </span>
+                {quotaSignalLabel && (
+                  <span className={`${styles.signalBadge} ${quotaSignalClass}`}>
+                    {quotaSignalLabel}
+                  </span>
+                )}
+                {subscriptionSignalLabel && (
+                  <span className={`${styles.signalBadge} ${subscriptionSignalClass}`}>
+                    {subscriptionSignalLabel}
+                  </span>
+                )}
                 {hasStatusWarning && (
                   <span
                     className={styles.statusWarningIndicator}
