@@ -227,7 +227,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : quotaPressure === 'warning'
         ? styles.signalBadgeWarning
         : '';
-  const showQuotaSignalBadge = !compact && Boolean(quotaSignalLabel);
 
   const showQuotaLayout =
     Boolean(quotaType) &&
@@ -500,23 +499,23 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   {typeLabel}
                 </span>
                 <span
-                  className={[
-                    styles.stateBadge,
-                    stateBadgeClass,
-                    hasStatusWarning ? styles.stateBadgeWithInfo : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
+                  className={`${styles.stateBadge} ${stateBadgeClass}`}
                   title={hasStatusWarning ? rawStatusMessage : undefined}
-                  aria-label={hasStatusWarning ? `${stateLabel}: ${rawStatusMessage}` : undefined}
-                  tabIndex={hasStatusWarning ? 0 : undefined}
                 >
                   {stateLabel}
-                  {hasStatusWarning && (
-                    <IconInfo className={styles.stateBadgeInfoIcon} size={12} aria-hidden="true" />
-                  )}
                 </span>
-                {showQuotaSignalBadge && (
+                {hasStatusWarning && (
+                  <span
+                    className={styles.statusWarningIndicator}
+                    title={rawStatusMessage}
+                    aria-label={rawStatusMessage}
+                    role="img"
+                    tabIndex={0}
+                  >
+                    <IconInfo className={styles.messageIcon} size={12} />
+                  </span>
+                )}
+                {quotaSignalLabel && (
                   <span className={`${styles.signalBadge} ${quotaSignalClass}`}>
                     {quotaSignalLabel}
                   </span>
