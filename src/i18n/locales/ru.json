@@ -509,6 +509,8 @@
     "upload_unlisted_warning": "Бэкенд принял файл, но после обновления карточка авторизации не появилась: {{names}}. Файл мог сохраниться, но не распознан как файл авторизации.",
     "download_success": "Файл успешно скачан",
     "delete_success": "Файл успешно удалён",
+    "delete_stale_removed": "Этот файл авторизации уже отсутствует и удалён из списка",
+    "delete_stale_removed_batch": "{{count}} файлов авторизации уже отсутствуют и удалены из списка",
     "delete_all_success": "Удаление завершено",
     "delete_filtered_success": "Удалено файлов {{type}}: {{count}}",
     "delete_filtered_partial": "Удаление файлов {{type}} завершено: успешных {{success}}, ошибок {{failed}}",

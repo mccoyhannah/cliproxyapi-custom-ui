@@ -36,6 +36,11 @@ type UploadValidationResult =
   | { file: File; valid: true }
   | { file: File; valid: false; reason: UploadValidationRejectReason };
 
+type AuthFileDeleteFailure = { name: string; error: string };
+type ApiErrorLike = Error & {
+  status?: number;
+};
+
 export type LoadAuthFilesOptions = {
   silent?: boolean;
   preserveExisting?: boolean;
@@ -78,6 +83,27 @@ export type UseAuthFilesDataResult = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const AUTH_FILE_NOT_FOUND_PATTERN = /auth file not found/i;
+
+const isAuthFileNotFoundMessage = (value: string): boolean =>
+  AUTH_FILE_NOT_FOUND_PATTERN.test(value);
+
+const isAuthFileNotFoundError = (err: unknown): boolean => {
+  if (typeof err === 'string') return isAuthFileNotFoundMessage(err);
+  if (!err || typeof err !== 'object') return false;
+  const error = err as ApiErrorLike;
+  return error.status === 404 || isAuthFileNotFoundMessage(error.message || '');
+};
+
+const getAuthFileNotFoundFailureNames = (failures: AuthFileDeleteFailure[]): string[] =>
+  failures
+    .filter((failure) => isAuthFileNotFoundMessage(failure.error))
+    .map((failure) => failure.name.trim())
+    .filter(Boolean);
+
+const getRealDeleteFailures = (failures: AuthFileDeleteFailure[]): AuthFileDeleteFailure[] =>
+  failures.filter((failure) => !isAuthFileNotFoundMessage(failure.error));
 
 const hasMeaningfulText = (value: unknown): boolean =>
   typeof value === 'string' ? value.trim().length > 0 : value != null;
@@ -427,9 +453,30 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
           setDeleting(name);
           try {
             const result = await authFilesApi.deleteFile(name);
-            showNotification(t('auth_files.delete_success'), 'success');
-            applyDeletedFiles(result.files.length > 0 ? result.files : [name]);
+            const staleNames = getAuthFileNotFoundFailureNames(result.failed);
+            const realFailures = getRealDeleteFailures(result.failed);
+            const deletedNames =
+              result.files.length > 0 || staleNames.length > 0 || realFailures.length > 0
+                ? result.files
+                : [name];
+
+            applyDeletedFiles([...deletedNames, ...staleNames]);
+            if (realFailures.length > 0) {
+              showNotification(
+                `${t('notification.delete_failed')}: ${realFailures[0].error}`,
+                'error'
+              );
+            } else if (staleNames.length > 0) {
+              showNotification(t('auth_files.delete_stale_removed'), 'info');
+            } else {
+              showNotification(t('auth_files.delete_success'), 'success');
+            }
           } catch (err: unknown) {
+            if (isAuthFileNotFoundError(err)) {
+              applyDeletedFiles([name]);
+              showNotification(t('auth_files.delete_stale_removed'), 'info');
+              return;
+            }
             const errorMessage = err instanceof Error ? err.message : '';
             showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
           } finally {
@@ -510,10 +557,18 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
               const result = await authFilesApi.deleteFiles(
                 filesToDelete.map((file) => file.name)
               );
-              const success = result.deleted;
-              const failed = result.failed.length;
+              const staleNames = getAuthFileNotFoundFailureNames(result.failed);
+              const realFailures = getRealDeleteFailures(result.failed);
+              const success = result.deleted + staleNames.length;
+              const failed = realFailures.length;
 
-              applyDeletedFiles(result.files);
+              applyDeletedFiles([...result.files, ...staleNames]);
+              if (staleNames.length > 0) {
+                showNotification(
+                  t('auth_files.delete_stale_removed_batch', { count: staleNames.length }),
+                  'info'
+                );
+              }
 
               if (failed === 0 && isStatusFiltered) {
                 showNotification(
@@ -941,24 +996,39 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         onConfirm: async () => {
           try {
             const result = await authFilesApi.deleteFiles(uniqueNames);
-            applyDeletedFiles(result.files);
+            const staleNames = getAuthFileNotFoundFailureNames(result.failed);
+            const realFailures = getRealDeleteFailures(result.failed);
+            const clearedCount = result.deleted + staleNames.length;
 
-            if (result.failed.length === 0) {
+            applyDeletedFiles([...result.files, ...staleNames]);
+            if (staleNames.length > 0) {
               showNotification(
-                `${t('auth_files.delete_all_success')} (${result.deleted})`,
+                t('auth_files.delete_stale_removed_batch', { count: staleNames.length }),
+                'info'
+              );
+            }
+
+            if (realFailures.length === 0) {
+              showNotification(
+                `${t('auth_files.delete_all_success')} (${clearedCount})`,
                 'success'
               );
             } else {
               showNotification(
                 t('auth_files.delete_filtered_partial', {
-                  success: result.deleted,
-                  failed: result.failed.length,
+                  success: clearedCount,
+                  failed: realFailures.length,
                   type: t('auth_files.filter_all'),
                 }),
                 'warning'
               );
             }
           } catch (err: unknown) {
+            if (uniqueNames.length === 1 && isAuthFileNotFoundError(err)) {
+              applyDeletedFiles(uniqueNames);
+              showNotification(t('auth_files.delete_stale_removed'), 'info');
+              return;
+            }
             const errorMessage = err instanceof Error ? err.message : '';
             showNotification(`${t('notification.delete_failed')}: ${errorMessage}`, 'error');
           }

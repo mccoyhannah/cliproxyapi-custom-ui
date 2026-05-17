@@ -509,6 +509,8 @@
     "upload_unlisted_warning": "後端已接收，但重新整理後沒有看到驗證檔案卡片：{{names}}。檔案可能已儲存，但未被識別為驗證檔案。",
     "download_success": "檔案下載成功",
     "delete_success": "檔案刪除成功",
+    "delete_stale_removed": "該驗證檔案已不存在，已從清單移除",
+    "delete_stale_removed_batch": "{{count}} 個驗證檔案已不存在，已從清單移除",
     "delete_all_success": "成功刪除",
     "delete_filtered_success": "成功刪除 {{count}} 個 {{type}} 驗證檔案",
     "delete_filtered_partial": "{{type}} 驗證檔案刪除完成，成功 {{success}} 個，失敗 {{failed}} 個",

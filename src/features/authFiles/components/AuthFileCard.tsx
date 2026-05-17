@@ -5,8 +5,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
+  IconCircleAlert,
   IconDownload,
-  IconInfo,
   IconModelCluster,
   IconSettings,
   IconTimer,
@@ -643,13 +643,13 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 </span>
                 {hasStatusWarning && (
                   <span
-                    className={`${styles.stateBadge} ${styles.stateBadgeWarning} ${styles.stateBadgeWithInfo}`}
+                    className={styles.stateWarningIconBadge}
                     title={rawStatusMessage}
                     aria-label={`${statusWarningLabel}: ${rawStatusMessage}`}
+                    role="img"
                     tabIndex={0}
                   >
-                    {statusWarningLabel}
-                    <IconInfo className={styles.stateBadgeInfoIcon} size={12} aria-hidden="true" />
+                    <IconCircleAlert size={14} aria-hidden="true" />
                   </span>
                 )}
                 <ToggleSwitch

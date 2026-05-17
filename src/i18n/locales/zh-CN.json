@@ -509,6 +509,8 @@
     "upload_unlisted_warning": "后端已接收，但刷新后没有看到认证文件卡片：{{names}}。文件可能已保存，但未被识别为认证文件。",
     "download_success": "文件下载成功",
     "delete_success": "文件删除成功",
+    "delete_stale_removed": "该认证文件已不存在，已从列表移除",
+    "delete_stale_removed_batch": "{{count}} 个认证文件已不存在，已从列表移除",
     "delete_all_success": "成功删除",
     "delete_filtered_success": "成功删除 {{count}} 个 {{type}} 认证文件",
     "delete_filtered_partial": "{{type}} 认证文件删除完成，成功 {{success}} 个，失败 {{failed}} 个",

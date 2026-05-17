@@ -1915,20 +1915,30 @@ button.codexSubscriptionValue {
   }
 }
 
-.stateBadgeWithInfo {
+.stateWarningIconBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--warning-text) 94%, var(--text-primary));
+  background: color-mix(in srgb, var(--warning-bg) 72%, var(--surface-control));
+  border: 1px solid color-mix(in srgb, var(--warning-border) 82%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
+    0 1px 2px color-mix(in srgb, var(--warning-border) 16%, transparent);
   cursor: help;
+  flex: 0 0 22px;
 }
 
-.stateBadgeWithInfo:focus-visible {
+.stateWarningIconBadge:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--warning-border) 28%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, #fff 14%, transparent);
-}
-
-.stateBadgeInfoIcon {
-  flex: 0 0 auto;
-  opacity: 0.82;
+    0 0 0 2px color-mix(in srgb, var(--warning-border) 34%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
 }
 
 .stateBadgeActive {
