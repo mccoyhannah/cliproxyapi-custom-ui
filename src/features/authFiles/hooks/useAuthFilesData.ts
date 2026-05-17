@@ -25,6 +25,17 @@ type DeleteAllOptions = {
   onResetEnabledOnly: () => void;
 };
 
+type UploadValidationRejectReason =
+  | 'invalid_extension'
+  | 'oversized'
+  | 'invalid_json'
+  | 'sub2api_export'
+  | 'unsupported_auth_shape';
+
+type UploadValidationResult =
+  | { file: File; valid: true }
+  | { file: File; valid: false; reason: UploadValidationRejectReason };
+
 export type LoadAuthFilesOptions = {
   silent?: boolean;
   preserveExisting?: boolean;
@@ -63,6 +74,82 @@ export type UseAuthFilesDataResult = {
   batchSetStatus: (names: string[], enabled: boolean) => Promise<void>;
   batchSetPriority: (names: string[], priority: number) => Promise<void>;
   batchDelete: (names: string[]) => void;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const hasMeaningfulText = (value: unknown): boolean =>
+  typeof value === 'string' ? value.trim().length > 0 : value != null;
+
+const hasAnyMeaningfulField = (record: Record<string, unknown>, fields: string[]): boolean =>
+  fields.some((field) => hasMeaningfulText(record[field]));
+
+const isSub2ApiExport = (record: Record<string, unknown>): boolean =>
+  hasMeaningfulText(record.accounts) &&
+  hasMeaningfulText(record.proxies) &&
+  hasMeaningfulText(record.exported_at);
+
+const isGoogleServiceAccountJson = (record: Record<string, unknown>): boolean =>
+  record.type === 'service_account' &&
+  hasMeaningfulText(record.client_email) &&
+  hasMeaningfulText(record.private_key);
+
+const isCliProxyAuthFileJson = (record: Record<string, unknown>): boolean => {
+  if (isSub2ApiExport(record)) return false;
+  if (isGoogleServiceAccountJson(record)) return true;
+
+  const hasToken = hasAnyMeaningfulField(record, [
+    'access_token',
+    'refresh_token',
+    'id_token',
+    'session_token',
+  ]);
+  const hasIdentity = hasAnyMeaningfulField(record, [
+    'account_id',
+    'chatgpt_account_id',
+    'email',
+    'name',
+    'type',
+    'provider',
+    'plan_type',
+    'chatgpt_plan_type',
+  ]);
+
+  return hasToken && hasIdentity;
+};
+
+const validateAuthFileUpload = async (file: File): Promise<UploadValidationResult> => {
+  if (!file.name.toLowerCase().endsWith('.json')) {
+    return { file, valid: false, reason: 'invalid_extension' };
+  }
+  if (file.size > MAX_AUTH_FILE_SIZE) {
+    return { file, valid: false, reason: 'oversized' };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text()) as unknown;
+  } catch {
+    return { file, valid: false, reason: 'invalid_json' };
+  }
+
+  if (!isRecord(parsed)) {
+    return { file, valid: false, reason: 'unsupported_auth_shape' };
+  }
+  if (isSub2ApiExport(parsed)) {
+    return { file, valid: false, reason: 'sub2api_export' };
+  }
+  if (!isCliProxyAuthFileJson(parsed)) {
+    return { file, valid: false, reason: 'unsupported_auth_shape' };
+  }
+
+  return { file, valid: true };
+};
+
+const summarizeFileNames = (names: string[]): string => {
+  const visibleNames = names.slice(0, 3).join(', ');
+  return names.length > 3 ? `${visibleNames} +${names.length - 3}` : visibleNames;
 };
 
 export function useAuthFilesData(): UseAuthFilesDataResult {
@@ -203,48 +290,100 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     async (filesToUpload: File[]) => {
       if (filesToUpload.length === 0) return;
 
-      const validFiles: File[] = [];
-      const invalidFiles: string[] = [];
-      const oversizedFiles: string[] = [];
-
-      filesToUpload.forEach((file) => {
-        if (!file.name.toLowerCase().endsWith('.json')) {
-          invalidFiles.push(file.name);
-          return;
-        }
-        if (file.size > MAX_AUTH_FILE_SIZE) {
-          oversizedFiles.push(file.name);
-          return;
-        }
-        validFiles.push(file);
-      });
-
-      if (invalidFiles.length > 0) {
-        showNotification(t('auth_files.upload_error_json'), 'error');
-      }
-      if (oversizedFiles.length > 0) {
-        showNotification(
-          t('auth_files.upload_error_size', { maxSize: formatFileSize(MAX_AUTH_FILE_SIZE) }),
-          'error'
-        );
-      }
-
-      if (validFiles.length === 0) {
-        return;
-      }
-
       setUploading(true);
       try {
+        const validationResults = await Promise.all(filesToUpload.map(validateAuthFileUpload));
+        const validFiles = validationResults
+          .filter((result): result is { file: File; valid: true } => result.valid)
+          .map((result) => result.file);
+        const rejectedByReason = validationResults.reduce<Record<UploadValidationRejectReason, string[]>>(
+          (result, item) => {
+            if (!item.valid) {
+              result[item.reason].push(item.file.name);
+            }
+            return result;
+          },
+          {
+            invalid_extension: [],
+            oversized: [],
+            invalid_json: [],
+            sub2api_export: [],
+            unsupported_auth_shape: [],
+          }
+        );
+
+        if (rejectedByReason.invalid_extension.length > 0) {
+          showNotification(
+            t('auth_files.upload_error_json', {
+              names: summarizeFileNames(rejectedByReason.invalid_extension),
+            }),
+            'error'
+          );
+        }
+        if (rejectedByReason.oversized.length > 0) {
+          showNotification(
+            t('auth_files.upload_error_size', {
+              maxSize: formatFileSize(MAX_AUTH_FILE_SIZE),
+              names: summarizeFileNames(rejectedByReason.oversized),
+            }),
+            'error'
+          );
+        }
+        if (rejectedByReason.invalid_json.length > 0) {
+          showNotification(
+            t('auth_files.upload_error_invalid_json', {
+              names: summarizeFileNames(rejectedByReason.invalid_json),
+            }),
+            'error'
+          );
+        }
+        if (rejectedByReason.sub2api_export.length > 0) {
+          showNotification(
+            t('auth_files.upload_error_sub2api', {
+              names: summarizeFileNames(rejectedByReason.sub2api_export),
+            }),
+            'error'
+          );
+        }
+        if (rejectedByReason.unsupported_auth_shape.length > 0) {
+          showNotification(
+            t('auth_files.upload_error_auth_shape', {
+              names: summarizeFileNames(rejectedByReason.unsupported_auth_shape),
+            }),
+            'error'
+          );
+        }
+
+        if (validFiles.length === 0) {
+          return;
+        }
+
+        const rejectedCount = validationResults.length - validFiles.length;
         const result = await authFilesApi.uploadFiles(validFiles);
         const successCount = result.uploaded;
 
         if (successCount > 0) {
           const suffix = validFiles.length > 1 ? ` (${successCount}/${validFiles.length})` : '';
+          const refreshed = await authFilesApi.list();
+          const refreshedFiles = refreshed?.files || [];
+          const refreshedNames = new Set(refreshedFiles.map((file) => file.name));
+          const uploadedNames = result.files.length > 0 ? result.files : validFiles.map((file) => file.name);
+          const unlistedNames = uploadedNames.filter((name) => !refreshedNames.has(name));
+
+          setFiles(refreshedFiles);
           showNotification(
-            `${t('auth_files.upload_success')}${suffix}`,
-            result.failed.length ? 'warning' : 'success'
+            `${t(rejectedCount > 0 ? 'auth_files.upload_partial_format' : 'auth_files.upload_success')}${suffix}`,
+            result.failed.length || rejectedCount > 0 ? 'warning' : 'success'
           );
-          await loadFiles({ preserveExisting: true, silent: true });
+
+          if (unlistedNames.length > 0) {
+            showNotification(
+              t('auth_files.upload_unlisted_warning', {
+                names: summarizeFileNames(unlistedNames),
+              }),
+              'warning'
+            );
+          }
         }
 
         if (result.failed.length > 0) {
@@ -260,7 +399,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         setUploading(false);
       }
     },
-    [loadFiles, showNotification, t]
+    [showNotification, t]
   );
 
   const handleFileChange = useCallback(
