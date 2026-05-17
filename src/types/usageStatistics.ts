@@ -1,5 +1,3 @@
-export type UsageStatsRangePreset = '1h' | '24h' | '7d' | 'custom';
-
 export type UsageStatsStatusFilter = 'all' | 'success' | 'failure' | 'unknown';
 
 export type UsageRequestStatus = 'success' | 'failure' | 'unknown';
@@ -86,9 +84,6 @@ export interface TokenLedgerModelUsageDatum {
 }
 
 export interface UsageStatsFilters {
-  range: UsageStatsRangePreset;
-  customStart: string;
-  customEnd: string;
   search: string;
   status: UsageStatsStatusFilter;
   model: string;

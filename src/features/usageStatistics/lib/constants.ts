@@ -2,13 +2,9 @@ import type {
   TokenLedgerFilters,
   TokenLedgerRangePreset,
   UsageStatsFilters,
-  UsageStatsRangePreset,
 } from '@/types/usageStatistics';
 
 export const DEFAULT_FILTERS: UsageStatsFilters = {
-  range: '24h',
-  customStart: '',
-  customEnd: '',
   search: '',
   status: 'all',
   model: '',
@@ -17,13 +13,6 @@ export const DEFAULT_FILTERS: UsageStatsFilters = {
   onlyMismatches: false,
   onlyUnparsed: false,
 };
-
-export const RANGE_OPTIONS: Array<{ value: UsageStatsRangePreset; label: string }> = [
-  { value: '1h', label: '最近 1 小时' },
-  { value: '24h', label: '最近 24 小时' },
-  { value: '7d', label: '最近 7 天' },
-  { value: 'custom', label: '自定义' },
-];
 
 export const DEFAULT_TOKEN_LEDGER_FILTERS: TokenLedgerFilters = {
   range: '30d',

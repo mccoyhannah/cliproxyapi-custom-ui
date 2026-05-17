@@ -70,14 +70,14 @@ export function UsageCharts({
         <div className={styles.chartHeader}>
           <div>
             <h2>模型用量柱状图</h2>
-            <p>看这段时间主要在用哪个模型。点柱子可以直接筛选。</p>
+            <p>看当前加载窗口主要在用哪个模型。点柱子可以直接筛选。</p>
           </div>
           <span>Top {modelUsage.length || 0}</span>
         </div>
         {loading ? (
           renderChartSkeleton()
         ) : modelUsage.length === 0 ? (
-          <EmptyState title="暂无模型用量" description="换个时间范围，或发起一次模型请求。" />
+          <EmptyState title="暂无模型用量" description="调整筛选条件，或发起一次模型请求。" />
         ) : (
           <div className={styles.modelBars}>
             {modelUsage.map((item) => {
@@ -113,7 +113,7 @@ export function UsageCharts({
         <div className={styles.chartHeader}>
           <div>
             <h2>Token 消耗结构（当前窗口）</h2>
-            <p>只统计当前已加载日志里已解析并上报 usage 的请求；长期总账看下方台账。</p>
+            <p>只统计当前已加载日志里已解析并上报 usage 的请求；长期总账看上方台账。</p>
           </div>
           <span>{formatPercent(tokenMetrics.coverageRate)} 覆盖</span>
         </div>

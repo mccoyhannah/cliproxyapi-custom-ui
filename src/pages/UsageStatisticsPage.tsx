@@ -57,9 +57,48 @@ import type {
   TokenLedgerFilters,
   TokenLedgerSnapshot,
   UsageRequestDetail,
+  UsageStatsRecord,
   UsageStatsFilters,
 } from '@/types/usageStatistics';
 import styles from './UsageStatisticsPage.module.scss';
+
+const formatWindowStamp = (timestampMs: number, language: string): string =>
+  new Date(timestampMs).toLocaleString(language, {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+const formatWindowDuration = (start: number, end: number): string => {
+  const spanMs = Math.max(0, end - start);
+  if (spanMs < 60_000) return '不足 1 分钟';
+  if (spanMs < 60 * 60_000) return `约 ${Math.ceil(spanMs / 60_000)} 分钟`;
+  if (spanMs < 24 * 60 * 60_000) {
+    return `约 ${Math.round((spanMs / (60 * 60_000)) * 10) / 10} 小时`;
+  }
+  return `约 ${Math.round((spanMs / (24 * 60 * 60_000)) * 10) / 10} 天`;
+};
+
+const buildCurrentWindowSummary = (
+  records: UsageStatsRecord[],
+  language: string
+): string => {
+  const timestamps = records
+    .map((record) => record.timestampMs)
+    .filter((timestamp): timestamp is number => timestamp !== null);
+
+  if (records.length === 0 || timestamps.length === 0) {
+    return `${records.length} 条 · 暂无可用时间窗口`;
+  }
+
+  const start = Math.min(...timestamps);
+  const end = Math.max(...timestamps);
+  return `${records.length} 条 · ${formatWindowStamp(start, language)} - ${formatWindowStamp(
+    end,
+    language
+  )} · ${formatWindowDuration(start, end)}`;
+};
 
 export function UsageStatisticsPage() {
   const { t, i18n } = useTranslation();
@@ -113,10 +152,7 @@ export function UsageStatisticsPage() {
 
   const normalizedFilters = useMemo(() => ({ ...DEFAULT_FILTERS, ...filters }), [filters]);
   const deferredSearch = useDeferredValue(normalizedFilters.search);
-  const activeRangeKey = [
-    normalizedFilters.range,
-    normalizedFilters.customStart,
-    normalizedFilters.customEnd,
+  const activeFilterKey = [
     normalizedFilters.status,
     normalizedFilters.model,
     normalizedFilters.source,
@@ -311,7 +347,7 @@ export function UsageStatisticsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [activeRangeKey]);
+  }, [activeFilterKey]);
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -321,8 +357,8 @@ export function UsageStatisticsPage() {
   );
 
   const autoDetailIds = useMemo(
-    () => getAutoDetailIds(baseRecords, normalizedFilters, deferredSearch, AUTO_DETAIL_LIMIT),
-    [baseRecords, deferredSearch, normalizedFilters]
+    () => getAutoDetailIds(baseRecords, deferredSearch, AUTO_DETAIL_LIMIT),
+    [baseRecords, deferredSearch]
   );
 
   useEffect(() => {
@@ -344,11 +380,16 @@ export function UsageStatisticsPage() {
     () => calculateTokenUsageMetrics(filteredRecords),
     [filteredRecords]
   );
-  const rangeLabel = formatRangePlainLabel(normalizedFilters);
+  const rangeLabel = formatRangePlainLabel();
+  const currentWindowSummary = useMemo(
+    () => buildCurrentWindowSummary(baseRecords, i18n.language),
+    [baseRecords, i18n.language]
+  );
+  const currentWindowHint = `最近 ${MAX_INDEX_LINES} 行摘要 · 筛选器和明细只作用于当前已加载请求尾部`;
   const modelUsage = useMemo(() => buildModelUsage(filteredRecords), [filteredRecords]);
   const timelineBuckets = useMemo(
-    () => buildTimelineBuckets(filteredRecords, normalizedFilters, i18n.language),
-    [filteredRecords, i18n.language, normalizedFilters]
+    () => buildTimelineBuckets(filteredRecords, i18n.language),
+    [filteredRecords, i18n.language]
   );
   const timelineMax = useMemo(() => getTimelineMax(timelineBuckets), [timelineBuckets]);
   const latencyMax = useMemo(() => getLatencyMax(timelineBuckets), [timelineBuckets]);
@@ -501,7 +542,7 @@ export function UsageStatisticsPage() {
             <span>当前加载窗口</span>
             <h2 id="current-window-title">当前窗口统计</h2>
           </div>
-          <p>{rangeLabel} · 筛选器和明细只作用于下方当前日志窗口</p>
+          <p>{currentWindowSummary}</p>
         </div>
 
         <UsageMetricsGrid
@@ -548,6 +589,8 @@ export function UsageStatisticsPage() {
           setFilterValue={setFilterValue}
           setRefreshInterval={setRefreshInterval}
           sourceOptions={sourceOptions}
+          windowHint={currentWindowHint}
+          windowSummary={currentWindowSummary}
         />
 
         <div className={styles.workbenchGrid}>

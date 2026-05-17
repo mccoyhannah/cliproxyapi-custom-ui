@@ -165,7 +165,7 @@ export function UsageMetricsGrid({
           <div className={styles.metricLabel}>后端总账</div>
           <div className={styles.metricValue}>{aggregateTotals.total}</div>
           <div className={styles.metricHint}>
-            后端保存的总成功/失败，不一定等于当前时间筛选。
+            后端保存的总成功/失败，不一定等于当前加载窗口。
           </div>
         </div>
       </Card>

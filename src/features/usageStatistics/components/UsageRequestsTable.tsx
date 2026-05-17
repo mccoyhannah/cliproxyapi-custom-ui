@@ -45,7 +45,7 @@ export function UsageRequestsTable({
         <div>
           <h2>模型请求明细</h2>
           <p>
-            当前看到的是：{rangeLabel} 的 {filteredRecords.length} 条模型请求。先读取最近{' '}
+            当前看到的是：{rangeLabel}内的 {filteredRecords.length} 条模型请求。先读取最近{' '}
             {maxIndexLines} 行摘要，再按需核验详情；当前第 {safePage} / {pageCount} 页。
           </p>
         </div>
@@ -58,7 +58,7 @@ export function UsageRequestsTable({
         ) : (
           <EmptyState
             title="暂无模型请求"
-            description="可以换个时间范围，或者开启请求日志后发起一次模型请求。"
+            description="可以调整筛选条件，或者开启请求日志后发起一次模型请求。"
           />
         )
       ) : (

@@ -3,7 +3,6 @@ import type {
   TokenUsageStatus,
   UsageRequestDetailStatus,
   UsageRequestStatus,
-  UsageStatsFilters,
 } from '@/types/usageStatistics';
 
 export const parseTimestampMs = (value?: string | null): number | null => {
@@ -63,12 +62,7 @@ export const formatTokenCount = (value: number | null): string => {
 
 export const formatPercent = (value: number): string => `${Math.round(value * 10) / 10}%`;
 
-export const formatRangePlainLabel = (filters: UsageStatsFilters): string => {
-  if (filters.range === '1h') return '最近 1 小时';
-  if (filters.range === '24h') return '最近 24 小时';
-  if (filters.range === '7d') return '最近 7 天';
-  return '自定义时间段';
-};
+export const formatRangePlainLabel = (): string => '当前加载窗口';
 
 export const maskSecret = (value: string): string => {
   const trimmed = value.trim();

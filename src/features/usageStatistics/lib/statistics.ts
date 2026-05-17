@@ -147,20 +147,6 @@ export const buildRequestRecords = (
     .filter((record): record is UsageStatsRecord => Boolean(record))
     .sort((a, b) => (b.timestampMs ?? 0) - (a.timestampMs ?? 0)) as UsageStatsRecord[];
 
-export const getRangeWindow = (
-  filters: UsageStatsFilters
-): { start: number | null; end: number | null } => {
-  const now = Date.now();
-  if (filters.range === '1h') return { start: now - 60 * 60 * 1000, end: now };
-  if (filters.range === '24h') return { start: now - 24 * 60 * 60 * 1000, end: now };
-  if (filters.range === '7d') return { start: now - 7 * 24 * 60 * 60 * 1000, end: now };
-
-  return {
-    start: parseTimestampMs(filters.customStart),
-    end: parseTimestampMs(filters.customEnd),
-  };
-};
-
 export const enrichRecord = (
   record: UsageStatsRecord,
   details: Record<string, UsageRequestDetail>
@@ -213,17 +199,11 @@ export const filterUsageRecords = (
   filters: UsageStatsFilters,
   deferredSearch: string
 ): EnrichedUsageStatsRecord[] => {
-  const { start, end } = getRangeWindow(filters);
   const search = deferredSearch.trim().toLowerCase();
   const selectedModel = filters.model.trim().toLowerCase();
   const selectedSource = filters.source.trim().toLowerCase();
 
   return records.filter((record) => {
-    if (record.timestampMs !== null) {
-      if (start !== null && record.timestampMs < start) return false;
-      if (end !== null && record.timestampMs > end) return false;
-    }
-
     if (filters.status !== 'all' && record.status !== filters.status) {
       return false;
     }
@@ -269,20 +249,14 @@ export const filterUsageRecords = (
 
 export const getAutoDetailIds = (
   baseRecords: UsageStatsRecord[],
-  filters: UsageStatsFilters,
   deferredSearch: string,
   limit: number
 ): string[] => {
-  const { start, end } = getRangeWindow(filters);
   const search = deferredSearch.trim().toLowerCase();
 
   return baseRecords
     .filter((record) => {
       if (!record.requestId) return false;
-      if (record.timestampMs !== null) {
-        if (start !== null && record.timestampMs < start) return false;
-        if (end !== null && record.timestampMs > end) return false;
-      }
       if (!search) return true;
       return [record.timeLabel, record.requestId, record.endpoint, record.source, record.statusLabel]
         .filter(Boolean)
@@ -427,43 +401,43 @@ export const buildModelUsage = (
   }));
 };
 
-const getBucketSizeMs = (filters: UsageStatsFilters, start: number, end: number): number => {
-  if (filters.range === '1h') return 5 * 60 * 1000;
-  if (filters.range === '24h') return 60 * 60 * 1000;
-  if (filters.range === '7d') return 24 * 60 * 60 * 1000;
+const getBucketSizeMs = (start: number, end: number): number => {
   const span = Math.max(end - start, 60 * 60 * 1000);
+  if (span <= 60 * 60 * 1000) return 5 * 60 * 1000;
+  if (span <= 24 * 60 * 60 * 1000) return 60 * 60 * 1000;
+  if (span <= 7 * 24 * 60 * 60 * 1000) return 24 * 60 * 60 * 1000;
   return Math.max(5 * 60 * 1000, Math.ceil(span / 12));
 };
 
 const formatBucketLabel = (
   timestampMs: number,
-  filters: UsageStatsFilters,
+  start: number,
+  end: number,
   language: string
 ): string => {
   const date = new Date(timestampMs);
-  if (filters.range === '1h') {
+  const span = Math.max(end - start, 0);
+  if (span <= 24 * 60 * 60 * 1000) {
     return date.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' });
   }
-  if (filters.range === '24h') {
-    return date.toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' });
+  if (span <= 7 * 24 * 60 * 60 * 1000) {
+    return date.toLocaleDateString(language, { month: 'numeric', day: 'numeric' });
   }
   return date.toLocaleDateString(language, { month: 'numeric', day: 'numeric' });
 };
 
 export const buildTimelineBuckets = (
   records: EnrichedUsageStatsRecord[],
-  filters: UsageStatsFilters,
   language: string
 ): TimelineBucket[] => {
-  const { start: rangeStart, end: rangeEnd } = getRangeWindow(filters);
   const now = Date.now();
   const recordTimes = records
     .map((record) => record.timestampMs)
     .filter((timestamp): timestamp is number => timestamp !== null);
-  const end = rangeEnd ?? now;
-  const fallbackStart = recordTimes.length > 0 ? Math.min(...recordTimes) : end - 24 * 60 * 60 * 1000;
-  const start = Math.min(rangeStart ?? fallbackStart, end - 1);
-  const bucketSizeMs = getBucketSizeMs(filters, start, end);
+  const end = recordTimes.length > 0 ? Math.max(...recordTimes) : now;
+  const fallbackStart = recordTimes.length > 0 ? Math.min(...recordTimes) : end - 60 * 60 * 1000;
+  const start = Math.min(fallbackStart, end - 1);
+  const bucketSizeMs = getBucketSizeMs(start, end);
   const bucketCount = Math.min(32, Math.max(1, Math.ceil((end - start) / bucketSizeMs)));
   const alignedStart = end - bucketCount * bucketSizeMs;
 
@@ -471,7 +445,7 @@ export const buildTimelineBuckets = (
     const bucketStart = alignedStart + index * bucketSizeMs;
     return {
       key: String(bucketStart),
-      label: formatBucketLabel(bucketStart, filters, language),
+      label: formatBucketLabel(bucketStart, start, end, language),
       total: 0,
       success: 0,
       failure: 0,

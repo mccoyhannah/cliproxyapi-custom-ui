@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { IconSearch } from '@/components/ui/icons';
 import type { UsageStatsFilters } from '@/types/usageStatistics';
-import { AUTO_DETAIL_LIMIT, RANGE_OPTIONS, REFRESH_INTERVAL_OPTIONS } from '../lib';
+import { AUTO_DETAIL_LIMIT, REFRESH_INTERVAL_OPTIONS } from '../lib';
 import styles from '@/pages/UsageStatisticsPage.module.scss';
 
 interface UsageFiltersProps {
@@ -25,6 +25,8 @@ interface UsageFiltersProps {
   ) => void;
   setRefreshInterval: (value: number) => void;
   sourceOptions: string[];
+  windowHint: string;
+  windowSummary: string;
 }
 
 export function UsageFilters({
@@ -42,23 +44,16 @@ export function UsageFilters({
   setFilterValue,
   setRefreshInterval,
   sourceOptions,
+  windowHint,
+  windowSummary,
 }: UsageFiltersProps) {
   return (
     <Card className={styles.controlCard}>
       <div className={styles.controlTopRow}>
-        <div className={styles.rangeTabs} role="tablist" aria-label="model request range">
-          {RANGE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`${styles.rangeTab} ${
-                normalizedFilters.range === option.value ? styles.rangeTabActive : ''
-              }`}
-              onClick={() => setFilterValue('range', option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className={styles.windowScopeInfo}>
+          <span>当前加载窗口</span>
+          <strong>{windowSummary}</strong>
+          <small>{windowHint}</small>
         </div>
         <div className={styles.refreshControls}>
           <ToggleSwitch
@@ -82,23 +77,6 @@ export function UsageFilters({
           </select>
         </div>
       </div>
-
-      {normalizedFilters.range === 'custom' && (
-        <div className={styles.customRange}>
-          <Input
-            type="datetime-local"
-            label="开始时间"
-            value={normalizedFilters.customStart}
-            onChange={(event) => setFilterValue('customStart', event.target.value)}
-          />
-          <Input
-            type="datetime-local"
-            label="结束时间"
-            value={normalizedFilters.customEnd}
-            onChange={(event) => setFilterValue('customEnd', event.target.value)}
-          />
-        </div>
-      )}
 
       <div className={styles.filterGrid}>
         <Input
@@ -181,7 +159,7 @@ export function UsageFilters({
           <strong>{requestLogEnabled ? '请求日志已开启' : '请求日志未开启'}</strong>
           <span>
             {requestLogEnabled
-              ? `首屏自动解析最近 ${AUTO_DETAIL_LIMIT} 条详情；时间筛选只作用于当前已加载日志尾部，长期 Token 看下方台账。`
+              ? `首屏自动解析最近 ${AUTO_DETAIL_LIMIT} 条详情；当前窗口来自最近加载的日志摘要，长期 Token 和时间范围看上方台账。`
               : '只能看到后端累计成功/失败；要核验模型路由，需要先开启请求日志。'}
           </span>
         </div>

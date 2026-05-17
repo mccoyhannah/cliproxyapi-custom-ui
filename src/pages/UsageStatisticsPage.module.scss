@@ -1093,6 +1093,54 @@
   flex-wrap: wrap;
 }
 
+.windowScopeInfo {
+  min-width: min(100%, 420px);
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 5%, transparent),
+      color-mix(in srgb, var(--bg-secondary) 82%, transparent)
+    ),
+    var(--bg-secondary);
+
+  span,
+  strong,
+  small {
+    display: block;
+    min-width: 0;
+  }
+
+  span {
+    color: color-mix(in srgb, var(--primary-active) 76%, var(--text-secondary));
+    font-size: 11px;
+    font-weight: 820;
+    line-height: 1.2;
+  }
+
+  strong {
+    margin-top: 3px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 780;
+    line-height: 1.35;
+  }
+
+  small {
+    margin-top: 3px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 720;
+    line-height: 1.35;
+  }
+
+  @include mobile {
+    width: 100%;
+  }
+}
+
 .rangeTabs {
   display: inline-flex;
   align-items: center;
