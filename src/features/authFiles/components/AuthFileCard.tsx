@@ -9,6 +9,7 @@ import {
   IconInfo,
   IconModelCluster,
   IconSettings,
+  IconTimer,
   IconTrash2,
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
@@ -49,6 +50,7 @@ import {
 } from '@/features/authFiles/constants';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQuotaSection';
+import { buildManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
 import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
@@ -77,9 +79,11 @@ export type AuthFileCardProps = {
   quotaFilterType: QuotaProviderType | null;
   statusBarCache: Map<string, AuthFileStatusBarData>;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
+  manualExpiryMs?: number | null;
   onShowModels: (file: AuthFileItem) => void;
   onDownload: (name: string) => void;
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
+  onManualExpiryEdit: (file: AuthFileItem) => void;
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
   onPriorityChange: (file: AuthFileItem, priority: number) => Promise<void>;
@@ -172,9 +176,11 @@ export function AuthFileCard(props: AuthFileCardProps) {
     quotaFilterType,
     statusBarCache,
     codexSubscriptionSnapshot,
+    manualExpiryMs,
     onShowModels,
     onDownload,
     onOpenPrefixProxyEditor,
+    onManualExpiryEdit,
     onDelete,
     onToggleStatus,
     onPriorityChange,
@@ -306,8 +312,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot
       : null;
+  const manualExpiry = buildManualExpiryRenderInfo(manualExpiryMs);
   const subscriptionWarningMs = 7 * 24 * 60 * 60 * 1000;
-  const subscriptionExpiryMs = visibleCodexSubscription?.subscriptionActiveUntilMs;
+  const subscriptionExpiryMs =
+    manualExpiry?.expiresAtMs ?? visibleCodexSubscription?.subscriptionActiveUntilMs;
   const subscriptionExpired =
     subscriptionExpiryMs !== null &&
     subscriptionExpiryMs !== undefined &&
@@ -332,14 +340,17 @@ export function AuthFileCard(props: AuthFileCardProps) {
     : subscriptionExpiringSoon
       ? styles.signalBadgeWarning
       : '';
-  const subscriptionExpiryLabel = visibleCodexSubscription?.subscriptionActiveUntil ?? '';
+  const subscriptionExpiryLabel =
+    manualExpiry?.title ?? visibleCodexSubscription?.subscriptionActiveUntil ?? '';
   const subscriptionExpiryDisplayLabel = compact
-    ? formatCodexSubscriptionShortDate(
+    ? manualExpiry?.label ??
+      formatCodexSubscriptionShortDate(
         visibleCodexSubscription?.subscriptionActiveUntilMs,
         subscriptionExpiryLabel
       )
     : subscriptionExpiryLabel;
-  const showSubscriptionMeta = Boolean(visibleCodexSubscription) && !showQuotaLayout;
+  const showSubscriptionMeta =
+    Boolean(manualExpiry || visibleCodexSubscription) && !showQuotaLayout;
 
   const setPriorityInput = (value: string) => {
     setPriorityDraft({ fileName: file.name, value, dirty: true });
@@ -635,6 +646,15 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 <span
                   className={`${styles.subscriptionExpiryPill} ${subscriptionExpiryClass}`}
                   title={subscriptionExpiryLabel || undefined}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onManualExpiryEdit(file)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onManualExpiryEdit(file);
+                    }
+                  }}
                 >
                   {subscriptionExpiryDisplayLabel}
                 </span>
@@ -669,6 +689,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 compact={compact}
                 summaryOnly={showQuotaSummaryOnly}
                 codexSubscriptionSnapshot={codexSubscriptionSnapshot}
+                manualExpiry={manualExpiry}
+                onManualExpiryEdit={() => onManualExpiryEdit(file)}
               />
             )}
           </div>
@@ -715,6 +737,17 @@ export function AuthFileCard(props: AuthFileCardProps) {
                     disabled={disableControls}
                   >
                     <IconSettings className={styles.actionIcon} size={16} />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onManualExpiryEdit(file)}
+                    className={`${styles.iconButton} ${manualExpiry ? styles.manualExpiryActionActive : ''}`}
+                    title={t('auth_files.manual_expiry_button', {
+                      defaultValue: '手动有效期',
+                    })}
+                  >
+                    <IconTimer className={styles.actionIcon} size={16} />
                   </Button>
                   <Button
                     variant="danger"

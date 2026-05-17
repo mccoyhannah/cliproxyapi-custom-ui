@@ -1024,6 +1024,25 @@
   box-sizing: border-box;
 }
 
+button.codexCompactChip {
+  font-family: inherit;
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(0.98);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, currentColor 10%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, currentColor 16%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+  }
+}
+
 .codexCompactPlanChip {
   flex: 0 0 auto;
   gap: 5px;
@@ -2043,6 +2062,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  cursor: pointer;
 }
 
 .subscriptionExpiryHealthy {
@@ -2528,6 +2548,88 @@
   box-shadow: 0 0 0 3px rgba($error-color, 0.12);
 }
 
+.manualExpiryEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.manualExpiryTarget {
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 54%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manualExpiryFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.62fr);
+  gap: 10px;
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.manualExpiryField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  span {
+    font-size: 11px;
+    font-weight: 740;
+    color: var(--text-tertiary);
+  }
+
+  input {
+    height: 38px;
+    min-width: 0;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+    background: var(--surface-control);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 680;
+    font-variant-numeric: tabular-nums;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: color-mix(in srgb, var(--primary-color) 70%, var(--border-color));
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    }
+  }
+}
+
+.manualExpiryHint {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.manualExpiryFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+
+  :global(.btn:first-child) {
+    margin-right: auto;
+  }
+}
+
 .cardActions {
   display: flex;
   align-items: center;
@@ -2631,6 +2733,12 @@
   box-sizing: border-box;
   border-radius: 8px;
   gap: 0;
+}
+
+.manualExpiryActionActive:global(.btn.btn-sm) {
+  color: #2563eb;
+  border-color: color-mix(in srgb, #2563eb 32%, var(--border-color));
+  background: color-mix(in srgb, #2563eb 8%, var(--bg-secondary));
 }
 
 .actionIcon {

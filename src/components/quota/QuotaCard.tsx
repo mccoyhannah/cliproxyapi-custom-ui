@@ -7,6 +7,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { TYPE_COLORS, type CodexSubscriptionSnapshot } from '@/utils/quota';
+import type { ManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -63,6 +64,8 @@ export interface QuotaRenderHelpers {
   displayMode?: 'quota-page' | 'auth-card' | 'auth-card-compact';
   compactAuthCard?: boolean;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
+  manualExpiry?: ManualExpiryRenderInfo | null;
+  onManualExpiryEdit?: () => void;
 }
 
 interface QuotaCardProps<TState extends QuotaStatusState> {

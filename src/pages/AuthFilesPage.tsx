@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { IconFilterAll } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { copyToClipboard } from '@/utils/clipboard';
 import {
@@ -58,6 +59,18 @@ import {
   writePersistedAuthFilesCompactMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
+import {
+  bootstrapAuthFilesManualExpiry,
+  formatDateInputValue,
+  formatManualExpiryFullDate,
+  formatTimeInputValue,
+  getDefaultManualExpiryMs,
+  getManualExpiryMs,
+  parseManualExpiryInput,
+  readAuthFilesManualExpiry,
+  writeAuthFilesManualExpiry,
+  type AuthFilesManualExpiryMap,
+} from '@/features/authFiles/manualExpiry';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
 import {
@@ -118,6 +131,12 @@ export function AuthFilesPage() {
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
   const [batchActionBarVisible, setBatchActionBarVisible] = useState(false);
   const [batchPriorityInput, setBatchPriorityInput] = useState('');
+  const [manualExpiryByFile, setManualExpiryByFile] = useState<AuthFilesManualExpiryMap>(() =>
+    readAuthFilesManualExpiry()
+  );
+  const [manualExpiryEditorFile, setManualExpiryEditorFile] = useState<AuthFileItem | null>(null);
+  const [manualExpiryDateInput, setManualExpiryDateInput] = useState('');
+  const [manualExpiryTimeInput, setManualExpiryTimeInput] = useState('');
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
@@ -217,6 +236,8 @@ export function AuthFilesPage() {
   const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
 
   useEffect(() => {
+    setManualExpiryByFile(bootstrapAuthFilesManualExpiry());
+
     const persistedCompactMode = readPersistedAuthFilesCompactMode();
     if (typeof persistedCompactMode === 'boolean') {
       setCompactMode(persistedCompactMode);
@@ -448,6 +469,9 @@ export function AuthFilesPage() {
     const originalIndexMap = new Map(filtered.map((file, index) => [file.name, index]));
 
     const getEffectiveSubscriptionExpiry = (file: AuthFileItem) => {
+      const manualExpiryMs = getManualExpiryMs(manualExpiryByFile, file.name);
+      if (manualExpiryMs !== null) return manualExpiryMs;
+
       const quota = codexQuota[file.name] as CodexQuotaState | undefined;
       const currentPlanType =
         quota?.status === 'success' ? normalizePlanType(quota.planType) : null;
@@ -500,7 +524,7 @@ export function AuthFilesPage() {
       });
     }
     return copy;
-  }, [codexQuota, codexSubscriptionSnapshots, filtered, sortMode]);
+  }, [codexQuota, codexSubscriptionSnapshots, filtered, manualExpiryByFile, sortMode]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -537,6 +561,77 @@ export function AuthFilesPage() {
   const handlePriorityInvalid = useCallback(() => {
     showNotification(t('auth_files.priority_invalid'), 'error');
   }, [showNotification, t]);
+
+  const openManualExpiryEditor = useCallback(
+    (file: AuthFileItem) => {
+      const expiresAtMs =
+        getManualExpiryMs(manualExpiryByFile, file.name) ?? getDefaultManualExpiryMs();
+      setManualExpiryEditorFile(file);
+      setManualExpiryDateInput(formatDateInputValue(expiresAtMs));
+      setManualExpiryTimeInput(formatTimeInputValue(expiresAtMs));
+    },
+    [manualExpiryByFile]
+  );
+
+  const closeManualExpiryEditor = useCallback(() => {
+    setManualExpiryEditorFile(null);
+    setManualExpiryDateInput('');
+    setManualExpiryTimeInput('');
+  }, []);
+
+  const saveManualExpiry = useCallback(() => {
+    if (!manualExpiryEditorFile) return;
+
+    const expiresAtMs = parseManualExpiryInput(manualExpiryDateInput, manualExpiryTimeInput);
+    if (expiresAtMs === null) {
+      showNotification(
+        t('auth_files.manual_expiry_invalid', { defaultValue: '有效期时间无效' }),
+        'error'
+      );
+      return;
+    }
+
+    setManualExpiryByFile((current) => {
+      const next = { ...current, [manualExpiryEditorFile.name]: expiresAtMs };
+      writeAuthFilesManualExpiry(next);
+      return next;
+    });
+    showNotification(
+      t('auth_files.manual_expiry_saved', {
+        name: manualExpiryEditorFile.name,
+        time: formatManualExpiryFullDate(expiresAtMs),
+        defaultValue: '已保存手动有效期',
+      }),
+      'success'
+    );
+    closeManualExpiryEditor();
+  }, [
+    closeManualExpiryEditor,
+    manualExpiryDateInput,
+    manualExpiryEditorFile,
+    manualExpiryTimeInput,
+    showNotification,
+    t,
+  ]);
+
+  const clearManualExpiry = useCallback(() => {
+    if (!manualExpiryEditorFile) return;
+
+    setManualExpiryByFile((current) => {
+      const next = { ...current };
+      delete next[manualExpiryEditorFile.name];
+      writeAuthFilesManualExpiry(next);
+      return next;
+    });
+    showNotification(
+      t('auth_files.manual_expiry_cleared', {
+        name: manualExpiryEditorFile.name,
+        defaultValue: '已清除手动有效期',
+      }),
+      'success'
+    );
+    closeManualExpiryEditor();
+  }, [closeManualExpiryEditor, manualExpiryEditorFile, showNotification, t]);
 
   const commitBatchPriority = useCallback(() => {
     const trimmed = batchPriorityInput.trim();
@@ -754,6 +849,14 @@ export function AuthFilesPage() {
       ? t('auth_files.delete_all_button')
       : `${t('common.delete')} ${getTypeLabel(t, filter)}`;
   })();
+  const manualExpiryEditorDisplayName = manualExpiryEditorFile
+    ? typeof manualExpiryEditorFile.note === 'string' && manualExpiryEditorFile.note.trim()
+      ? manualExpiryEditorFile.note.trim()
+      : manualExpiryEditorFile.name
+    : '';
+  const manualExpiryEditorExistingMs = manualExpiryEditorFile
+    ? getManualExpiryMs(manualExpiryByFile, manualExpiryEditorFile.name)
+    : null;
 
   return (
     <div className={styles.container}>
@@ -969,11 +1072,13 @@ export function AuthFilesPage() {
                     quotaFilterType={quotaFilterType}
                     statusBarCache={statusBarCache}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
+                    manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
                     priorityUpdating={priorityUpdating}
                     noteUpdating={noteUpdating}
                     onShowModels={showModels}
                     onDownload={handleDownload}
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
+                    onManualExpiryEdit={openManualExpiryEditor}
                     onDelete={handleDelete}
                     onToggleStatus={handleStatusToggle}
                     onPriorityChange={handlePriorityChange}
@@ -1064,6 +1169,60 @@ export function AuthFilesPage() {
         onSave={handlePrefixProxySave}
         onChange={handlePrefixProxyChange}
       />
+
+      <Modal
+        open={Boolean(manualExpiryEditorFile)}
+        title={t('auth_files.manual_expiry_title', { defaultValue: '手动有效期' })}
+        onClose={closeManualExpiryEditor}
+        width={420}
+        footer={
+          <div className={styles.manualExpiryFooter}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearManualExpiry}
+              disabled={!manualExpiryEditorExistingMs}
+            >
+              {t('auth_files.manual_expiry_clear', { defaultValue: '清除' })}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={closeManualExpiryEditor}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" onClick={saveManualExpiry}>
+              {t('common.save')}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.manualExpiryEditor}>
+          <div className={styles.manualExpiryTarget} title={manualExpiryEditorFile?.name}>
+            {manualExpiryEditorDisplayName}
+          </div>
+          <div className={styles.manualExpiryFields}>
+            <label className={styles.manualExpiryField}>
+              <span>{t('auth_files.manual_expiry_date', { defaultValue: '日期' })}</span>
+              <input
+                type="date"
+                value={manualExpiryDateInput}
+                onChange={(event) => setManualExpiryDateInput(event.currentTarget.value)}
+              />
+            </label>
+            <label className={styles.manualExpiryField}>
+              <span>{t('auth_files.manual_expiry_time', { defaultValue: '时间' })}</span>
+              <input
+                type="time"
+                value={manualExpiryTimeInput}
+                onChange={(event) => setManualExpiryTimeInput(event.currentTarget.value)}
+              />
+            </label>
+          </div>
+          <div className={styles.manualExpiryHint}>
+            {t('auth_files.manual_expiry_hint', {
+              defaultValue: '只保存在当前浏览器，用于卡片显示、排序和提醒，不会修改认证文件。',
+            })}
+          </div>
+        </div>
+      </Modal>
 
       {batchActionBarVisible && typeof document !== 'undefined'
         ? createPortal(

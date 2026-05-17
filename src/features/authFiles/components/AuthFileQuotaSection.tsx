@@ -10,6 +10,7 @@ import {
 } from '@/components/quota';
 import { useNotificationStore, useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
+import type { ManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
 import {
   formatCodexSubscriptionShortDate,
   getStatusFromError,
@@ -42,6 +43,8 @@ export type AuthFileQuotaSectionProps = {
   compact?: boolean;
   summaryOnly?: boolean;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
+  manualExpiry?: ManualExpiryRenderInfo | null;
+  onManualExpiryEdit?: () => void;
 };
 
 export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
@@ -52,6 +55,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     compact = false,
     summaryOnly = false,
     codexSubscriptionSnapshot,
+    manualExpiry,
+    onManualExpiryEdit,
   } = props;
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
@@ -150,6 +155,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         displayMode: 'auth-card-compact',
         compactAuthCard: compact,
         codexSubscriptionSnapshot,
+        manualExpiry,
+        onManualExpiryEdit,
       }) as ReactNode;
 
       if (!content) return null;
@@ -163,9 +170,9 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       );
     }
 
-    if (!compactCodexExpiry) return null;
+    if (!manualExpiry && !compactCodexExpiry) return null;
 
-    const expiryMs = compactCodexExpiry.subscriptionActiveUntilMs;
+    const expiryMs = manualExpiry?.expiresAtMs ?? compactCodexExpiry?.subscriptionActiveUntilMs;
     const warningMs = 7 * 24 * 60 * 60 * 1000;
     const expiryClass =
       expiryMs !== null && expiryMs !== undefined && expiryMs <= referenceTimeMs
@@ -185,12 +192,16 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
             </span>
             <span
               className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
-              title={compactCodexExpiry.subscriptionActiveUntil || undefined}
+              title={manualExpiry?.title ?? compactCodexExpiry?.subscriptionActiveUntil ?? undefined}
+              onClick={onManualExpiryEdit}
+              role={onManualExpiryEdit ? 'button' : undefined}
+              tabIndex={onManualExpiryEdit ? 0 : undefined}
             >
-              {formatCodexSubscriptionShortDate(
-                compactCodexExpiry.subscriptionActiveUntilMs,
-                compactCodexExpiry.subscriptionActiveUntil
-              )}
+              {manualExpiry?.label ??
+                formatCodexSubscriptionShortDate(
+                  compactCodexExpiry?.subscriptionActiveUntilMs,
+                  compactCodexExpiry?.subscriptionActiveUntil
+                )}
             </span>
           </div>
         </div>
@@ -225,6 +236,8 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
           QuotaProgressBar,
           displayMode: 'auth-card',
           codexSubscriptionSnapshot,
+          manualExpiry,
+          onManualExpiryEdit,
         }) as ReactNode)
       ) : (
         <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.idle`)}</div>

@@ -864,6 +864,7 @@ const renderCodexItems = (
   const { createElement: h, Fragment } = React;
   const windows = quota.windows ?? [];
   const planType = quota.planType ?? null;
+  const manualExpiry = helpers.manualExpiry ?? null;
   const subscriptionSnapshot =
     helpers.codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     helpers.codexSubscriptionSnapshot.subscriptionActiveUntil
@@ -875,6 +876,11 @@ const renderCodexItems = (
     subscriptionSnapshot?.subscriptionActiveUntilMs ?? quota.subscriptionActiveUntilMs ?? null;
   const subscriptionStatus =
     subscriptionSnapshot?.subscriptionStatus ?? quota.subscriptionStatus ?? 'missing';
+  const effectiveSubscriptionActiveUntil =
+    manualExpiry?.title ?? subscriptionActiveUntil;
+  const effectiveSubscriptionActiveUntilMs =
+    manualExpiry?.expiresAtMs ?? subscriptionActiveUntilMs;
+  const effectiveSubscriptionStatus = manualExpiry ? 'found' : subscriptionStatus;
   const isAuthCard =
     helpers.displayMode === 'auth-card' || helpers.displayMode === 'auth-card-compact';
   const isCompactAuthCard = helpers.displayMode === 'auth-card-compact';
@@ -882,7 +888,10 @@ const renderCodexItems = (
   const normalizedPlanType = normalizePlanType(planType);
   const currentPlanIsFree = normalizedPlanType === 'free';
   const hasSubscriptionExpiry =
-    !currentPlanIsFree && subscriptionStatus === 'found' && Boolean(subscriptionActiveUntil);
+    manualExpiry !== null ||
+    (!currentPlanIsFree &&
+      effectiveSubscriptionStatus === 'found' &&
+      Boolean(effectiveSubscriptionActiveUntil));
 
   const getPlanLabel = (pt?: string | null): string | null => {
     const normalized = normalizePlanType(pt);
@@ -915,11 +924,12 @@ const renderCodexItems = (
   const nowMs = Date.now();
   const warningMs = 7 * 24 * 60 * 60 * 1000;
   const subscriptionStatusClass =
-    subscriptionStatus === 'read_error' || subscriptionStatus === 'missing'
+    effectiveSubscriptionStatus === 'read_error' || effectiveSubscriptionStatus === 'missing'
       ? styleMap.codexSubscriptionMuted
-      : subscriptionActiveUntilMs !== null && subscriptionActiveUntilMs <= nowMs
+      : effectiveSubscriptionActiveUntilMs !== null && effectiveSubscriptionActiveUntilMs <= nowMs
       ? styleMap.codexSubscriptionExpired
-      : subscriptionActiveUntilMs !== null && subscriptionActiveUntilMs - nowMs <= warningMs
+      : effectiveSubscriptionActiveUntilMs !== null &&
+          effectiveSubscriptionActiveUntilMs - nowMs <= warningMs
         ? styleMap.codexSubscriptionWarning
         : styleMap.codexSubscriptionHealthy;
   if (isCompactAuthCard) {
@@ -931,7 +941,8 @@ const renderCodexItems = (
       key: string,
       value: ReactNode,
       className: string,
-      title?: string | null
+      title?: string | null,
+      onClick?: () => void
     ) => {
       if (!value) return;
       if (typeof value === 'string') {
@@ -939,13 +950,15 @@ const renderCodexItems = (
       } else if (title) {
         compactTitleParts.push(title);
       }
+      const element = onClick ? 'button' : 'span';
       targetNodes.push(
         h(
-          'span',
+          element,
           {
             key,
             className: [styleMap.codexCompactChip, className].filter(Boolean).join(' '),
             title: title || undefined,
+            ...(onClick ? { type: 'button', onClick } : {}),
           },
           value
         )
@@ -1021,7 +1034,11 @@ const renderCodexItems = (
           h(
             'strong',
             { className: styleMap.codexSubscriptionDate },
-            formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil)
+            manualExpiry?.label ??
+              formatCodexSubscriptionShortDate(
+                effectiveSubscriptionActiveUntilMs,
+                effectiveSubscriptionActiveUntil
+              )
           )
         ),
         [
@@ -1029,7 +1046,8 @@ const renderCodexItems = (
           styleMap.codexSubscriptionExpiryChip,
           subscriptionStatusClass,
         ].filter(Boolean).join(' '),
-        subscriptionActiveUntil
+        effectiveSubscriptionActiveUntil,
+        helpers.onManualExpiryEdit
       );
     }
 
@@ -1114,8 +1132,12 @@ const renderCodexItems = (
 
   if (hasSubscriptionExpiry) {
     const subscriptionValue = isCompactAuthCard
-      ? formatCodexSubscriptionShortDate(subscriptionActiveUntilMs, subscriptionActiveUntil)
-      : subscriptionActiveUntil;
+      ? manualExpiry?.label ??
+        formatCodexSubscriptionShortDate(
+          effectiveSubscriptionActiveUntilMs,
+          effectiveSubscriptionActiveUntil
+        )
+      : effectiveSubscriptionActiveUntil;
 
     pushInfoRow(
       'subscription-expiry',
@@ -1128,7 +1150,7 @@ const renderCodexItems = (
         styleMap.codexSubscriptionValue,
         subscriptionStatusClass,
       ].filter(Boolean).join(' '),
-      hasSubscriptionExpiry ? subscriptionActiveUntil : null
+      hasSubscriptionExpiry ? effectiveSubscriptionActiveUntil : null
     );
   }
 
