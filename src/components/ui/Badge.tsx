@@ -8,11 +8,14 @@ export type BadgeVariant =
   | 'neutral'
   | 'recommended';
 export type BadgeSize = 'sm' | 'md';
+export type BadgeAppearance = 'soft' | 'outline' | 'solid';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
   size?: BadgeSize;
+  appearance?: BadgeAppearance;
   dot?: boolean;
+  pulse?: boolean;
   icon?: ReactNode;
   mono?: boolean;
 }
@@ -21,7 +24,9 @@ export function Badge({
   children,
   variant = 'neutral',
   size = 'md',
+  appearance = 'soft',
   dot = false,
+  pulse = false,
   icon,
   mono = false,
   className = '',
@@ -30,8 +35,10 @@ export function Badge({
   const classes = [
     'badge',
     `badge-${variant}`,
+    `badge-${appearance}`,
     size === 'sm' ? 'badge-sm' : '',
     dot ? 'badge-with-dot' : '',
+    dot && pulse ? 'badge-dot-pulse' : '',
     mono ? 'badge-mono' : '',
     className,
   ]

@@ -373,15 +373,18 @@
 .configPill {
   display: inline-flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: 6px 14px;
+  gap: 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0;
   background: color-mix(in srgb, var(--bg-primary) 68%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
-  border-radius: $radius-full;
+  border-radius: $radius-md;
   --glass-blur: 10px;
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   font-size: 13px;
+  overflow: hidden;
   transition: border-color $transition-fast;
 
   &:hover {
@@ -395,11 +398,23 @@
 }
 
 .configPillLabel {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  padding: 0 10px;
+  border-right: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 58%, transparent);
   color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .configPillValue {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 11px;
   font-weight: 600;
   color: var(--text-primary);
 
@@ -413,6 +428,11 @@
 }
 
 .configPillMono {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  min-width: 0;
+  padding: 0 11px;
   font-size: 12px;
   font-family: $font-mono;
   color: var(--text-secondary);
@@ -424,9 +444,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 8px;
-  border-radius: $radius-full;
-  border: 1px solid var(--border-color);
+  align-self: stretch;
+  min-width: 0;
+  padding: 0 11px;
+  border-radius: 0;
+  border: 0;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
@@ -1008,23 +1030,41 @@
   min-width: 0;
   border-radius: $radius-md;
   border-color: var(--cold-border);
-  background: var(--cold-surface);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent),
+    color-mix(in srgb, var(--cold-surface) 94%, var(--ops-surface-2));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 13%, transparent),
+    0 10px 22px -22px color-mix(in srgb, var(--cold-accent) 34%, transparent);
 }
 
 .configPillLabel {
+  min-height: 34px;
   color: var(--cold-muted);
+  background: color-mix(in srgb, var(--ops-surface-2) 76%, transparent);
+  border-right-color: color-mix(in srgb, var(--cold-border) 76%, transparent);
+}
+
+.configPillValue,
+.configPillMono,
+.configBadge {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  min-height: 34px;
+  padding: 0 11px;
+  font-family: $font-mono;
+  font-size: 12px;
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
+    color-mix(in srgb, var(--ops-surface-1) 82%, var(--ops-surface-2));
 }
 
 .configPillValue.on,
 .configPillValue.off {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
-  padding: 3px 8px;
-  border-radius: $radius-md;
-  border: 1px solid transparent;
-  font-family: $font-mono;
-  font-size: 12px;
 
   &::before {
     content: '';
@@ -1036,18 +1076,19 @@
 }
 
 .configPillValue.on {
-  border-color: rgb(20 184 166 / 0.24);
-  background: rgb(20 184 166 / 0.1);
-  color: #0f766e;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 14%, transparent), transparent),
+    color-mix(in srgb, var(--ops-success) 10%, var(--ops-surface-1));
+  color: color-mix(in srgb, var(--ops-success) 78%, var(--text-primary));
 
   &::before {
     background: var(--cold-mint);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ops-success) 14%, transparent);
   }
 }
 
 .configPillValue.off {
-  border-color: color-mix(in srgb, var(--ops-border-subtle) 70%, #94a3b8);
-  background: rgb(100 116 139 / 0.08);
+  background: color-mix(in srgb, #64748b 8%, var(--ops-surface-1));
   color: var(--cold-muted);
 
   &::before {
@@ -1058,12 +1099,14 @@
 .configPillMono {
   color: var(--cold-ink);
   overflow-wrap: anywhere;
+  justify-content: flex-start;
 }
 
 .configBadge {
   gap: 6px;
-  border-radius: $radius-md;
+  border-radius: 0;
   font-family: $font-mono;
+  border-left: 0;
 
   &::before {
     content: '';
@@ -1077,20 +1120,19 @@
 
 .configBadgeRoundRobin {
   color: var(--cold-accent-strong);
-  border-color: color-mix(in srgb, var(--cold-accent) 32%, transparent);
-  background: var(--cold-accent-soft);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
+    color-mix(in srgb, var(--cold-accent) 12%, var(--ops-surface-1));
 }
 
 .configBadgeFillFirst {
-  color: #0f766e;
-  border-color: rgb(20 184 166 / 0.28);
-  background: rgb(20 184 166 / 0.1);
+  color: color-mix(in srgb, var(--ops-success) 78%, var(--text-primary));
+  background: color-mix(in srgb, var(--ops-success) 10%, var(--ops-surface-1));
 }
 
 .configBadgeUnknown {
   color: var(--cold-muted);
-  border-color: color-mix(in srgb, var(--ops-border-subtle) 78%, #94a3b8);
-  background: rgb(100 116 139 / 0.08);
+  background: color-mix(in srgb, #64748b 8%, var(--ops-surface-1));
 }
 
 .viewMoreLink {

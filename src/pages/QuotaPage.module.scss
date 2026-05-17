@@ -830,14 +830,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0;
   flex: 1 1 184px;
   min-width: 0;
   min-height: 34px;
-  padding: 6px 10px;
+  padding: 0;
   border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
   border-radius: $radius-md;
-  background: var(--surface-control);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 94%, var(--surface-panel));
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 
   &:first-child {
     flex: 0 1 146px;
@@ -851,10 +855,14 @@
 .codexPlanLabel {
   display: inline-flex;
   align-items: center;
-  min-height: 13px;
+  align-self: stretch;
+  min-height: 32px;
+  padding: 0 9px;
+  border-right: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 54%, transparent);
   font-size: 10px;
   line-height: 1.2;
-  font-weight: 650;
+  font-weight: 760;
   letter-spacing: 0;
   color: var(--text-tertiary);
 }
@@ -862,11 +870,16 @@
 .codexPlanValue {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 9px;
   width: fit-content;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 780;
   color: var(--text-primary);
   text-transform: capitalize;
+  font-variant-numeric: tabular-nums;
 }
 
 .codexPlanBadge {
@@ -954,16 +967,26 @@
 }
 
 .codexSubscriptionValue {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
   width: fit-content;
-  padding: 2px 7px;
-  border-radius: $radius-sm;
+  padding: 2px 8px;
+  border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--success-color) 28%, var(--border-color));
-  background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
   white-space: nowrap;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
 .codexSubscriptionHealthy {
-  color: color-mix(in srgb, var(--success-color) 82%, var(--text-primary));
+  color: var(--status-info-text);
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
 }
 
 .codexSubscriptionWarning {
@@ -973,15 +996,15 @@
 }
 
 .codexSubscriptionExpired {
-  color: var(--danger-color);
-  border-color: color-mix(in srgb, var(--danger-color) 50%, var(--border-color));
-  background: color-mix(in srgb, var(--danger-color) 12%, var(--bg-primary));
+  color: var(--status-error-text);
+  border-color: var(--status-error-border);
+  background: var(--status-error-bg);
 }
 
 .codexSubscriptionMuted {
-  color: var(--text-secondary);
-  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
-  background: transparent;
+  color: var(--status-neutral-text);
+  border-color: var(--status-neutral-border);
+  background: var(--status-neutral-bg);
 }
 
 .premiumPlanValue {
@@ -1246,12 +1269,18 @@
 }
 
 .typeBadge {
-  padding: 4px 10px;
-  border-radius: 12px;
+  min-height: 24px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 760;
+  line-height: 1;
   white-space: nowrap;
   flex-shrink: 0;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
+    0 1px 2px color-mix(in srgb, #000 5%, transparent);
 }
 
 .fileName {
@@ -1279,22 +1308,26 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 21px;
-  padding: 2px 7px;
+  min-height: 22px;
+  padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-primary));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--bg-secondary) 82%, var(--bg-primary));
   color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.15;
-  font-weight: 740;
+  font-weight: 820;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
 .quotaStatusChipRecommended {
-  color: color-mix(in srgb, var(--success-color) 70%, var(--text-primary));
-  border-color: color-mix(in srgb, var(--success-color) 34%, var(--border-color));
-  background: color-mix(in srgb, var(--success-color) 11%, var(--bg-primary));
+  color: var(--status-success-text);
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
 }
 
 .quotaStatusChipWarning {
@@ -1304,21 +1337,21 @@
 }
 
 .quotaStatusChipDanger {
-  color: var(--danger-color);
-  border-color: color-mix(in srgb, var(--danger-color) 44%, var(--border-color));
-  background: color-mix(in srgb, var(--danger-color) 10%, var(--bg-primary));
+  color: var(--status-error-text);
+  border-color: var(--status-error-border);
+  background: var(--status-error-bg);
 }
 
 .quotaStatusChipInfo {
-  color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
-  border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
-  background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary));
+  color: var(--status-info-text);
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
 }
 
 .quotaStatusChipNeutral {
-  color: var(--text-tertiary);
-  border-color: color-mix(in srgb, var(--border-color) 72%, transparent);
-  background: color-mix(in srgb, var(--bg-tertiary) 64%, var(--bg-primary));
+  color: var(--status-neutral-text);
+  border-color: var(--status-neutral-border);
+  background: var(--status-neutral-bg);
 }
 
 .pagination {

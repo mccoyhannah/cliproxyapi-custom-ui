@@ -266,7 +266,7 @@ export function HeaderActions({
           className="header-status-cluster"
           aria-label={t('dashboard.system_status', { defaultValue: 'System status' })}
         >
-          <Badge variant={connectionBadgeVariant} size="sm" dot>
+          <Badge variant={connectionBadgeVariant} size="sm" dot pulse={connectionStatus !== 'disconnected'}>
             {connectionLabel}
           </Badge>
           <Badge variant="neutral" size="sm" mono>

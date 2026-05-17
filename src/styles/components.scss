@@ -347,18 +347,37 @@ textarea {
   background: var(--badge-bg, var(--status-neutral-bg));
   color: var(--badge-text, var(--status-neutral-text));
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 760;
   line-height: 1.2;
   white-space: nowrap;
   box-sizing: border-box;
   font-variant-numeric: tabular-nums;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #fff 10%, transparent) inset,
+    0 1px 2px color-mix(in srgb, var(--badge-glow, transparent) 32%, transparent);
 }
 
 .badge-sm {
-  min-height: 20px;
+  min-height: 22px;
   padding: 2px 7px;
   gap: 5px;
   font-size: 11px;
+}
+
+.badge-outline {
+  background: transparent;
+  color: var(--badge-text, var(--status-neutral-text));
+  border-color: color-mix(in srgb, var(--badge-border, var(--status-neutral-border)) 88%, transparent);
+  box-shadow: none;
+}
+
+.badge-solid {
+  background: var(--badge-solid-bg, var(--badge-text, var(--status-neutral-text)));
+  border-color: var(--badge-solid-bg, var(--badge-border, var(--status-neutral-border)));
+  color: var(--badge-solid-text, var(--primary-contrast));
+  box-shadow:
+    0 6px 16px -14px var(--badge-glow, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
 }
 
 .badge-mono {
@@ -391,43 +410,90 @@ textarea {
   height: 7px;
   border-radius: $radius-full;
   background: currentColor;
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, currentColor 14%, transparent),
+    0 0 12px color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.badge-dot-pulse .badge-dot {
+  animation: badge-dot-pulse 1.8s ease-in-out infinite;
 }
 
 .badge-success {
   --badge-bg: var(--status-success-bg);
   --badge-text: var(--status-success-text);
   --badge-border: var(--status-success-border);
+  --badge-solid-bg: var(--status-success-solid);
+  --badge-solid-text: var(--status-success-solid-text);
+  --badge-glow: var(--status-success-glow);
 }
 
 .badge-error {
   --badge-bg: var(--status-error-bg);
   --badge-text: var(--status-error-text);
   --badge-border: var(--status-error-border);
+  --badge-solid-bg: var(--status-error-solid);
+  --badge-solid-text: var(--status-error-solid-text);
+  --badge-glow: var(--status-error-glow);
 }
 
 .badge-warning {
   --badge-bg: var(--status-warning-bg);
   --badge-text: var(--status-warning-text);
   --badge-border: var(--status-warning-border);
+  --badge-solid-bg: var(--status-warning-solid);
+  --badge-solid-text: var(--status-warning-solid-text);
+  --badge-glow: var(--status-warning-glow);
 }
 
 .badge-info {
   --badge-bg: var(--status-info-bg);
   --badge-text: var(--status-info-text);
   --badge-border: var(--status-info-border);
+  --badge-solid-bg: var(--status-info-solid);
+  --badge-solid-text: var(--status-info-solid-text);
+  --badge-glow: var(--status-info-glow);
 }
 
 .badge-neutral {
   --badge-bg: var(--status-neutral-bg);
   --badge-text: var(--status-neutral-text);
   --badge-border: var(--status-neutral-border);
+  --badge-solid-bg: var(--status-neutral-solid);
+  --badge-solid-text: var(--status-neutral-solid-text);
+  --badge-glow: var(--status-neutral-glow);
 }
 
 .badge-recommended {
   --badge-bg: var(--status-recommended-bg);
   --badge-text: var(--status-recommended-text);
   --badge-border: var(--status-recommended-border);
+  --badge-solid-bg: var(--status-recommended-solid);
+  --badge-solid-text: var(--status-recommended-solid-text);
+  --badge-glow: var(--status-recommended-glow);
+}
+
+@keyframes badge-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, currentColor 14%, transparent),
+      0 0 12px color-mix(in srgb, currentColor 24%, transparent);
+  }
+
+  50% {
+    transform: scale(0.92);
+    box-shadow:
+      0 0 0 5px color-mix(in srgb, currentColor 8%, transparent),
+      0 0 18px color-mix(in srgb, currentColor 38%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-dot-pulse .badge-dot {
+    animation: none;
+  }
 }
 
 .status-badge {

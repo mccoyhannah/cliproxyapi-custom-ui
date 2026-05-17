@@ -336,23 +336,30 @@
 }
 
 .filterTag {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
   max-width: 100%;
-  padding: 7px 12px 7px 8px;
+  min-height: 34px;
+  padding: 5px 11px 5px 7px;
   border-radius: 8px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 720;
   line-height: 1.2;
   border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 90%, var(--bg-primary));
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 1px 1px color-mix(in srgb, #000 5%, transparent);
+  overflow: hidden;
+  box-shadow:
+    0 1px 1px color-mix(in srgb, #000 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 13%, transparent);
   transition:
     transform $transition-fast,
     box-shadow $transition-fast,
@@ -360,11 +367,59 @@
     background-color $transition-fast,
     color $transition-fast;
 
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border-radius: 7px;
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--filter-color) 18%, transparent), transparent 70%),
+      linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent);
+    opacity: 0;
+    transform: translateX(-9px);
+    transition:
+      opacity $transition-fast,
+      transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    pointer-events: none;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -35% auto -35% -40%;
+    width: 42%;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, #fff 28%, transparent), transparent);
+    opacity: 0;
+    transform: translateX(-40%);
+    transition:
+      opacity $transition-fast,
+      transform 420ms ease;
+    pointer-events: none;
+  }
+
   &:hover {
     transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--filter-color) 40%, var(--border-color));
     background: color-mix(in srgb, var(--filter-surface) 12%, var(--surface-control));
     color: var(--text-primary);
+    box-shadow:
+      0 10px 22px -20px color-mix(in srgb, var(--filter-color) 60%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--filter-color) 8%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+
+    &::before {
+      opacity: 0.5;
+      transform: translateX(0);
+    }
+
+    &::after {
+      opacity: 0.7;
+      transform: translateX(360%);
+    }
+  }
+
+  &:active {
+    transform: scale(0.98);
   }
 
   &:focus-visible {
@@ -384,14 +439,23 @@
   color: var(--text-primary);
   box-shadow:
     0 6px 18px -16px color-mix(in srgb, var(--filter-color) 70%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--filter-color) 82%, transparent);
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--filter-color) 18%, transparent);
+
+  &::before {
+    opacity: 0.78;
+    transform: translateX(0);
+  }
 
   .filterTagIconWrap {
     border-color: color-mix(in srgb, var(--filter-color) 40%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--filter-color) 10%, transparent);
   }
 }
 
 .filterTagLabel {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -432,16 +496,19 @@
 }
 
 .filterTagCount {
+  position: relative;
+  z-index: 1;
   display: inline-grid;
   place-items: center;
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--filter-color) 18%, transparent);
   background: color-mix(in srgb, var(--filter-color) 12%, transparent);
   color: var(--text-tertiary);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 820;
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
   line-height: 1;
@@ -451,6 +518,7 @@
 .filterTagActive .filterTagCount {
   background: color-mix(in srgb, var(--filter-color) 22%, transparent);
   color: var(--filter-color);
+  border-color: color-mix(in srgb, var(--filter-color) 30%, transparent);
 }
 
 .filterControlsPanel {
@@ -1168,19 +1236,22 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
-  min-height: 18px;
-  padding: 1px 6px;
+  min-height: 22px;
+  padding: 2px 7px;
   border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--bg-secondary) 84%, var(--bg-primary));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--bg-secondary) 84%, var(--bg-primary));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 780;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   box-sizing: border-box;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
 button.codexCompactChip {
@@ -1205,7 +1276,7 @@ button.codexCompactChip {
 .codexCompactPlanChip {
   flex: 0 0 auto;
   gap: 5px;
-  min-height: 22px;
+  min-height: 24px;
   padding: 2px 8px 2px 7px;
   color: var(--codex-plan-text, color-mix(in srgb, var(--text-primary) 88%, var(--text-secondary)));
   border-color: var(--codex-plan-border, color-mix(in srgb, var(--border-color) 74%, transparent));
@@ -1234,7 +1305,7 @@ button.codexCompactChip {
   justify-content: flex-start;
   gap: 5px;
   min-width: 56px;
-  min-height: 20px;
+  min-height: 22px;
   padding: 1px 7px 1px 6px;
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
   background: color-mix(
@@ -1320,11 +1391,15 @@ button.codexCompactChip {
   align-items: center;
   width: fit-content;
   max-width: 170px;
-  min-height: 18px;
-  padding: 1px 7px;
+  min-height: 22px;
+  padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent),
+    color-mix(in srgb, currentColor 8%, transparent);
+  font-weight: 800;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
 button.codexSubscriptionValue {
@@ -1342,10 +1417,10 @@ button.codexSubscriptionValue {
   flex: 0 0 auto;
   justify-content: flex-start;
   gap: 4px;
-  min-height: 20px;
+  min-height: 22px;
   max-width: 100%;
   width: fit-content;
-  padding: 1px 7px;
+  padding: 2px 8px;
 }
 
 .codexSubscriptionLabel {
@@ -1879,25 +1954,30 @@ button.codexSubscriptionValue {
 .typeBadge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: 6px;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 760;
   line-height: 1;
   border: 1px solid transparent;
   white-space: nowrap;
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 12%, transparent);
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
+    0 1px 2px color-mix(in srgb, #000 5%, transparent);
 }
 
 .stateBadge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
-  border-radius: 6px;
+  min-height: 24px;
+  padding: 3px 9px;
+  border-radius: 999px;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 780;
   line-height: 1;
   white-space: nowrap;
   letter-spacing: 0;
@@ -2214,11 +2294,12 @@ button.codexSubscriptionValue {
   display: inline-flex;
   align-items: center;
   max-width: 180px;
+  min-height: 22px;
   min-width: 0;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2226,30 +2307,59 @@ button.codexSubscriptionValue {
   text-overflow: ellipsis;
   border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 }
 
 .subscriptionExpiryHealthy {
-  color: var(--success-badge-text, #065f46);
-  background: color-mix(in srgb, var(--success-badge-bg, #d1fae5) 58%, transparent);
+  color: var(--status-info-text, var(--primary-color));
+  border-color: color-mix(in srgb, var(--status-info-border, var(--primary-color)) 78%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--status-info-bg, #dbeafe) 78%, transparent);
 }
 
 .subscriptionExpiryWarning {
   color: var(--warning-text, #92400e);
-  background: color-mix(in srgb, var(--warning-bg, #fef3c7) 68%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warning-bg) 32%, transparent);
+  border-color: color-mix(in srgb, var(--warning-border) 82%, transparent);
+  background: color-mix(in srgb, var(--warning-bg, #fef3c7) 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--warning-bg) 32%, transparent);
 }
 
 .subscriptionExpiryExpired {
   color: var(--failure-badge-text);
-  background: color-mix(in srgb, var(--failure-badge-bg) 62%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger-color) 10%, transparent);
+  border-color: color-mix(in srgb, var(--failure-badge-border) 82%, transparent);
+  background: color-mix(in srgb, var(--failure-badge-bg) 66%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
 .subscriptionExpiryUnset {
   color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
   border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color));
-  background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 8%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--primary-color) 8%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filterTag,
+  .filterTag::before,
+  .filterTag::after,
+  button.codexCompactChip,
+  button.codexSubscriptionValue {
+    transition: none;
+  }
+
+  .filterTag:active,
+  button.codexSubscriptionValue:hover {
+    transform: none;
+  }
 }
 
 .noteText {
