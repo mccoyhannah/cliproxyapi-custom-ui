@@ -4,10 +4,18 @@ import type {
   TokenLedgerModelUsageDatum,
 } from '@/types/usageStatistics';
 import type { TokenUsageMetrics } from './statistics';
-import { UNPARSED_MODEL_LABEL } from './constants';
+import {
+  DEFAULT_TOKEN_LEDGER_FILTERS,
+  TOKEN_LEDGER_RECENT_HOUR_OPTIONS,
+  UNPARSED_MODEL_LABEL,
+} from './constants';
 import { formatDateTime, parseTimestampMs } from './formatters';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const TOKEN_LEDGER_RECENT_HOUR_VALUES = TOKEN_LEDGER_RECENT_HOUR_OPTIONS.map(
+  (option) => option.value
+);
 
 const startOfToday = (): number => {
   const now = new Date();
@@ -19,10 +27,20 @@ const startOfThisMonth = (): number => {
   return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 };
 
+const resolveRecentHours = (value: number | null | undefined): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && TOKEN_LEDGER_RECENT_HOUR_VALUES.includes(parsed)
+    ? parsed
+    : DEFAULT_TOKEN_LEDGER_FILTERS.recentHours;
+};
+
 export const getTokenLedgerRangeWindow = (
   filters: TokenLedgerFilters
 ): { start: number | null; end: number | null } => {
   const now = Date.now();
+  if (filters.range === 'hours') {
+    return { start: now - resolveRecentHours(filters.recentHours) * HOUR_MS, end: now };
+  }
   if (filters.range === 'today') return { start: startOfToday(), end: now };
   if (filters.range === '7d') return { start: now - 7 * DAY_MS, end: now };
   if (filters.range === '30d') return { start: now - 30 * DAY_MS, end: now };
@@ -35,6 +53,7 @@ export const getTokenLedgerRangeWindow = (
 };
 
 export const formatTokenLedgerRangeLabel = (filters: TokenLedgerFilters): string => {
+  if (filters.range === 'hours') return `最近 ${resolveRecentHours(filters.recentHours)} 小时`;
   if (filters.range === 'today') return '今日';
   if (filters.range === '7d') return '最近 7 天';
   if (filters.range === '30d') return '最近 30 天';

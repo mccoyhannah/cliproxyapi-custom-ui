@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { IconRefreshCw } from '@/components/ui/icons';
 import type {
@@ -13,6 +14,7 @@ import type {
 } from '@/types/usageStatistics';
 import {
   DEFAULT_TOKEN_LEDGER_FILTERS,
+  TOKEN_LEDGER_RECENT_HOUR_OPTIONS,
   TOKEN_LEDGER_RANGE_OPTIONS,
   buildTokenLedgerModelUsage,
   calculateTokenLedgerMetrics,
@@ -41,6 +43,10 @@ interface TokenLedgerPanelProps {
 }
 
 const EMPTY_LEDGER_ENTRIES: TokenLedgerEntry[] = [];
+const TOKEN_LEDGER_RECENT_HOUR_SELECT_OPTIONS = TOKEN_LEDGER_RECENT_HOUR_OPTIONS.map((option) => ({
+  value: String(option.value),
+  label: option.label,
+}));
 
 const parseDateMs = (value: string | null | undefined): number | null => {
   if (!value) return null;
@@ -159,6 +165,19 @@ export function TokenLedgerPanel({
             </button>
           ))}
         </div>
+        {normalizedFilters.range === 'hours' && (
+          <div className={styles.ledgerHourSelect}>
+            <span>小时范围</span>
+            <Select
+              value={String(normalizedFilters.recentHours)}
+              options={TOKEN_LEDGER_RECENT_HOUR_SELECT_OPTIONS}
+              onChange={(value) => setFilterValue('recentHours', Number(value))}
+              ariaLabel="选择长期 Token 台账最近小时范围"
+              className={styles.ledgerHourSelectControl}
+              fullWidth={false}
+            />
+          </div>
+        )}
         {ledger && <span className={styles.ledgerRangeNote}>当前范围 {selectedSpanLabel}</span>}
       </div>
 

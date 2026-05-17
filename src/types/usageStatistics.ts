@@ -22,7 +22,7 @@ export type TokenUsageStatus =
   | 'unavailable'
   | 'error';
 
-export type TokenLedgerRangePreset = 'today' | '7d' | '30d' | 'month' | 'custom';
+export type TokenLedgerRangePreset = 'hours' | 'today' | '7d' | '30d' | 'month' | 'custom';
 
 export type TokenLedgerEntryStatus = 'ready' | 'missing-fields' | 'error';
 
@@ -37,6 +37,7 @@ export interface TokenUsage {
 
 export interface TokenLedgerFilters {
   range: TokenLedgerRangePreset;
+  recentHours: number;
   customStart: string;
   customEnd: string;
 }

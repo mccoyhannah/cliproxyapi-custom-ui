@@ -27,16 +27,28 @@ export const RANGE_OPTIONS: Array<{ value: UsageStatsRangePreset; label: string 
 
 export const DEFAULT_TOKEN_LEDGER_FILTERS: TokenLedgerFilters = {
   range: '30d',
+  recentHours: 6,
   customStart: '',
   customEnd: '',
 };
 
 export const TOKEN_LEDGER_RANGE_OPTIONS: Array<{ value: TokenLedgerRangePreset; label: string }> = [
+  { value: 'hours', label: '最近几小时' },
   { value: 'today', label: '今日' },
   { value: '7d', label: '最近 7 天' },
   { value: '30d', label: '最近 30 天' },
   { value: 'month', label: '本月' },
   { value: 'custom', label: '自定义' },
+];
+
+export const TOKEN_LEDGER_RECENT_HOUR_OPTIONS = [
+  { value: 1, label: '1 小时' },
+  { value: 3, label: '3 小时' },
+  { value: 6, label: '6 小时' },
+  { value: 12, label: '12 小时' },
+  { value: 24, label: '24 小时' },
+  { value: 48, label: '48 小时' },
+  { value: 72, label: '72 小时' },
 ];
 
 export const REFRESH_INTERVAL_OPTIONS = [

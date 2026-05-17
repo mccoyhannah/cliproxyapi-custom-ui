@@ -495,75 +495,85 @@ export function UsageStatisticsPage() {
         setFilterValue={setTokenLedgerFilterValue}
       />
 
-      <UsageMetricsGrid
-        aggregateTotals={aggregateTotals}
-        loading={initialLoading}
-        onCompleteTokenDetails={() => void handleCompleteTokenDetails()}
-        rangeLabel={rangeLabel}
-        requestMetrics={requestMetrics}
-        tokenCompletionDisabled={
-          tokenCompletionLoading ||
-          connectionStatus !== 'connected' ||
-          filteredRecords.every((record) => record.detailStatus !== 'pending')
-        }
-        tokenCompletionLoading={tokenCompletionLoading}
-        tokenMetrics={tokenMetrics}
-      />
+      <section className={styles.currentWindowSection} aria-labelledby="current-window-title">
+        <div className={styles.currentWindowHeader}>
+          <div>
+            <span>当前加载窗口</span>
+            <h2 id="current-window-title">当前窗口统计</h2>
+          </div>
+          <p>{rangeLabel} · 筛选器和明细只作用于下方当前日志窗口</p>
+        </div>
 
-      <UsageCharts
-        latencyMax={latencyMax}
-        loading={initialLoading}
-        modelMatrix={modelMatrix}
-        modelUsage={modelUsage}
-        normalizedFilters={normalizedFilters}
-        onModelUsageClick={handleModelUsageClick}
-        rangeLabel={rangeLabel}
-        requestMetrics={requestMetrics}
-        tokenMetrics={tokenMetrics}
-        timelineBuckets={timelineBuckets}
-        timelineMax={timelineMax}
-      />
-
-      <UsageFilters
-        autoRefresh={autoRefresh}
-        configAvailable={Boolean(config)}
-        connectionStatus={connectionStatus}
-        enablingRequestLog={enablingRequestLog}
-        error={error}
-        modelOptions={modelOptions}
-        normalizedFilters={normalizedFilters}
-        onEnableRequestLog={() => void handleEnableRequestLog()}
-        refreshInterval={refreshInterval}
-        requestLogEnabled={requestLogEnabled}
-        setAutoRefresh={setAutoRefresh}
-        setFilterValue={setFilterValue}
-        setRefreshInterval={setRefreshInterval}
-        sourceOptions={sourceOptions}
-      />
-
-      <div className={styles.workbenchGrid}>
-        <UsageRequestsTable
-          filteredRecords={filteredRecords}
+        <UsageMetricsGrid
+          aggregateTotals={aggregateTotals}
           loading={initialLoading}
-          maxIndexLines={MAX_INDEX_LINES}
-          onNextPage={() => setPage((current) => Math.min(pageCount, current + 1))}
-          onPreviousPage={() => setPage((current) => Math.max(1, current - 1))}
-          onSelectRecord={handleSelectRecord}
-          pageCount={pageCount}
-          pagedRecords={pagedRecords}
+          onCompleteTokenDetails={() => void handleCompleteTokenDetails()}
           rangeLabel={rangeLabel}
-          safePage={safePage}
-          selectedRecord={selectedRecord}
+          requestMetrics={requestMetrics}
+          tokenCompletionDisabled={
+            tokenCompletionLoading ||
+            connectionStatus !== 'connected' ||
+            filteredRecords.every((record) => record.detailStatus !== 'pending')
+          }
+          tokenCompletionLoading={tokenCompletionLoading}
+          tokenMetrics={tokenMetrics}
         />
 
-        <UsageDetailsRail
-          downloadingId={downloadingId}
+        <UsageCharts
+          latencyMax={latencyMax}
+          loading={initialLoading}
           modelMatrix={modelMatrix}
-          onDownloadLog={(requestId) => void handleDownloadRequestLog(requestId)}
-          onParseDetails={(requestId) => void loadRequestDetails([requestId], true)}
-          selectedRecord={selectedRecord}
+          modelUsage={modelUsage}
+          normalizedFilters={normalizedFilters}
+          onModelUsageClick={handleModelUsageClick}
+          rangeLabel={rangeLabel}
+          requestMetrics={requestMetrics}
+          tokenMetrics={tokenMetrics}
+          timelineBuckets={timelineBuckets}
+          timelineMax={timelineMax}
         />
-      </div>
+
+        <UsageFilters
+          autoRefresh={autoRefresh}
+          configAvailable={Boolean(config)}
+          connectionStatus={connectionStatus}
+          enablingRequestLog={enablingRequestLog}
+          error={error}
+          modelOptions={modelOptions}
+          normalizedFilters={normalizedFilters}
+          onEnableRequestLog={() => void handleEnableRequestLog()}
+          refreshInterval={refreshInterval}
+          requestLogEnabled={requestLogEnabled}
+          setAutoRefresh={setAutoRefresh}
+          setFilterValue={setFilterValue}
+          setRefreshInterval={setRefreshInterval}
+          sourceOptions={sourceOptions}
+        />
+
+        <div className={styles.workbenchGrid}>
+          <UsageRequestsTable
+            filteredRecords={filteredRecords}
+            loading={initialLoading}
+            maxIndexLines={MAX_INDEX_LINES}
+            onNextPage={() => setPage((current) => Math.min(pageCount, current + 1))}
+            onPreviousPage={() => setPage((current) => Math.max(1, current - 1))}
+            onSelectRecord={handleSelectRecord}
+            pageCount={pageCount}
+            pagedRecords={pagedRecords}
+            rangeLabel={rangeLabel}
+            safePage={safePage}
+            selectedRecord={selectedRecord}
+          />
+
+          <UsageDetailsRail
+            downloadingId={downloadingId}
+            modelMatrix={modelMatrix}
+            onDownloadLog={(requestId) => void handleDownloadRequestLog(requestId)}
+            onParseDetails={(requestId) => void loadRequestDetails([requestId], true)}
+            selectedRecord={selectedRecord}
+          />
+        </div>
+      </section>
     </div>
   );
 }
