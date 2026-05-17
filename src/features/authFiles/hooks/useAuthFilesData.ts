@@ -46,6 +46,7 @@ export type UseAuthFilesDataResult = {
   noteUpdating: Record<string, boolean>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   loadFiles: (options?: LoadAuthFilesOptions) => Promise<void>;
+  uploadAuthFiles: (filesToUpload: File[]) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleDelete: (name: string) => void;
@@ -198,18 +199,16 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const fileList = event.target.files;
-      if (!fileList || fileList.length === 0) return;
+  const uploadAuthFiles = useCallback(
+    async (filesToUpload: File[]) => {
+      if (filesToUpload.length === 0) return;
 
-      const filesToUpload = Array.from(fileList);
       const validFiles: File[] = [];
       const invalidFiles: string[] = [];
       const oversizedFiles: string[] = [];
 
       filesToUpload.forEach((file) => {
-        if (!file.name.endsWith('.json')) {
+        if (!file.name.toLowerCase().endsWith('.json')) {
           invalidFiles.push(file.name);
           return;
         }
@@ -231,7 +230,6 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       }
 
       if (validFiles.length === 0) {
-        event.target.value = '';
         return;
       }
 
@@ -260,10 +258,23 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         showNotification(`${t('notification.upload_failed')}: ${errorMessage}`, 'error');
       } finally {
         setUploading(false);
-        event.target.value = '';
       }
     },
     [loadFiles, showNotification, t]
+  );
+
+  const handleFileChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const fileList = event.target.files;
+      if (!fileList || fileList.length === 0) return;
+
+      try {
+        await uploadAuthFiles(Array.from(fileList));
+      } finally {
+        event.target.value = '';
+      }
+    },
+    [uploadAuthFiles]
   );
 
   const handleDelete = useCallback(
@@ -834,6 +845,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     noteUpdating,
     fileInputRef,
     loadFiles,
+    uploadAuthFiles,
     handleUploadClick,
     handleFileChange,
     handleDelete,

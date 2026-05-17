@@ -143,6 +143,165 @@
   }
 }
 
+.uploadDropPool {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface-panel) 92%, #eff6ff),
+      color-mix(in srgb, var(--bg-primary) 84%, #ecfeff)
+    );
+  box-shadow:
+    0 14px 32px -26px color-mix(in srgb, var(--primary-color) 50%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent),
+    inset 4px 0 0 color-mix(in srgb, var(--primary-color) 62%, #14b8a6);
+  color: var(--text-primary);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast,
+    background $transition-fast;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 6px;
+    border: 1px dashed color-mix(in srgb, var(--primary-color) 26%, transparent);
+    pointer-events: none;
+  }
+
+  &:hover,
+  &:focus-visible {
+    outline: none;
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary-color) 54%, var(--border-color));
+    box-shadow:
+      0 18px 36px -26px color-mix(in srgb, var(--primary-color) 70%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--primary-color) 10%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 46%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--primary-color) 80%, #14b8a6);
+  }
+
+  @include mobile {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 86px;
+    align-items: flex-start;
+  }
+}
+
+.uploadDropPoolActive {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #14b8a6 64%, var(--primary-color));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, #ecfeff 48%, var(--surface-panel)),
+      color-mix(in srgb, #eff6ff 44%, var(--bg-primary))
+    );
+  box-shadow:
+    0 22px 42px -24px color-mix(in srgb, #14b8a6 62%, transparent),
+    0 0 0 4px color-mix(in srgb, #14b8a6 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent),
+    inset 4px 0 0 #14b8a6;
+
+  &::after {
+    border-color: color-mix(in srgb, #14b8a6 56%, transparent);
+  }
+}
+
+.uploadDropPoolDisabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  transform: none;
+
+  &:hover,
+  &:focus-visible {
+    transform: none;
+    border-color: color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+    box-shadow:
+      0 14px 32px -26px color-mix(in srgb, var(--primary-color) 50%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent),
+      inset 4px 0 0 color-mix(in srgb, var(--primary-color) 62%, #14b8a6);
+  }
+}
+
+.uploadDropPoolIcon {
+  position: relative;
+  z-index: 1;
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 26%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #fff 78%, var(--primary-color) 8%),
+      color-mix(in srgb, var(--surface-control) 78%, #dbeafe)
+    );
+  color: color-mix(in srgb, var(--primary-color) 78%, #0f766e);
+  box-shadow: 0 10px 20px -18px color-mix(in srgb, var(--primary-color) 70%, transparent);
+}
+
+.uploadDropPoolCopy {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uploadDropPoolTitle {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+.uploadDropPoolHint {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.uploadDropPoolStatus {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, #14b8a6 26%, var(--border-color));
+  background: color-mix(in srgb, #ecfdf5 62%, var(--surface-control));
+  color: color-mix(in srgb, #047857 82%, var(--text-primary));
+  font-size: 12px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  @include mobile {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 .filterAllIconWrap {
   position: relative;
   border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
@@ -1168,6 +1327,17 @@ button.codexCompactChip {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
+button.codexSubscriptionValue {
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  border-style: solid;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
 .codexSubscriptionExpiryChip {
   flex: 0 0 auto;
   justify-content: flex-start;
@@ -1217,6 +1387,13 @@ button.codexCompactChip {
   color: var(--text-secondary);
   border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
   background: transparent;
+}
+
+.codexSubscriptionUnset {
+  color: color-mix(in srgb, var(--primary-color) 72%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary));
+  box-shadow: 0 0 0 1px color-mix(in srgb, #fff 20%, transparent) inset;
 }
 
 :global([data-theme='dark']) .codexSubscriptionHealthy {
@@ -2082,6 +2259,13 @@ button.codexCompactChip {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger-color) 10%, transparent);
 }
 
+.subscriptionExpiryUnset {
+  color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 8%, transparent);
+}
+
 .noteText {
   font-size: 12px;
   color: var(--text-secondary);
@@ -2548,6 +2732,93 @@ button.codexCompactChip {
   box-shadow: 0 0 0 3px rgba($error-color, 0.12);
 }
 
+.manualExpiryOverlay:global(.modal-overlay) {
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      color-mix(in srgb, var(--primary-color) 12%, transparent),
+      transparent 34%
+    ),
+    color-mix(in srgb, #0f172a 40%, var(--bg-body));
+  backdrop-filter: blur(10px) saturate(0.92);
+  -webkit-backdrop-filter: blur(10px) saturate(0.92);
+}
+
+.manualExpiryModal:global(.modal) {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-panel) 96%, #eff6ff),
+      color-mix(in srgb, var(--bg-primary) 96%, #f8fafc)
+    );
+  box-shadow:
+    0 28px 70px -34px color-mix(in srgb, #0f172a 76%, transparent),
+    0 0 0 1px color-mix(in srgb, #fff 36%, transparent),
+    inset 4px 0 0 color-mix(in srgb, var(--primary-color) 68%, #14b8a6);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  :global(.modal-header) {
+    min-height: 58px;
+    padding: 16px 58px 14px 20px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--primary-color) 9%, transparent),
+        transparent 58%
+      );
+  }
+
+  :global(.modal-title) {
+    font-size: 19px;
+    font-weight: 820;
+  }
+
+  :global(.modal-body) {
+    padding: 18px 20px;
+    background: color-mix(in srgb, var(--bg-primary) 78%, transparent);
+  }
+
+  :global(.modal-footer) {
+    padding: 14px 20px 18px;
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 66%, transparent);
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--surface-panel) 90%, transparent),
+        color-mix(in srgb, var(--bg-primary) 96%, transparent)
+      );
+  }
+
+  :global(.modal-close-floating) {
+    top: 14px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
+    box-shadow: 0 10px 22px -18px color-mix(in srgb, #0f172a 70%, transparent);
+  }
+}
+
+.manualExpiryModalTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    width: 8px;
+    height: 22px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, var(--primary-color), #14b8a6);
+    box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--primary-color) 80%, transparent);
+  }
+}
+
 .manualExpiryEditor {
   display: flex;
   flex-direction: column;
@@ -2557,13 +2828,21 @@ button.codexCompactChip {
 
 .manualExpiryTarget {
   min-width: 0;
-  padding: 9px 10px;
+  padding: 12px 14px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 54%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface-control) 92%, #eef2ff),
+      color-mix(in srgb, var(--bg-primary) 86%, #ecfeff)
+    );
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 760;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 58%, #14b8a6),
+    0 10px 24px -22px color-mix(in srgb, var(--primary-color) 55%, transparent);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2571,8 +2850,8 @@ button.codexCompactChip {
 
 .manualExpiryFields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(112px, 0.62fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 0.62fr);
+  gap: 12px;
 
   @include mobile {
     grid-template-columns: 1fr;
@@ -2582,40 +2861,54 @@ button.codexCompactChip {
 .manualExpiryField {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 94%, var(--bg-primary));
+  box-shadow:
+    var(--shadow-control),
+    inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
 
   span {
     font-size: 11px;
-    font-weight: 740;
-    color: var(--text-tertiary);
+    font-weight: 780;
+    color: var(--text-secondary);
   }
 
   input {
-    height: 38px;
+    height: 42px;
     min-width: 0;
-    padding: 7px 10px;
+    padding: 8px 11px;
     border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
-    background: var(--surface-control);
+    border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+    background: color-mix(in srgb, var(--bg-primary) 96%, #fff);
     color: var(--text-primary);
-    font-size: 13px;
-    font-weight: 680;
+    font-size: 14px;
+    font-weight: 760;
     font-variant-numeric: tabular-nums;
     box-sizing: border-box;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent);
 
     &:focus {
       outline: none;
-      border-color: color-mix(in srgb, var(--primary-color) 70%, var(--border-color));
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+      border-color: color-mix(in srgb, var(--primary-color) 72%, var(--border-color));
+      box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent),
+        inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent);
     }
   }
 }
 
 .manualExpiryHint {
-  color: var(--text-tertiary);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #14b8a6 18%, var(--border-color));
+  background: color-mix(in srgb, #ecfdf5 48%, var(--surface-panel));
+  color: color-mix(in srgb, var(--text-secondary) 84%, #047857);
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .manualExpiryFooter {

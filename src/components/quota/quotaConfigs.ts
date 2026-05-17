@@ -892,6 +892,8 @@ const renderCodexItems = (
     (!currentPlanIsFree &&
       effectiveSubscriptionStatus === 'found' &&
       Boolean(effectiveSubscriptionActiveUntil));
+  const canSetManualSubscriptionExpiry =
+    isAuthCard && Boolean(normalizedPlanType) && !currentPlanIsFree && !hasSubscriptionExpiry;
 
   const getPlanLabel = (pt?: string | null): string | null => {
     const normalized = normalizePlanType(pt);
@@ -924,7 +926,10 @@ const renderCodexItems = (
   const nowMs = Date.now();
   const warningMs = 7 * 24 * 60 * 60 * 1000;
   const subscriptionStatusClass =
-    effectiveSubscriptionStatus === 'read_error' || effectiveSubscriptionStatus === 'missing'
+    canSetManualSubscriptionExpiry
+      ? styleMap.codexSubscriptionUnset
+      : effectiveSubscriptionStatus === 'read_error' ||
+    effectiveSubscriptionStatus === 'missing'
       ? styleMap.codexSubscriptionMuted
       : effectiveSubscriptionActiveUntilMs !== null && effectiveSubscriptionActiveUntilMs <= nowMs
       ? styleMap.codexSubscriptionExpired
@@ -1019,7 +1024,7 @@ const renderCodexItems = (
       );
     });
 
-    if (hasSubscriptionExpiry) {
+    if (hasSubscriptionExpiry || canSetManualSubscriptionExpiry) {
       pushChip(
         identityNodes,
         'subscription-expiry',
@@ -1034,11 +1039,13 @@ const renderCodexItems = (
           h(
             'strong',
             { className: styleMap.codexSubscriptionDate },
-            manualExpiry?.label ??
-              formatCodexSubscriptionShortDate(
-                effectiveSubscriptionActiveUntilMs,
-                effectiveSubscriptionActiveUntil
-              )
+            canSetManualSubscriptionExpiry
+              ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+              : manualExpiry?.label ??
+                formatCodexSubscriptionShortDate(
+                  effectiveSubscriptionActiveUntilMs,
+                  effectiveSubscriptionActiveUntil
+                )
           )
         ),
         [
@@ -1046,7 +1053,11 @@ const renderCodexItems = (
           styleMap.codexSubscriptionExpiryChip,
           subscriptionStatusClass,
         ].filter(Boolean).join(' '),
-        effectiveSubscriptionActiveUntil,
+        canSetManualSubscriptionExpiry
+          ? t('auth_files.manual_expiry_setup_title', {
+              defaultValue: '为该付费套餐手动设置有效期',
+            })
+          : effectiveSubscriptionActiveUntil,
         helpers.onManualExpiryEdit
       );
     }
@@ -1091,15 +1102,25 @@ const renderCodexItems = (
     labelKey: string,
     value: ReactNode,
     valueClassName = styleMap.codexPlanDateValue,
-    title?: string | null
+    title?: string | null,
+    onClick?: () => void
   ) => {
     if (!value) return;
+    const valueElement = onClick ? 'button' : 'span';
     infoRows.push(
       h(
         'div',
         { key, className: styleMap.codexInfoItem },
         h('span', { className: styleMap.codexPlanLabel }, t(labelKey)),
-        h('span', { className: valueClassName, title: title || undefined }, value)
+        h(
+          valueElement,
+          {
+            className: valueClassName,
+            title: title || undefined,
+            ...(onClick ? { type: 'button', onClick } : {}),
+          },
+          value
+        )
       )
     );
   };
@@ -1120,7 +1141,7 @@ const renderCodexItems = (
         .join(' ');
   pushInfoRow('plan', 'codex_quota.plan_label', planDisplayValue, planValueClass);
 
-  if (isAuthCard && hasSubscriptionExpiry) {
+  if (isAuthCard && (hasSubscriptionExpiry || canSetManualSubscriptionExpiry)) {
     infoRows.push(
       h('span', {
         key: 'subscription-divider',
@@ -1130,14 +1151,18 @@ const renderCodexItems = (
     );
   }
 
-  if (hasSubscriptionExpiry) {
+  if (hasSubscriptionExpiry || canSetManualSubscriptionExpiry) {
     const subscriptionValue = isCompactAuthCard
-      ? manualExpiry?.label ??
+      ? canSetManualSubscriptionExpiry
+        ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+        : manualExpiry?.label ??
         formatCodexSubscriptionShortDate(
           effectiveSubscriptionActiveUntilMs,
           effectiveSubscriptionActiveUntil
         )
-      : effectiveSubscriptionActiveUntil;
+      : canSetManualSubscriptionExpiry
+        ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+        : effectiveSubscriptionActiveUntil;
 
     pushInfoRow(
       'subscription-expiry',
@@ -1150,7 +1175,14 @@ const renderCodexItems = (
         styleMap.codexSubscriptionValue,
         subscriptionStatusClass,
       ].filter(Boolean).join(' '),
-      hasSubscriptionExpiry ? effectiveSubscriptionActiveUntil : null
+      canSetManualSubscriptionExpiry
+        ? t('auth_files.manual_expiry_setup_title', {
+            defaultValue: '为该付费套餐手动设置有效期',
+          })
+        : hasSubscriptionExpiry
+          ? effectiveSubscriptionActiveUntil
+          : null,
+      canSetManualSubscriptionExpiry ? helpers.onManualExpiryEdit : undefined
     );
   }
 

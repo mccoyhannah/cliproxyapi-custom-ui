@@ -146,6 +146,15 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot
       : null;
+  const compactCodexPlanType =
+    compact && quotaType === 'codex' ? normalizePlanType(resolveCodexPlanType(file)) : null;
+  const compactCanSetManualExpiry =
+    compact &&
+    quotaType === 'codex' &&
+    Boolean(compactCodexPlanType) &&
+    compactCodexPlanType !== 'free' &&
+    !manualExpiry &&
+    !compactCodexExpiry;
 
   if ((compact || summaryOnly) && quotaType === 'codex') {
     if (quotaStatus === 'success' && quota) {
@@ -170,12 +179,13 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       );
     }
 
-    if (!manualExpiry && !compactCodexExpiry) return null;
+    if (!manualExpiry && !compactCodexExpiry && !compactCanSetManualExpiry) return null;
 
     const expiryMs = manualExpiry?.expiresAtMs ?? compactCodexExpiry?.subscriptionActiveUntilMs;
     const warningMs = 7 * 24 * 60 * 60 * 1000;
-    const expiryClass =
-      expiryMs !== null && expiryMs !== undefined && expiryMs <= referenceTimeMs
+    const expiryClass = compactCanSetManualExpiry
+      ? styles.codexSubscriptionUnset
+      : expiryMs !== null && expiryMs !== undefined && expiryMs <= referenceTimeMs
         ? styles.codexSubscriptionExpired
         : expiryMs !== null && expiryMs !== undefined && expiryMs - referenceTimeMs <= warningMs
           ? styles.codexSubscriptionWarning
@@ -192,16 +202,24 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
             </span>
             <span
               className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
-              title={manualExpiry?.title ?? compactCodexExpiry?.subscriptionActiveUntil ?? undefined}
+              title={
+                manualExpiry?.title ??
+                compactCodexExpiry?.subscriptionActiveUntil ??
+                t('auth_files.manual_expiry_setup_title', {
+                  defaultValue: '为该付费套餐手动设置有效期',
+                })
+              }
               onClick={onManualExpiryEdit}
               role={onManualExpiryEdit ? 'button' : undefined}
               tabIndex={onManualExpiryEdit ? 0 : undefined}
             >
-              {manualExpiry?.label ??
-                formatCodexSubscriptionShortDate(
-                  compactCodexExpiry?.subscriptionActiveUntilMs,
-                  compactCodexExpiry?.subscriptionActiveUntil
-                )}
+              {compactCanSetManualExpiry
+                ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+                : (manualExpiry?.label ??
+                  formatCodexSubscriptionShortDate(
+                    compactCodexExpiry?.subscriptionActiveUntilMs,
+                    compactCodexExpiry?.subscriptionActiveUntil
+                  ))}
             </span>
           </div>
         </div>

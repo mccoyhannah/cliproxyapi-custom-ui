@@ -252,7 +252,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
     resolvedQuotaType === 'codex'
       ? currentCodexPlanType ?? normalizePlanType(resolveCodexPlanType(file))
       : null;
-  const currentCodexPlanIsFree = currentCodexPlanType === 'free';
   const compactPlanToneClass =
     compact && effectiveCodexPlanType === 'team'
       ? styles.fileCardCompactPlanTeam
@@ -263,6 +262,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
           : compact && PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType ?? '')
             ? styles.fileCardCompactPlanPremium
             : '';
+  const codexPlanCanHaveSubscriptionExpiry =
+    resolvedQuotaType === 'codex' &&
+    Boolean(effectiveCodexPlanType) &&
+    effectiveCodexPlanType !== 'free';
 
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndexKey = normalizeRecentRequestAuthIndex(rawAuthIndex);
@@ -307,12 +310,14 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =
     resolvedQuotaType === 'codex' &&
-    !currentCodexPlanIsFree &&
+    codexPlanCanHaveSubscriptionExpiry &&
     codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot
       : null;
   const manualExpiry = buildManualExpiryRenderInfo(manualExpiryMs);
+  const showManualExpirySetup =
+    codexPlanCanHaveSubscriptionExpiry && !manualExpiry && !visibleCodexSubscription;
   const subscriptionWarningMs = 7 * 24 * 60 * 60 * 1000;
   const subscriptionExpiryMs =
     manualExpiry?.expiresAtMs ?? visibleCodexSubscription?.subscriptionActiveUntilMs;
@@ -325,11 +330,13 @@ export function AuthFileCard(props: AuthFileCardProps) {
     subscriptionExpiryMs !== null &&
     subscriptionExpiryMs !== undefined &&
     subscriptionExpiryMs - referenceTimeMs <= subscriptionWarningMs;
-  const subscriptionExpiryClass = subscriptionExpired
-    ? styles.subscriptionExpiryExpired
-    : subscriptionExpiringSoon
-      ? styles.subscriptionExpiryWarning
-      : styles.subscriptionExpiryHealthy;
+  const subscriptionExpiryClass = showManualExpirySetup
+    ? styles.subscriptionExpiryUnset
+    : subscriptionExpired
+      ? styles.subscriptionExpiryExpired
+      : subscriptionExpiringSoon
+        ? styles.subscriptionExpiryWarning
+        : styles.subscriptionExpiryHealthy;
   const subscriptionSignalLabel = subscriptionExpired
     ? t('auth_files.subscription_signal_expired', { defaultValue: '订阅到期' })
     : subscriptionExpiringSoon
@@ -341,16 +348,24 @@ export function AuthFileCard(props: AuthFileCardProps) {
       ? styles.signalBadgeWarning
       : '';
   const subscriptionExpiryLabel =
-    manualExpiry?.title ?? visibleCodexSubscription?.subscriptionActiveUntil ?? '';
+    manualExpiry?.title ??
+    visibleCodexSubscription?.subscriptionActiveUntil ??
+    t('auth_files.manual_expiry_setup_title', {
+      defaultValue: '为该付费套餐手动设置有效期',
+    });
   const subscriptionExpiryDisplayLabel = compact
-    ? manualExpiry?.label ??
+    ? showManualExpirySetup
+      ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+      : manualExpiry?.label ??
       formatCodexSubscriptionShortDate(
         visibleCodexSubscription?.subscriptionActiveUntilMs,
         subscriptionExpiryLabel
       )
-    : subscriptionExpiryLabel;
+    : showManualExpirySetup
+      ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+      : subscriptionExpiryLabel;
   const showSubscriptionMeta =
-    Boolean(manualExpiry || visibleCodexSubscription) && !showQuotaLayout;
+    Boolean(manualExpiry || visibleCodexSubscription || showManualExpirySetup) && !showQuotaLayout;
 
   const setPriorityInput = (value: string) => {
     setPriorityDraft({ fileName: file.name, value, dirty: true });

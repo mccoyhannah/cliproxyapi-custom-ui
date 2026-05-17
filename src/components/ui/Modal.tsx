@@ -18,6 +18,7 @@ interface ModalProps {
   footer?: ReactNode;
   width?: number | string;
   className?: string;
+  overlayClassName?: string;
   closeDisabled?: boolean;
 }
 
@@ -123,6 +124,7 @@ export function Modal({
   footer,
   width = 520,
   className,
+  overlayClassName,
   closeDisabled = false,
   children,
 }: PropsWithChildren<ModalProps>) {
@@ -269,7 +271,7 @@ export function Modal({
 
   if (!open && !isVisible) return null;
 
-  const overlayClass = `modal-overlay ${isClosing ? 'modal-overlay-closing' : 'modal-overlay-entering'}`;
+  const overlayClass = `modal-overlay ${isClosing ? 'modal-overlay-closing' : 'modal-overlay-entering'}${overlayClassName ? ` ${overlayClassName}` : ''}`;
   const modalClass = `modal ${isClosing ? 'modal-closing' : 'modal-entering'}${className ? ` ${className}` : ''}`;
 
   const modalContent = (

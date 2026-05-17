@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +22,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { IconFilterAll } from '@/components/ui/icons';
+import { IconFilterAll, IconInbox } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -137,6 +139,7 @@ export function AuthFilesPage() {
   const [manualExpiryEditorFile, setManualExpiryEditorFile] = useState<AuthFileItem | null>(null);
   const [manualExpiryDateInput, setManualExpiryDateInput] = useState('');
   const [manualExpiryTimeInput, setManualExpiryTimeInput] = useState('');
+  const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
@@ -161,6 +164,7 @@ export function AuthFilesPage() {
     noteUpdating,
     fileInputRef,
     loadFiles,
+    uploadAuthFiles,
     handleUploadClick,
     handleFileChange,
     handleDelete,
@@ -227,6 +231,7 @@ export function AuthFilesPage() {
   });
 
   const disableControls = connectionStatus !== 'connected';
+  const uploadDropDisabled = disableControls || uploading;
   const normalizedFilter = normalizeProviderKey(String(filter));
   const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
     normalizedFilter as QuotaProviderType
@@ -234,6 +239,68 @@ export function AuthFilesPage() {
     ? (normalizedFilter as QuotaProviderType)
     : null;
   const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
+
+  const stopUploadDropEvent = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const hasDraggedFiles = (event: DragEvent<HTMLElement>) =>
+    Array.from(event.dataTransfer.types).includes('Files');
+
+  const handleUploadPoolClick = useCallback(() => {
+    if (uploadDropDisabled) return;
+    handleUploadClick();
+  }, [handleUploadClick, uploadDropDisabled]);
+
+  const handleUploadPoolKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (uploadDropDisabled || (event.key !== 'Enter' && event.key !== ' ')) return;
+      event.preventDefault();
+      handleUploadClick();
+    },
+    [handleUploadClick, uploadDropDisabled]
+  );
+
+  const handleUploadPoolDragEnter = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      stopUploadDropEvent(event);
+      if (!uploadDropDisabled && hasDraggedFiles(event)) {
+        setUploadDropActive(true);
+      }
+    },
+    [uploadDropDisabled]
+  );
+
+  const handleUploadPoolDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      stopUploadDropEvent(event);
+      event.dataTransfer.dropEffect = uploadDropDisabled ? 'none' : 'copy';
+      if (!uploadDropDisabled && hasDraggedFiles(event)) {
+        setUploadDropActive(true);
+      }
+    },
+    [uploadDropDisabled]
+  );
+
+  const handleUploadPoolDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+    stopUploadDropEvent(event);
+    const nextTarget = event.relatedTarget;
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
+    setUploadDropActive(false);
+  }, []);
+
+  const handleUploadPoolDrop = useCallback(
+    async (event: DragEvent<HTMLDivElement>) => {
+      stopUploadDropEvent(event);
+      setUploadDropActive(false);
+      if (uploadDropDisabled) return;
+
+      const droppedFiles = Array.from(event.dataTransfer.files);
+      await uploadAuthFiles(droppedFiles);
+    },
+    [uploadAuthFiles, uploadDropDisabled]
+  );
 
   useEffect(() => {
     setManualExpiryByFile(bootstrapAuthFilesManualExpiry());
@@ -857,6 +924,18 @@ export function AuthFilesPage() {
   const manualExpiryEditorExistingMs = manualExpiryEditorFile
     ? getManualExpiryMs(manualExpiryByFile, manualExpiryEditorFile.name)
     : null;
+  const uploadDropPoolClass = [
+    styles.uploadDropPool,
+    uploadDropActive ? styles.uploadDropPoolActive : '',
+    uploadDropDisabled ? styles.uploadDropPoolDisabled : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const uploadDropStatusLabel = uploading
+    ? t('auth_files.upload_pool_uploading', { defaultValue: '上传中' })
+    : disableControls
+      ? t('auth_files.upload_pool_disconnected', { defaultValue: '未连接' })
+      : t('auth_files.upload_pool_ready', { defaultValue: '就绪' });
 
   return (
     <div className={styles.container}>
@@ -924,6 +1003,34 @@ export function AuthFilesPage() {
 
         <div className={styles.filterSection}>
           {renderFilterTags()}
+
+          <div
+            className={uploadDropPoolClass}
+            role="button"
+            tabIndex={uploadDropDisabled ? -1 : 0}
+            aria-disabled={uploadDropDisabled}
+            onClick={handleUploadPoolClick}
+            onKeyDown={handleUploadPoolKeyDown}
+            onDragEnter={handleUploadPoolDragEnter}
+            onDragOver={handleUploadPoolDragOver}
+            onDragLeave={handleUploadPoolDragLeave}
+            onDrop={handleUploadPoolDrop}
+          >
+            <span className={styles.uploadDropPoolIcon} aria-hidden="true">
+              <IconInbox size={20} />
+            </span>
+            <span className={styles.uploadDropPoolCopy}>
+              <span className={styles.uploadDropPoolTitle}>
+                {t('auth_files.upload_pool_title', { defaultValue: '拖入 JSON 认证文件' })}
+              </span>
+              <span className={styles.uploadDropPoolHint}>
+                {t('auth_files.upload_pool_hint', {
+                  defaultValue: '支持多文件，松手后直接上传；也可以点击这里选择文件。',
+                })}
+              </span>
+            </span>
+            <span className={styles.uploadDropPoolStatus}>{uploadDropStatusLabel}</span>
+          </div>
 
           <div className={styles.filterContent}>
             <div className={styles.filterControlsPanel}>
@@ -1172,9 +1279,15 @@ export function AuthFilesPage() {
 
       <Modal
         open={Boolean(manualExpiryEditorFile)}
-        title={t('auth_files.manual_expiry_title', { defaultValue: '手动有效期' })}
+        title={
+          <span className={styles.manualExpiryModalTitle}>
+            {t('auth_files.manual_expiry_title', { defaultValue: '手动有效期' })}
+          </span>
+        }
         onClose={closeManualExpiryEditor}
-        width={420}
+        width={460}
+        className={styles.manualExpiryModal}
+        overlayClassName={styles.manualExpiryOverlay}
         footer={
           <div className={styles.manualExpiryFooter}>
             <Button
