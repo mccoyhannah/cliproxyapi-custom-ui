@@ -14,17 +14,9 @@ import {
 } from '@/components/ui/icons';
 import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
 import { useQuotaStore } from '@/stores';
-import type {
-  AntigravityQuotaState,
-  AuthFileItem,
-  ClaudeQuotaState,
-  CodexQuotaState,
-  GeminiCliQuotaState,
-  KimiQuotaState,
-} from '@/types';
+import type { AuthFileItem } from '@/types';
 import {
   formatCodexSubscriptionShortDate,
-  getCodexMinRemainingPercent,
   normalizePlanType,
   resolveCodexPlanType,
   resolveAuthProvider,
@@ -54,17 +46,7 @@ import { buildManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
 import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
-const QUOTA_WARNING_REMAINING_PERCENT = 30;
-const QUOTA_CRITICAL_REMAINING_PERCENT = 12;
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
-
-type AuthCardQuotaState =
-  | AntigravityQuotaState
-  | ClaudeQuotaState
-  | CodexQuotaState
-  | GeminiCliQuotaState
-  | KimiQuotaState
-  | undefined;
 
 export type AuthFileCardProps = {
   file: AuthFileItem;
@@ -96,69 +78,6 @@ const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
   const provider = resolveAuthProvider(file);
   if (!QUOTA_PROVIDER_TYPES.has(provider as QuotaProviderType)) return null;
   return provider as QuotaProviderType;
-};
-
-const clampPercent = (value: number) => Math.max(0, Math.min(100, value));
-
-const minFiniteValue = (values: Array<number | null | undefined>): number | null => {
-  const finiteValues = values.filter(
-    (value): value is number => typeof value === 'number' && Number.isFinite(value)
-  );
-  return finiteValues.length > 0 ? Math.min(...finiteValues) : null;
-};
-
-const usedPercentToRemaining = (value: number | null | undefined): number | null =>
-  typeof value === 'number' && Number.isFinite(value) ? clampPercent(100 - value) : null;
-
-const quotaFractionToPercent = (value: number | null | undefined): number | null =>
-  typeof value === 'number' && Number.isFinite(value) ? clampPercent(value * 100) : null;
-
-const getQuotaRemainingPercent = (
-  quotaType: QuotaProviderType | null,
-  quota: AuthCardQuotaState
-): number | null => {
-  if (!quota || quota.status !== 'success') return null;
-
-  if (quotaType === 'codex') {
-    return getCodexMinRemainingPercent(quota as CodexQuotaState);
-  }
-
-  if (quotaType === 'claude') {
-    const claudeQuota = quota as ClaudeQuotaState;
-    return minFiniteValue([
-      ...(claudeQuota.windows ?? []).map((window) => usedPercentToRemaining(window.usedPercent)),
-      claudeQuota.extraUsage?.is_enabled
-        ? usedPercentToRemaining(claudeQuota.extraUsage.utilization)
-        : null,
-    ]);
-  }
-
-  if (quotaType === 'antigravity') {
-    return minFiniteValue(
-      ((quota as AntigravityQuotaState).groups ?? []).map((group) =>
-        quotaFractionToPercent(group.remainingFraction)
-      )
-    );
-  }
-
-  if (quotaType === 'gemini-cli') {
-    return minFiniteValue(
-      ((quota as GeminiCliQuotaState).buckets ?? []).map((bucket) =>
-        quotaFractionToPercent(bucket.remainingFraction)
-      )
-    );
-  }
-
-  if (quotaType === 'kimi') {
-    return minFiniteValue(
-      ((quota as KimiQuotaState).rows ?? []).map((row) => {
-        if (row.limit <= 0) return null;
-        return clampPercent(((row.limit - row.used) / row.limit) * 100);
-      })
-    );
-  }
-
-  return null;
 };
 
 export function AuthFileCard(props: AuthFileCardProps) {
@@ -201,39 +120,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const selectedQuotaType =
     quotaFilterType && resolvedQuotaType === quotaFilterType ? quotaFilterType : null;
   const quotaType = selectedQuotaType ?? (resolvedQuotaType === 'codex' ? 'codex' : null);
-  const quotaSnapshot = useQuotaStore((state) => {
-    if (resolvedQuotaType === 'antigravity') return state.antigravityQuota[file.name];
-    if (resolvedQuotaType === 'claude') return state.claudeQuota[file.name];
-    if (resolvedQuotaType === 'codex') return state.codexQuota[file.name];
-    if (resolvedQuotaType === 'gemini-cli') return state.geminiCliQuota[file.name];
-    if (resolvedQuotaType === 'kimi') return state.kimiQuota[file.name];
-    return undefined;
-  }) as AuthCardQuotaState;
-  const quotaRemainingPercent = getQuotaRemainingPercent(resolvedQuotaType, quotaSnapshot);
-  const quotaPressure = file.disabled
-    ? null
-    : quotaSnapshot?.status === 'error'
-      ? 'error'
-      : quotaRemainingPercent !== null && quotaRemainingPercent <= QUOTA_CRITICAL_REMAINING_PERCENT
-        ? 'critical'
-        : quotaRemainingPercent !== null && quotaRemainingPercent <= QUOTA_WARNING_REMAINING_PERCENT
-          ? 'warning'
-          : null;
-  const quotaSignalLabel =
-    quotaPressure === 'error'
-      ? t('auth_files.quota_signal_error', { defaultValue: '额度异常' })
-      : quotaPressure === 'critical'
-        ? t('auth_files.quota_signal_critical', { defaultValue: '额度紧张' })
-        : quotaPressure === 'warning'
-          ? t('auth_files.quota_signal_warning', { defaultValue: '额度偏低' })
-          : '';
-  const quotaSignalClass =
-    quotaPressure === 'error' || quotaPressure === 'critical'
-      ? styles.signalBadgeDanger
-      : quotaPressure === 'warning'
-        ? styles.signalBadgeWarning
-        : '';
-
   const showQuotaLayout =
     Boolean(quotaType) &&
     !isRuntimeOnly &&
@@ -337,16 +223,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : subscriptionExpiringSoon
         ? styles.subscriptionExpiryWarning
         : styles.subscriptionExpiryHealthy;
-  const subscriptionSignalLabel = subscriptionExpired
-    ? t('auth_files.subscription_signal_expired', { defaultValue: '订阅到期' })
-    : subscriptionExpiringSoon
-      ? t('auth_files.subscription_signal_warning', { defaultValue: '订阅将到期' })
-      : '';
-  const subscriptionSignalClass = subscriptionExpired
-    ? styles.signalBadgeDanger
-    : subscriptionExpiringSoon
-      ? styles.signalBadgeWarning
-      : '';
   const subscriptionExpiryLabel =
     manualExpiry?.title ??
     visibleCodexSubscription?.subscriptionActiveUntil ??
@@ -476,6 +352,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : hasStatusWarning
         ? styles.stateBadgeWarning
         : styles.stateBadgeActive;
+  const statusWarningLabel = t('auth_files.health_status_warning');
   const cardToneClass = isRuntimeOnly ? styles.fileCardVirtual : '';
 
   return (
@@ -524,31 +401,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 >
                   {typeLabel}
                 </span>
-                <span
-                  className={[
-                    styles.stateBadge,
-                    stateBadgeClass,
-                    hasStatusWarning ? styles.stateBadgeWithInfo : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  title={hasStatusWarning ? rawStatusMessage : undefined}
-                  aria-label={hasStatusWarning ? `${stateLabel}: ${rawStatusMessage}` : undefined}
-                  tabIndex={hasStatusWarning ? 0 : undefined}
-                >
-                  {stateLabel}
-                  {hasStatusWarning && (
-                    <IconInfo className={styles.stateBadgeInfoIcon} size={12} aria-hidden="true" />
-                  )}
-                </span>
-                {quotaSignalLabel && (
-                  <span className={`${styles.signalBadge} ${quotaSignalClass}`}>
-                    {quotaSignalLabel}
-                  </span>
-                )}
-                {subscriptionSignalLabel && (
-                  <span className={`${styles.signalBadge} ${subscriptionSignalClass}`}>
-                    {subscriptionSignalLabel}
+                {isRuntimeOnly && (
+                  <span className={`${styles.stateBadge} ${stateBadgeClass}`}>
+                    {stateLabel}
                   </span>
                 )}
               </div>
@@ -786,6 +641,17 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 <span className={styles.statusToggleLabel}>
                   {t('auth_files.status_toggle_label')}
                 </span>
+                {hasStatusWarning && (
+                  <span
+                    className={`${styles.stateBadge} ${styles.stateBadgeWarning} ${styles.stateBadgeWithInfo}`}
+                    title={rawStatusMessage}
+                    aria-label={`${statusWarningLabel}: ${rawStatusMessage}`}
+                    tabIndex={0}
+                  >
+                    {statusWarningLabel}
+                    <IconInfo className={styles.stateBadgeInfoIcon} size={12} aria-hidden="true" />
+                  </span>
+                )}
                 <ToggleSwitch
                   ariaLabel={t('auth_files.status_toggle_label')}
                   checked={!file.disabled}
