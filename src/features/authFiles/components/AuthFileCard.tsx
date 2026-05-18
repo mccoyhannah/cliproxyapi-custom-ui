@@ -726,7 +726,16 @@ export function AuthFileCard(props: AuthFileCardProps) {
               )}
             </div>
             {!isRuntimeOnly && (
-              <div className={styles.statusToggle}>
+              <div
+                className={`${styles.statusToggle} ${
+                  file.disabled
+                    ? styles.statusToggleDisabled
+                    : hasStatusWarning
+                      ? styles.statusToggleWarning
+                      : styles.statusToggleActive
+                }`}
+              >
+                <span className={styles.statusToggleStateDot} aria-hidden="true" />
                 <span className={styles.statusToggleLabel}>
                   {t('auth_files.status_toggle_label')}
                 </span>
