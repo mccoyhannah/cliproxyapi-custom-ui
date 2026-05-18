@@ -47,6 +47,8 @@ type UploadValidationResult =
   | { file: File; valid: false; reason: UploadValidationRejectReason };
 
 type AuthFileDeleteFailure = { name: string; error: string };
+export type AuthFilePriorityBatchChange = { name: string; priority: number };
+export type AuthFilePriorityBatchResult = { successCount: number; failCount: number };
 type ApiErrorLike = Error & {
   status?: number;
 };
@@ -88,6 +90,9 @@ export type UseAuthFilesDataResult = {
   batchDownload: (names: string[]) => Promise<void>;
   batchSetStatus: (names: string[], enabled: boolean) => Promise<void>;
   batchSetPriority: (names: string[], priority: number) => Promise<void>;
+  batchSetPriorities: (
+    changes: AuthFilePriorityBatchChange[]
+  ) => Promise<AuthFilePriorityBatchResult>;
   batchDelete: (names: string[]) => void;
 };
 
@@ -1031,6 +1036,107 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     [deselectAll, files, priorityUpdating, showNotification, t]
   );
 
+  const batchSetPriorities = useCallback(
+    async (changes: AuthFilePriorityBatchChange[]): Promise<AuthFilePriorityBatchResult> => {
+      if (batchPriorityPendingRef.current) return { successCount: 0, failCount: 0 };
+
+      const changeMap = new Map<string, number>();
+      changes.forEach((change) => {
+        const name = change.name.trim();
+        if (!name) return;
+        changeMap.set(name, change.priority);
+      });
+
+      const targetNameList = Array.from(changeMap.keys());
+      if (targetNameList.length === 0) return { successCount: 0, failCount: 0 };
+      if (targetNameList.some((name) => priorityUpdating[name] === true)) {
+        return { successCount: 0, failCount: targetNameList.length };
+      }
+
+      const targetNames = new Set(targetNameList);
+      const originalPriorities = new Map(
+        files
+          .filter((file) => targetNames.has(file.name))
+          .map((file) => [file.name, file.priority ?? file['priority']])
+      );
+      const existingTargetNameList = targetNameList.filter((name) => originalPriorities.has(name));
+      if (existingTargetNameList.length === 0) return { successCount: 0, failCount: 0 };
+
+      batchPriorityPendingRef.current = true;
+      setBatchPriorityUpdating(true);
+      setPriorityUpdating((prev) => {
+        const next = { ...prev };
+        existingTargetNameList.forEach((name) => {
+          next[name] = true;
+        });
+        return next;
+      });
+      setFiles((prev) =>
+        prev.map((file) =>
+          changeMap.has(file.name) ? { ...file, priority: changeMap.get(file.name) } : file
+        )
+      );
+
+      try {
+        const results = await Promise.allSettled(
+          existingTargetNameList.map((name) =>
+            authFilesApi.patchFields(name, { priority: changeMap.get(name) ?? 0 })
+          )
+        );
+
+        let successCount = 0;
+        let failCount = 0;
+        const failedNames = new Set<string>();
+
+        results.forEach((result, index) => {
+          const name = existingTargetNameList[index];
+          if (result.status === 'fulfilled') {
+            successCount++;
+          } else {
+            failCount++;
+            failedNames.add(name);
+          }
+        });
+
+        setFiles((prev) =>
+          prev.map((file) =>
+            failedNames.has(file.name)
+              ? { ...file, priority: originalPriorities.get(file.name) }
+              : file
+          )
+        );
+
+        if (successCount > 0 && failCount === 0) {
+          showNotification(
+            t('auth_files.priority_rotation_apply_success', { count: successCount }),
+            'success'
+          );
+        } else if (successCount > 0 || failCount > 0) {
+          showNotification(
+            t('auth_files.priority_rotation_apply_partial', {
+              success: successCount,
+              failed: failCount,
+            }),
+            failCount > 0 ? 'warning' : 'success'
+          );
+        }
+
+        return { successCount, failCount };
+      } finally {
+        batchPriorityPendingRef.current = false;
+        setBatchPriorityUpdating(false);
+        setPriorityUpdating((prev) => {
+          const next = { ...prev };
+          existingTargetNameList.forEach((name) => {
+            delete next[name];
+          });
+          return next;
+        });
+      }
+    },
+    [files, priorityUpdating, showNotification, t]
+  );
+
   const batchDownload = useCallback(
     async (names: string[]) => {
       const uniqueNames = Array.from(new Set(names));
@@ -1155,6 +1261,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     batchDownload,
     batchSetStatus,
     batchSetPriority,
+    batchSetPriorities,
     batchDelete,
   };
 }

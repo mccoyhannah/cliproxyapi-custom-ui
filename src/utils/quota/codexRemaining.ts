@@ -22,6 +22,17 @@ export function getCodexMinRemainingPercent(
   return remainingValues.length > 0 ? Math.min(...remainingValues) : null;
 }
 
+export function getCodexFiveHourRemainingPercent(
+  quota: CodexQuotaState | undefined
+): number | null {
+  if (!quota || quota.status !== 'success') return null;
+
+  const fiveHourWindow = (quota.windows ?? []).find((window) => window.id === 'five-hour');
+  const used = fiveHourWindow?.usedPercent;
+  if (typeof used !== 'number' || !Number.isFinite(used)) return null;
+  return clampPercent(100 - used);
+}
+
 export function compareCodexMinRemainingPercentAsc(
   a: number | null,
   b: number | null
