@@ -45,4 +45,18 @@ export const logsApi = {
       responseType: 'blob',
       timeout: LOGS_TIMEOUT_MS
     }),
+
+  downloadRequestLogTextById: (id: string, retryNonce = Date.now()) =>
+    apiClient.getRaw(`/request-log-by-id/${encodeURIComponent(id)}`, {
+      params: { _: retryNonce },
+      responseType: 'text',
+      timeout: LOGS_TIMEOUT_MS,
+      headers: {
+        Accept: 'text/plain, */*',
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        Pragma: 'no-cache',
+        Expires: '0'
+      },
+      validateStatus: (status) => (status >= 200 && status < 300) || status === 304
+    }),
 };

@@ -8,6 +8,7 @@ export type UsageRequestDetailStatus =
   | 'ready'
   | 'missing-fields'
   | 'unavailable'
+  | 'download-error'
   | 'error';
 
 export type ModelMatchStatus = 'match' | 'mismatch' | 'pending' | 'missing' | 'unavailable';

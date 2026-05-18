@@ -109,7 +109,9 @@ const statusFromCode = (statusCode?: number): UsageRequestStatus => {
 const pendingTokenUsage = (detailStatus: UsageRequestDetail['detailStatus']): TokenUsage => {
   if (detailStatus === 'loading') return emptyTokenUsage('loading');
   if (detailStatus === 'error') return emptyTokenUsage('error');
-  if (detailStatus === 'unavailable') return emptyTokenUsage('unavailable');
+  if (detailStatus === 'unavailable' || detailStatus === 'download-error') {
+    return emptyTokenUsage('unavailable');
+  }
   return emptyTokenUsage('pending');
 };
 

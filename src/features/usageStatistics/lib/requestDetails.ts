@@ -26,9 +26,11 @@ export const emptyDetail = (
       ? 'loading'
       : detailStatus === 'pending'
         ? 'pending'
-        : detailStatus === 'error'
-          ? 'error'
-          : detailStatus === 'unavailable'
+      : detailStatus === 'error'
+        ? 'error'
+        : detailStatus === 'unavailable'
+          ? 'unavailable'
+          : detailStatus === 'download-error'
             ? 'unavailable'
             : 'unreported'
   ),
@@ -203,6 +205,10 @@ const splitLogSections = (text: string): Record<string, string> => {
     return sections;
   }, {});
 };
+
+export const hasRequestDetailLogMarkers = (text: string): boolean =>
+  /^===\s*REQUEST BODY\s*===$/m.test(text) &&
+  /^===\s*API REQUEST 1\s*===$/m.test(text);
 
 const parseAuthLine = (
   raw: string

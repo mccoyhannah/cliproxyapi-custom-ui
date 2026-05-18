@@ -41,6 +41,7 @@ import {
   getErrorStatus,
   getLatencyMax,
   getTimelineMax,
+  hasRequestDetailLogMarkers,
   parseDetailLog,
   responseDataToBlob,
   responseDataToText,
@@ -98,6 +99,20 @@ const buildCurrentWindowSummary = (
     end,
     language
   )} · ${formatWindowDuration(start, end)}`;
+};
+
+const REQUEST_DETAIL_PARTIAL_MESSAGE = '详情日志只返回了部分内容，请刷新后重试';
+const REQUEST_DETAIL_EMPTY_MESSAGE = '详情日志为空，请刷新后重试';
+const REQUEST_DETAIL_DOWNLOAD_MESSAGE = '详情下载失败';
+
+const isPartialRequestLogStatus = (status?: number): boolean => status === 206 || status === 304;
+
+const buildDetailDownloadMessage = (message: string, status?: number | null): string => {
+  if (status === 206) return REQUEST_DETAIL_PARTIAL_MESSAGE;
+  if (status === 304) return '详情日志命中了浏览器缓存，请刷新后重试';
+  if (!message) return REQUEST_DETAIL_DOWNLOAD_MESSAGE;
+  if (message.toLowerCase().includes('network error')) return REQUEST_DETAIL_DOWNLOAD_MESSAGE;
+  return `${REQUEST_DETAIL_DOWNLOAD_MESSAGE}: ${message}`;
 };
 
 export function UsageStatisticsPage() {
@@ -219,14 +234,43 @@ export function UsageStatisticsPage() {
 
       const queue = [...candidates];
       const workerCount = Math.min(DETAIL_CONCURRENCY, queue.length);
+      const loadDetailText = async (id: string) => {
+        const fetchText = async (retryIndex: number) => {
+          const response = await logsApi.downloadRequestLogTextById(id, Date.now() + retryIndex);
+          const text = await responseDataToText((response as { data?: unknown }).data);
+          const status = Number((response as { status?: unknown }).status);
+          return { status, text };
+        };
+
+        const first = await fetchText(0);
+        if (
+          !isPartialRequestLogStatus(first.status) &&
+          first.text.trim() &&
+          hasRequestDetailLogMarkers(first.text)
+        ) {
+          return first.text;
+        }
+
+        const second = await fetchText(1);
+        if (isPartialRequestLogStatus(second.status)) {
+          throw new Error(buildDetailDownloadMessage('', second.status));
+        }
+        if (!second.text.trim()) {
+          throw new Error(REQUEST_DETAIL_EMPTY_MESSAGE);
+        }
+        if (!hasRequestDetailLogMarkers(second.text)) {
+          throw new Error(REQUEST_DETAIL_PARTIAL_MESSAGE);
+        }
+        return second.text;
+      };
+
       const workers = Array.from({ length: workerCount }, async () => {
         while (queue.length > 0) {
           const id = queue.shift();
           if (!id) return;
 
           try {
-            const response = await logsApi.downloadRequestLogById(id);
-            const text = await responseDataToText((response as { data?: unknown }).data);
+            const text = await loadDetailText(id);
             const detail = parseDetailLog(id, text);
             setRequestDetails((prev) => ({ ...prev, [id]: detail }));
           } catch (err: unknown) {
@@ -236,8 +280,10 @@ export function UsageStatisticsPage() {
               ...prev,
               [id]: emptyDetail(
                 id,
-                status === 404 ? 'unavailable' : 'error',
-                message || (status === 404 ? '后端没有找到对应详情日志' : '详情解析失败')
+                status === 404 ? 'unavailable' : 'download-error',
+                status === 404
+                  ? '后端没有找到对应详情日志'
+                  : buildDetailDownloadMessage(message, status)
               ),
             }));
           } finally {
@@ -479,7 +525,7 @@ export function UsageStatisticsPage() {
   const handleSelectRecord = useCallback(
     (requestId: string) => {
       setSelectedRequestId(requestId);
-      void loadRequestDetails([requestId]);
+      void loadRequestDetails([requestId], true);
     },
     [loadRequestDetails]
   );

@@ -77,7 +77,13 @@ export const resolveModelMatch = (
   actualModel: string | null
 ): ModelMatchStatus => {
   if (detailStatus === 'pending' || detailStatus === 'loading') return 'pending';
-  if (detailStatus === 'unavailable' || detailStatus === 'error') return 'unavailable';
+  if (
+    detailStatus === 'unavailable' ||
+    detailStatus === 'download-error' ||
+    detailStatus === 'error'
+  ) {
+    return 'unavailable';
+  }
 
   const configured = normalizeModelForCompare(configuredModel);
   const actual = normalizeModelForCompare(actualModel);
@@ -98,6 +104,7 @@ export const getDetailStatusLabel = (status: UsageRequestDetailStatus): string =
   if (status === 'ready') return '已核验';
   if (status === 'missing-fields') return '日志缺字段';
   if (status === 'unavailable') return '无详情';
+  if (status === 'download-error') return '详情下载失败';
   if (status === 'error') return '详情错误';
   return '还没核验';
 };
