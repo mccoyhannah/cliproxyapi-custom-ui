@@ -97,6 +97,8 @@ const BATCH_BAR_BASE_TRANSFORM = 'translateX(-50%)';
 const BATCH_BAR_HIDDEN_TRANSFORM = 'translateX(-50%) translateY(56px)';
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
+const PRIORITY_ROTATION_THRESHOLD_STEP = 5;
+const PRIORITY_ROTATION_SLOT_STEP = 1;
 
 const escapeWildcardSearchSegment = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -117,6 +119,8 @@ const getPrioritySortValue = (file: AuthFileItem): number =>
   parsePriorityValue(file.priority ?? file['priority']) ?? 0;
 
 const formatPriorityRotationPercent = (value: number): string => `${Math.round(value)}%`;
+const formatPriorityRotationPriority = (value: number | null): string =>
+  value === null ? '-' : `P${value}`;
 
 export function AuthFilesPage() {
   const { t } = useTranslation();
@@ -787,6 +791,40 @@ export function AuthFilesPage() {
     [updatePriorityRotationSettings]
   );
 
+  const adjustPriorityRotationThreshold = useCallback(
+    (delta: number) => {
+      const raw = priorityRotationThresholdInput.trim();
+      const base = raw
+        ? normalizePriorityRotationThresholdPercent(raw)
+        : priorityRotationSettings.thresholdPercent;
+      const thresholdPercent = normalizePriorityRotationThresholdPercent(base + delta);
+      setPriorityRotationThresholdInput(String(thresholdPercent));
+      updatePriorityRotationSettings({ thresholdPercent });
+    },
+    [
+      priorityRotationSettings.thresholdPercent,
+      priorityRotationThresholdInput,
+      updatePriorityRotationSettings,
+    ]
+  );
+
+  const adjustPriorityRotationSlots = useCallback(
+    (delta: number) => {
+      const raw = priorityRotationSlotsInput.trim();
+      const base = raw
+        ? normalizePriorityRotationActiveSlotLimit(raw)
+        : priorityRotationSettings.activeSlotLimit;
+      const activeSlotLimit = normalizePriorityRotationActiveSlotLimit(base + delta);
+      setPriorityRotationSlotsInput(String(activeSlotLimit));
+      updatePriorityRotationSettings({ activeSlotLimit });
+    },
+    [
+      priorityRotationSettings.activeSlotLimit,
+      priorityRotationSlotsInput,
+      updatePriorityRotationSettings,
+    ]
+  );
+
   const getPriorityRotationNoChangeMessage = useCallback(
     (analysis: PriorityRotationAnalysis): { message: string; tone: 'info' | 'warning' } => {
       if (analysis.status === 'quota_unknown') {
@@ -1140,6 +1178,26 @@ export function AuthFilesPage() {
           threshold: priorityRotationAnalysis.thresholdPercent,
           slots: priorityRotationAnalysis.activeSlotLimit,
         });
+  const priorityRotationTierItems = [
+    {
+      key: 'active',
+      label: t('auth_files.priority_rotation_tier_active'),
+      value: formatPriorityRotationPriority(priorityRotationAnalysis.activePriority),
+      className: styles.priorityRotationTierActive,
+    },
+    {
+      key: 'standby',
+      label: t('auth_files.priority_rotation_tier_standby'),
+      value: formatPriorityRotationPriority(priorityRotationAnalysis.standbyPriority),
+      className: styles.priorityRotationTierStandby,
+    },
+    {
+      key: 'buffer',
+      label: t('auth_files.priority_rotation_tier_buffer'),
+      value: formatPriorityRotationPriority(priorityRotationAnalysis.reservePriority),
+      className: styles.priorityRotationTierBuffer,
+    },
+  ];
   const getPriorityRotationChangeReason = (change: PriorityRotationChange) => {
     if (change.reason === 'low_remaining') {
       return t('auth_files.priority_rotation_reason_demote_low', {
@@ -1264,43 +1322,89 @@ export function AuthFilesPage() {
                   <span className={styles.priorityRotationMeta}>
                     {priorityRotationLayerLabel}
                   </span>
+                  <span
+                    className={styles.priorityRotationTiers}
+                    aria-label={t('auth_files.priority_rotation_tiers_aria')}
+                  >
+                    {priorityRotationTierItems.map((tier) => (
+                      <span
+                        className={`${styles.priorityRotationTier} ${tier.className}`}
+                        key={tier.key}
+                      >
+                        <span className={styles.priorityRotationTierLabel}>{tier.label}</span>
+                        <span className={styles.priorityRotationTierValue}>{tier.value}</span>
+                      </span>
+                    ))}
+                  </span>
                 </span>
               </div>
               <div className={styles.priorityRotationControls}>
                 <label className={styles.priorityRotationSetting}>
                   <span>{t('auth_files.priority_rotation_threshold_label')}</span>
-                  <span className={styles.priorityRotationSettingInputWrap}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      step={1}
-                      value={priorityRotationThresholdInput}
+                  <span className={styles.priorityRotationStepper}>
+                    <button
+                      type="button"
+                      className={styles.priorityRotationStepperButton}
                       disabled={batchPriorityUpdating}
-                      aria-label={t('auth_files.priority_rotation_threshold_label')}
-                      onChange={(event) =>
-                        setPriorityRotationThresholdInput(event.currentTarget.value)
+                      aria-label={t('auth_files.priority_rotation_threshold_decrease')}
+                      onClick={() =>
+                        adjustPriorityRotationThreshold(-PRIORITY_ROTATION_THRESHOLD_STEP)
                       }
-                      onBlur={(event) =>
-                        commitPriorityRotationThresholdInput(event.currentTarget.value)
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.currentTarget.blur();
+                    >
+                      −
+                    </button>
+                    <span className={styles.priorityRotationStepperValue}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={priorityRotationThresholdInput}
+                        disabled={batchPriorityUpdating}
+                        aria-label={t('auth_files.priority_rotation_threshold_label')}
+                        onChange={(event) =>
+                          setPriorityRotationThresholdInput(event.currentTarget.value)
                         }
-                      }}
-                    />
-                    <span>%</span>
+                        onBlur={(event) =>
+                          commitPriorityRotationThresholdInput(event.currentTarget.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
+                          }
+                        }}
+                      />
+                      <span>%</span>
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.priorityRotationStepperButton}
+                      disabled={batchPriorityUpdating}
+                      aria-label={t('auth_files.priority_rotation_threshold_increase')}
+                      onClick={() =>
+                        adjustPriorityRotationThreshold(PRIORITY_ROTATION_THRESHOLD_STEP)
+                      }
+                    >
+                      +
+                    </button>
                   </span>
                 </label>
                 <label className={styles.priorityRotationSetting}>
                   <span>{t('auth_files.priority_rotation_slots_label')}</span>
-                  <span className={styles.priorityRotationSettingInputWrap}>
+                  <span className={styles.priorityRotationStepper}>
+                    <button
+                      type="button"
+                      className={styles.priorityRotationStepperButton}
+                      disabled={batchPriorityUpdating}
+                      aria-label={t('auth_files.priority_rotation_slots_decrease')}
+                      onClick={() => adjustPriorityRotationSlots(-PRIORITY_ROTATION_SLOT_STEP)}
+                    >
+                      −
+                    </button>
+                    <span className={styles.priorityRotationStepperValue}>
                     <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      step={1}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={priorityRotationSlotsInput}
                       disabled={batchPriorityUpdating}
                       aria-label={t('auth_files.priority_rotation_slots_label')}
@@ -1314,7 +1418,16 @@ export function AuthFilesPage() {
                         }
                       }}
                     />
-                    <span>{t('auth_files.priority_rotation_slots_unit')}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.priorityRotationStepperButton}
+                      disabled={batchPriorityUpdating}
+                      aria-label={t('auth_files.priority_rotation_slots_increase')}
+                      onClick={() => adjustPriorityRotationSlots(PRIORITY_ROTATION_SLOT_STEP)}
+                    >
+                      +
+                    </button>
                   </span>
                 </label>
               </div>
@@ -1694,9 +1807,10 @@ export function AuthFilesPage() {
                 })}
               </span>
               <span>
-                {t('auth_files.priority_rotation_summary_layers', {
-                  active: priorityRotationPreview.activePriority,
-                  standby: priorityRotationPreview.standbyPriority,
+                {t('auth_files.priority_rotation_summary_tiers', {
+                  active: formatPriorityRotationPriority(priorityRotationPreview.activePriority),
+                  standby: formatPriorityRotationPriority(priorityRotationPreview.standbyPriority),
+                  buffer: formatPriorityRotationPriority(priorityRotationPreview.reservePriority),
                 })}
               </span>
               <span>

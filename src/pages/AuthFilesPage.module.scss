@@ -630,7 +630,7 @@
 .priorityRotationCopy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -651,11 +651,61 @@
   white-space: nowrap;
 }
 
+.priorityRotationTiers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.priorityRotationTier {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--tier-color, var(--primary-color)) 28%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
+    color-mix(in srgb, var(--tier-color, var(--primary-color)) 10%, var(--surface-control));
+  color: color-mix(in srgb, var(--tier-color, var(--primary-color)) 82%, var(--text-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.priorityRotationTierActive {
+  --tier-color: #2563eb;
+}
+
+.priorityRotationTierStandby {
+  --tier-color: #0891b2;
+}
+
+.priorityRotationTierBuffer {
+  --tier-color: #64748b;
+}
+
+.priorityRotationTierLabel {
+  color: color-mix(in srgb, currentColor 70%, var(--text-secondary));
+  font-size: 10px;
+  font-weight: 820;
+}
+
+.priorityRotationTierValue {
+  color: currentColor;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 880;
+}
+
 .priorityRotationControls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  grid-template-columns: repeat(2, minmax(142px, 1fr));
   gap: 8px;
-  min-width: 210px;
+  min-width: 300px;
 
   @include mobile {
     min-width: 0;
@@ -674,21 +724,73 @@
   text-transform: uppercase;
 }
 
-.priorityRotationSettingInputWrap {
-  display: flex;
+.priorityRotationStepper {
+  display: grid;
+  grid-template-columns: 32px minmax(60px, 1fr) 32px;
   align-items: center;
-  gap: 5px;
-  height: 30px;
+  height: 36px;
   min-width: 0;
-  padding: 0 8px;
+  overflow: hidden;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
   background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
   color: var(--text-secondary);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+}
+
+.priorityRotationStepperButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  appearance: none;
+  background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  font-size: 18px;
+  font-weight: 820;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.12s ease;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    color: color-mix(in srgb, var(--primary-color) 92%, var(--text-primary));
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.94);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-color) 45%, transparent);
+  }
+
+  &:disabled {
+    color: var(--text-tertiary);
+    cursor: not-allowed;
+    opacity: 0.62;
+  }
+}
+
+.priorityRotationStepperValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+  border-inline: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
 
   input {
-    width: 100%;
+    width: 38px;
     min-width: 0;
     padding: 0;
     border: 0;
@@ -696,9 +798,10 @@
     background: transparent;
     color: var(--text-primary);
     font-family: var(--font-mono);
-    font-size: 13px;
-    font-weight: 800;
+    font-size: 15px;
+    font-weight: 860;
     line-height: 1;
+    text-align: center;
     font-variant-numeric: tabular-nums;
 
     &:disabled {
@@ -710,7 +813,7 @@
   span {
     flex: 0 0 auto;
     color: var(--text-tertiary);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     text-transform: none;
   }
