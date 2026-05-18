@@ -560,10 +560,10 @@ export function AuthFileCard(props: AuthFileCardProps) {
                       title={t('auth_files.priority_hint')}
                     />
                   </span>
+                  {showPriorityTier && (
+                    <span className={styles.priorityBadgeTier}>{priorityTierLabel}</span>
+                  )}
                 </label>
-                {showPriorityTier && (
-                  <span className={styles.priorityBadgeTier}>{priorityTierLabel}</span>
-                )}
                 <button
                   type="button"
                   className={styles.priorityBadgeStepButton}
