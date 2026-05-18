@@ -973,7 +973,11 @@ export function AuthFilesPage() {
       return;
     }
 
-    const triggerKey = `${priorityRotationAutoRunId}:${priorityRotationAutoDataKey}`;
+    const triggerKey = [
+      priorityRotationAutoRunId,
+      priorityRotationAutoDataKey,
+      `slots:${priorityRotationSettings.activeSlotLimit}`,
+    ].join(':');
     if (lastPriorityRotationAutoTriggerRef.current === triggerKey) return;
     lastPriorityRotationAutoTriggerRef.current = triggerKey;
 
@@ -1043,6 +1047,7 @@ export function AuthFilesPage() {
     priorityRotationAutoDataKey,
     priorityRotationAutoRunId,
     priorityRotationPreview,
+    priorityRotationSettings.activeSlotLimit,
     priorityRotationSettings.autoEnabled,
     showNotification,
     t,
@@ -1517,26 +1522,8 @@ export function AuthFilesPage() {
               </div>
               <div className={styles.priorityRotationControls}>
                 <label className={styles.priorityRotationSetting}>
-                  <span>{t('auth_files.priority_rotation_threshold_label')}</span>
-                  <span className={styles.priorityRotationThresholdControl}>
-                    <input
-                      className={styles.priorityRotationSlider}
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={PRIORITY_ROTATION_THRESHOLD_STEP}
-                      value={priorityRotationSettings.thresholdPercent}
-                      disabled={batchPriorityUpdating}
-                      aria-label={t('auth_files.priority_rotation_threshold_label')}
-                      style={
-                        {
-                          '--priority-rotation-slider-progress': `${priorityRotationSettings.thresholdPercent}%`,
-                        } as CSSProperties
-                      }
-                      onChange={(event) =>
-                        commitPriorityRotationThresholdInput(event.currentTarget.value)
-                      }
-                    />
+                  <span className={styles.priorityRotationSettingHeader}>
+                    <span>{t('auth_files.priority_rotation_threshold_label')}</span>
                     <span className={styles.priorityRotationThresholdValue}>
                       <input
                         type="text"
@@ -1560,9 +1547,31 @@ export function AuthFilesPage() {
                       <span>%</span>
                     </span>
                   </span>
+                  <span className={styles.priorityRotationThresholdControl}>
+                    <input
+                      className={styles.priorityRotationSlider}
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={PRIORITY_ROTATION_THRESHOLD_STEP}
+                      value={priorityRotationSettings.thresholdPercent}
+                      disabled={batchPriorityUpdating}
+                      aria-label={t('auth_files.priority_rotation_threshold_label')}
+                      style={
+                        {
+                          '--priority-rotation-slider-progress': `${priorityRotationSettings.thresholdPercent}%`,
+                        } as CSSProperties
+                      }
+                      onChange={(event) =>
+                        commitPriorityRotationThresholdInput(event.currentTarget.value)
+                      }
+                    />
+                  </span>
                 </label>
                 <label className={styles.priorityRotationSetting}>
-                  <span>{t('auth_files.priority_rotation_slots_label')}</span>
+                  <span className={styles.priorityRotationSettingHeader}>
+                    <span>{t('auth_files.priority_rotation_slots_label')}</span>
+                  </span>
                   <span
                     className={`${styles.priorityRotationStepper} ${styles.priorityRotationSlotStepper}`}
                   >

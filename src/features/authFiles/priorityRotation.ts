@@ -283,25 +283,6 @@ export const analyzeCodexPriorityRotation = (
       });
   }
 
-  if (demotionMap.size === 0) {
-    return {
-      thresholdPercent: threshold,
-      activeSlotLimit: slotLimit,
-      status: 'no_changes',
-      managedCount: candidates.length,
-      unknownCount,
-      activePriority,
-      standbyPriority,
-      reservePriority,
-      activeCount: activeCandidates.length,
-      healthyActiveCount: healthyActiveCandidates.length,
-      standbyCount: standbyCandidates.length,
-      healthyStandbyCount: healthyStandbyCandidates.length,
-      projectedActiveCount: activeCandidates.length,
-      changes: [],
-    };
-  }
-
   const demotions = activeCandidates
     .filter((candidate) => demotionMap.has(candidate.file.name))
     .sort((a, b) => {
@@ -319,10 +300,7 @@ export const analyzeCodexPriorityRotation = (
       role: 'demote',
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
-  const promotionSlots = Math.min(
-    demotions.length,
-    Math.max(0, slotLimit - projectedActiveCount)
-  );
+  const promotionSlots = Math.max(0, slotLimit - projectedActiveCount);
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
       const remainingCompare = b.remainingPercent - a.remainingPercent;
@@ -340,6 +318,26 @@ export const analyzeCodexPriorityRotation = (
       role: 'promote',
       reason: 'promote_standby',
     }));
+  const changes = [...demotions, ...promotions];
+
+  if (changes.length === 0) {
+    return {
+      thresholdPercent: threshold,
+      activeSlotLimit: slotLimit,
+      status: promotionSlots > 0 ? 'no_standby' : 'no_changes',
+      managedCount: candidates.length,
+      unknownCount,
+      activePriority,
+      standbyPriority,
+      reservePriority,
+      activeCount: activeCandidates.length,
+      healthyActiveCount: healthyActiveCandidates.length,
+      standbyCount: standbyCandidates.length,
+      healthyStandbyCount: healthyStandbyCandidates.length,
+      projectedActiveCount: activeCandidates.length,
+      changes: [],
+    };
+  }
 
   return {
     thresholdPercent: threshold,
@@ -355,6 +353,6 @@ export const analyzeCodexPriorityRotation = (
     standbyCount: standbyCandidates.length,
     healthyStandbyCount: healthyStandbyCandidates.length,
     projectedActiveCount: projectedActiveCount + promotions.length,
-    changes: [...demotions, ...promotions],
+    changes,
   };
 };
