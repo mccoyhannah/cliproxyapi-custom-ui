@@ -213,6 +213,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     Boolean(priorityTier) &&
     resolvedQuotaType === 'codex' &&
     (effectiveCodexPlanType === 'team' || effectiveCodexPlanType === 'plus');
+  const isFreeCodexPriority = resolvedQuotaType === 'codex' && effectiveCodexPlanType === 'free';
   const priorityTierLabel =
     priorityTier === 'active'
       ? t('auth_files.priority_rotation_tier_active')
@@ -524,7 +525,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
             </div>
             {!isRuntimeOnly && (
               <div
-                className={`${styles.priorityBadgeEditor} ${showPriorityTier ? priorityTierClass : ''}`}
+                className={`${styles.priorityBadgeEditor} ${
+                  showPriorityTier ? priorityTierClass : ''
+                } ${isFreeCodexPriority ? styles.priorityBadgeEditorFree : ''}`}
               >
                 <button
                   type="button"

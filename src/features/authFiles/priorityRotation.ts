@@ -49,6 +49,8 @@ export type PriorityRotationChange = {
 
 export type PriorityRotationAnalysis = {
   thresholdPercent: number;
+  effectiveThresholdPercent: number;
+  thresholdAdjusted: boolean;
   activeSlotLimit: number;
   status: PriorityRotationStatus;
   managedCount: number;
@@ -174,6 +176,8 @@ const buildEmptyAnalysis = (
   unknownCount = 0
 ): PriorityRotationAnalysis => ({
   thresholdPercent,
+  effectiveThresholdPercent: thresholdPercent,
+  thresholdAdjusted: false,
   activeSlotLimit,
   status,
   managedCount: 0,
@@ -251,16 +255,29 @@ export const analyzeCodexPriorityRotation = (
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
   );
+  const activeAndStandbyCandidates = [...activeCandidates, ...standbyCandidates];
+  const highestActiveOrStandbyRemaining = activeAndStandbyCandidates.reduce(
+    (highest, candidate) => Math.max(highest, candidate.remainingPercent),
+    0
+  );
+  const shouldRelaxThreshold =
+    activeCandidates.length > 0 &&
+    standbyCandidates.length > 0 &&
+    highestActiveOrStandbyRemaining < threshold;
+  const effectiveThreshold = shouldRelaxThreshold
+    ? clampThresholdPercent(Math.floor(highestActiveOrStandbyRemaining))
+    : threshold;
+  const thresholdAdjusted = effectiveThreshold < threshold;
   const healthyActiveCandidates = activeCandidates.filter(
-    (candidate) => candidate.remainingPercent >= threshold
+    (candidate) => candidate.remainingPercent >= effectiveThreshold
   );
   const healthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.remainingPercent >= threshold
+    (candidate) => candidate.remainingPercent >= effectiveThreshold
   );
 
   const demotionMap = new Map<string, PriorityRotationChangeReason>();
   activeCandidates.forEach((candidate) => {
-    if (candidate.remainingPercent < threshold) {
+    if (candidate.remainingPercent < effectiveThreshold) {
       demotionMap.set(candidate.file.name, 'low_remaining');
     }
   });
@@ -323,6 +340,8 @@ export const analyzeCodexPriorityRotation = (
   if (changes.length === 0) {
     return {
       thresholdPercent: threshold,
+      effectiveThresholdPercent: effectiveThreshold,
+      thresholdAdjusted,
       activeSlotLimit: slotLimit,
       status: promotionSlots > 0 ? 'no_standby' : 'no_changes',
       managedCount: candidates.length,
@@ -341,6 +360,8 @@ export const analyzeCodexPriorityRotation = (
 
   return {
     thresholdPercent: threshold,
+    effectiveThresholdPercent: effectiveThreshold,
+    thresholdAdjusted,
     activeSlotLimit: slotLimit,
     status: 'ready',
     managedCount: candidates.length,

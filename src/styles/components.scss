@@ -539,13 +539,15 @@ textarea {
 
 .notification-container {
   position: fixed;
-  top: $spacing-lg;
-  right: $spacing-lg;
+  top: max(#{$spacing-md}, env(safe-area-inset-top));
+  right: clamp(12px, 2vw, #{$spacing-lg});
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
   z-index: $z-notification;
-  max-width: 360px;
+  width: min(420px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
 }
 
 body.modal-open .notification-container {
@@ -625,7 +627,9 @@ body.modal-open .notification-container {
     right: $spacing-md;
     bottom: $spacing-md;
     left: $spacing-md;
+    width: auto;
     max-width: none;
+    gap: 8px;
   }
 
   .custom-ui-sync-banner {
@@ -699,22 +703,22 @@ textarea {
 @keyframes notification-enter {
   from {
     opacity: 0;
-    transform: translateX(100%);
+    transform: translateY(-6px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes notification-exit {
   from {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
   }
   to {
     opacity: 0;
-    transform: translateX(100%);
+    transform: translateY(-6px) scale(0.98);
   }
 }
 
@@ -727,8 +731,11 @@ textarea {
   color: var(--text-primary);
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: $spacing-sm;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 
   // Animation states
   &.entering {
@@ -750,11 +757,16 @@ textarea {
   }
 
   .message {
+    min-width: 0;
     flex: 1;
     font-weight: 500;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .close-btn {
+    flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;

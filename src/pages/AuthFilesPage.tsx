@@ -106,6 +106,7 @@ const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
 const PRIORITY_ROTATION_THRESHOLD_STEP = 5;
 const PRIORITY_ROTATION_SLOT_STEP = 1;
+const PRIORITY_ROTATION_MANUAL_SUPPRESS_MS = 1600;
 
 const escapeWildcardSearchSegment = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -212,6 +213,7 @@ export function AuthFilesPage() {
   const lastPriorityRotationAutoTriggerRef = useRef('');
   const lastPriorityRotationAutoChangeRef = useRef('');
   const priorityRotationAutoApplyingRef = useRef(false);
+  const priorityRotationAutoSuppressedUntilRef = useRef(0);
 
   const {
     files,
@@ -236,7 +238,7 @@ export function AuthFilesPage() {
     handleDeleteAll,
     handleDownload,
     handleStatusToggle,
-    handlePriorityChange,
+    handlePriorityChange: saveAuthFilePriority,
     handleDisplayNameChange,
     toggleSelect,
     selectAllVisible,
@@ -731,6 +733,10 @@ export function AuthFilesPage() {
     () => selectedNames.some((name) => priorityUpdating[name] === true),
     [priorityUpdating, selectedNames]
   );
+  const isAnyPriorityUpdating = useMemo(
+    () => Object.values(priorityUpdating).some(Boolean),
+    [priorityUpdating]
+  );
   const batchStatusButtonsDisabled =
     disableControls ||
     selectedNames.length === 0 ||
@@ -745,6 +751,19 @@ export function AuthFilesPage() {
   const handlePriorityInvalid = useCallback(() => {
     showNotification(t('auth_files.priority_invalid'), 'error');
   }, [showNotification, t]);
+
+  const handlePriorityChange = useCallback(
+    async (item: AuthFileItem, priority: number) => {
+      const previousPriority = parsePriorityValue(item.priority ?? item['priority']);
+      if (previousPriority !== priority) {
+        priorityRotationAutoSuppressedUntilRef.current =
+          Date.now() + PRIORITY_ROTATION_MANUAL_SUPPRESS_MS;
+      }
+
+      await saveAuthFilePriority(item, priority);
+    },
+    [saveAuthFilePriority]
+  );
 
   const openManualExpiryEditor = useCallback(
     (file: AuthFileItem) => {
@@ -967,9 +986,18 @@ export function AuthFilesPage() {
       disableControls ||
       loading ||
       batchPriorityUpdating ||
+      isAnyPriorityUpdating ||
       priorityRotationPreview ||
       priorityRotationAutoApplyingRef.current
     ) {
+      return;
+    }
+    if (Date.now() < priorityRotationAutoSuppressedUntilRef.current) {
+      if (priorityRotationSettings.lastAutoSkippedReason !== 'manual_priority_change') {
+        updatePriorityRotationSettings({
+          lastAutoSkippedReason: 'manual_priority_change',
+        });
+      }
       return;
     }
 
@@ -1013,7 +1041,7 @@ export function AuthFilesPage() {
         } else {
           lastPriorityRotationAutoChangeRef.current = '';
           updatePriorityRotationSettings({
-            lastAutoSkippedReason: 'apply_failed',
+            lastAutoSkippedReason: result.failCount > 0 ? 'busy_or_conflict' : 'apply_failed',
           });
         }
 
@@ -1024,14 +1052,6 @@ export function AuthFilesPage() {
             }),
             'success'
           );
-        } else if (result.successCount > 0 || result.failCount > 0) {
-          showNotification(
-            t('auth_files.priority_rotation_auto_partial', {
-              success: result.successCount,
-              failed: result.failCount,
-            }),
-            result.successCount > 0 ? 'warning' : 'error'
-          );
         }
       } finally {
         priorityRotationAutoApplyingRef.current = false;
@@ -1041,6 +1061,7 @@ export function AuthFilesPage() {
     batchPriorityUpdating,
     batchSetPriorities,
     disableControls,
+    isAnyPriorityUpdating,
     loadFiles,
     loading,
     priorityRotationAnalysis,
@@ -1049,6 +1070,7 @@ export function AuthFilesPage() {
     priorityRotationPreview,
     priorityRotationSettings.activeSlotLimit,
     priorityRotationSettings.autoEnabled,
+    priorityRotationSettings.lastAutoSkippedReason,
     showNotification,
     t,
     updatePriorityRotationSettings,
@@ -1309,6 +1331,11 @@ export function AuthFilesPage() {
     priorityRotationAnalysis.healthyStandbyCount === 0
       ? t('auth_files.priority_rotation_status_no_healthy_standby')
       : '';
+  const priorityRotationEffectiveThresholdLabel = priorityRotationAnalysis.thresholdAdjusted
+    ? t('auth_files.priority_rotation_status_effective_threshold', {
+        threshold: priorityRotationAnalysis.effectiveThresholdPercent,
+      })
+    : '';
   const priorityRotationAutoEnabled = priorityRotationSettings.autoEnabled === true;
   const priorityRotationAutoStatusLabel = priorityRotationAutoEnabled
     ? t('auth_files.priority_rotation_auto_status_on')
@@ -1342,19 +1369,22 @@ export function AuthFilesPage() {
       className: styles.priorityRotationTierBuffer,
     },
   ];
-  const getPriorityRotationChangeReason = (change: PriorityRotationChange) => {
+  const getPriorityRotationChangeReason = (
+    change: PriorityRotationChange,
+    analysis: PriorityRotationAnalysis = priorityRotationAnalysis
+  ) => {
     if (change.reason === 'low_remaining') {
       return t('auth_files.priority_rotation_reason_demote_low', {
-        threshold: priorityRotationAnalysis.thresholdPercent,
+        threshold: analysis.effectiveThresholdPercent,
       });
     }
     if (change.reason === 'over_active_limit') {
       return t('auth_files.priority_rotation_reason_demote_over_limit', {
-        limit: priorityRotationAnalysis.activeSlotLimit,
+        limit: analysis.activeSlotLimit,
       });
     }
     return t('auth_files.priority_rotation_reason_promote', {
-      threshold: priorityRotationAnalysis.thresholdPercent,
+      threshold: analysis.effectiveThresholdPercent,
     });
   };
   const priorityRotationPreviewSummaryItems = priorityRotationPreview
@@ -1366,6 +1396,17 @@ export function AuthFilesPage() {
             threshold: priorityRotationPreview.thresholdPercent,
           }),
         },
+        ...(priorityRotationPreview.thresholdAdjusted
+          ? [
+              {
+                key: 'effectiveThreshold',
+                label: t('auth_files.priority_rotation_summary_effective_threshold_label'),
+                value: t('auth_files.priority_rotation_summary_effective_threshold_value', {
+                  threshold: priorityRotationPreview.effectiveThresholdPercent,
+                }),
+              },
+            ]
+          : []),
         {
           key: 'slots',
           label: t('auth_files.priority_rotation_summary_slots_label'),
@@ -1636,6 +1677,13 @@ export function AuthFilesPage() {
                       {priorityRotationNoStandbyLabel}
                     </span>
                   )}
+                  {priorityRotationEffectiveThresholdLabel && (
+                    <span
+                      className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusInfo}`}
+                    >
+                      {priorityRotationEffectiveThresholdLabel}
+                    </span>
+                  )}
                 </div>
                 <div
                   className={`${styles.priorityRotationAutoToggle} ${
@@ -1663,6 +1711,8 @@ export function AuthFilesPage() {
                   onClick={openPriorityRotationPreview}
                   disabled={disableControls || loading || batchPriorityUpdating}
                   loading={batchPriorityUpdating}
+                  title={t('auth_files.priority_rotation_button_aria')}
+                  aria-label={t('auth_files.priority_rotation_button_aria')}
                 >
                   {t('auth_files.priority_rotation_button')}
                 </Button>
@@ -2041,7 +2091,7 @@ export function AuthFilesPage() {
                     {formatPriorityRotationPercent(change.remainingPercent)}
                   </span>
                   <span className={styles.priorityRotationReason}>
-                    {getPriorityRotationChangeReason(change)}
+                    {getPriorityRotationChangeReason(change, priorityRotationPreview)}
                   </span>
                 </div>
               ))}

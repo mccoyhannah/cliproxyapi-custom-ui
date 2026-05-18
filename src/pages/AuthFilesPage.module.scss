@@ -976,7 +976,7 @@
 
 .priorityRotationActions {
   display: grid;
-  grid-template-columns: auto minmax(196px, 1fr);
+  grid-template-columns: auto minmax(148px, 1fr);
   grid-template-rows: auto auto;
   align-items: center;
   justify-content: stretch;
@@ -985,7 +985,7 @@
   min-width: 0;
 
   @include tablet {
-    grid-template-columns: auto minmax(196px, 1fr);
+    grid-template-columns: auto minmax(148px, 1fr);
   }
 
   @include mobile {
@@ -1129,7 +1129,7 @@
 
 .priorityRotationButton {
   width: 100%;
-  min-width: 188px;
+  min-width: 136px;
   white-space: nowrap;
 
   &:global(.btn) {
@@ -2820,6 +2820,38 @@ button.codexSubscriptionValue {
 
 .priorityBadgeEditorBuffer {
   --priority-badge-color: #64748b;
+}
+
+.priorityBadgeEditorFree {
+  --priority-badge-color: #64748b;
+  border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #64748b 4%, transparent), transparent 64%),
+    color-mix(in srgb, var(--surface-control) 76%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+
+  .priorityBadgeValueShell {
+    color: color-mix(in srgb, #64748b 68%, var(--text-secondary));
+  }
+
+  .priorityBadgePrefix {
+    font-size: 12px;
+    font-weight: 760;
+  }
+
+  .priorityBadgeInput {
+    font-size: 16px;
+    font-weight: 760;
+  }
+
+  .priorityBadgeStepButton {
+    color: color-mix(in srgb, var(--text-tertiary) 82%, var(--text-secondary));
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, #64748b 7%, transparent);
+      color: color-mix(in srgb, #64748b 76%, var(--text-primary));
+    }
+  }
 }
 
 .priorityBadgeMain {
