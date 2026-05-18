@@ -197,8 +197,17 @@
   display: flex;
   align-items: center;
   gap: $spacing-sm;
-  padding-bottom: 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-primary) 88%, transparent),
+      color-mix(in srgb, var(--surface-panel) 82%, var(--bg-primary))
+    ),
+    var(--surface-panel);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
 
   @include mobile {
     flex-direction: column;
@@ -221,7 +230,7 @@
 
 .searchInput {
   flex: 1;
-  border-radius: 16px !important;
+  border-radius: 8px !important;
   padding-right: 132px !important;
 }
 
@@ -297,13 +306,46 @@
 }
 
 .editorWrapper {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   flex: 0 0 auto;
   height: clamp(420px, 64vh, 980px);
-  border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
-  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  border-radius: 8px;
   overflow: hidden;
-  background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--success-color) 3%, transparent) 1px,
+      transparent 1px
+    ),
+    color-mix(in srgb, var(--bg-primary) 92%, var(--surface-panel));
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--bg-primary) 62%, transparent),
+    0 18px 46px -38px rgba(0, 0, 0, 0.4);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  &:focus-within {
+    border-color: color-mix(in srgb, var(--primary-color) 48%, var(--border-color));
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--primary-color) 16%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--primary-color) 12%, transparent),
+      0 18px 46px -38px rgba(0, 0, 0, 0.4);
+  }
 
   @supports (height: 100dvh) {
     height: clamp(420px, 64dvh, 980px);
@@ -313,7 +355,9 @@
     .cm-editor {
       height: 100%;
       font-size: 14px;
-      font-family: 'Consolas', 'Monaco', 'Menlo', monospace;
+      font-family:
+        ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+        monospace;
       background: transparent;
     }
 
@@ -322,11 +366,29 @@
       -webkit-overflow-scrolling: touch;
       touch-action: pan-x pan-y;
       overscroll-behavior: contain;
+      scrollbar-color: color-mix(in srgb, var(--text-tertiary) 46%, transparent) transparent;
+    }
+
+    .cm-scroller::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    .cm-scroller::-webkit-scrollbar-thumb {
+      border: 3px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+      background-color: color-mix(in srgb, var(--text-tertiary) 36%, transparent);
+    }
+
+    .cm-scroller::-webkit-scrollbar-thumb:hover {
+      background-color: color-mix(in srgb, var(--text-secondary) 52%, transparent);
     }
 
     .cm-gutters {
       border-right: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
-      background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+      background: color-mix(in srgb, var(--surface-panel) 82%, var(--bg-primary));
+      box-shadow: inset -1px 0 0 color-mix(in srgb, #fff 10%, transparent);
     }
 
     .cm-lineNumbers .cm-gutterElement {
@@ -336,33 +398,47 @@
     }
 
     .cm-activeLine {
-      background: var(--bg-hover);
+      background: color-mix(in srgb, var(--primary-color) 7%, transparent);
     }
 
     .cm-activeLineGutter {
-      background: var(--bg-hover);
+      background: color-mix(in srgb, var(--primary-color) 9%, transparent);
     }
 
     .cm-selectionMatch {
-      background: rgba(255, 193, 7, 0.3);
+      background: color-mix(in srgb, var(--warning-color) 24%, transparent);
     }
 
     .cm-searchMatch {
-      background: rgba(255, 193, 7, 0.4);
-      outline: 1px solid rgba(255, 193, 7, 0.6);
+      background: color-mix(in srgb, var(--warning-color) 32%, transparent);
+      outline: 1px solid color-mix(in srgb, var(--warning-color) 58%, transparent);
     }
 
     .cm-searchMatch-selected {
-      background: rgba(255, 152, 0, 0.5);
+      background: color-mix(in srgb, var(--warning-color) 48%, transparent);
+    }
+
+    .cm-lintRange-error {
+      text-decoration-thickness: 2px;
     }
 
     [data-theme='dark'] & {
+      background:
+        linear-gradient(90deg, rgba(59, 130, 246, 0.07) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(34, 197, 94, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.98));
+      background-size:
+        32px 32px,
+        32px 32px,
+        auto;
+
       .cm-gutters {
-        background: var(--bg-tertiary);
+        background: rgba(15, 23, 42, 0.82);
+        border-right-color: rgba(148, 163, 184, 0.18);
       }
 
       .cm-selectionMatch {
-        background: rgba(255, 193, 7, 0.2);
+        background: rgba(245, 158, 11, 0.22);
       }
     }
   }

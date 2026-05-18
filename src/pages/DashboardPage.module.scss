@@ -231,11 +231,10 @@
 
 .bentoGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: auto auto;
-  gap: $spacing-md;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 
-  @media (max-width: 900px) {
+  @media (max-width: 1100px) {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -248,6 +247,7 @@
   display: flex;
   flex-direction: column;
   gap: $spacing-md;
+  min-height: 158px;
   padding: $spacing-lg;
   background: linear-gradient(
     145deg,
@@ -278,10 +278,9 @@
   }
 }
 
-// First card spans 2 rows — the "hero stat"
+// First card keeps a subtle accent without breaking the operational grid.
 .bentoLarge {
-  grid-row: 1 / 3;
-  justify-content: center;
+  justify-content: flex-start;
   background: linear-gradient(
     160deg,
     color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary)),
@@ -289,17 +288,15 @@
   );
 
   .bentoValue {
-    font-size: 44px;
+    font-size: 32px;
   }
 
   .bentoIcon {
-    width: 56px;
-    height: 56px;
+    width: 44px;
+    height: 44px;
   }
 
   @media (max-width: 900px) {
-    grid-row: auto;
-
     .bentoValue {
       font-size: 32px;
     }
@@ -1282,5 +1279,329 @@
 @media (max-width: $breakpoint-mobile) {
   .dashboardState:global(.empty-state) {
     min-height: 104px;
+  }
+}
+
+// Final developer-console convergence: neutral data surfaces and restrained accents.
+.dashboard {
+  --cold-accent: #64748b;
+  --cold-accent-strong: #334155;
+  --cold-accent-soft: rgb(100 116 139 / 0.1);
+  --cold-mint: #64748b;
+  --cold-warning: var(--ops-warning);
+  --cold-danger: var(--ops-danger);
+  --cold-ink: var(--text-primary);
+  --cold-muted: var(--text-secondary);
+  --cold-surface: var(--surface-card);
+  --cold-surface-2: var(--surface-panel);
+  --cold-border: var(--border-base);
+  max-width: min(1120px, 100%);
+
+  &::before {
+    inset: -22px -16px;
+    border-radius: var(--radius-card);
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--border-base) 36%, transparent) 1px, transparent 1px),
+      linear-gradient(180deg, color-mix(in srgb, var(--border-base) 30%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+    opacity: 0.42;
+  }
+}
+
+.hero {
+  min-height: 164px;
+  padding: 28px;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow);
+
+  &::before {
+    border-top: 2px solid color-mix(in srgb, var(--primary-color) 52%, var(--border-base));
+  }
+
+  &::after {
+    display: none;
+  }
+}
+
+.heroWatermark {
+  color: var(--text-primary);
+  opacity: 0.026;
+}
+
+.heroGreeting,
+.sectionHeading,
+.signalLabel,
+.signalValue,
+.time,
+.buildDate,
+.versionText,
+.bentoValue,
+.configPillValue,
+.configPillMono,
+.configBadge {
+  font-family: $font-mono;
+  font-variant-numeric: tabular-nums;
+}
+
+.heroGreeting {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.heroTitle {
+  color: var(--text-primary);
+  font-size: clamp(32px, 4.2vw, 42px);
+}
+
+.heroCaring,
+.bentoLabel,
+.bentoSublabel,
+.signalLabel,
+.date,
+.buildDate {
+  color: var(--text-secondary);
+}
+
+.heroSignalGrid {
+  gap: 10px;
+}
+
+.heroSignal,
+.dateTimeBlock {
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  box-shadow: none;
+}
+
+.heroSignal {
+  padding: 10px 12px;
+}
+
+.signalLabel {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.signalValue {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.dateTimeBlock {
+  min-width: 180px;
+  padding: 10px 12px;
+}
+
+.time {
+  color: var(--text-primary);
+  font-size: 21px;
+}
+
+.connectionPill {
+  min-height: 32px;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.connectionConnected {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.connectionConnecting {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.connectionDisconnected {
+  border-color: var(--status-error-border);
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+
+.sectionHeading {
+  margin-bottom: 10px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.bentoGrid {
+  gap: 12px;
+}
+
+.bentoCard {
+  min-height: 148px;
+  padding: 20px;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow);
+
+  &::before {
+    top: 14px;
+    bottom: 14px;
+    width: 2px;
+    background: color-mix(in srgb, var(--primary-color) 54%, var(--border-base));
+  }
+
+  &:hover {
+    border-color: var(--border-hover);
+    background: var(--surface-card-hover);
+    box-shadow: var(--shadow-card);
+    transform: translateY(-1px);
+  }
+}
+
+.bentoLarge {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 48%),
+    var(--surface-card);
+
+  .bentoValue {
+    font-size: 48px;
+  }
+}
+
+.bentoIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px var(--border-secondary);
+}
+
+.bentoCard:hover .bentoIcon {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+  color: var(--primary-color);
+}
+
+.bentoValue {
+  min-height: 34px;
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 780;
+}
+
+.bentoLabel {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.valueSkeleton,
+.sublabelSkeleton {
+  background:
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg-surface) 68%, transparent), transparent),
+    color-mix(in srgb, var(--text-primary) 7%, var(--surface-panel));
+}
+
+.dashboardState:global(.empty-state) {
+  border-color: var(--status-error-border);
+  border-left: 2px solid var(--danger-color);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow);
+}
+
+.heroSignal:nth-child(2),
+.heroSignal:nth-child(3) {
+  border-color: var(--border-base);
+  background: var(--surface-panel);
+}
+
+.bentoCard:nth-child(2)::before {
+  background: color-mix(in srgb, var(--ops-success) 58%, var(--border-base));
+}
+
+.bentoCard:nth-child(3)::before {
+  background: color-mix(in srgb, var(--ops-warning) 58%, var(--border-base));
+}
+
+.bentoCard:nth-child(4)::before {
+  background: color-mix(in srgb, var(--ops-info) 58%, var(--border-base));
+}
+
+.configPill {
+  min-height: 34px;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: none;
+
+  &:hover {
+    background: var(--surface-card-hover);
+    border-color: var(--border-hover);
+  }
+}
+
+.configPillLabel {
+  min-height: 34px;
+  border-right-color: var(--border-base);
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+}
+
+.configPillValue,
+.configPillMono,
+.configBadge {
+  min-height: 34px;
+  background: var(--surface-card);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.configPillValue.on {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.configPillValue.off,
+.configBadgeUnknown {
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.configBadgeRoundRobin {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.configBadgeFillFirst {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.viewMoreLink {
+  color: var(--primary-color);
+  font-weight: 650;
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .dashboard::before {
+    opacity: 0.28;
+  }
+
+  .hero {
+    padding: 20px;
+  }
+
+  .dateTimeBlock {
+    min-width: 0;
+  }
+
+  .bentoCard {
+    min-height: 128px;
+    padding: 18px;
+  }
+
+  .bentoLarge .bentoValue {
+    font-size: 38px;
   }
 }

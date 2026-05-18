@@ -584,30 +584,52 @@
 .priorityRotationBar {
   display: grid;
   grid-template-columns:
-    minmax(270px, 1fr)
-    minmax(340px, 420px)
-    minmax(336px, 390px);
-  gap: 18px;
+    minmax(220px, 0.88fr)
+    minmax(338px, 1fr)
+    minmax(340px, 0.92fr);
+  gap: 14px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-bottom: 12px;
-  padding: 12px;
+  padding: 12px 14px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--primary-color) 8%, transparent),
-      transparent 52%
+      color-mix(in srgb, var(--primary-color) 5%, transparent),
+      transparent 58%
     ),
-    color-mix(in srgb, var(--surface-panel) 92%, var(--bg-primary));
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--surface-card) 94%, var(--surface-panel));
   box-shadow:
-    var(--shadow-control),
+    0 14px 34px -30px color-mix(in srgb, var(--primary-color) 50%, transparent),
     inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 58%, #14b8a6);
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 54%, #14b8a6);
+
+  @media (max-width: 1320px) {
+    grid-template-columns: minmax(240px, 0.9fr) minmax(320px, 1fr);
+
+    .priorityRotationActions {
+      grid-column: 1 / -1;
+      justify-self: stretch;
+      max-width: none;
+      padding-inline-start: 0;
+      border-left: 0;
+    }
+  }
 
   @include tablet {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    padding: 12px;
   }
 }
 
@@ -622,11 +644,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 18%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 8%, var(--surface-control));
   color: color-mix(in srgb, var(--primary-color) 88%, #14b8a6);
-  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--primary-color) 34%, transparent));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
 }
 
 .priorityRotationCopy {
@@ -638,8 +665,8 @@
 
 .priorityRotationTitle {
   color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 750;
+  font-size: 15px;
+  font-weight: 780;
   line-height: 1.25;
 }
 
@@ -703,9 +730,9 @@
 
 .priorityRotationControls {
   display: grid;
-  grid-template-columns: minmax(210px, 1fr) auto;
+  grid-template-columns: minmax(210px, 1fr) minmax(112px, auto);
   align-items: end;
-  column-gap: 30px;
+  column-gap: 16px;
   row-gap: 10px;
   width: 100%;
   min-width: 0;
@@ -756,7 +783,7 @@
 
 .priorityRotationSlotStepper {
   width: max-content;
-  min-width: 108px;
+  min-width: 112px;
 }
 
 .priorityRotationStepperButton {
@@ -976,21 +1003,30 @@
 
 .priorityRotationActions {
   display: grid;
-  grid-template-columns: auto minmax(148px, 1fr);
+  grid-template-columns: minmax(166px, 1fr) minmax(148px, 180px);
   grid-template-rows: auto auto;
   align-items: center;
-  justify-content: stretch;
-  gap: 8px;
+  justify-content: end;
+  justify-self: end;
+  gap: 8px 10px;
   width: 100%;
+  max-width: 386px;
   min-width: 0;
 
   @include tablet {
-    grid-template-columns: auto minmax(148px, 1fr);
+    grid-template-columns: minmax(176px, 1fr) minmax(160px, 1fr);
+    justify-content: stretch;
+    justify-self: stretch;
+    max-width: none;
+    padding-inline-start: 0;
+    border-left: 0;
   }
 
   @include mobile {
     grid-template-columns: 1fr;
     align-items: stretch;
+    padding-inline-start: 0;
+    border-left: 0;
 
     :global(.btn) {
       flex: 1 1 auto;
@@ -1023,10 +1059,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 20px;
+  min-height: 22px;
   min-width: 0;
   max-width: 100%;
-  padding: 0 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 750;
@@ -1037,17 +1073,22 @@
 }
 
 .priorityRotationAutoToggle {
-  width: max-content;
+  width: 100%;
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-control) 82%, var(--bg-primary));
   color: var(--text-secondary);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
 
   :global(label) {
     gap: 6px;
+    min-width: 0;
   }
 
   :global(.track) {
@@ -1079,8 +1120,8 @@
 .priorityRotationAutoLabel {
   display: inline-flex;
   flex-direction: row;
-  align-items: baseline;
-  gap: 3px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   line-height: 1;
 
@@ -1129,7 +1170,7 @@
 
 .priorityRotationButton {
   width: 100%;
-  min-width: 136px;
+  min-width: 0;
   white-space: nowrap;
 
   &:global(.btn) {
@@ -1229,18 +1270,18 @@
 // 卡片网格
 .fileGrid {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
   align-items: stretch;
   min-width: 0;
 }
 
 .fileGridQuotaManaged {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
 }
 
 .fileGridCompact {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
 }
 
 .authFilesEmptyState:global(.empty-state) {
@@ -2154,12 +2195,14 @@ button.codexSubscriptionValue {
 .fileCard {
   position: relative;
   overflow: hidden;
-  background-color: var(--surface-card);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent 140px),
+    var(--surface-card);
   --glass-blur: 8px;
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
-  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  border-radius: 8px;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -2173,9 +2216,15 @@ button.codexSubscriptionValue {
 
   &:hover {
     transform: translateY(-1px);
-    background-color: var(--surface-card-hover);
-    box-shadow: var(--shadow-card);
-    border-color: color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--primary-color) 4%, transparent),
+        transparent 150px
+      ),
+      var(--surface-card-hover);
+    box-shadow: 0 18px 42px -34px color-mix(in srgb, var(--primary-color) 58%, transparent);
+    border-color: color-mix(in srgb, var(--primary-color) 26%, var(--border-color));
   }
 }
 
@@ -2287,7 +2336,7 @@ button.codexSubscriptionValue {
 
 .fileCardCompact {
   padding: 10px;
-  border-radius: var(--radius-card);
+  border-radius: 8px;
 
   .fileCardMain {
     gap: 6px;
@@ -2456,7 +2505,7 @@ button.codexSubscriptionValue {
   }
 
   .priorityBadgeInput {
-    width: 1.35ch;
+    width: 3ch;
     font-size: 17px;
   }
 
@@ -2499,17 +2548,17 @@ button.codexSubscriptionValue {
 }
 
 .providerAvatar {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, var(--border-color));
   box-shadow:
-    0 6px 16px -14px currentColor,
-    inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
+    0 10px 22px -20px currentColor,
+    inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
 }
 
 .providerAvatarImage {
@@ -2901,7 +2950,7 @@ button.codexSubscriptionValue {
 
 .priorityBadgeInput {
   field-sizing: content;
-  width: 1.35ch;
+  width: 3ch;
   min-width: 0;
   max-width: 4ch;
   padding: 0;
@@ -3306,7 +3355,9 @@ button.codexSubscriptionValue {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, currentColor 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
 }
 
 .statLabel {
@@ -3335,12 +3386,21 @@ button.codexSubscriptionValue {
 .statusPanel {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
+  padding: 8px 9px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 42%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 52%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
 }
 
 .statusPanelCompact {
   gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .statusPanelCompact .statusPanelLabel {
@@ -4061,6 +4121,11 @@ button.codexSubscriptionValue {
   margin-top: auto;
   padding-top: 9px;
   border-top: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
+
+  @media (max-width: 1500px) {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
 }
 
 .cardActionsMain {
@@ -4070,6 +4135,11 @@ button.codexSubscriptionValue {
   gap: 6px;
   min-width: 0;
   flex: 1;
+
+  @media (max-width: 1500px) {
+    width: 100%;
+    flex: 1 1 100%;
+  }
 }
 
 .primaryActionButton:global(.btn.btn-sm) {
@@ -4120,6 +4190,10 @@ button.codexSubscriptionValue {
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 34%, transparent);
   background: color-mix(in srgb, var(--bg-tertiary) 36%, transparent);
+
+  @media (max-width: 1500px) {
+    margin-left: auto;
+  }
 }
 
 .statusToggle {
@@ -4132,6 +4206,12 @@ button.codexSubscriptionValue {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--border-color) 34%, transparent);
   background: color-mix(in srgb, var(--surface-control) 36%, transparent);
+
+  @media (max-width: 1500px) {
+    width: 100%;
+    justify-content: space-between;
+    margin-left: 0;
+  }
 }
 
 .statusToggleLabel {

@@ -66,18 +66,49 @@ export function YamlEditor({
             backgroundColor: 'transparent',
             color: 'var(--text-primary)',
           },
+          '&.cm-focused': {
+            outline: 'none',
+          },
+          '.cm-scroller': {
+            backgroundColor: 'transparent',
+            fontFamily:
+              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Courier New', monospace",
+          },
           '.cm-content': {
             caretColor: 'var(--primary-color)',
-            padding: '18px 0',
+            minHeight: '100%',
+            padding: '20px 0 24px',
           },
           '.cm-line': {
-            padding: '0 18px',
+            padding: '0 20px',
           },
           '.cm-gutters': {
             minWidth: '58px',
+            color: 'var(--text-tertiary)',
+          },
+          '.cm-foldGutter': {
+            color: 'var(--text-muted)',
+          },
+          '.cm-activeLineGutter': {
+            color: 'var(--text-primary)',
+            fontWeight: '700',
           },
           '.cm-activeLine': {
             boxShadow: 'inset 3px 0 0 var(--primary-color)',
+          },
+          '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+            backgroundColor: 'color-mix(in srgb, var(--primary-color) 24%, transparent) !important',
+          },
+          '.cm-cursor': {
+            borderLeftColor: 'var(--primary-color)',
+          },
+          '.cm-placeholder': {
+            color: 'var(--text-tertiary)',
+            fontStyle: 'normal',
+          },
+          '.cm-matchingBracket, .cm-nonmatchingBracket': {
+            outline: '1px solid color-mix(in srgb, var(--primary-color) 34%, transparent)',
+            backgroundColor: 'color-mix(in srgb, var(--primary-color) 10%, transparent)',
           },
           '.cm-tooltip': {
             border: '1px solid color-mix(in srgb, var(--danger-color) 40%, var(--border-color))',
@@ -114,6 +145,7 @@ export function YamlEditor({
       search(),
       highlightSelectionMatches(),
       keymap.of(searchKeymap),
+      EditorView.lineWrapping,
       lintGutter(),
       yamlLinter,
       editorTheme,

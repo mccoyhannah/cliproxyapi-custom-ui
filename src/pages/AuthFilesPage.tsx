@@ -132,13 +132,17 @@ const formatPriorityRotationPriority = (value: number | null): string =>
 type AuthFilePriorityTier = 'active' | 'standby' | 'buffer';
 
 const buildPriorityRotationChangeFingerprint = (analysis: PriorityRotationAnalysis): string =>
-  analysis.changes
-    .map(
-      (change) =>
-        `${change.name}:${change.fromPriority}->${change.toPriority}:${change.role}:${change.reason}:${Math.round(change.remainingPercent)}`
-    )
-    .sort()
-    .join('|');
+  [
+    `threshold:${analysis.thresholdPercent}`,
+    `effective:${analysis.effectiveThresholdPercent}`,
+    `slots:${analysis.activeSlotLimit}`,
+    ...analysis.changes
+      .map(
+        (change) =>
+          `${change.name}:${change.fromPriority}->${change.toPriority}:${change.role}:${change.reason}:${Math.round(change.remainingPercent)}`
+      )
+      .sort(),
+  ].join('|');
 
 const buildPriorityRotationAutoDataFingerprint = (
   files: AuthFileItem[],
@@ -202,6 +206,7 @@ export function AuthFilesPage() {
   const [priorityRotationPreview, setPriorityRotationPreview] =
     useState<PriorityRotationAnalysis | null>(null);
   const [priorityRotationAutoRunId, setPriorityRotationAutoRunId] = useState(0);
+  const [priorityRotationAutoApplying, setPriorityRotationAutoApplying] = useState(false);
   const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
@@ -1004,6 +1009,7 @@ export function AuthFilesPage() {
     const triggerKey = [
       priorityRotationAutoRunId,
       priorityRotationAutoDataKey,
+      `threshold:${priorityRotationSettings.thresholdPercent}`,
       `slots:${priorityRotationSettings.activeSlotLimit}`,
     ].join(':');
     if (lastPriorityRotationAutoTriggerRef.current === triggerKey) return;
@@ -1020,6 +1026,7 @@ export function AuthFilesPage() {
     if (lastPriorityRotationAutoChangeRef.current === changeFingerprint) return;
     lastPriorityRotationAutoChangeRef.current = changeFingerprint;
     priorityRotationAutoApplyingRef.current = true;
+    setPriorityRotationAutoApplying(true);
 
     void (async () => {
       try {
@@ -1055,6 +1062,7 @@ export function AuthFilesPage() {
         }
       } finally {
         priorityRotationAutoApplyingRef.current = false;
+        setPriorityRotationAutoApplying(false);
       }
     })();
   }, [
@@ -1071,6 +1079,7 @@ export function AuthFilesPage() {
     priorityRotationSettings.activeSlotLimit,
     priorityRotationSettings.autoEnabled,
     priorityRotationSettings.lastAutoSkippedReason,
+    priorityRotationSettings.thresholdPercent,
     showNotification,
     t,
     updatePriorityRotationSettings,
@@ -1337,6 +1346,7 @@ export function AuthFilesPage() {
       })
     : '';
   const priorityRotationAutoEnabled = priorityRotationSettings.autoEnabled === true;
+  const priorityRotationControlsDisabled = batchPriorityUpdating && !priorityRotationAutoApplying;
   const priorityRotationAutoStatusLabel = priorityRotationAutoEnabled
     ? t('auth_files.priority_rotation_auto_status_on')
     : t('auth_files.priority_rotation_auto_status_off');
@@ -1571,7 +1581,7 @@ export function AuthFilesPage() {
                         inputMode="numeric"
                         pattern="[0-9]*"
                         value={priorityRotationThresholdInput}
-                        disabled={batchPriorityUpdating}
+                        disabled={priorityRotationControlsDisabled}
                         aria-label={t('auth_files.priority_rotation_threshold_label')}
                         onChange={(event) =>
                           setPriorityRotationThresholdInput(event.currentTarget.value)
@@ -1596,7 +1606,7 @@ export function AuthFilesPage() {
                       max={100}
                       step={PRIORITY_ROTATION_THRESHOLD_STEP}
                       value={priorityRotationSettings.thresholdPercent}
-                      disabled={batchPriorityUpdating}
+                      disabled={priorityRotationControlsDisabled}
                       aria-label={t('auth_files.priority_rotation_threshold_label')}
                       style={
                         {
@@ -1619,7 +1629,7 @@ export function AuthFilesPage() {
                     <button
                       type="button"
                       className={styles.priorityRotationStepperButton}
-                      disabled={batchPriorityUpdating}
+                      disabled={priorityRotationControlsDisabled}
                       aria-label={t('auth_files.priority_rotation_slots_decrease')}
                       onClick={() => adjustPriorityRotationSlots(-PRIORITY_ROTATION_SLOT_STEP)}
                     >
@@ -1631,7 +1641,7 @@ export function AuthFilesPage() {
                         inputMode="numeric"
                         pattern="[0-9]*"
                         value={priorityRotationSlotsInput}
-                        disabled={batchPriorityUpdating}
+                        disabled={priorityRotationControlsDisabled}
                         aria-label={t('auth_files.priority_rotation_slots_label')}
                         onChange={(event) =>
                           setPriorityRotationSlotsInput(event.currentTarget.value)
@@ -1649,7 +1659,7 @@ export function AuthFilesPage() {
                     <button
                       type="button"
                       className={styles.priorityRotationStepperButton}
-                      disabled={batchPriorityUpdating}
+                      disabled={priorityRotationControlsDisabled}
                       aria-label={t('auth_files.priority_rotation_slots_increase')}
                       onClick={() => adjustPriorityRotationSlots(PRIORITY_ROTATION_SLOT_STEP)}
                     >
@@ -1693,7 +1703,7 @@ export function AuthFilesPage() {
                   <ToggleSwitch
                     checked={priorityRotationAutoEnabled}
                     onChange={handlePriorityRotationAutoToggle}
-                    disabled={disableControls || loading || batchPriorityUpdating}
+                    disabled={disableControls || loading || priorityRotationControlsDisabled}
                     ariaLabel={t('auth_files.priority_rotation_auto_label')}
                     label={
                       <span className={styles.priorityRotationAutoLabel}>

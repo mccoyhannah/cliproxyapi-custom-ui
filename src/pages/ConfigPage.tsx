@@ -217,7 +217,7 @@ export function ConfigPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (activeTab === 'visual' && visualParseError) {
       showNotification(t('config_management.visual_mode_save_blocked'), 'error');
       return;
@@ -289,7 +289,36 @@ export function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    activeTab,
+    applyVisualChangesToYaml,
+    content,
+    hasSourceYamlError,
+    loadVisualValuesFromYaml,
+    showNotification,
+    sourceYamlErrorDetail,
+    t,
+    visualParseError,
+  ]);
+
+  useEffect(() => {
+    if (activeTab !== 'source' || !isCurrentLayer) return;
+
+    const handleSourceSaveShortcut = (event: KeyboardEvent) => {
+      const isSaveShortcut =
+        (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's';
+      if (!isSaveShortcut) return;
+
+      event.preventDefault();
+      if (loading || saving || disableControls || diffModalOpen) return;
+      void handleSave();
+    };
+
+    window.addEventListener('keydown', handleSourceSaveShortcut, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleSourceSaveShortcut, { capture: true });
+    };
+  }, [activeTab, diffModalOpen, disableControls, handleSave, isCurrentLayer, loading, saving]);
 
   const handleChange = useCallback((value: string) => {
     setContent(value);

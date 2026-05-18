@@ -1637,3 +1637,134 @@ select {
     background: transparent;
   }
 }
+
+// Developer-console convergence: neutral surfaces, fine borders, restrained lift.
+.btn {
+  min-height: var(--control-height);
+  padding: 8px 12px;
+  border-color: var(--border-base);
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+  color: var(--text-primary);
+  box-shadow: none;
+  font-weight: 650;
+
+  &:hover:not(:disabled) {
+    transform: none;
+    box-shadow: var(--shadow-control);
+  }
+
+  &.btn-primary {
+    border-color: color-mix(in srgb, var(--primary-color) 88%, #111827);
+    background: var(--primary-color);
+    color: var(--primary-contrast, #fff);
+
+    &:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+    }
+  }
+
+  &.btn-secondary {
+    background: var(--surface-control);
+    border-color: var(--border-base);
+
+    &:hover {
+      background: var(--surface-control-hover);
+      border-color: var(--border-hover);
+    }
+  }
+
+  &.btn-ghost {
+    background: transparent;
+    border-color: transparent;
+
+    &:hover {
+      background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+      color: var(--text-primary);
+    }
+  }
+
+  &.btn-sm {
+    padding: 6px 10px;
+  }
+
+  &.btn-xs {
+    min-height: 28px;
+    padding: 4px 8px;
+  }
+}
+
+.input,
+textarea,
+select {
+  border-color: var(--border-base);
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+  box-shadow: none;
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    background: var(--surface-control-hover);
+  }
+
+  &:focus {
+    border-color: var(--primary-color);
+    box-shadow: var(--focus-ring);
+  }
+}
+
+.card {
+  padding: 16px;
+  border: 1px solid var(--border-base);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow);
+
+  &.card-compact {
+    padding: 14px;
+  }
+
+  &.card-interactive:hover {
+    border-color: var(--border-hover);
+    background: var(--surface-card-hover);
+    box-shadow: var(--shadow-card);
+  }
+}
+
+.card-header {
+  margin-bottom: 14px;
+
+  .title {
+    font-size: 16px;
+    font-weight: 720;
+  }
+}
+
+.badge,
+.status-badge,
+.pill {
+  box-shadow: none;
+}
+
+.badge {
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: $radius-full;
+  font-weight: 700;
+}
+
+.stat-card,
+.item-row,
+.table,
+.log-viewer,
+.empty-state,
+.skeleton-card,
+.skeleton-auth-card,
+.skeleton-config-panel,
+.skeleton-table-row {
+  border-color: var(--border-base);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow);
+}

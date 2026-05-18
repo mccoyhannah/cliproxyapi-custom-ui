@@ -54,12 +54,32 @@ export function LogViewer({
       ? filteredLineCount
       : 0
     : parsedVisibleLines.length;
+  const copyHint = t('logs.double_click_copy_hint', {
+    defaultValue: 'Double-click a row to copy',
+  });
+  const copyLineLabel = t('logs.copy_line', { defaultValue: 'Copy line' });
+  const copyLineButtonText = t('logs.copy_line_short', { defaultValue: '复制' });
+  const emptyPrompt = (
+    <span className={styles.emptyPrompt} aria-hidden="true">
+      &gt;_
+    </span>
+  );
   const chrome = (
     <div className={styles.terminalChrome}>
-      <div className={styles.terminalLights} aria-hidden="true">
-        <span />
-        <span />
-        <span />
+      <div className={styles.terminalIdentity}>
+        <div className={styles.terminalLights} aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className={styles.terminalTitleBlock}>
+          <span className={styles.terminalTitle}>{showRawLogs ? 'raw.log' : 'server.log'}</span>
+          <span className={styles.terminalHint}>
+            {showRawLogs
+              ? t('logs.raw_mode_label', { defaultValue: 'raw buffer' })
+              : t('logs.parsed_mode_label', { defaultValue: 'parsed stream' })}
+          </span>
+        </div>
       </div>
       <div className={styles.terminalStatusList}>
         <span
@@ -109,6 +129,7 @@ export function LogViewer({
         {chrome}
         <EmptyState
           className={styles.logEmptyState}
+          icon={emptyPrompt}
           title={t('logs.search_empty_title')}
           description={t('logs.search_empty_desc')}
           variant="info"
@@ -123,6 +144,7 @@ export function LogViewer({
         {chrome}
         <EmptyState
           className={styles.logEmptyState}
+          icon={emptyPrompt}
           title={t('logs.empty_title')}
           description={t('logs.empty_desc')}
         />
@@ -150,13 +172,25 @@ export function LogViewer({
         </div>
       )}
       {showRawLogs ? (
-        <pre className={styles.rawLog} spellCheck={false}>
+        <pre
+          className={styles.rawLog}
+          spellCheck={false}
+          title={t('logs.raw_copy_hint', {
+            defaultValue: 'Select text or double-click to copy the visible buffer',
+          })}
+          onDoubleClick={() => {
+            if (rawVisibleText) onCopyLine(rawVisibleText);
+          }}
+        >
           {rawVisibleText}
         </pre>
       ) : (
         <div className={styles.logList}>
           {parsedVisibleLines.map((line, index) => {
             const rowClassNames = [styles.logRow];
+            if (line.level === 'info') rowClassNames.push(styles.rowInfo);
+            if (line.level === 'debug') rowClassNames.push(styles.rowDebug);
+            if (line.level === 'trace') rowClassNames.push(styles.rowTrace);
             if (line.level === 'warn') rowClassNames.push(styles.rowWarn);
             if (line.level === 'error' || line.level === 'fatal')
               rowClassNames.push(styles.rowError);
@@ -171,9 +205,7 @@ export function LogViewer({
                 onPointerLeave={onLongPressCancel}
                 onPointerCancel={onLongPressCancel}
                 onPointerMove={onLongPressMove}
-                title={t('logs.double_click_copy_hint', {
-                  defaultValue: 'Double-click to copy',
-                })}
+                title={copyHint}
               >
                 <div className={styles.timestamp}>{line.timestamp || ''}</div>
                 <div className={styles.rowMain}>
@@ -254,6 +286,20 @@ export function LogViewer({
                   )}
 
                   {line.message && <span className={styles.message}>{line.message}</span>}
+
+                  <button
+                    type="button"
+                    className={styles.copyButton}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCopyLine(line.raw);
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    title={copyLineLabel}
+                    aria-label={copyLineLabel}
+                  >
+                    {copyLineButtonText}
+                  </button>
                 </div>
               </div>
             );
