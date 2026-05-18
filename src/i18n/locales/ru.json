@@ -625,6 +625,8 @@
     "priority_rotation_button": "Умно настроить приоритет",
     "priority_rotation_layers": "Ротация только между активным и резервом; буфер только для наблюдения",
     "priority_rotation_layers_unknown": "Автоопределение уровней Team / Plus; буфер только для наблюдения",
+    "priority_rotation_layers_short": "Ротация активного и резерва; буфер только наблюдает",
+    "priority_rotation_layers_title": "Умная настройка меняет только активный и резервный уровни; буфер нужен для наблюдения за новыми аккаунтами и не повышается автоматически.",
     "priority_rotation_tiers_aria": "Уровни умного приоритета Codex",
     "priority_rotation_tier_active": "Активный",
     "priority_rotation_tier_standby": "Резерв",

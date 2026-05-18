@@ -625,6 +625,8 @@
     "priority_rotation_button": "智慧調節優先順序",
     "priority_rotation_layers": "只在主力和備用之間接力；緩衝層只觀察，不參與自動提升",
     "priority_rotation_layers_unknown": "自動識別 Team / Plus 層級；緩衝層只觀察，不參與自動提升",
+    "priority_rotation_layers_short": "只在主力和備用間接力，緩衝層僅觀察",
+    "priority_rotation_layers_title": "智慧調節只在主力和備用層之間換班；緩衝層用於新號觀察，不會自動提升。",
     "priority_rotation_tiers_aria": "Codex 智慧優先順序層級",
     "priority_rotation_tier_active": "主力",
     "priority_rotation_tier_standby": "備用",

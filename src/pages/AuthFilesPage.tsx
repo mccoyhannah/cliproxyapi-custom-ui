@@ -22,7 +22,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { IconFilterAll, IconInbox, IconRefreshCw } from '@/components/ui/icons';
+import { IconFilterAll, IconInbox, IconRefreshCw, IconSettings } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -791,23 +791,6 @@ export function AuthFilesPage() {
     [updatePriorityRotationSettings]
   );
 
-  const adjustPriorityRotationThreshold = useCallback(
-    (delta: number) => {
-      const raw = priorityRotationThresholdInput.trim();
-      const base = raw
-        ? normalizePriorityRotationThresholdPercent(raw)
-        : priorityRotationSettings.thresholdPercent;
-      const thresholdPercent = normalizePriorityRotationThresholdPercent(base + delta);
-      setPriorityRotationThresholdInput(String(thresholdPercent));
-      updatePriorityRotationSettings({ thresholdPercent });
-    },
-    [
-      priorityRotationSettings.thresholdPercent,
-      priorityRotationThresholdInput,
-      updatePriorityRotationSettings,
-    ]
-  );
-
   const adjustPriorityRotationSlots = useCallback(
     (delta: number) => {
       const raw = priorityRotationSlotsInput.trim();
@@ -1165,19 +1148,8 @@ export function AuthFilesPage() {
           priorityRotationAnalysis.status === 'no_standby'
         ? styles.priorityRotationStatusWarning
         : styles.priorityRotationStatusMuted;
-  const priorityRotationLayerLabel =
-    priorityRotationAnalysis.activePriority !== null &&
-    priorityRotationAnalysis.standbyPriority !== null
-      ? t('auth_files.priority_rotation_layers', {
-          active: priorityRotationAnalysis.activePriority,
-          standby: priorityRotationAnalysis.standbyPriority,
-          threshold: priorityRotationAnalysis.thresholdPercent,
-          slots: priorityRotationAnalysis.activeSlotLimit,
-        })
-      : t('auth_files.priority_rotation_layers_unknown', {
-          threshold: priorityRotationAnalysis.thresholdPercent,
-          slots: priorityRotationAnalysis.activeSlotLimit,
-        });
+  const priorityRotationLayerLabel = t('auth_files.priority_rotation_layers_short');
+  const priorityRotationLayerTitle = t('auth_files.priority_rotation_layers_title');
   const priorityRotationTierItems = [
     {
       key: 'active',
@@ -1313,13 +1285,16 @@ export function AuthFilesPage() {
             <div className={styles.priorityRotationBar}>
               <div className={styles.priorityRotationMain}>
                 <span className={styles.priorityRotationIcon} aria-hidden="true">
-                  <IconRefreshCw size={18} />
+                  <IconSettings size={19} />
                 </span>
                 <span className={styles.priorityRotationCopy}>
                   <span className={styles.priorityRotationTitle}>
                     {t('auth_files.priority_rotation_title')}
                   </span>
-                  <span className={styles.priorityRotationMeta}>
+                  <span
+                    className={styles.priorityRotationMeta}
+                    title={priorityRotationLayerTitle}
+                  >
                     {priorityRotationLayerLabel}
                   </span>
                   <span
@@ -1341,19 +1316,26 @@ export function AuthFilesPage() {
               <div className={styles.priorityRotationControls}>
                 <label className={styles.priorityRotationSetting}>
                   <span>{t('auth_files.priority_rotation_threshold_label')}</span>
-                  <span className={styles.priorityRotationStepper}>
-                    <button
-                      type="button"
-                      className={styles.priorityRotationStepperButton}
+                  <span className={styles.priorityRotationThresholdControl}>
+                    <input
+                      className={styles.priorityRotationSlider}
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={PRIORITY_ROTATION_THRESHOLD_STEP}
+                      value={priorityRotationSettings.thresholdPercent}
                       disabled={batchPriorityUpdating}
-                      aria-label={t('auth_files.priority_rotation_threshold_decrease')}
-                      onClick={() =>
-                        adjustPriorityRotationThreshold(-PRIORITY_ROTATION_THRESHOLD_STEP)
+                      aria-label={t('auth_files.priority_rotation_threshold_label')}
+                      style={
+                        {
+                          '--priority-rotation-slider-progress': `${priorityRotationSettings.thresholdPercent}%`,
+                        } as CSSProperties
                       }
-                    >
-                      −
-                    </button>
-                    <span className={styles.priorityRotationStepperValue}>
+                      onChange={(event) =>
+                        commitPriorityRotationThresholdInput(event.currentTarget.value)
+                      }
+                    />
+                    <span className={styles.priorityRotationThresholdValue}>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -1375,22 +1357,13 @@ export function AuthFilesPage() {
                       />
                       <span>%</span>
                     </span>
-                    <button
-                      type="button"
-                      className={styles.priorityRotationStepperButton}
-                      disabled={batchPriorityUpdating}
-                      aria-label={t('auth_files.priority_rotation_threshold_increase')}
-                      onClick={() =>
-                        adjustPriorityRotationThreshold(PRIORITY_ROTATION_THRESHOLD_STEP)
-                      }
-                    >
-                      +
-                    </button>
                   </span>
                 </label>
                 <label className={styles.priorityRotationSetting}>
                   <span>{t('auth_files.priority_rotation_slots_label')}</span>
-                  <span className={styles.priorityRotationStepper}>
+                  <span
+                    className={`${styles.priorityRotationStepper} ${styles.priorityRotationSlotStepper}`}
+                  >
                     <button
                       type="button"
                       className={styles.priorityRotationStepperButton}
@@ -1401,23 +1374,25 @@ export function AuthFilesPage() {
                       −
                     </button>
                     <span className={styles.priorityRotationStepperValue}>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={priorityRotationSlotsInput}
-                      disabled={batchPriorityUpdating}
-                      aria-label={t('auth_files.priority_rotation_slots_label')}
-                      onChange={(event) => setPriorityRotationSlotsInput(event.currentTarget.value)}
-                      onBlur={(event) =>
-                        commitPriorityRotationSlotsInput(event.currentTarget.value)
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.currentTarget.blur();
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={priorityRotationSlotsInput}
+                        disabled={batchPriorityUpdating}
+                        aria-label={t('auth_files.priority_rotation_slots_label')}
+                        onChange={(event) =>
+                          setPriorityRotationSlotsInput(event.currentTarget.value)
                         }
-                      }}
-                    />
+                        onBlur={(event) =>
+                          commitPriorityRotationSlotsInput(event.currentTarget.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
+                          }
+                        }}
+                      />
                     </span>
                     <button
                       type="button"
@@ -1439,7 +1414,7 @@ export function AuthFilesPage() {
                     {priorityRotationStatusLabel}
                   </span>
                   <span
-                    className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusMuted}`}
+                    className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusInfo}`}
                   >
                     {priorityRotationSlotLabel}
                   </span>
@@ -1453,7 +1428,7 @@ export function AuthFilesPage() {
                 </div>
                 <Button
                   className={styles.priorityRotationButton}
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
                   leftIcon={<IconRefreshCw size={16} />}
                   onClick={openPriorityRotationPreview}

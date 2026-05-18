@@ -69,7 +69,7 @@ type PriorityRotationCandidate = {
 const clampThresholdPercent = (value: unknown): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return DEFAULT_THRESHOLD_PERCENT;
-  return Math.max(1, Math.min(99, Math.round(numeric)));
+  return Math.max(0, Math.min(100, Math.round(numeric)));
 };
 
 const clampActiveSlotLimit = (value: unknown): number => {

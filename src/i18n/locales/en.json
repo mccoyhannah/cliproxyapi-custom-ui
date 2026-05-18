@@ -625,6 +625,8 @@
     "priority_rotation_button": "Smart adjust priority",
     "priority_rotation_layers": "Rotates only between active and standby; buffer is observation-only",
     "priority_rotation_layers_unknown": "Auto-detect Team / Plus tiers; buffer is observation-only",
+    "priority_rotation_layers_short": "Active and standby rotate; buffer only observes",
+    "priority_rotation_layers_title": "Smart adjustment only rotates between active and standby tiers; buffer is for observing new accounts and is never promoted automatically.",
     "priority_rotation_tiers_aria": "Codex smart priority tiers",
     "priority_rotation_tier_active": "Active",
     "priority_rotation_tier_standby": "Standby",
