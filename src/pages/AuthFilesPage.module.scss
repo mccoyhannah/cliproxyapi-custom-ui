@@ -581,7 +581,7 @@
 
 .priorityRotationBar {
   display: grid;
-  grid-template-columns: minmax(260px, 1.08fr) minmax(320px, 0.9fr) auto;
+  grid-template-columns: minmax(280px, 1fr) minmax(340px, 380px) minmax(400px, 400px);
   gap: 12px;
   align-items: center;
   margin-bottom: 12px;
@@ -600,7 +600,7 @@
     inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
     inset 3px 0 0 color-mix(in srgb, var(--primary-color) 58%, #14b8a6);
 
-  @include mobile {
+  @include tablet {
     grid-template-columns: 1fr;
     align-items: stretch;
   }
@@ -700,9 +700,11 @@
   display: grid;
   grid-template-columns: minmax(190px, 1fr) minmax(112px, 126px);
   gap: 8px;
-  min-width: 320px;
+  width: 100%;
+  min-width: 0;
 
   @include mobile {
+    grid-template-columns: 1fr;
     min-width: 0;
   }
 }
@@ -962,11 +964,18 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
   min-width: 0;
+  flex-wrap: nowrap;
+
+  @include tablet {
+    justify-content: space-between;
+  }
 
   @include mobile {
-    justify-content: stretch;
+    align-items: stretch;
+    flex-direction: column;
 
     :global(.btn) {
       flex: 1 1 auto;
@@ -980,14 +989,20 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  min-width: 0;
+  flex: 0 0 176px;
+  width: 176px;
+  min-width: 176px;
   padding: 4px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--border-color) 54%, transparent);
   background: color-mix(in srgb, var(--surface-control) 58%, transparent);
 
   @include mobile {
+    width: 100%;
+    min-width: 0;
+    flex: 0 1 auto;
     justify-content: flex-start;
+    border-radius: 8px;
   }
 }
 
@@ -996,7 +1011,8 @@
   align-items: center;
   justify-content: center;
   min-height: 24px;
-  max-width: 180px;
+  min-width: 74px;
+  max-width: 166px;
   padding: 0 10px;
   border-radius: 999px;
   font-size: 12px;
@@ -1005,6 +1021,72 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.priorityRotationAutoToggle {
+  flex: 0 0 112px;
+  width: 112px;
+  min-width: 112px;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 70%, var(--bg-primary));
+  color: var(--text-secondary);
+
+  :global(label) {
+    gap: 6px;
+  }
+
+  :global(.track) {
+    flex-basis: 36px;
+    width: 36px;
+    height: 20px;
+  }
+
+  :global(.thumb) {
+    width: 14px;
+    height: 14px;
+  }
+
+  :global(input:checked + .track .thumb) {
+    transform: translateX(16px);
+  }
+
+  @include mobile {
+    width: 100%;
+    min-width: 0;
+    flex: 0 1 auto;
+    border-radius: 8px;
+  }
+}
+
+.priorityRotationAutoToggleOn {
+  color: color-mix(in srgb, var(--success-color) 76%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--success-color) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--success-color) 8%, var(--surface-control));
+}
+
+.priorityRotationAutoLabel {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.05;
+
+  span:first-child {
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 820;
+    white-space: nowrap;
+  }
+
+  span:last-child {
+    color: currentColor;
+    font-size: 9px;
+    font-weight: 760;
+    white-space: nowrap;
+  }
 }
 
 .priorityRotationStatusReady {
@@ -1032,6 +1114,7 @@
 }
 
 .priorityRotationButton {
+  flex: 0 0 188px;
   white-space: nowrap;
 
   &:global(.btn) {
@@ -1040,6 +1123,11 @@
       0 0 0 1px color-mix(in srgb, var(--primary-color) 14%, transparent),
       0 8px 20px color-mix(in srgb, var(--primary-color) 18%, transparent),
       var(--ops-control-shadow);
+  }
+
+  @include mobile {
+    flex-basis: auto;
+    width: 100%;
   }
 }
 
@@ -2336,6 +2424,26 @@ button.codexSubscriptionValue {
     font-size: 11px;
   }
 
+  .priorityBadgeEditor {
+    grid-template-columns: 28px minmax(74px, auto) 28px;
+    min-height: 32px;
+  }
+
+  .priorityBadgeMain {
+    gap: 5px;
+    padding-inline: 6px;
+  }
+
+  .priorityBadgeLabel,
+  .priorityBadgeTier {
+    display: none;
+  }
+
+  .priorityBadgeInput {
+    width: 3ch;
+    font-size: 17px;
+  }
+
   .subscriptionExpiryMeta {
     flex: 0 1 auto;
     gap: 4px;
@@ -2660,6 +2768,161 @@ button.codexSubscriptionValue {
 
 .priorityValue {
   font-variant-numeric: tabular-nums;
+}
+
+.priorityBadgeEditor {
+  --priority-badge-color: var(--primary-color);
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 30px minmax(88px, auto) 30px;
+  align-items: stretch;
+  min-height: 36px;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--priority-badge-color) 22%, var(--border-color));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--priority-badge-color) 9%, transparent),
+      transparent 62%
+    ),
+    color-mix(in srgb, var(--surface-control) 92%, var(--bg-primary));
+  box-shadow:
+    0 10px 22px -22px color-mix(in srgb, var(--priority-badge-color) 58%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+}
+
+.priorityBadgeEditorActive {
+  --priority-badge-color: #2563eb;
+}
+
+.priorityBadgeEditorStandby {
+  --priority-badge-color: #0891b2;
+}
+
+.priorityBadgeEditorBuffer {
+  --priority-badge-color: #64748b;
+}
+
+.priorityBadgeMain {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 3px 8px;
+  border-inline: 1px solid color-mix(in srgb, var(--border-color) 54%, transparent);
+}
+
+.priorityBadgeLabel {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.priorityBadgeValueShell {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  min-width: 44px;
+  color: color-mix(in srgb, var(--priority-badge-color) 84%, var(--text-primary));
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.priorityBadgePrefix {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.priorityBadgeInput {
+  width: 3ch;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: currentColor;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 920;
+  line-height: 1;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+
+  &::placeholder {
+    color: color-mix(in srgb, currentColor 42%, transparent);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.68;
+  }
+}
+
+.priorityBadgeStepButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color $transition-fast,
+    color $transition-fast,
+    transform $transition-fast;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--priority-badge-color) 10%, transparent);
+    color: color-mix(in srgb, var(--priority-badge-color) 84%, var(--text-primary));
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.94);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+}
+
+.priorityBadgeTier {
+  position: absolute;
+  right: 34px;
+  bottom: 2px;
+  max-width: 44px;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--priority-badge-color) 82%, var(--text-primary));
+  font-size: 9px;
+  font-weight: 860;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.priorityBadgeSpinner {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--surface-control) 60%, transparent);
 }
 
 .priorityInlineEditor {
@@ -3504,7 +3767,28 @@ button.codexSubscriptionValue {
   }
 }
 
+.priorityRotationOverlay {
+  z-index: $z-notification + 20;
+  background:
+    radial-gradient(
+      circle at 50% 20%,
+      color-mix(in srgb, var(--primary-color) 13%, transparent),
+      transparent 42%
+    ),
+    rgb(15 23 42 / 0.42);
+  backdrop-filter: blur(5px) saturate(1.04);
+  -webkit-backdrop-filter: blur(5px) saturate(1.04);
+}
+
 .priorityRotationModal {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent 180px),
+    color-mix(in srgb, var(--surface-card) 98%, var(--bg-primary));
+  border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  box-shadow:
+    0 28px 80px -34px rgb(15 23 42 / 0.46),
+    inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
+
   :global(.modal-body) {
     padding-top: 0;
   }
@@ -3518,27 +3802,47 @@ button.codexSubscriptionValue {
 
 .priorityRotationSummary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-
-  span {
-    min-width: 0;
-    padding: 9px 10px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
-    background: color-mix(in srgb, var(--surface-control) 90%, var(--bg-primary));
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 
   @include mobile {
     grid-template-columns: 1fr;
   }
+}
+
+.priorityRotationSummaryItem {
+  min-width: 0;
+  padding: 10px 11px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 72%, var(--bg-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--border-color) 42%, transparent);
+}
+
+.priorityRotationSummaryLabel {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 820;
+  letter-spacing: 0;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.priorityRotationSummaryValue {
+  display: block;
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 880;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
 }
 
 .priorityRotationTable {
@@ -3553,7 +3857,7 @@ button.codexSubscriptionValue {
 .priorityRotationHeader,
 .priorityRotationRow {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) minmax(96px, 0.5fr) minmax(88px, 0.4fr) minmax(
+  grid-template-columns: minmax(180px, 1.25fr) minmax(106px, 0.5fr) minmax(88px, 0.4fr) minmax(
       160px,
       1fr
     );
@@ -3574,7 +3878,7 @@ button.codexSubscriptionValue {
 }
 
 .priorityRotationRow {
-  padding: 11px 12px;
+  padding: 13px 12px;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 650;
@@ -3602,12 +3906,21 @@ button.codexSubscriptionValue {
   height: 26px;
   padding: 0 8px;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--primary-color) 82%, var(--text-primary));
-  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, transparent);
-  background: color-mix(in srgb, var(--primary-color) 9%, var(--surface-control));
+  color: color-mix(in srgb, var(--priority-change-color, var(--primary-color)) 84%, var(--text-primary));
+  border: 1px solid color-mix(in srgb, var(--priority-change-color, var(--primary-color)) 24%, transparent);
+  background: color-mix(in srgb, var(--priority-change-color, var(--primary-color)) 10%, var(--surface-control));
   font-family: var(--font-mono);
   font-size: 12px;
+  font-weight: 860;
   font-variant-numeric: tabular-nums;
+}
+
+.priorityRotationDirectionDemote {
+  --priority-change-color: var(--warning-color);
+}
+
+.priorityRotationDirectionPromote {
+  --priority-change-color: var(--success-color);
 }
 
 .priorityRotationRemaining {
@@ -3635,9 +3948,46 @@ button.codexSubscriptionValue {
 
 .priorityRotationFooter {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   width: 100%;
+
+  @include mobile {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.priorityRotationFooterHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.35;
+
+  svg {
+    flex: 0 0 auto;
+    color: color-mix(in srgb, var(--info-color) 78%, var(--text-secondary));
+  }
+}
+
+.priorityRotationFooterActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+
+  @include mobile {
+    width: 100%;
+
+    :global(.btn) {
+      flex: 1 1 0;
+    }
+  }
 }
 
 .cardActions {

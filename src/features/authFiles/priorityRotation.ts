@@ -31,6 +31,10 @@ export type AuthFilesPriorityRotationSettings = {
   activeSlotLimit: number;
   lastAppliedAt?: number;
   lastAppliedChangeCount?: number;
+  autoEnabled?: boolean;
+  lastAutoAppliedAt?: number;
+  lastAutoAppliedChangeCount?: number;
+  lastAutoSkippedReason?: string;
 };
 
 export type PriorityRotationChange = {
@@ -111,6 +115,22 @@ export const readAuthFilesPriorityRotationSettings =
           Number.isFinite(parsed.lastAppliedChangeCount)
             ? parsed.lastAppliedChangeCount
             : undefined,
+        autoEnabled: parsed.autoEnabled === true,
+        lastAutoAppliedAt:
+          typeof parsed.lastAutoAppliedAt === 'number' &&
+          Number.isFinite(parsed.lastAutoAppliedAt)
+            ? parsed.lastAutoAppliedAt
+            : undefined,
+        lastAutoAppliedChangeCount:
+          typeof parsed.lastAutoAppliedChangeCount === 'number' &&
+          Number.isFinite(parsed.lastAutoAppliedChangeCount)
+            ? parsed.lastAutoAppliedChangeCount
+            : undefined,
+        lastAutoSkippedReason:
+          typeof parsed.lastAutoSkippedReason === 'string' &&
+          parsed.lastAutoSkippedReason.trim()
+            ? parsed.lastAutoSkippedReason.trim()
+            : undefined,
       };
     } catch {
       return {
@@ -131,6 +151,7 @@ export const writeAuthFilesPriorityRotationSettings = (
         ...settings,
         thresholdPercent: clampThresholdPercent(settings.thresholdPercent),
         activeSlotLimit: clampActiveSlotLimit(settings.activeSlotLimit),
+        autoEnabled: settings.autoEnabled === true,
       })
     );
   } catch {

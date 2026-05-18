@@ -48,6 +48,7 @@ type UploadValidationResult =
 
 type AuthFileDeleteFailure = { name: string; error: string };
 export type AuthFilePriorityBatchChange = { name: string; priority: number };
+export type AuthFilePriorityBatchOptions = { notify?: boolean };
 export type AuthFilePriorityBatchResult = { successCount: number; failCount: number };
 type ApiErrorLike = Error & {
   status?: number;
@@ -91,7 +92,8 @@ export type UseAuthFilesDataResult = {
   batchSetStatus: (names: string[], enabled: boolean) => Promise<void>;
   batchSetPriority: (names: string[], priority: number) => Promise<void>;
   batchSetPriorities: (
-    changes: AuthFilePriorityBatchChange[]
+    changes: AuthFilePriorityBatchChange[],
+    options?: AuthFilePriorityBatchOptions
   ) => Promise<AuthFilePriorityBatchResult>;
   batchDelete: (names: string[]) => void;
 };
@@ -1037,7 +1039,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   );
 
   const batchSetPriorities = useCallback(
-    async (changes: AuthFilePriorityBatchChange[]): Promise<AuthFilePriorityBatchResult> => {
+    async (
+      changes: AuthFilePriorityBatchChange[],
+      options: AuthFilePriorityBatchOptions = {}
+    ): Promise<AuthFilePriorityBatchResult> => {
       if (batchPriorityPendingRef.current) return { successCount: 0, failCount: 0 };
 
       const changeMap = new Map<string, number>();
@@ -1106,12 +1111,13 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
           )
         );
 
-        if (successCount > 0 && failCount === 0) {
+        const shouldNotify = options.notify !== false;
+        if (shouldNotify && successCount > 0 && failCount === 0) {
           showNotification(
             t('auth_files.priority_rotation_apply_success', { count: successCount }),
             'success'
           );
-        } else if (successCount > 0 || failCount > 0) {
+        } else if (shouldNotify && (successCount > 0 || failCount > 0)) {
           showNotification(
             t('auth_files.priority_rotation_apply_partial', {
               success: successCount,

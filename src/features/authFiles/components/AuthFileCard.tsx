@@ -48,6 +48,7 @@ import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
+type AuthFilePriorityTier = 'active' | 'standby' | 'buffer';
 
 export type AuthFileCardProps = {
   file: AuthFileItem;
@@ -64,6 +65,7 @@ export type AuthFileCardProps = {
   authTokenSnapshot?: CodexAuthTokenSnapshot | null;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   manualExpiryMs?: number | null;
+  priorityTier?: AuthFilePriorityTier | null;
   onShowModels: (file: AuthFileItem) => void;
   onDownload: (name: string) => void;
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
@@ -99,6 +101,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     authTokenSnapshot,
     codexSubscriptionSnapshot,
     manualExpiryMs,
+    priorityTier,
     onShowModels,
     onDownload,
     onOpenPrefixProxyEditor,
@@ -206,6 +209,26 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const prioritySaving = priorityUpdating[file.name] === true;
   const displayNameSaving = noteUpdating[file.name] === true;
+  const showPriorityTier =
+    Boolean(priorityTier) &&
+    resolvedQuotaType === 'codex' &&
+    (effectiveCodexPlanType === 'team' || effectiveCodexPlanType === 'plus');
+  const priorityTierLabel =
+    priorityTier === 'active'
+      ? t('auth_files.priority_rotation_tier_active')
+      : priorityTier === 'standby'
+        ? t('auth_files.priority_rotation_tier_standby')
+        : priorityTier === 'buffer'
+          ? t('auth_files.priority_rotation_tier_buffer')
+          : '';
+  const priorityTierClass =
+    priorityTier === 'active'
+      ? styles.priorityBadgeEditorActive
+      : priorityTier === 'standby'
+        ? styles.priorityBadgeEditorStandby
+        : priorityTier === 'buffer'
+          ? styles.priorityBadgeEditorBuffer
+          : '';
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =
     resolvedQuotaType === 'codex' &&
@@ -500,48 +523,63 @@ export function AuthFileCard(props: AuthFileCardProps) {
               <span className={styles.metaValue}>{formatModified(file)}</span>
             </div>
             {!isRuntimeOnly && (
-              <div className={`${styles.metaItem} ${styles.priorityInlineEditor}`}>
-                <label className={styles.metaLabel} htmlFor={priorityInputId}>
-                  {t('auth_files.priority_display')}
+              <div
+                className={`${styles.priorityBadgeEditor} ${showPriorityTier ? priorityTierClass : ''}`}
+              >
+                <button
+                  type="button"
+                  className={styles.priorityBadgeStepButton}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => stepPriorityInput(-1)}
+                  disabled={disableControls || prioritySaving}
+                  aria-label={t('auth_files.priority_decrease')}
+                  title={t('auth_files.priority_decrease')}
+                >
+                  -
+                </button>
+                <label className={styles.priorityBadgeMain} htmlFor={priorityInputId}>
+                  <span className={styles.priorityBadgeLabel}>
+                    {t('auth_files.priority_display')}
+                  </span>
+                  <span className={styles.priorityBadgeValueShell}>
+                    <span aria-hidden="true" className={styles.priorityBadgePrefix}>
+                      P
+                    </span>
+                    <input
+                      id={priorityInputId}
+                      className={styles.priorityBadgeInput}
+                      type="text"
+                      inputMode="numeric"
+                      value={priorityInput}
+                      placeholder="0"
+                      onChange={(event) => setPriorityInput(event.currentTarget.value)}
+                      onBlur={commitPriorityInput}
+                      onKeyDown={handlePriorityKeyDown}
+                      disabled={disableControls || prioritySaving}
+                      aria-label={t('auth_files.priority_display')}
+                      title={t('auth_files.priority_hint')}
+                    />
+                  </span>
                 </label>
-                <div className={styles.priorityStepper}>
-                  <button
-                    type="button"
-                    className={styles.priorityStepButton}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => stepPriorityInput(-1)}
-                    disabled={disableControls || prioritySaving}
-                    aria-label={t('auth_files.priority_decrease')}
-                    title={t('auth_files.priority_decrease')}
-                  >
-                    -
-                  </button>
-                  <input
-                    id={priorityInputId}
-                    className={styles.priorityStepperInput}
-                    type="text"
-                    inputMode="numeric"
-                    value={priorityInput}
-                    onChange={(event) => setPriorityInput(event.currentTarget.value)}
-                    onBlur={commitPriorityInput}
-                    onKeyDown={handlePriorityKeyDown}
-                    disabled={disableControls || prioritySaving}
-                    aria-label={t('auth_files.priority_display')}
-                    title={t('auth_files.priority_hint')}
-                  />
-                  <button
-                    type="button"
-                    className={styles.priorityStepButton}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => stepPriorityInput(1)}
-                    disabled={disableControls || prioritySaving}
-                    aria-label={t('auth_files.priority_increase')}
-                    title={t('auth_files.priority_increase')}
-                  >
-                    +
-                  </button>
-                </div>
-                {prioritySaving && <LoadingSpinner size={12} />}
+                {showPriorityTier && (
+                  <span className={styles.priorityBadgeTier}>{priorityTierLabel}</span>
+                )}
+                <button
+                  type="button"
+                  className={styles.priorityBadgeStepButton}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => stepPriorityInput(1)}
+                  disabled={disableControls || prioritySaving}
+                  aria-label={t('auth_files.priority_increase')}
+                  title={t('auth_files.priority_increase')}
+                >
+                  +
+                </button>
+                {prioritySaving && (
+                  <span className={styles.priorityBadgeSpinner}>
+                    <LoadingSpinner size={12} />
+                  </span>
+                )}
               </div>
             )}
             {showSubscriptionMeta && (

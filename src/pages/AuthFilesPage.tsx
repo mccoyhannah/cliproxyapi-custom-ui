@@ -22,7 +22,13 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { IconFilterAll, IconInbox, IconRefreshCw, IconSettings } from '@/components/ui/icons';
+import {
+  IconFilterAll,
+  IconInbox,
+  IconInfo,
+  IconRefreshCw,
+  IconSettings,
+} from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -79,6 +85,7 @@ import {
   normalizePriorityRotationThresholdPercent,
   readAuthFilesPriorityRotationSettings,
   writeAuthFilesPriorityRotationSettings,
+  type AuthFilesPriorityRotationSettings,
   type PriorityRotationAnalysis,
   type PriorityRotationChange,
 } from '@/features/authFiles/priorityRotation';
@@ -121,6 +128,34 @@ const getPrioritySortValue = (file: AuthFileItem): number =>
 const formatPriorityRotationPercent = (value: number): string => `${Math.round(value)}%`;
 const formatPriorityRotationPriority = (value: number | null): string =>
   value === null ? '-' : `P${value}`;
+type AuthFilePriorityTier = 'active' | 'standby' | 'buffer';
+
+const buildPriorityRotationChangeFingerprint = (analysis: PriorityRotationAnalysis): string =>
+  analysis.changes
+    .map(
+      (change) =>
+        `${change.name}:${change.fromPriority}->${change.toPriority}:${change.role}:${change.reason}:${Math.round(change.remainingPercent)}`
+    )
+    .sort()
+    .join('|');
+
+const buildPriorityRotationAutoDataFingerprint = (
+  files: AuthFileItem[],
+  codexQuota: Record<string, CodexQuotaState>
+): string => {
+  const filePart = files
+    .map((file) => {
+      const priority = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+      return `${file.name}:${file.type ?? ''}:${file.disabled === true ? 1 : 0}:${priority}`;
+    })
+    .sort()
+    .join('|');
+  const quotaPart = Object.entries(codexQuota)
+    .map(([name, quota]) => `${name}:${JSON.stringify(quota)}`)
+    .sort()
+    .join('|');
+  return `${filePart}::${quotaPart}`;
+};
 
 export function AuthFilesPage() {
   const { t } = useTranslation();
@@ -165,6 +200,7 @@ export function AuthFilesPage() {
   );
   const [priorityRotationPreview, setPriorityRotationPreview] =
     useState<PriorityRotationAnalysis | null>(null);
+  const [priorityRotationAutoRunId, setPriorityRotationAutoRunId] = useState(0);
   const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
@@ -173,6 +209,9 @@ export function AuthFilesPage() {
   const selectionCountRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
+  const lastPriorityRotationAutoTriggerRef = useRef('');
+  const lastPriorityRotationAutoChangeRef = useRef('');
+  const priorityRotationAutoApplyingRef = useRef(false);
 
   const {
     files,
@@ -281,6 +320,29 @@ export function AuthFilesPage() {
       priorityRotationSettings.thresholdPercent,
     ]
   );
+  const priorityRotationAutoDataKey = useMemo(
+    () => buildPriorityRotationAutoDataFingerprint(files, codexQuota),
+    [codexQuota, files]
+  );
+  const priorityTierByFile = useMemo(() => {
+    const tiers = new Map<string, AuthFilePriorityTier>();
+    files.forEach((file) => {
+      const priority = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+      if (priorityRotationAnalysis.activePriority === priority) {
+        tiers.set(file.name, 'active');
+      } else if (priorityRotationAnalysis.standbyPriority === priority) {
+        tiers.set(file.name, 'standby');
+      } else if (priorityRotationAnalysis.reservePriority === priority) {
+        tiers.set(file.name, 'buffer');
+      }
+    });
+    return tiers;
+  }, [
+    files,
+    priorityRotationAnalysis.activePriority,
+    priorityRotationAnalysis.reservePriority,
+    priorityRotationAnalysis.standbyPriority,
+  ]);
 
   const stopUploadDropEvent = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -761,16 +823,18 @@ export function AuthFilesPage() {
   }, [priorityRotationSettings.activeSlotLimit, priorityRotationSettings.thresholdPercent]);
 
   const updatePriorityRotationSettings = useCallback(
-    (updates: Partial<typeof priorityRotationSettings>) => {
-      const nextSettings = {
-        ...priorityRotationSettings,
-        ...updates,
-      };
-      setPriorityRotationSettings(nextSettings);
-      writeAuthFilesPriorityRotationSettings(nextSettings);
+    (updates: Partial<AuthFilesPriorityRotationSettings>) => {
+      setPriorityRotationSettings((current) => {
+        const nextSettings = {
+          ...current,
+          ...updates,
+        };
+        writeAuthFilesPriorityRotationSettings(nextSettings);
+        return nextSettings;
+      });
       setPriorityRotationPreview(null);
     },
-    [priorityRotationSettings]
+    []
   );
 
   const commitPriorityRotationThresholdInput = useCallback(
@@ -865,13 +929,10 @@ export function AuthFilesPage() {
     );
 
     if (result.successCount > 0) {
-      const nextSettings = {
-        ...priorityRotationSettings,
+      updatePriorityRotationSettings({
         lastAppliedAt: Date.now(),
         lastAppliedChangeCount: result.successCount,
-      };
-      setPriorityRotationSettings(nextSettings);
-      writeAuthFilesPriorityRotationSettings(nextSettings);
+      });
       await loadFiles({ preserveExisting: true, silent: true });
     }
 
@@ -883,7 +944,109 @@ export function AuthFilesPage() {
     closePriorityRotationPreview,
     loadFiles,
     priorityRotationPreview,
-    priorityRotationSettings,
+    updatePriorityRotationSettings,
+  ]);
+
+  const handlePriorityRotationAutoToggle = useCallback(
+    (enabled: boolean) => {
+      if (enabled) {
+        lastPriorityRotationAutoChangeRef.current = '';
+        setPriorityRotationAutoRunId((current) => current + 1);
+      }
+      updatePriorityRotationSettings({
+        autoEnabled: enabled,
+        lastAutoSkippedReason: enabled ? undefined : 'disabled',
+      });
+    },
+    [updatePriorityRotationSettings]
+  );
+
+  useEffect(() => {
+    if (!priorityRotationSettings.autoEnabled) return;
+    if (
+      disableControls ||
+      loading ||
+      batchPriorityUpdating ||
+      priorityRotationPreview ||
+      priorityRotationAutoApplyingRef.current
+    ) {
+      return;
+    }
+
+    const triggerKey = `${priorityRotationAutoRunId}:${priorityRotationAutoDataKey}`;
+    if (lastPriorityRotationAutoTriggerRef.current === triggerKey) return;
+    lastPriorityRotationAutoTriggerRef.current = triggerKey;
+
+    if (priorityRotationAnalysis.changes.length === 0) {
+      updatePriorityRotationSettings({
+        lastAutoSkippedReason: priorityRotationAnalysis.status,
+      });
+      return;
+    }
+
+    const changeFingerprint = buildPriorityRotationChangeFingerprint(priorityRotationAnalysis);
+    if (lastPriorityRotationAutoChangeRef.current === changeFingerprint) return;
+    lastPriorityRotationAutoChangeRef.current = changeFingerprint;
+    priorityRotationAutoApplyingRef.current = true;
+
+    void (async () => {
+      try {
+        const result = await batchSetPriorities(
+          priorityRotationAnalysis.changes.map((change) => ({
+            name: change.name,
+            priority: change.toPriority,
+          })),
+          { notify: false }
+        );
+
+        if (result.successCount > 0) {
+          updatePriorityRotationSettings({
+            lastAutoAppliedAt: Date.now(),
+            lastAutoAppliedChangeCount: result.successCount,
+            lastAutoSkippedReason: undefined,
+          });
+          await loadFiles({ preserveExisting: true, silent: true });
+        } else {
+          lastPriorityRotationAutoChangeRef.current = '';
+          updatePriorityRotationSettings({
+            lastAutoSkippedReason: 'apply_failed',
+          });
+        }
+
+        if (result.failCount === 0 && result.successCount > 0) {
+          showNotification(
+            t('auth_files.priority_rotation_auto_success', {
+              count: result.successCount,
+            }),
+            'success'
+          );
+        } else if (result.successCount > 0 || result.failCount > 0) {
+          showNotification(
+            t('auth_files.priority_rotation_auto_partial', {
+              success: result.successCount,
+              failed: result.failCount,
+            }),
+            result.successCount > 0 ? 'warning' : 'error'
+          );
+        }
+      } finally {
+        priorityRotationAutoApplyingRef.current = false;
+      }
+    })();
+  }, [
+    batchPriorityUpdating,
+    batchSetPriorities,
+    disableControls,
+    loadFiles,
+    loading,
+    priorityRotationAnalysis,
+    priorityRotationAutoDataKey,
+    priorityRotationAutoRunId,
+    priorityRotationPreview,
+    priorityRotationSettings.autoEnabled,
+    showNotification,
+    t,
+    updatePriorityRotationSettings,
   ]);
 
   const commitBatchPriority = useCallback(() => {
@@ -1141,6 +1304,10 @@ export function AuthFilesPage() {
     priorityRotationAnalysis.healthyStandbyCount === 0
       ? t('auth_files.priority_rotation_status_no_healthy_standby')
       : '';
+  const priorityRotationAutoEnabled = priorityRotationSettings.autoEnabled === true;
+  const priorityRotationAutoStatusLabel = priorityRotationAutoEnabled
+    ? t('auth_files.priority_rotation_auto_status_on')
+    : t('auth_files.priority_rotation_auto_status_off');
   const priorityRotationStatusClass =
     priorityRotationAnalysis.changes.length > 0
       ? styles.priorityRotationStatusReady
@@ -1185,6 +1352,41 @@ export function AuthFilesPage() {
       threshold: priorityRotationAnalysis.thresholdPercent,
     });
   };
+  const priorityRotationPreviewSummaryItems = priorityRotationPreview
+    ? [
+        {
+          key: 'threshold',
+          label: t('auth_files.priority_rotation_summary_threshold_label'),
+          value: t('auth_files.priority_rotation_summary_threshold_value', {
+            threshold: priorityRotationPreview.thresholdPercent,
+          }),
+        },
+        {
+          key: 'slots',
+          label: t('auth_files.priority_rotation_summary_slots_label'),
+          value: t('auth_files.priority_rotation_summary_slots_value', {
+            current: priorityRotationPreview.projectedActiveCount,
+            limit: priorityRotationPreview.activeSlotLimit,
+          }),
+        },
+        {
+          key: 'tiers',
+          label: t('auth_files.priority_rotation_summary_tiers_label'),
+          value: t('auth_files.priority_rotation_summary_tiers_value', {
+            active: formatPriorityRotationPriority(priorityRotationPreview.activePriority),
+            standby: formatPriorityRotationPriority(priorityRotationPreview.standbyPriority),
+            buffer: formatPriorityRotationPriority(priorityRotationPreview.reservePriority),
+          }),
+        },
+        {
+          key: 'count',
+          label: t('auth_files.priority_rotation_summary_count_label'),
+          value: t('auth_files.priority_rotation_summary_count_value', {
+            count: priorityRotationPreview.changes.length,
+          }),
+        },
+      ]
+    : [];
 
   return (
     <div className={styles.container}>
@@ -1426,6 +1628,24 @@ export function AuthFilesPage() {
                     </span>
                   )}
                 </div>
+                <div
+                  className={`${styles.priorityRotationAutoToggle} ${
+                    priorityRotationAutoEnabled ? styles.priorityRotationAutoToggleOn : ''
+                  }`}
+                >
+                  <ToggleSwitch
+                    checked={priorityRotationAutoEnabled}
+                    onChange={handlePriorityRotationAutoToggle}
+                    disabled={disableControls || loading || batchPriorityUpdating}
+                    ariaLabel={t('auth_files.priority_rotation_auto_label')}
+                    label={
+                      <span className={styles.priorityRotationAutoLabel}>
+                        <span>{t('auth_files.priority_rotation_auto_label')}</span>
+                        <span>{priorityRotationAutoStatusLabel}</span>
+                      </span>
+                    }
+                  />
+                </div>
                 <Button
                   className={styles.priorityRotationButton}
                   variant="primary"
@@ -1588,6 +1808,7 @@ export function AuthFilesPage() {
                     authTokenSnapshot={authTokenSnapshots.get(file.name)}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
+                    priorityTier={priorityTierByFile.get(file.name) ?? null}
                     priorityUpdating={priorityUpdating}
                     noteUpdating={noteUpdating}
                     onShowModels={showModels}
@@ -1751,48 +1972,38 @@ export function AuthFilesPage() {
         onClose={closePriorityRotationPreview}
         width={760}
         className={styles.priorityRotationModal}
+        overlayClassName={styles.priorityRotationOverlay}
         footer={
           <div className={styles.priorityRotationFooter}>
-            <Button variant="secondary" size="sm" onClick={closePriorityRotationPreview}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void applyPriorityRotation()}
-              disabled={!priorityRotationPreview?.changes.length || batchPriorityUpdating}
-              loading={batchPriorityUpdating}
-            >
-              {t('auth_files.priority_rotation_apply')}
-            </Button>
+            <div className={styles.priorityRotationFooterHint}>
+              <IconInfo size={15} aria-hidden="true" />
+              <span>{t('auth_files.priority_rotation_hint')}</span>
+            </div>
+            <div className={styles.priorityRotationFooterActions}>
+              <Button variant="secondary" size="sm" onClick={closePriorityRotationPreview}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void applyPriorityRotation()}
+                disabled={!priorityRotationPreview?.changes.length || batchPriorityUpdating}
+                loading={batchPriorityUpdating}
+              >
+                {t('auth_files.priority_rotation_apply')}
+              </Button>
+            </div>
           </div>
         }
       >
         {priorityRotationPreview && (
           <div className={styles.priorityRotationPreview}>
             <div className={styles.priorityRotationSummary}>
-              <span>
-                {t('auth_files.priority_rotation_summary_threshold', {
-                  threshold: priorityRotationPreview.thresholdPercent,
-                })}
-              </span>
-              <span>
-                {t('auth_files.priority_rotation_summary_slots', {
-                  current: priorityRotationPreview.projectedActiveCount,
-                  limit: priorityRotationPreview.activeSlotLimit,
-                })}
-              </span>
-              <span>
-                {t('auth_files.priority_rotation_summary_tiers', {
-                  active: formatPriorityRotationPriority(priorityRotationPreview.activePriority),
-                  standby: formatPriorityRotationPriority(priorityRotationPreview.standbyPriority),
-                  buffer: formatPriorityRotationPriority(priorityRotationPreview.reservePriority),
-                })}
-              </span>
-              <span>
-                {t('auth_files.priority_rotation_summary_count', {
-                  count: priorityRotationPreview.changes.length,
-                })}
-              </span>
+              {priorityRotationPreviewSummaryItems.map((item) => (
+                <div className={styles.priorityRotationSummaryItem} key={item.key}>
+                  <span className={styles.priorityRotationSummaryLabel}>{item.label}</span>
+                  <span className={styles.priorityRotationSummaryValue}>{item.value}</span>
+                </div>
+              ))}
             </div>
             <div className={styles.priorityRotationTable} role="table">
               <div className={styles.priorityRotationHeader} role="row">
@@ -1806,10 +2017,16 @@ export function AuthFilesPage() {
                   <span className={styles.priorityRotationName} title={change.name}>
                     {change.displayName}
                   </span>
-                  <span className={styles.priorityRotationDirection}>
-                    <span>{change.fromPriority}</span>
+                  <span
+                    className={`${styles.priorityRotationDirection} ${
+                      change.role === 'demote'
+                        ? styles.priorityRotationDirectionDemote
+                        : styles.priorityRotationDirectionPromote
+                    }`}
+                  >
+                    <span>P{change.fromPriority}</span>
                     <span aria-hidden="true">→</span>
-                    <span>{change.toPriority}</span>
+                    <span>P{change.toPriority}</span>
                   </span>
                   <span className={styles.priorityRotationRemaining}>
                     {formatPriorityRotationPercent(change.remainingPercent)}
@@ -1819,9 +2036,6 @@ export function AuthFilesPage() {
                   </span>
                 </div>
               ))}
-            </div>
-            <div className={styles.priorityRotationHint}>
-              {t('auth_files.priority_rotation_hint')}
             </div>
           </div>
         )}

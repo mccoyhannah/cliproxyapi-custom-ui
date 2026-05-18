@@ -868,7 +868,7 @@
   .nav-item {
     position: relative;
     min-height: 42px;
-    color: var(--text-secondary);
+    color: color-mix(in srgb, var(--text-secondary) 72%, var(--text-primary));
     overflow: hidden;
     isolation: isolate;
 
@@ -914,6 +914,10 @@
     .nav-label {
       position: relative;
       z-index: 1;
+    }
+
+    .nav-icon {
+      color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
     }
 
     &:hover {
