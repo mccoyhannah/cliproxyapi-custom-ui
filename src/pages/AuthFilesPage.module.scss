@@ -581,7 +581,7 @@
 
 .priorityRotationBar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
   align-items: center;
   margin-bottom: 12px;
@@ -651,6 +651,71 @@
   white-space: nowrap;
 }
 
+.priorityRotationControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  gap: 8px;
+  min-width: 210px;
+
+  @include mobile {
+    min-width: 0;
+  }
+}
+
+.priorityRotationSetting {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.priorityRotationSettingInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  min-width: 0;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
+  color: var(--text-secondary);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+
+  input {
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+
+    &:disabled {
+      color: var(--text-tertiary);
+      cursor: not-allowed;
+    }
+  }
+
+  span {
+    flex: 0 0 auto;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: none;
+  }
+}
+
 .priorityRotationActions {
   display: flex;
   align-items: center;
@@ -664,6 +729,19 @@
     :global(.btn) {
       flex: 1 1 auto;
     }
+  }
+}
+
+.priorityRotationStatusGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+
+  @include mobile {
+    justify-content: flex-start;
   }
 }
 
@@ -3180,7 +3258,7 @@ button.codexSubscriptionValue {
 
 .priorityRotationSummary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
 
   span {
