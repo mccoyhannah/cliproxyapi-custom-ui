@@ -16,6 +16,7 @@ import {
   getStatusFromError,
   normalizePlanType,
   resolveCodexPlanType,
+  type CodexAuthTokenSnapshot,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
 import {
@@ -42,6 +43,7 @@ export type AuthFileQuotaSectionProps = {
   disableControls: boolean;
   compact?: boolean;
   summaryOnly?: boolean;
+  authTokenSnapshot?: CodexAuthTokenSnapshot | null;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   manualExpiry?: ManualExpiryRenderInfo | null;
   onManualExpiryEdit?: () => void;
@@ -54,6 +56,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     disableControls,
     compact = false,
     summaryOnly = false,
+    authTokenSnapshot,
     codexSubscriptionSnapshot,
     manualExpiry,
     onManualExpiryEdit,
@@ -141,16 +144,19 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
   const compactCodexExpiry =
     compact &&
     quotaType === 'codex' &&
+    authTokenSnapshot?.hasRefreshToken !== false &&
     normalizePlanType(resolveCodexPlanType(file)) !== 'free' &&
     codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     codexSubscriptionSnapshot.subscriptionActiveUntil
       ? codexSubscriptionSnapshot
       : null;
+  const compactAccessTokenOnly = compact && quotaType === 'codex' && authTokenSnapshot?.hasRefreshToken === false;
   const compactCodexPlanType =
     compact && quotaType === 'codex' ? normalizePlanType(resolveCodexPlanType(file)) : null;
   const compactCanSetManualExpiry =
     compact &&
     quotaType === 'codex' &&
+    !compactAccessTokenOnly &&
     Boolean(compactCodexPlanType) &&
     compactCodexPlanType !== 'free' &&
     !manualExpiry &&
@@ -163,6 +169,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         QuotaProgressBar,
         displayMode: 'auth-card-compact',
         compactAuthCard: compact,
+        authTokenSnapshot,
         codexSubscriptionSnapshot,
         manualExpiry,
         onManualExpiryEdit,
@@ -179,17 +186,44 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       );
     }
 
-    if (!manualExpiry && !compactCodexExpiry && !compactCanSetManualExpiry) return null;
+    if (!compactAccessTokenOnly && !manualExpiry && !compactCodexExpiry && !compactCanSetManualExpiry) return null;
 
-    const expiryMs = manualExpiry?.expiresAtMs ?? compactCodexExpiry?.subscriptionActiveUntilMs;
+    const expiryMs = compactAccessTokenOnly
+      ? authTokenSnapshot?.accessTokenExpiresAtMs
+      : (manualExpiry?.expiresAtMs ?? compactCodexExpiry?.subscriptionActiveUntilMs);
     const warningMs = 7 * 24 * 60 * 60 * 1000;
     const expiryClass = compactCanSetManualExpiry
       ? styles.codexSubscriptionUnset
+      : compactAccessTokenOnly && (expiryMs === null || expiryMs === undefined)
+        ? styles.codexSubscriptionWarning
       : expiryMs !== null && expiryMs !== undefined && expiryMs <= referenceTimeMs
         ? styles.codexSubscriptionExpired
         : expiryMs !== null && expiryMs !== undefined && expiryMs - referenceTimeMs <= warningMs
           ? styles.codexSubscriptionWarning
           : styles.codexSubscriptionHealthy;
+    const expiryTitle = compactAccessTokenOnly
+      ? authTokenSnapshot?.accessTokenExpiresAt ??
+        t('auth_files.access_token_expiry_unknown_title', {
+          defaultValue: '没有 refresh_token，且无法识别 access_token 到期时间',
+        })
+      : (manualExpiry?.title ??
+        compactCodexExpiry?.subscriptionActiveUntil ??
+        t('auth_files.manual_expiry_setup_title', {
+          defaultValue: '为该付费套餐手动设置有效期',
+        }));
+    const expiryLabel = compactAccessTokenOnly
+      ? t('auth_files.access_token_expiry_short_label', { defaultValue: 'Access 到期' })
+      : t('auth_files.subscription_expiry_short_label');
+    const expiryValue = compactAccessTokenOnly
+      ? formatCodexSubscriptionShortDate(expiryMs, authTokenSnapshot?.accessTokenExpiresAt) ||
+        t('auth_files.access_token_expiry_unknown', { defaultValue: '无法识别' })
+      : compactCanSetManualExpiry
+        ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+        : (manualExpiry?.label ??
+          formatCodexSubscriptionShortDate(
+            compactCodexExpiry?.subscriptionActiveUntilMs,
+            compactCodexExpiry?.subscriptionActiveUntil
+          ));
 
     return (
       <div
@@ -198,28 +232,16 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         <div className={`${styles.codexInfoGrid} ${styles.codexInfoGridCompact}`}>
           <div className={`${styles.codexInfoItem} ${styles.codexInfoItemCompact}`}>
             <span className={styles.codexPlanLabel}>
-              {t('auth_files.subscription_expiry_short_label')}
+              {expiryLabel}
             </span>
             <span
               className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
-              title={
-                manualExpiry?.title ??
-                compactCodexExpiry?.subscriptionActiveUntil ??
-                t('auth_files.manual_expiry_setup_title', {
-                  defaultValue: '为该付费套餐手动设置有效期',
-                })
-              }
-              onClick={onManualExpiryEdit}
-              role={onManualExpiryEdit ? 'button' : undefined}
-              tabIndex={onManualExpiryEdit ? 0 : undefined}
+              title={expiryTitle}
+              onClick={compactAccessTokenOnly ? undefined : onManualExpiryEdit}
+              role={!compactAccessTokenOnly && onManualExpiryEdit ? 'button' : undefined}
+              tabIndex={!compactAccessTokenOnly && onManualExpiryEdit ? 0 : undefined}
             >
-              {compactCanSetManualExpiry
-                ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
-                : (manualExpiry?.label ??
-                  formatCodexSubscriptionShortDate(
-                    compactCodexExpiry?.subscriptionActiveUntilMs,
-                    compactCodexExpiry?.subscriptionActiveUntil
-                  ))}
+              {expiryValue}
             </span>
           </div>
         </div>
@@ -253,6 +275,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
           styles,
           QuotaProgressBar,
           displayMode: 'auth-card',
+          authTokenSnapshot,
           codexSubscriptionSnapshot,
           manualExpiry,
           onManualExpiryEdit,

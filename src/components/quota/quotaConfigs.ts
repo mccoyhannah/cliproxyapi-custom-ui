@@ -864,8 +864,11 @@ const renderCodexItems = (
   const { createElement: h, Fragment } = React;
   const windows = quota.windows ?? [];
   const planType = quota.planType ?? null;
-  const manualExpiry = helpers.manualExpiry ?? null;
+  const authTokenSnapshot = helpers.authTokenSnapshot ?? null;
+  const accessTokenOnly = authTokenSnapshot?.hasRefreshToken === false;
+  const manualExpiry = accessTokenOnly ? null : (helpers.manualExpiry ?? null);
   const subscriptionSnapshot =
+    !accessTokenOnly &&
     helpers.codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
     helpers.codexSubscriptionSnapshot.subscriptionActiveUntil
       ? helpers.codexSubscriptionSnapshot
@@ -877,10 +880,18 @@ const renderCodexItems = (
   const subscriptionStatus =
     subscriptionSnapshot?.subscriptionStatus ?? quota.subscriptionStatus ?? 'missing';
   const effectiveSubscriptionActiveUntil =
-    manualExpiry?.title ?? subscriptionActiveUntil;
+    accessTokenOnly
+      ? authTokenSnapshot.accessTokenExpiresAt
+      : (manualExpiry?.title ?? subscriptionActiveUntil);
   const effectiveSubscriptionActiveUntilMs =
-    manualExpiry?.expiresAtMs ?? subscriptionActiveUntilMs;
-  const effectiveSubscriptionStatus = manualExpiry ? 'found' : subscriptionStatus;
+    accessTokenOnly
+      ? authTokenSnapshot.accessTokenExpiresAtMs
+      : (manualExpiry?.expiresAtMs ?? subscriptionActiveUntilMs);
+  const effectiveSubscriptionStatus = accessTokenOnly
+    ? authTokenSnapshot.accessTokenStatus
+    : manualExpiry
+      ? 'found'
+      : subscriptionStatus;
   const isAuthCard =
     helpers.displayMode === 'auth-card' || helpers.displayMode === 'auth-card-compact';
   const isCompactAuthCard = helpers.displayMode === 'auth-card-compact';
@@ -888,12 +899,17 @@ const renderCodexItems = (
   const normalizedPlanType = normalizePlanType(planType);
   const currentPlanIsFree = normalizedPlanType === 'free';
   const hasSubscriptionExpiry =
+    accessTokenOnly ||
     manualExpiry !== null ||
     (!currentPlanIsFree &&
       effectiveSubscriptionStatus === 'found' &&
       Boolean(effectiveSubscriptionActiveUntil));
   const canSetManualSubscriptionExpiry =
-    isAuthCard && Boolean(normalizedPlanType) && !currentPlanIsFree && !hasSubscriptionExpiry;
+    !accessTokenOnly &&
+    isAuthCard &&
+    Boolean(normalizedPlanType) &&
+    !currentPlanIsFree &&
+    !hasSubscriptionExpiry;
 
   const getPlanLabel = (pt?: string | null): string | null => {
     const normalized = normalizePlanType(pt);
@@ -928,6 +944,8 @@ const renderCodexItems = (
   const subscriptionStatusClass =
     canSetManualSubscriptionExpiry
       ? styleMap.codexSubscriptionUnset
+      : accessTokenOnly && effectiveSubscriptionActiveUntilMs === null
+        ? styleMap.codexSubscriptionWarning
       : effectiveSubscriptionStatus === 'read_error' ||
     effectiveSubscriptionStatus === 'missing'
       ? styleMap.codexSubscriptionMuted
@@ -1025,6 +1043,20 @@ const renderCodexItems = (
     });
 
     if (hasSubscriptionExpiry || canSetManualSubscriptionExpiry) {
+      const expiryLabelKey = accessTokenOnly
+        ? 'auth_files.access_token_expiry_short_label'
+        : 'auth_files.subscription_expiry_short_label';
+      const expiryValue = accessTokenOnly
+        ? formatCodexSubscriptionShortDate(
+            effectiveSubscriptionActiveUntilMs,
+            effectiveSubscriptionActiveUntil
+          ) || t('auth_files.access_token_expiry_unknown', { defaultValue: '无法识别' })
+        : manualExpiry?.label ??
+          formatCodexSubscriptionShortDate(
+            effectiveSubscriptionActiveUntilMs,
+            effectiveSubscriptionActiveUntil
+          );
+
       pushChip(
         identityNodes,
         'subscription-expiry',
@@ -1034,18 +1066,14 @@ const renderCodexItems = (
           h(
             'span',
             { className: styleMap.codexSubscriptionLabel },
-            t('auth_files.subscription_expiry_short_label', { defaultValue: '到期' })
+            t(expiryLabelKey, { defaultValue: accessTokenOnly ? 'Access 到期' : '到期' })
           ),
           h(
             'strong',
             { className: styleMap.codexSubscriptionDate },
             canSetManualSubscriptionExpiry
               ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
-              : manualExpiry?.label ??
-                formatCodexSubscriptionShortDate(
-                  effectiveSubscriptionActiveUntilMs,
-                  effectiveSubscriptionActiveUntil
-                )
+              : expiryValue
           )
         ),
         [
@@ -1057,8 +1085,13 @@ const renderCodexItems = (
           ? t('auth_files.manual_expiry_setup_title', {
               defaultValue: '为该付费套餐手动设置有效期',
             })
-          : effectiveSubscriptionActiveUntil,
-        helpers.onManualExpiryEdit
+          : accessTokenOnly
+            ? (effectiveSubscriptionActiveUntil ??
+              t('auth_files.access_token_expiry_unknown_title', {
+                defaultValue: '没有 refresh_token，且无法识别 access_token 到期时间',
+              }))
+            : effectiveSubscriptionActiveUntil,
+        accessTokenOnly ? undefined : helpers.onManualExpiryEdit
       );
     }
 
@@ -1155,18 +1188,28 @@ const renderCodexItems = (
     const subscriptionValue = isCompactAuthCard
       ? canSetManualSubscriptionExpiry
         ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
-        : manualExpiry?.label ??
+        : accessTokenOnly
+          ? formatCodexSubscriptionShortDate(
+              effectiveSubscriptionActiveUntilMs,
+              effectiveSubscriptionActiveUntil
+            ) || t('auth_files.access_token_expiry_unknown', { defaultValue: '无法识别' })
+          : manualExpiry?.label ??
         formatCodexSubscriptionShortDate(
           effectiveSubscriptionActiveUntilMs,
           effectiveSubscriptionActiveUntil
         )
       : canSetManualSubscriptionExpiry
         ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
-        : effectiveSubscriptionActiveUntil;
+        : accessTokenOnly
+          ? effectiveSubscriptionActiveUntil ??
+            t('auth_files.access_token_expiry_unknown', { defaultValue: '无法识别' })
+          : effectiveSubscriptionActiveUntil;
 
     pushInfoRow(
       'subscription-expiry',
-      isAuthCard
+      accessTokenOnly
+        ? 'auth_files.access_token_expiry_short_label'
+        : isAuthCard
         ? 'auth_files.subscription_expiry_short_label'
         : 'codex_quota.subscription_expiry_label',
       subscriptionValue,
@@ -1179,10 +1222,15 @@ const renderCodexItems = (
         ? t('auth_files.manual_expiry_setup_title', {
             defaultValue: '为该付费套餐手动设置有效期',
           })
+        : accessTokenOnly
+          ? (effectiveSubscriptionActiveUntil ??
+            t('auth_files.access_token_expiry_unknown_title', {
+              defaultValue: '没有 refresh_token，且无法识别 access_token 到期时间',
+            }))
         : hasSubscriptionExpiry
           ? effectiveSubscriptionActiveUntil
           : null,
-      canSetManualSubscriptionExpiry ? helpers.onManualExpiryEdit : undefined
+      canSetManualSubscriptionExpiry && !accessTokenOnly ? helpers.onManualExpiryEdit : undefined
     );
   }
 

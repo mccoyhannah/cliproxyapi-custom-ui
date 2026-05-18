@@ -52,7 +52,7 @@ import { useAuthFilesModels } from '@/features/authFiles/hooks/useAuthFilesModel
 import { useAuthFilesOauth } from '@/features/authFiles/hooks/useAuthFilesOauth';
 import { useAuthFilesPrefixProxyEditor } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
 import { useAuthFilesStatusBarCache } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
-import { useCodexSubscriptionSnapshots } from '@/features/authFiles/hooks/useCodexSubscriptionSnapshots';
+import { useCodexAuthFileSnapshots } from '@/features/authFiles/hooks/useCodexAuthFileSnapshots';
 import {
   isAuthFilesSortMode,
   readAuthFilesUiState,
@@ -530,12 +530,18 @@ export function AuthFilesPage() {
       return matchType && matchSearch;
     });
   }, [filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
-  const codexSubscriptionSnapshots = useCodexSubscriptionSnapshots(filtered);
+  const { authTokenSnapshots, subscriptionSnapshots: codexSubscriptionSnapshots } =
+    useCodexAuthFileSnapshots(filtered);
 
   const sorted = useMemo(() => {
     const originalIndexMap = new Map(filtered.map((file, index) => [file.name, index]));
 
     const getEffectiveSubscriptionExpiry = (file: AuthFileItem) => {
+      const authTokenSnapshot = authTokenSnapshots.get(file.name);
+      if (authTokenSnapshot?.hasRefreshToken === false) {
+        return authTokenSnapshot.accessTokenExpiresAtMs ?? 0;
+      }
+
       const manualExpiryMs = getManualExpiryMs(manualExpiryByFile, file.name);
       if (manualExpiryMs !== null) return manualExpiryMs;
 
@@ -591,7 +597,14 @@ export function AuthFilesPage() {
       });
     }
     return copy;
-  }, [codexQuota, codexSubscriptionSnapshots, filtered, manualExpiryByFile, sortMode]);
+  }, [
+    authTokenSnapshots,
+    codexQuota,
+    codexSubscriptionSnapshots,
+    filtered,
+    manualExpiryByFile,
+    sortMode,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -1178,6 +1191,7 @@ export function AuthFilesPage() {
                     statusUpdating={statusUpdating}
                     quotaFilterType={quotaFilterType}
                     statusBarCache={statusBarCache}
+                    authTokenSnapshot={authTokenSnapshots.get(file.name)}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
                     priorityUpdating={priorityUpdating}

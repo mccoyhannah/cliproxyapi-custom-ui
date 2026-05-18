@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
-import { TYPE_COLORS, type CodexSubscriptionSnapshot } from '@/utils/quota';
+import { TYPE_COLORS, type CodexAuthTokenSnapshot, type CodexSubscriptionSnapshot } from '@/utils/quota';
 import type { ManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
 import styles from '@/pages/QuotaPage.module.scss';
 
@@ -63,6 +63,7 @@ export interface QuotaRenderHelpers {
   QuotaProgressBar: (props: QuotaProgressBarProps) => ReactElement;
   displayMode?: 'quota-page' | 'auth-card' | 'auth-card-compact';
   compactAuthCard?: boolean;
+  authTokenSnapshot?: CodexAuthTokenSnapshot | null;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   manualExpiry?: ManualExpiryRenderInfo | null;
   onManualExpiryEdit?: () => void;

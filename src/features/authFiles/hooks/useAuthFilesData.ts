@@ -8,6 +8,10 @@ import { formatFileSize } from '@/utils/format';
 import { MAX_AUTH_FILE_SIZE } from '@/utils/constants';
 import { downloadBlob } from '@/utils/download';
 import {
+  formatAccessTokenExpiryIso,
+  readCodexAuthTokenSnapshotFromRecord,
+} from '@/utils/quota';
+import {
   getTypeLabel,
   hasAuthFileStatusMessage,
   isRuntimeOnlyAuthFile,
@@ -33,7 +37,13 @@ type UploadValidationRejectReason =
   | 'unsupported_auth_shape';
 
 type UploadValidationResult =
-  | { file: File; valid: true }
+  | {
+      file: File;
+      originalName: string;
+      valid: true;
+      missingRefreshToken: boolean;
+      accessTokenExpiryKnown: boolean;
+    }
   | { file: File; valid: false; reason: UploadValidationRejectReason };
 
 type AuthFileDeleteFailure = { name: string; error: string };
@@ -170,7 +180,40 @@ const validateAuthFileUpload = async (file: File): Promise<UploadValidationResul
     return { file, valid: false, reason: 'unsupported_auth_shape' };
   }
 
-  return { file, valid: true };
+  const authTokenSnapshot = readCodexAuthTokenSnapshotFromRecord(parsed, {
+    assumeComplete: true,
+  });
+  const missingRefreshToken =
+    authTokenSnapshot.hasAccessToken && authTokenSnapshot.hasRefreshToken === false;
+  const accessTokenExpiresAtMs = authTokenSnapshot.accessTokenExpiresAtMs;
+  const accessTokenExpiryKnown =
+    accessTokenExpiresAtMs !== null && Number.isFinite(accessTokenExpiresAtMs);
+
+  if (missingRefreshToken && accessTokenExpiryKnown) {
+    const normalizedAuthJson = {
+      ...parsed,
+      expired: formatAccessTokenExpiryIso(accessTokenExpiresAtMs),
+    };
+
+    return {
+      file: new File([JSON.stringify(normalizedAuthJson, null, 2)], file.name, {
+        type: file.type || 'application/json',
+        lastModified: file.lastModified,
+      }),
+      originalName: file.name,
+      valid: true,
+      missingRefreshToken,
+      accessTokenExpiryKnown,
+    };
+  }
+
+  return {
+    file,
+    originalName: file.name,
+    valid: true,
+    missingRefreshToken,
+    accessTokenExpiryKnown,
+  };
 };
 
 const summarizeFileNames = (names: string[]): string => {
@@ -319,9 +362,18 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       setUploading(true);
       try {
         const validationResults = await Promise.all(filesToUpload.map(validateAuthFileUpload));
-        const validFiles = validationResults
-          .filter((result): result is { file: File; valid: true } => result.valid)
-          .map((result) => result.file);
+        const acceptedFiles = validationResults.filter(
+          (
+            result
+          ): result is {
+            file: File;
+            originalName: string;
+            valid: true;
+            missingRefreshToken: boolean;
+            accessTokenExpiryKnown: boolean;
+          } => result.valid
+        );
+        const validFiles = acceptedFiles.map((result) => result.file);
         const rejectedByReason = validationResults.reduce<Record<UploadValidationRejectReason, string[]>>(
           (result, item) => {
             if (!item.valid) {
@@ -395,6 +447,23 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
           const refreshedNames = new Set(refreshedFiles.map((file) => file.name));
           const uploadedNames = result.files.length > 0 ? result.files : validFiles.map((file) => file.name);
           const unlistedNames = uploadedNames.filter((name) => !refreshedNames.has(name));
+          const uploadedNameSet = new Set(uploadedNames);
+          const missingRefreshWithExpiry = acceptedFiles
+            .filter(
+              (item) =>
+                uploadedNameSet.has(item.originalName) &&
+                item.missingRefreshToken &&
+                item.accessTokenExpiryKnown
+            )
+            .map((item) => item.originalName);
+          const missingRefreshWithoutExpiry = acceptedFiles
+            .filter(
+              (item) =>
+                uploadedNameSet.has(item.originalName) &&
+                item.missingRefreshToken &&
+                !item.accessTokenExpiryKnown
+            )
+            .map((item) => item.originalName);
 
           setFiles(refreshedFiles);
           showNotification(
@@ -406,6 +475,22 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             showNotification(
               t('auth_files.upload_unlisted_warning', {
                 names: summarizeFileNames(unlistedNames),
+              }),
+              'warning'
+            );
+          }
+          if (missingRefreshWithExpiry.length > 0) {
+            showNotification(
+              t('auth_files.upload_missing_refresh_token_expiry_known', {
+                names: summarizeFileNames(missingRefreshWithExpiry),
+              }),
+              'warning'
+            );
+          }
+          if (missingRefreshWithoutExpiry.length > 0) {
+            showNotification(
+              t('auth_files.upload_missing_refresh_token_expiry_unknown', {
+                names: summarizeFileNames(missingRefreshWithoutExpiry),
               }),
               'warning'
             );
