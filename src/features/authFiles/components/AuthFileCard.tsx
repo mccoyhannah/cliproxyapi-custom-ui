@@ -439,7 +439,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
                       defaultValue: '没有 refresh_token，过期后需要重新登录获取新凭证',
                     })}
                   >
-                    <IconCircleAlert size={12} aria-hidden="true" />
                     {t('auth_files.missing_refresh_token_badge', {
                       defaultValue: '临时凭证',
                     })}
