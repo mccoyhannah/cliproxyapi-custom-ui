@@ -1726,34 +1726,24 @@ export function AuthFilesPage() {
       })
     : '';
   const priorityRotationStatusLabel =
+    priorityRotationAnalysis.status === 'quota_unknown'
+      ? t('auth_files.priority_rotation_status_unknown')
+      : priorityRotationAnalysis.status === 'no_standby'
+        ? t('auth_files.priority_rotation_status_no_standby')
+        : t('auth_files.priority_rotation_status_idle');
+  const priorityRotationVisibleActiveCount =
     priorityRotationAnalysis.changes.length > 0
-      ? t('auth_files.priority_rotation_status_applying')
-      : priorityRotationAnalysis.status === 'quota_unknown'
-        ? t('auth_files.priority_rotation_status_unknown')
-        : priorityRotationAnalysis.status === 'no_standby'
-          ? t('auth_files.priority_rotation_status_no_standby')
-          : t('auth_files.priority_rotation_status_idle');
+      ? priorityRotationAnalysis.activeCount
+      : priorityRotationAnalysis.projectedActiveCount;
   const priorityRotationSlotLabel = t('auth_files.priority_rotation_status_slots', {
-    current: priorityRotationAnalysis.projectedActiveCount,
+    current: priorityRotationVisibleActiveCount,
     limit: priorityRotationAnalysis.activeSlotLimit,
   });
-  const priorityRotationNoStandbyLabel =
-    priorityRotationAnalysis.changes.length > 0 &&
-    priorityRotationAnalysis.healthyStandbyCount === 0
-      ? t('auth_files.priority_rotation_status_no_healthy_standby')
-      : '';
-  const priorityRotationEffectiveThresholdLabel = priorityRotationAnalysis.thresholdAdjusted
-    ? t('auth_files.priority_rotation_status_effective_threshold', {
-        threshold: priorityRotationAnalysis.effectiveThresholdPercent,
-      })
-    : '';
   const priorityRotationStatusClass =
-    priorityRotationAnalysis.changes.length > 0
-      ? styles.priorityRotationStatusReady
-      : priorityRotationAnalysis.status === 'quota_unknown' ||
-          priorityRotationAnalysis.status === 'no_standby'
-        ? styles.priorityRotationStatusWarning
-        : styles.priorityRotationStatusMuted;
+    priorityRotationAnalysis.status === 'quota_unknown' ||
+    priorityRotationAnalysis.status === 'no_standby'
+      ? styles.priorityRotationStatusWarning
+      : styles.priorityRotationStatusMuted;
   const priorityRotationPendingSaveLabel = t('auth_files.priority_rotation_sidecar_unsaved');
   const priorityRotationInputPendingLabel = t('auth_files.priority_rotation_sidecar_input_pending');
   const priorityRotationDraftStatusLabel = priorityRotationSidecarCommittedDraftDirty
@@ -2072,20 +2062,6 @@ export function AuthFilesPage() {
                   >
                     {priorityRotationSlotLabel}
                   </span>
-                  {priorityRotationNoStandbyLabel && (
-                    <span
-                      className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
-                    >
-                      {priorityRotationNoStandbyLabel}
-                    </span>
-                  )}
-                  {priorityRotationEffectiveThresholdLabel && (
-                    <span
-                      className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusInfo}`}
-                    >
-                      {priorityRotationEffectiveThresholdLabel}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
