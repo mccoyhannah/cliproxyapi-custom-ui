@@ -79,12 +79,34 @@ const requestSidecar = async <T>(
     },
   });
   const text = await response.text();
-  const data = text.trim() ? JSON.parse(text) : null;
+  const trimmedText = text.trim();
+  let data: unknown = null;
+  let parseFailed = false;
+  if (trimmedText) {
+    try {
+      data = JSON.parse(trimmedText);
+    } catch {
+      parseFailed = true;
+      data = null;
+    }
+  }
+  if (response.ok && parseFailed) {
+    throw new Error(
+      `Invalid sidecar JSON response: ${response.status} ${trimmedText.slice(0, 160)}`
+    );
+  }
   if (!response.ok) {
+    const rawMessage = trimmedText.slice(0, 160);
+    const errorMessage =
+      data && typeof data === 'object' && 'error' in data
+        ? (data as { error?: unknown }).error
+        : null;
     const message =
-      data && typeof data === 'object' && typeof data.error === 'string'
-        ? data.error
-        : `Sidecar request failed: ${response.status}`;
+      typeof errorMessage === 'string'
+        ? errorMessage
+        : rawMessage
+          ? `Sidecar request failed: ${response.status} ${rawMessage}`
+          : `Sidecar request failed: ${response.status}`;
     throw new Error(message);
   }
   return data as T;
