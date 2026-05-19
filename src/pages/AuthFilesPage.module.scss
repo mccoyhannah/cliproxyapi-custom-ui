@@ -1203,12 +1203,17 @@
   line-height: 1;
   cursor: pointer;
   transition:
-    background-color 0.16s ease,
     color 0.16s ease,
     transform 0.12s ease;
 
-  &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+  svg {
+    flex: 0 0 auto;
+    transition:
+      color 0.16s ease,
+      transform 0.12s ease;
+  }
+
+  &:hover:not(:disabled) svg {
     color: color-mix(in srgb, var(--primary-color) 86%, var(--text-primary));
   }
 

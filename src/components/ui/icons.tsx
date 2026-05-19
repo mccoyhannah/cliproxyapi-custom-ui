@@ -174,6 +174,23 @@ export function IconRefreshCw({ size = 20, ...props }: IconProps) {
   );
 }
 
+export function IconPlus({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...baseSvgProps} width={size} height={size} {...props}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  );
+}
+
+export function IconMinus({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...baseSvgProps} width={size} height={size} {...props}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function IconDownload({ size = 20, ...props }: IconProps) {
   return (
     <svg {...baseSvgProps} width={size} height={size} {...props}>

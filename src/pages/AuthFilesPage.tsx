@@ -26,6 +26,8 @@ import {
   IconFilterAll,
   IconInbox,
   IconInfo,
+  IconMinus,
+  IconPlus,
   IconRefreshCw,
   IconSlidersHorizontal,
 } from '@/components/ui/icons';
@@ -2197,7 +2199,7 @@ export function AuthFilesPage() {
                         aria-label={t('auth_files.priority_rotation_slots_decrease')}
                         onClick={() => adjustPriorityRotationSlots(-PRIORITY_ROTATION_SLOT_STEP)}
                       >
-                        -
+                        <IconMinus size={16} />
                       </button>
                       <span className={styles.priorityRotationStepperValue}>
                         <input
@@ -2228,7 +2230,7 @@ export function AuthFilesPage() {
                         aria-label={t('auth_files.priority_rotation_slots_increase')}
                         onClick={() => adjustPriorityRotationSlots(PRIORITY_ROTATION_SLOT_STEP)}
                       >
-                        +
+                        <IconPlus size={16} />
                       </button>
                     </span>
                   </label>
@@ -2250,7 +2252,7 @@ export function AuthFilesPage() {
                           )
                         }
                       >
-                        -
+                        <IconMinus size={16} />
                       </button>
                       <span className={styles.priorityRotationStepperValue}>
                         <input
@@ -2286,7 +2288,7 @@ export function AuthFilesPage() {
                           )
                         }
                       >
-                        +
+                        <IconPlus size={16} />
                       </button>
                     </span>
                   </label>
