@@ -77,8 +77,6 @@ export function AuthFilesPrefixProxyEditorModal(props: AuthFilesPrefixProxyEdito
       onClose={onClose}
       closeDisabled={editor?.saving === true}
       width={720}
-      className={styles.prefixProxyDrawer}
-      overlayClassName={styles.prefixProxyDrawerOverlay}
       title={
         editor?.fileName
           ? t('auth_files.auth_field_editor_title', { name: editor.fileName })

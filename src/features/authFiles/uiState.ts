@@ -7,7 +7,6 @@ export const AUTH_FILES_SORT_MODES = [
 ] as const;
 
 export type AuthFilesSortMode = (typeof AUTH_FILES_SORT_MODES)[number];
-export type AuthFilesFileViewMode = 'grid' | 'list';
 
 export type AuthFilesUiState = {
   filter?: string;
@@ -15,7 +14,6 @@ export type AuthFilesUiState = {
   disabledOnly?: boolean;
   enabledOnly?: boolean;
   compactMode?: boolean;
-  fileViewMode?: AuthFilesFileViewMode;
   search?: string;
   page?: number;
   pageSize?: number;
