@@ -3,11 +3,11 @@
  */
 
 // 中性开发者控制台基础色
-$primary-color: #2563eb;
-$success-color: #0f8a5f;
-$warning-color: #b7791f;
-$error-color: #c2413d;
-$info-color: #2563eb;
+$primary-color: #3b82f6;
+$success-color: #10b981;
+$warning-color: #f59e0b;
+$error-color: #ef4444;
+$info-color: #3b82f6;
 
 // 灰阶
 $gray-50: #f9fafb;
@@ -30,24 +30,24 @@ $spacing-xl: 32px;
 $spacing-2xl: 48px;
 
 // 圆角
-$radius-sm: 6px;
+$radius-sm: 4px;
 $radius-md: 8px;
-$radius-lg: 10px;
+$radius-lg: 8px;
 $radius-full: 9999px;
 
 // 状态语义
 $status-tones: success, error, warning, info, neutral;
 
 // 阴影
-$shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
-$shadow-md: 0 1px 3px rgb(15 23 42 / 0.08);
-$shadow-lg: 0 12px 28px -24px rgb(15 23 42 / 0.3);
-$shadow-control: 0 1px 2px rgb(15 23 42 / 0.05);
-$shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 12px 30px -28px rgb(15 23 42 / 0.28);
+$shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06);
+$shadow-md: 0 1px 3px rgb(15 23 42 / 0.1);
+$shadow-lg: 0 18px 44px -32px rgb(15 23 42 / 0.36);
+$shadow-control: 0 1px 2px rgb(15 23 42 / 0.06);
+$shadow-card: 0 1px 2px rgb(15 23 42 / 0.06), 0 18px 44px -36px rgb(15 23 42 / 0.34);
 
 // 过渡
-$transition-fast: 150ms ease;
-$transition-normal: 300ms ease;
+$transition-fast: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+$transition-normal: 240ms cubic-bezier(0.4, 0, 0.2, 1);
 $transition-slow: 500ms ease;
 
 // 断点

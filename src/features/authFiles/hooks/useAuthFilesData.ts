@@ -50,6 +50,14 @@ type AuthFileDeleteFailure = { name: string; error: string };
 export type AuthFilePriorityBatchChange = { name: string; priority: number };
 export type AuthFilePriorityBatchOptions = { notify?: boolean };
 export type AuthFilePriorityBatchResult = { successCount: number; failCount: number };
+export type AuthFileUploadStage = 'idle' | 'validating' | 'uploading' | 'refreshing';
+export type AuthFileUploadProgress = {
+  stage: AuthFileUploadStage;
+  total: number;
+  accepted: number;
+  rejected: number;
+  uploaded: number;
+};
 type ApiErrorLike = Error & {
   status?: number;
 };
@@ -66,6 +74,7 @@ export type UseAuthFilesDataResult = {
   loading: boolean;
   error: string;
   uploading: boolean;
+  uploadProgress: AuthFileUploadProgress;
   deleting: string | null;
   deletingAll: boolean;
   statusUpdating: Record<string, boolean>;
@@ -105,6 +114,14 @@ const AUTH_FILE_NOT_FOUND_PATTERN = /auth file not found/i;
 
 const isAuthFileNotFoundMessage = (value: string): boolean =>
   AUTH_FILE_NOT_FOUND_PATTERN.test(value);
+
+const IDLE_UPLOAD_PROGRESS: AuthFileUploadProgress = {
+  stage: 'idle',
+  total: 0,
+  accepted: 0,
+  rejected: 0,
+  uploaded: 0,
+};
 
 const isAuthFileNotFoundError = (err: unknown): boolean => {
   if (typeof err === 'string') return isAuthFileNotFoundMessage(err);
@@ -236,6 +253,8 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] =
+    useState<AuthFileUploadProgress>(IDLE_UPLOAD_PROGRESS);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
@@ -367,6 +386,13 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       if (filesToUpload.length === 0) return;
 
       setUploading(true);
+      setUploadProgress({
+        stage: 'validating',
+        total: filesToUpload.length,
+        accepted: 0,
+        rejected: 0,
+        uploaded: 0,
+      });
       try {
         const validationResults = await Promise.all(filesToUpload.map(validateAuthFileUpload));
         const acceptedFiles = validationResults.filter(
@@ -396,6 +422,14 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             unsupported_auth_shape: [],
           }
         );
+
+        setUploadProgress({
+          stage: validFiles.length > 0 ? 'uploading' : 'validating',
+          total: validationResults.length,
+          accepted: validFiles.length,
+          rejected: validationResults.length - validFiles.length,
+          uploaded: 0,
+        });
 
         if (rejectedByReason.invalid_extension.length > 0) {
           showNotification(
@@ -446,6 +480,13 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         const rejectedCount = validationResults.length - validFiles.length;
         const result = await authFilesApi.uploadFiles(validFiles);
         const successCount = result.uploaded;
+        setUploadProgress({
+          stage: 'refreshing',
+          total: validationResults.length,
+          accepted: validFiles.length,
+          rejected: rejectedCount,
+          uploaded: successCount,
+        });
 
         if (successCount > 0) {
           const suffix = validFiles.length > 1 ? ` (${successCount}/${validFiles.length})` : '';
@@ -515,6 +556,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         showNotification(`${t('notification.upload_failed')}: ${errorMessage}`, 'error');
       } finally {
         setUploading(false);
+        setUploadProgress(IDLE_UPLOAD_PROGRESS);
       }
     },
     [showNotification, t]
@@ -1250,6 +1292,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     loading,
     error,
     uploading,
+    uploadProgress,
     deleting,
     deletingAll,
     statusUpdating,

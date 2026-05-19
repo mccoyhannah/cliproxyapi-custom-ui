@@ -3,12 +3,46 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Input } from '@/components/ui/Input';
+import { SensitiveValueField } from '@/components/ui/SensitiveValueField';
 import type {
   PrefixProxyEditorField,
   PrefixProxyEditorFieldValue,
   PrefixProxyEditorState,
 } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
 import styles from '@/pages/AuthFilesPage.module.scss';
+
+const SENSITIVE_FIELD_NAMES = new Set([
+  'access_token',
+  'refresh_token',
+  'api_key',
+  'private_key',
+  'client_secret',
+  'token',
+]);
+
+type SensitiveEntry = { path: string; value: string };
+
+const collectSensitiveEntries = (
+  value: unknown,
+  path: string[] = [],
+  result: SensitiveEntry[] = []
+): SensitiveEntry[] => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
+
+  Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
+    const nextPath = [...path, key];
+    const normalizedKey = key.trim().toLowerCase();
+    if (typeof item === 'string' && SENSITIVE_FIELD_NAMES.has(normalizedKey)) {
+      result.push({ path: nextPath.join('.'), value: item });
+      return;
+    }
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
+      collectSensitiveEntries(item, nextPath, result);
+    }
+  });
+
+  return result.slice(0, 12);
+};
 
 export type AuthFilesPrefixProxyEditorModalProps = {
   disableControls: boolean;
@@ -35,6 +69,7 @@ export function AuthFilesPrefixProxyEditorModal(props: AuthFilesPrefixProxyEdito
   };
   const previewText = formatJsonText(updatedText);
   const invalidContentPreview = editor?.invalidContentPreview ?? '';
+  const sensitiveEntries = editor?.json ? collectSensitiveEntries(editor.json) : [];
 
   return (
     <Modal
@@ -120,6 +155,32 @@ export function AuthFilesPrefixProxyEditorModal(props: AuthFilesPrefixProxyEdito
               </div>
               {editor.json && (
                 <div className={styles.prefixProxyFields}>
+                  {sensitiveEntries.length > 0 && (
+                    <div className={styles.sensitiveFieldsPanel}>
+                      <div className={styles.sensitiveFieldsHeader}>
+                        <span>{t('auth_files.sensitive_fields_title')}</span>
+                        <span>{t('auth_files.sensitive_fields_count', { count: sensitiveEntries.length })}</span>
+                      </div>
+                      <div className={styles.sensitiveFieldsGrid}>
+                        {sensitiveEntries.map((entry) => (
+                          <SensitiveValueField
+                            key={entry.path}
+                            label={entry.path}
+                            value={entry.value}
+                            revealLabel={t('auth_files.sensitive_reveal')}
+                            hideLabel={t('auth_files.sensitive_hide')}
+                            copyLabel={t('auth_files.sensitive_copy')}
+                            copiedLabel={t('auth_files.sensitive_copied')}
+                            emptyLabel={t('auth_files.sensitive_empty')}
+                            disabled={disableControls || editor.saving}
+                            onCopyResult={(success) => {
+                              if (success) void onCopyText(entry.value);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <Input
                     label={t('auth_files.prefix_label')}
                     value={editor.prefix}

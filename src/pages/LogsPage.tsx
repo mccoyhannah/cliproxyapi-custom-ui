@@ -29,7 +29,13 @@ import { copyToClipboard } from '@/utils/clipboard';
 import { downloadBlob } from '@/utils/download';
 import { MANAGEMENT_API_PREFIX } from '@/utils/constants';
 import { formatUnixTimestamp } from '@/utils/format';
-import { HTTP_METHODS, STATUS_GROUPS, resolveStatusGroup, type LogState } from './hooks/logTypes';
+import {
+  HTTP_METHODS,
+  LOG_LEVELS,
+  STATUS_GROUPS,
+  resolveStatusGroup,
+  type LogState,
+} from './hooks/logTypes';
 import { parseLogLine } from './hooks/logParsing';
 import { useLogFilters } from './hooks/useLogFilters';
 import { isNearBottom, useLogScroller } from './hooks/useLogScroller';
@@ -305,13 +311,23 @@ export function LogsPage() {
   const filters = useLogFilters({ parsedLines: parsedSearchLines });
   const structuredFiltersPanelId = 'logs-structured-filters';
   const structuredFilterCount =
-    filters.methodFilters.length + filters.statusFilters.length + filters.pathFilters.length;
+    filters.methodFilters.length +
+    filters.levelFilters.length +
+    filters.statusFilters.length +
+    filters.pathFilters.length;
 
   const { filteredParsedLines, filteredLines, removedCount } = useMemo(() => {
     const filteredParsed = parsedSearchLines.filter((line) => {
       if (
         filters.methodFilterSet.size > 0 &&
         (!line.method || !filters.methodFilterSet.has(line.method))
+      ) {
+        return false;
+      }
+
+      if (
+        filters.levelFilterSet.size > 0 &&
+        (!line.level || !filters.levelFilterSet.has(line.level))
       ) {
         return false;
       }
@@ -338,6 +354,7 @@ export function LogsPage() {
     };
   }, [
     baseLines,
+    filters.levelFilterSet,
     filters.methodFilterSet,
     filters.pathFilterSet,
     filters.statusFilterSet,
@@ -564,6 +581,29 @@ export function LogsPage() {
                   </div>
 
                   <div className={styles.filterChipGroup}>
+                    <span className={styles.filterChipLabel}>{t('logs.filter_level')}</span>
+                    <div className={styles.filterChipList}>
+                      {LOG_LEVELS.map((level) => {
+                        const active = filters.levelFilters.includes(level);
+                        const count = filters.levelCounts[level] ?? 0;
+                        return (
+                          <button
+                            key={level}
+                            type="button"
+                            className={`${styles.filterChip} ${styles.levelFilterChip} ${active ? styles.filterChipActive : ''}`}
+                            data-level={level}
+                            onClick={() => filters.toggleLevelFilter(level)}
+                            disabled={count === 0 && !active}
+                            aria-pressed={active}
+                          >
+                            {t(`logs.filter_level_${level}`)} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className={styles.filterChipGroup}>
                     <span className={styles.filterChipLabel}>{t('logs.filter_status')}</span>
                     <div className={styles.filterChipList}>
                       {STATUS_GROUPS.map((statusGroup) => {
@@ -648,70 +688,6 @@ export function LogsPage() {
                 }
               />
 
-              <div className={styles.toolbar}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => loadLogs(false)}
-                  disabled={disableControls || loading}
-                  className={styles.actionButton}
-                >
-                  <span className={styles.buttonContent}>
-                    <IconRefreshCw size={16} />
-                    {t('logs.refresh_button')}
-                  </span>
-                </Button>
-                <ToggleSwitch
-                  checked={autoRefresh}
-                  onChange={(value) => setAutoRefresh(value)}
-                  disabled={disableControls}
-                  label={
-                    <span className={styles.switchLabel}>
-                      <IconTimer size={16} />
-                      {t('logs.auto_refresh')}
-                    </span>
-                  }
-                />
-                <ToggleSwitch
-                  checked={followTail}
-                  onChange={(value) => setFollowTail(value)}
-                  label={
-                    <span
-                      className={styles.switchLabel}
-                      title={t('logs.follow_tail_hint', {
-                        defaultValue: 'Keep the viewer pinned to the latest log line',
-                      })}
-                    >
-                      <IconChevronDown size={16} />
-                      {t('logs.follow_tail', { defaultValue: 'Follow tail' })}
-                    </span>
-                  }
-                />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={downloadLogs}
-                  disabled={logState.buffer.length === 0}
-                  className={styles.actionButton}
-                >
-                  <span className={styles.buttonContent}>
-                    <IconDownload size={16} />
-                    {t('logs.download_button')}
-                  </span>
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={clearLogs}
-                  disabled={disableControls}
-                  className={styles.actionButton}
-                >
-                  <span className={styles.buttonContent}>
-                    <IconTrash2 size={16} />
-                    {t('logs.clear_button')}
-                  </span>
-                </Button>
-              </div>
             </div>
 
             <LogViewer
@@ -728,6 +704,70 @@ export function LogsPage() {
               showRawLogs={showRawLogs}
               rawVisibleText={rawVisibleText}
               parsedVisibleLines={parsedVisibleLines}
+              toolbarSlot={
+                <div className={styles.terminalActions}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => loadLogs(false)}
+                    disabled={disableControls || loading}
+                    className={styles.actionButton}
+                    title={t('logs.refresh_button')}
+                  >
+                    <span className={styles.buttonContent}>
+                      <IconRefreshCw size={16} />
+                      {t('logs.refresh_button')}
+                    </span>
+                  </Button>
+                  <ToggleSwitch
+                    checked={autoRefresh}
+                    onChange={(value) => setAutoRefresh(value)}
+                    disabled={disableControls}
+                    label={
+                      <span className={styles.switchLabel}>
+                        <IconTimer size={16} />
+                        {t('logs.auto_refresh')}
+                      </span>
+                    }
+                  />
+                  <ToggleSwitch
+                    checked={followTail}
+                    onChange={(value) => setFollowTail(value)}
+                    label={
+                      <span className={styles.switchLabel} title={t('logs.follow_tail_hint')}>
+                        <IconChevronDown size={16} />
+                        {t('logs.follow_tail')}
+                      </span>
+                    }
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={downloadLogs}
+                    disabled={logState.buffer.length === 0}
+                    className={styles.actionButton}
+                    title={t('logs.download_button')}
+                  >
+                    <span className={styles.buttonContent}>
+                      <IconDownload size={16} />
+                      {t('logs.download_button')}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={clearLogs}
+                    disabled={disableControls}
+                    className={styles.actionButton}
+                    title={t('logs.clear_button')}
+                  >
+                    <span className={styles.buttonContent}>
+                      <IconTrash2 size={16} />
+                      {t('logs.clear_button')}
+                    </span>
+                  </Button>
+                </div>
+              }
               logViewerRef={scroller.logViewerRef}
               onScroll={scroller.handleLogScroll}
               onCopyLine={(raw) => {

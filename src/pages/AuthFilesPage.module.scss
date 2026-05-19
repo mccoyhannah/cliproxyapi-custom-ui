@@ -149,19 +149,18 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 72px;
-  padding: 12px 14px;
+  min-height: 82px;
+  padding: 14px 16px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
+  border: 1px dashed color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--surface-panel) 92%, #eff6ff),
-    color-mix(in srgb, var(--bg-primary) 84%, #ecfeff)
+    color-mix(in srgb, var(--surface-panel) 90%, var(--primary-color) 5%),
+    color-mix(in srgb, var(--bg-primary) 86%, #14b8a6 4%)
   );
   box-shadow:
     0 10px 24px -24px color-mix(in srgb, var(--primary-color) 38%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 44%, #14b8a6);
+    inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
   color: var(--text-primary);
   cursor: pointer;
   overflow: hidden;
@@ -176,7 +175,7 @@
     position: absolute;
     inset: 8px;
     border-radius: 6px;
-    border: 1px solid transparent;
+    border: 1px dashed transparent;
     pointer-events: none;
     transition: border-color $transition-fast;
   }
@@ -189,8 +188,7 @@
     box-shadow:
       0 12px 28px -24px color-mix(in srgb, var(--primary-color) 46%, transparent),
       0 0 0 3px color-mix(in srgb, var(--primary-color) 8%, transparent),
-      inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent),
-      inset 3px 0 0 color-mix(in srgb, var(--primary-color) 58%, #14b8a6);
+      inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
   }
 
   @include mobile {
@@ -205,8 +203,8 @@
   border-color: color-mix(in srgb, #14b8a6 64%, var(--primary-color));
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, #ecfeff 48%, var(--surface-panel)),
-    color-mix(in srgb, #eff6ff 44%, var(--bg-primary))
+    color-mix(in srgb, #14b8a6 14%, var(--surface-panel)),
+    color-mix(in srgb, var(--primary-color) 10%, var(--bg-primary))
   );
   box-shadow:
     0 22px 42px -24px color-mix(in srgb, #14b8a6 62%, transparent),
@@ -231,8 +229,7 @@
     border-color: color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
     box-shadow:
       0 10px 24px -24px color-mix(in srgb, var(--primary-color) 38%, transparent),
-      inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent),
-      inset 3px 0 0 color-mix(in srgb, var(--primary-color) 44%, #14b8a6);
+      inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
   }
 }
 
@@ -246,11 +243,7 @@
   justify-content: center;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--primary-color) 26%, transparent);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, #fff 78%, var(--primary-color) 8%),
-    color-mix(in srgb, var(--surface-control) 78%, #dbeafe)
-  );
+  background: color-mix(in srgb, var(--surface-control) 82%, var(--primary-color) 10%);
   color: color-mix(in srgb, var(--primary-color) 78%, #0f766e);
   box-shadow: 0 10px 20px -18px color-mix(in srgb, var(--primary-color) 70%, transparent);
 }
@@ -275,6 +268,26 @@
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.uploadDropProgressTrack {
+  position: relative;
+  width: min(320px, 100%);
+  height: 5px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: $radius-full;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.uploadDropProgressBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary-color), #14b8a6);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--primary-color) 34%, transparent);
+  transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .uploadDropPoolStatus {
@@ -4409,6 +4422,31 @@ button.codexSubscriptionValue {
   :global(.form-group) {
     margin: 0;
   }
+}
+
+.sensitiveFieldsPanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-panel) 82%, transparent);
+}
+
+.sensitiveFieldsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.sensitiveFieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 
 .prefixProxyTextareaInvalid {

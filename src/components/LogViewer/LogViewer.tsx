@@ -1,6 +1,7 @@
-import type { PointerEvent as ReactPointerEvent, RefObject, UIEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject, UIEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { IconCopy } from '@/components/ui/icons';
 import { resolveStatusGroup, type LogState, type ParsedLogLine } from '@/pages/hooks/logTypes';
 
 type LogViewerStyles = Record<string, string>;
@@ -19,6 +20,7 @@ interface LogViewerProps {
   showRawLogs: boolean;
   rawVisibleText: string;
   parsedVisibleLines: ParsedLogLine[];
+  toolbarSlot?: ReactNode;
   logViewerRef: RefObject<HTMLDivElement | null>;
   onScroll: (e: UIEvent<HTMLDivElement>) => void;
   onCopyLine: (raw: string) => void;
@@ -41,6 +43,7 @@ export function LogViewer({
   showRawLogs,
   rawVisibleText,
   parsedVisibleLines,
+  toolbarSlot,
   logViewerRef,
   onScroll,
   onCopyLine,
@@ -58,7 +61,6 @@ export function LogViewer({
     defaultValue: 'Double-click a row to copy',
   });
   const copyLineLabel = t('logs.copy_line', { defaultValue: 'Copy line' });
-  const copyLineButtonText = t('logs.copy_line_short', { defaultValue: '复制' });
   const emptyPrompt = (
     <span className={styles.emptyPrompt} aria-hidden="true">
       &gt;_
@@ -105,6 +107,7 @@ export function LogViewer({
           {t('logs.loaded_lines', { count: renderedCount })}
         </span>
       </div>
+      {toolbarSlot && <div className={styles.terminalToolbar}>{toolbarSlot}</div>}
     </div>
   );
 
@@ -298,7 +301,7 @@ export function LogViewer({
                     title={copyLineLabel}
                     aria-label={copyLineLabel}
                   >
-                    {copyLineButtonText}
+                    <IconCopy size={14} />
                   </button>
                 </div>
               </div>

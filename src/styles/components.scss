@@ -210,6 +210,149 @@ textarea {
   }
 }
 
+.input-shell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.input-with-action {
+  padding-right: 42px;
+}
+
+.input-actions {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+
+  > button,
+  .input-action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    transition:
+      color $transition-fast,
+      background-color $transition-fast,
+      transform $transition-fast;
+
+    &:hover:not(:disabled) {
+      color: var(--text-primary);
+      background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+    }
+
+    &:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.56;
+    }
+  }
+}
+
+.sensitive-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--surface-control) 72%, transparent);
+}
+
+.sensitive-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sensitive-field-label {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sensitive-field-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.sensitive-field-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition:
+    color $transition-fast,
+    border-color $transition-fast,
+    background-color $transition-fast,
+    transform $transition-fast;
+
+  &:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background: var(--surface-control-hover);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+  }
+}
+
+.sensitive-field-value {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  color: var(--text-primary);
+  font-family: var(--mono-font);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1394,7 +1537,7 @@ select {
 .card {
   border: 1px solid var(--border-base);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 92%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 88%, transparent), transparent 68%),
     var(--surface-card);
   box-shadow: var(--shadow-card);
   padding: 20px;
@@ -1579,6 +1722,44 @@ select {
   gap: 10px;
 }
 
+// Final console refinement layer: one place for the dense, calm control surface.
+.btn,
+.input,
+textarea,
+select,
+.card {
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn {
+  border-color: color-mix(in srgb, var(--border-base) 72%, transparent);
+}
+
+.btn.btn-icon-only .btn-label {
+  display: none;
+}
+
+.card {
+  border-color: var(--border-subtle);
+}
+
+[data-theme='dark'] {
+  .btn.btn-secondary,
+  .input,
+  textarea,
+  select {
+    background: color-mix(in srgb, var(--surface-control) 92%, transparent);
+    border-color: var(--border-subtle);
+  }
+
+  .card {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 72%),
+      var(--surface-card);
+  }
+}
+
 .skeleton-config-panel .skeleton-line:nth-child(1) {
   width: 38%;
   height: 16px;
@@ -1642,16 +1823,16 @@ select {
 .btn {
   min-height: var(--control-height);
   padding: 8px 12px;
-  border-color: var(--border-base);
+  border-color: var(--border-subtle);
   border-radius: var(--radius-md);
-  background: var(--surface-control);
+  background: color-mix(in srgb, var(--surface-control) 96%, transparent);
   color: var(--text-primary);
-  box-shadow: none;
+  box-shadow: var(--shadow-control);
   font-weight: 650;
 
   &:hover:not(:disabled) {
-    transform: none;
-    box-shadow: var(--shadow-control);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-control), 0 10px 22px -20px var(--primary-color);
   }
 
   &.btn-primary {
@@ -1667,7 +1848,7 @@ select {
 
   &.btn-secondary {
     background: var(--surface-control);
-    border-color: var(--border-base);
+    border-color: var(--border-subtle);
 
     &:hover {
       background: var(--surface-control-hover);
@@ -1698,10 +1879,10 @@ select {
 .input,
 textarea,
 select {
-  border-color: var(--border-base);
+  border-color: var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-control);
-  box-shadow: none;
+  box-shadow: var(--shadow-control);
 
   &:hover:not(:disabled) {
     border-color: var(--border-hover);
@@ -1715,14 +1896,16 @@ select {
 }
 
 .card {
-  padding: 16px;
-  border: 1px solid var(--border-base);
+  padding: 20px;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
-  background: var(--surface-card);
-  box-shadow: var(--shadow);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-surface) 88%, transparent), transparent 70%),
+    var(--surface-card);
+  box-shadow: var(--shadow-card);
 
   &.card-compact {
-    padding: 14px;
+    padding: 16px;
   }
 
   &.card-interactive:hover {

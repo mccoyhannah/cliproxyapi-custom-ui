@@ -201,6 +201,27 @@ export function IconDownload({ size = 20, ...props }: IconProps) {
   );
 }
 
+export function IconUploadCloud({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...baseSvgProps} width={size} height={size} {...props}>
+      <path d="M12 13V3" />
+      <path d="m16 7-4-4-4 4" />
+      <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" />
+      <path d="M16 17h2a4 4 0 0 0 0-8" />
+      <path d="M8 17H6a4 4 0 0 1 0-8" />
+    </svg>
+  );
+}
+
+export function IconCopy({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...baseSvgProps} width={size} height={size} {...props}>
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  );
+}
+
 export function IconTrash2({ size = 20, ...props }: IconProps) {
   return (
     <svg {...baseSvgProps} width={size} height={size} {...props}>

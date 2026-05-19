@@ -24,12 +24,12 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
   IconFilterAll,
-  IconInbox,
   IconInfo,
   IconMinus,
   IconPlus,
   IconRefreshCw,
   IconSlidersHorizontal,
+  IconUploadCloud,
 } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
@@ -281,6 +281,7 @@ export function AuthFilesPage() {
     loading,
     error,
     uploading,
+    uploadProgress,
     deleting,
     deletingAll,
     statusUpdating,
@@ -1666,10 +1667,26 @@ export function AuthFilesPage() {
     .filter(Boolean)
     .join(' ');
   const uploadDropStatusLabel = uploading
-    ? t('auth_files.upload_pool_uploading', { defaultValue: '上传中' })
+    ? t(`auth_files.upload_stage_${uploadProgress.stage}`)
     : disableControls
-      ? t('auth_files.upload_pool_disconnected', { defaultValue: '未连接' })
-      : t('auth_files.upload_pool_ready', { defaultValue: '就绪' });
+      ? t('auth_files.upload_pool_disconnected')
+      : t('auth_files.upload_pool_ready');
+  const uploadDropProgressPercent =
+    uploadProgress.stage === 'validating'
+      ? 24
+      : uploadProgress.stage === 'uploading'
+        ? 64
+        : uploadProgress.stage === 'refreshing'
+          ? 88
+          : 0;
+  const uploadDropProgressMeta = uploading
+    ? t('auth_files.upload_progress_meta', {
+        total: uploadProgress.total,
+        accepted: uploadProgress.accepted,
+        rejected: uploadProgress.rejected,
+        uploaded: uploadProgress.uploaded,
+      })
+    : '';
   const priorityRotationStatusLabel =
     priorityRotationAnalysis.changes.length > 0
       ? t('auth_files.priority_rotation_status_ready', {
@@ -1959,17 +1976,23 @@ export function AuthFilesPage() {
             onDrop={handleUploadPoolDrop}
           >
             <span className={styles.uploadDropPoolIcon} aria-hidden="true">
-              <IconInbox size={20} />
+              <IconUploadCloud size={20} />
             </span>
             <span className={styles.uploadDropPoolCopy}>
               <span className={styles.uploadDropPoolTitle}>
-                {t('auth_files.upload_pool_title', { defaultValue: '拖入 JSON 认证文件' })}
+                {t('auth_files.upload_pool_title')}
               </span>
               <span className={styles.uploadDropPoolHint}>
-                {t('auth_files.upload_pool_hint', {
-                  defaultValue: '支持多文件，松手后直接上传；也可以点击这里选择文件。',
-                })}
+                {uploadDropProgressMeta || t('auth_files.upload_pool_hint')}
               </span>
+              {uploading && (
+                <span className={styles.uploadDropProgressTrack} aria-hidden="true">
+                  <span
+                    className={styles.uploadDropProgressBar}
+                    style={{ width: `${uploadDropProgressPercent}%` }}
+                  />
+                </span>
+              )}
             </span>
             <span className={styles.uploadDropPoolStatus}>{uploadDropStatusLabel}</span>
           </div>
