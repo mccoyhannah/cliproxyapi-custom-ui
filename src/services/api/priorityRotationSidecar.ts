@@ -16,6 +16,19 @@ export type PriorityRotationSidecarChange = {
   reason: 'low_remaining' | 'over_active_limit' | 'promote_standby';
 };
 
+export type PriorityRotationSidecarCandidate = {
+  name: string;
+  displayName: string;
+  priority: number | null;
+  planType: string | null;
+  remainingPercent: number | null;
+  tier: 'active' | 'standby' | 'reserve' | 'other' | string;
+  isActive: boolean;
+  isStandby: boolean;
+  belowThreshold: boolean | null;
+  decision: string;
+};
+
 export type PriorityRotationSidecarAnalysis = {
   thresholdPercent: number;
   effectiveThresholdPercent: number;
@@ -30,6 +43,7 @@ export type PriorityRotationSidecarAnalysis = {
   activeCount: number;
   standbyCount: number;
   projectedActiveCount: number;
+  candidates: PriorityRotationSidecarCandidate[];
   changes: PriorityRotationSidecarChange[];
 };
 
@@ -45,6 +59,9 @@ export type PriorityRotationSidecarState = {
   lastCompletedAt: string | null;
   lastAppliedChangeCount: number;
   lastFailedChangeCount: number;
+  lastMutationAt?: string | null;
+  lastMutationAppliedChangeCount?: number;
+  lastMutationChanges?: PriorityRotationSidecarChange[];
   nextRunAt: string | null;
   lastAnalysis: PriorityRotationSidecarAnalysis | null;
   updatedAt: string | null;

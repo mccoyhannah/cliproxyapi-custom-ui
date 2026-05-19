@@ -31,7 +31,10 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.equal(result.status, 'ready');
   assert.deepEqual(
     result.changes.map((change) => [change.name, change.role, change.toPriority]),
-    [['standby-good.json', 'promote', 10]]
+    [
+      ['active-low.json', 'demote', 5],
+      ['standby-good.json', 'promote', 10],
+    ]
   );
 }
 
@@ -84,15 +87,94 @@ const quota = (usedPercent, planType = 'team') => ({
     50,
     5
   );
-  assert.equal(result.status, 'no_standby');
-  assert.equal(result.thresholdAdjusted, true);
-  assert.equal(result.effectiveThresholdPercent, 30);
+  assert.equal(result.status, 'ready');
+  assert.equal(result.thresholdAdjusted, false);
+  assert.equal(result.effectiveThresholdPercent, 50);
+  assert.ok(result.changes.some((change) => change.reason === 'low_remaining'));
 }
 
 {
   const files = [codexFile('unknown.json', 10)];
   const result = analyzeCodexPriorityRotation(files, {}, 50, 5);
   assert.equal(result.status, 'quota_unknown');
+}
+
+{
+  const files = [
+    codexFile('active-a.json', 3),
+    codexFile('active-b.json', 3),
+    codexFile('active-c.json', 3),
+    codexFile('active-d.json', 3),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(51),
+      'active-b.json': quota(20),
+      'active-c.json': quota(25),
+      'active-d.json': quota(30),
+    },
+    50,
+    4
+  );
+  assert.equal(result.status, 'ready');
+  assert.ok(
+    result.changes.some(
+      (change) =>
+        change.name === 'active-a.json' &&
+        change.role === 'demote' &&
+        change.reason === 'low_remaining'
+    )
+  );
+}
+
+{
+  const files = [
+    codexFile('active-low.json', 3),
+    codexFile('active-good-a.json', 3),
+    codexFile('active-good-b.json', 3),
+    codexFile('active-good-c.json', 3),
+    codexFile('standby-good.json', 2),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-low.json': quota(51),
+      'active-good-a.json': quota(20),
+      'active-good-b.json': quota(25),
+      'active-good-c.json': quota(30),
+      'standby-good.json': quota(10),
+    },
+    50,
+    4
+  );
+  assert.equal(result.status, 'ready');
+  assert.ok(result.changes.some((change) => change.name === 'active-low.json'));
+  assert.ok(result.changes.some((change) => change.name === 'standby-good.json'));
+}
+
+{
+  const files = [codexFile('active-good.json', 3), codexFile('standby-good.json', 2)];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-good.json': quota(40),
+      'standby-good.json': quota(20),
+    },
+    50,
+    1
+  );
+  assert.equal(result.status, 'no_changes');
+  assert.ok(Array.isArray(result.candidates));
+  assert.ok(
+    result.candidates.some(
+      (candidate) =>
+        candidate.name === 'active-good.json' &&
+        candidate.tier === 'active' &&
+        candidate.belowThreshold === false &&
+        candidate.decision === 'keep'
+    )
+  );
 }
 
 {
@@ -107,6 +189,20 @@ const quota = (usedPercent, planType = 'team') => ({
     5
   );
   assert.equal(result.managedCount, 1);
+}
+
+{
+  const files = [codexFile('business-team.json', 3, 'self_serve_business_usage_based')];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'business-team.json': quota(20, 'self_serve_business_usage_based'),
+    },
+    50,
+    4
+  );
+  assert.equal(result.managedCount, 1);
+  assert.equal(result.candidates[0]?.decision, 'keep');
 }
 
 {

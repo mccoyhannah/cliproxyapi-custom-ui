@@ -18,15 +18,15 @@ const DEFAULT_SETTINGS = {
   activeSlotLimit: 5,
   checkIntervalMinutes: 5,
 };
-const ALL_ACTIVE_BELOW_THRESHOLD_RELAX_PERCENT = 20;
 const MAX_BODY_BYTES = 1024 * 1024;
 const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8317',
   'http://localhost:8317',
   'http://[::1]:8317',
 ]);
-const MANAGED_CODEX_PLANS = new Set(['team', 'plus']);
+const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_based']);
 const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
+const MAX_ROTATION_PASSES = 8;
 
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
@@ -58,6 +58,9 @@ let state = {
   lastCompletedAt: null,
   lastAppliedChangeCount: 0,
   lastFailedChangeCount: 0,
+  lastMutationAt: null,
+  lastMutationAppliedChangeCount: 0,
+  lastMutationChanges: [],
   nextRunAt: null,
   lastAnalysis: null,
   updatedAt: new Date().toISOString(),
@@ -580,6 +583,34 @@ function getDisplayName(file) {
   return note || file.name;
 }
 
+function buildCandidateDetail({
+  file,
+  priority = null,
+  planType = null,
+  remainingPercent = null,
+  tier = 'other',
+  belowThreshold = null,
+  decision = 'keep',
+}) {
+  return {
+    name: String(file?.name ?? ''),
+    displayName: getDisplayName(file),
+    priority,
+    planType,
+    remainingPercent,
+    tier,
+    isActive: tier === 'active',
+    isStandby: tier === 'standby',
+    belowThreshold,
+    decision,
+  };
+}
+
+function stripCandidateOrder(candidate) {
+  const { order: _order, ...rest } = candidate;
+  return rest;
+}
+
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
 }
@@ -592,7 +623,13 @@ function getCodexFiveHourRemainingPercent(quota) {
   return clampPercent(100 - used);
 }
 
-function buildEmptyAnalysis(thresholdPercent, activeSlotLimit, status, unknownCount = 0) {
+function buildEmptyAnalysis(
+  thresholdPercent,
+  activeSlotLimit,
+  status,
+  unknownCount = 0,
+  candidates = []
+) {
   return {
     thresholdPercent,
     effectiveThresholdPercent: thresholdPercent,
@@ -609,6 +646,7 @@ function buildEmptyAnalysis(thresholdPercent, activeSlotLimit, status, unknownCo
     standbyCount: 0,
     healthyStandbyCount: 0,
     projectedActiveCount: 0,
+    candidates,
     changes: [],
   };
 }
@@ -622,24 +660,62 @@ export function analyzeCodexPriorityRotation(
   const threshold = clampInteger(thresholdPercent, DEFAULT_SETTINGS.thresholdPercent, 0, 100);
   const slotLimit = clampInteger(activeSlotLimit, DEFAULT_SETTINGS.activeSlotLimit, 1, 99);
   const candidates = [];
+  const skippedCandidates = [];
   let unknownCount = 0;
 
-  files.forEach((file) => {
-    if (!isCodexFile(file) || isDisabledAuthFile(file) || isRuntimeOnlyAuthFile(file)) return;
+  files.forEach((file, order) => {
+    if (!isCodexFile(file)) return;
 
-    const quota = codexQuota[file.name];
-    const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
-    if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) return;
-
-    const remainingPercent = getCodexFiveHourRemainingPercent(quota);
     const priority = parsePriorityValue(file.priority) ?? 0;
+    const filePlanType = normalizePlanType(resolveCodexPlanType(file));
+    const addSkippedCandidate = (decision, values = {}) => {
+      skippedCandidates.push({
+        order,
+        ...buildCandidateDetail({
+          file,
+          priority,
+          planType: filePlanType,
+          tier: 'other',
+          belowThreshold: null,
+          decision,
+          ...values,
+        }),
+      });
+    };
 
-    if (planType === null || remainingPercent === null) {
-      unknownCount += 1;
+    if (isDisabledAuthFile(file)) {
+      addSkippedCandidate('skipped_disabled');
       return;
     }
 
-    candidates.push({ file, priority, remainingPercent });
+    if (isRuntimeOnlyAuthFile(file)) {
+      addSkippedCandidate('skipped_runtime_only');
+      return;
+    }
+
+    const quota = codexQuota[file.name];
+    const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
+    const remainingPercent = getCodexFiveHourRemainingPercent(quota);
+
+    if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) {
+      addSkippedCandidate('skipped_plan', {
+        planType,
+        remainingPercent,
+      });
+      return;
+    }
+
+    if (planType === null || remainingPercent === null) {
+      unknownCount += 1;
+      addSkippedCandidate('quota_unknown', {
+        planType,
+        remainingPercent,
+        belowThreshold: remainingPercent === null ? null : remainingPercent < threshold,
+      });
+      return;
+    }
+
+    candidates.push({ order, file, priority, planType, remainingPercent });
   });
 
   if (candidates.length === 0) {
@@ -647,7 +723,8 @@ export function analyzeCodexPriorityRotation(
       threshold,
       slotLimit,
       unknownCount > 0 ? 'quota_unknown' : 'no_changes',
-      unknownCount
+      unknownCount,
+      skippedCandidates.sort((a, b) => a.order - b.order).map(stripCandidateOrder)
     );
   }
 
@@ -661,6 +738,7 @@ export function analyzeCodexPriorityRotation(
     return {
       ...buildEmptyAnalysis(threshold, slotLimit, 'insufficient_layers', unknownCount),
       managedCount: candidates.length,
+      candidates: skippedCandidates.sort((a, b) => a.order - b.order).map(stripCandidateOrder),
     };
   }
 
@@ -669,13 +747,8 @@ export function analyzeCodexPriorityRotation(
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
   );
-  const shouldRelaxThreshold =
-    activeCandidates.length > 0 &&
-    activeCandidates.every((candidate) => candidate.remainingPercent < threshold);
-  const effectiveThreshold = shouldRelaxThreshold
-    ? clampInteger(threshold - ALL_ACTIVE_BELOW_THRESHOLD_RELAX_PERCENT, threshold, 0, 100)
-    : threshold;
-  const thresholdAdjusted = effectiveThreshold < threshold;
+  const effectiveThreshold = threshold;
+  const thresholdAdjusted = false;
   const healthyActiveCandidates = activeCandidates.filter(
     (candidate) => candidate.remainingPercent >= effectiveThreshold
   );
@@ -741,6 +814,44 @@ export function analyzeCodexPriorityRotation(
       reason: 'promote_standby',
     }));
   const changes = [...demotions, ...promotions];
+  const promotionNames = new Set(promotions.map((change) => change.name));
+  const analysisCandidates = [
+    ...skippedCandidates,
+    ...candidates.map((candidate) => {
+      const isActive = candidate.priority === activePriority;
+      const isStandby = candidate.priority === standbyPriority;
+      const tier = isActive
+        ? 'active'
+        : isStandby
+          ? 'standby'
+          : candidate.priority === reservePriority
+            ? 'reserve'
+            : 'other';
+      const demotionReason = demotionMap.get(candidate.file.name);
+      const decision =
+        demotionReason === 'low_remaining'
+          ? 'demote_low_remaining'
+          : demotionReason === 'over_active_limit'
+            ? 'demote_over_active_limit'
+            : promotionNames.has(candidate.file.name)
+              ? 'promote_standby'
+              : 'keep';
+      return {
+        order: candidate.order,
+        ...buildCandidateDetail({
+          file: candidate.file,
+          priority: candidate.priority,
+          planType: candidate.planType,
+          remainingPercent: candidate.remainingPercent,
+          tier,
+          belowThreshold: candidate.remainingPercent < threshold,
+          decision,
+        }),
+      };
+    }),
+  ]
+    .sort((a, b) => a.order - b.order)
+    .map(stripCandidateOrder);
 
   if (changes.length === 0) {
     return {
@@ -759,6 +870,7 @@ export function analyzeCodexPriorityRotation(
       standbyCount: standbyCandidates.length,
       healthyStandbyCount: healthyStandbyCandidates.length,
       projectedActiveCount: activeCandidates.length,
+      candidates: analysisCandidates,
       changes: [],
     };
   }
@@ -779,6 +891,7 @@ export function analyzeCodexPriorityRotation(
     standbyCount: standbyCandidates.length,
     healthyStandbyCount: healthyStandbyCandidates.length,
     projectedActiveCount: projectedActiveCount + promotions.length,
+    candidates: analysisCandidates,
     changes,
   };
 }
@@ -835,10 +948,14 @@ async function fetchCodexQuotaState(file, key) {
   const requestHeader = {
     Authorization: 'Bearer $TOKEN$',
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
     'User-Agent': 'codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal',
   };
   const accountId = resolveCodexChatgptAccountId(file);
   if (accountId) requestHeader['Chatgpt-Account-Id'] = accountId;
+  const usageUrl = new URL(CODEX_USAGE_URL);
+  usageUrl.searchParams.set('_cpamc_ts', Date.now().toString());
 
   const result = await managementJson('/api-call', key, {
     method: 'POST',
@@ -846,7 +963,7 @@ async function fetchCodexQuotaState(file, key) {
     body: {
       authIndex,
       method: 'GET',
-      url: CODEX_USAGE_URL,
+      url: usageUrl.toString(),
       header: requestHeader,
     },
   });
@@ -914,6 +1031,18 @@ function summarizeAnalysis(analysis) {
     activeCount: analysis.activeCount,
     standbyCount: analysis.standbyCount,
     projectedActiveCount: analysis.projectedActiveCount,
+    candidates: (analysis.candidates ?? []).map((candidate) => ({
+      name: candidate.name,
+      displayName: candidate.displayName,
+      priority: candidate.priority,
+      planType: candidate.planType,
+      remainingPercent: candidate.remainingPercent,
+      tier: candidate.tier,
+      isActive: candidate.isActive,
+      isStandby: candidate.isStandby,
+      belowThreshold: candidate.belowThreshold,
+      decision: candidate.decision,
+    })),
     changes: analysis.changes.map((change) => ({
       name: change.name,
       displayName: change.displayName,
@@ -923,6 +1052,23 @@ function summarizeAnalysis(analysis) {
       role: change.role,
       reason: change.reason,
     })),
+  };
+}
+
+function summarizeCandidateDecisions(candidates = []) {
+  const decisions = {};
+  let activeBelowThresholdCount = 0;
+  for (const candidate of candidates) {
+    const key = String(candidate.decision ?? 'unknown');
+    decisions[key] = (decisions[key] ?? 0) + 1;
+    if (candidate.isActive && candidate.belowThreshold === true) {
+      activeBelowThresholdCount += 1;
+    }
+  }
+  return {
+    total: candidates.length,
+    activeBelowThresholdCount,
+    decisions,
   };
 }
 
@@ -970,33 +1116,51 @@ export async function runPriorityRotation(options = {}) {
 
       const key = await readSecret();
       const listPayload = await managementJson('/auth-files', key, { timeoutMs: 30_000 });
-      const files = normalizeAuthFilesResponse(listPayload);
+      const files = normalizeAuthFilesResponse(listPayload).map((file) => ({ ...file }));
       const codexQuota = await buildCodexQuotaMap(files, key);
-      const analysis = analyzeCodexPriorityRotation(
+      let analysis = analyzeCodexPriorityRotation(
         files,
         codexQuota,
         settings.thresholdPercent,
         settings.activeSlotLimit
       );
-
       let successCount = 0;
       let failCount = 0;
+      const successfulChanges = [];
+      let passCount = 0;
       if (analysis.changes.length > 0 && !dryRun) {
-        for (const change of analysis.changes) {
-          try {
-            await managementJson('/auth-files/fields', key, {
-              method: 'PATCH',
-              timeoutMs: 30_000,
-              body: { name: change.name, priority: change.toPriority },
-            });
-            successCount += 1;
-          } catch (error) {
-            failCount += 1;
-            await logLine('warn', 'priority patch failed', {
-              name: change.name,
-              message: error instanceof Error ? error.message : String(error),
-            });
+        while (analysis.changes.length > 0 && passCount < MAX_ROTATION_PASSES) {
+          passCount += 1;
+          let passSuccessCount = 0;
+          for (const change of analysis.changes) {
+            try {
+              await managementJson('/auth-files/fields', key, {
+                method: 'PATCH',
+                timeoutMs: 30_000,
+                body: { name: change.name, priority: change.toPriority },
+              });
+              successCount += 1;
+              passSuccessCount += 1;
+              successfulChanges.push(change);
+              const file = files.find((item) => item.name === change.name);
+              if (file) {
+                file.priority = change.toPriority;
+              }
+            } catch (error) {
+              failCount += 1;
+              await logLine('warn', 'priority patch failed', {
+                name: change.name,
+                message: error instanceof Error ? error.message : String(error),
+              });
+            }
           }
+          if (passSuccessCount === 0) break;
+          analysis = analyzeCodexPriorityRotation(
+            files,
+            codexQuota,
+            settings.thresholdPercent,
+            settings.activeSlotLimit
+          );
         }
       }
 
@@ -1010,24 +1174,45 @@ export async function runPriorityRotation(options = {}) {
               : successCount > 0
                 ? 'applied'
                 : analysis.status;
+      const completedAt = new Date().toISOString();
+      const mutationPatch =
+        successCount > 0
+          ? {
+              lastMutationAt: completedAt,
+              lastMutationAppliedChangeCount: successCount,
+              lastMutationChanges: successfulChanges.map((change) => ({
+                name: change.name,
+                displayName: change.displayName,
+                fromPriority: change.fromPriority,
+                toPriority: change.toPriority,
+                remainingPercent: change.remainingPercent,
+                role: change.role,
+                reason: change.reason,
+              })),
+            }
+          : {};
 
       await updateState({
         running: false,
         lastStatus: finalStatus,
-        lastSkippedReason: analysis.changes.length === 0 ? analysis.status : null,
-        lastCompletedAt: new Date().toISOString(),
+        lastSkippedReason:
+          successCount > 0 ? null : analysis.changes.length === 0 ? analysis.status : null,
+        lastCompletedAt: completedAt,
         lastAppliedChangeCount: successCount,
         lastFailedChangeCount: failCount,
         nextRunAt: nextRunIso(),
         lastAnalysis: summarizeAnalysis(analysis),
+        ...mutationPatch,
       });
       await logLine('info', 'priority rotation completed', {
         status: finalStatus,
-        changes: analysis.changes.length,
+        changes: successfulChanges.length || analysis.changes.length,
         successCount,
         failCount,
+        passCount,
         dryRun,
         manual,
+        candidates: summarizeCandidateDecisions(analysis.candidates),
       });
       return sanitizeStateForResponse();
     } catch (error) {

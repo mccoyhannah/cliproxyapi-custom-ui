@@ -273,6 +273,7 @@ export function AuthFilesPage() {
   const priorityRotationSidecarAutoSaveSignatureRef = useRef('');
   const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
   const priorityRotationSidecarStatusRequestIdRef = useRef(0);
+  const priorityRotationSidecarLastMutationRef = useRef('');
 
   const {
     files,
@@ -1290,6 +1291,45 @@ export function AuthFilesPage() {
     }
   }, [apiBase, managementKey, mergePriorityRotationSidecarResult, showNotification, t]);
 
+  const runPriorityRotationSidecarNow = useCallback(async () => {
+    if (!managementKey) {
+      showNotification(t('auth_files.priority_rotation_sidecar_missing_login'), 'error');
+      return;
+    }
+    if (priorityRotationSidecarDraftDirty) {
+      showNotification(t('auth_files.priority_rotation_sidecar_save_required'), 'warning');
+      return;
+    }
+    if (priorityRotationSidecarStatus?.state.hasSecret !== true) {
+      showNotification(t('auth_files.priority_rotation_sidecar_check_missing_secret'), 'warning');
+      return;
+    }
+
+    setPriorityRotationSidecarSaving(true);
+    try {
+      const result = await priorityRotationSidecarApi.runNow(managementKey);
+      mergePriorityRotationSidecarResult(result.settings, result.state, true);
+      if ((result.state.lastAppliedChangeCount ?? 0) > 0) {
+        await loadFiles({ preserveExisting: true, silent: true });
+      }
+      showNotification(t('auth_files.priority_rotation_sidecar_run_complete'), 'success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setPriorityRotationSidecarError(message);
+      showNotification(t('auth_files.priority_rotation_sidecar_run_failed', { message }), 'error');
+    } finally {
+      setPriorityRotationSidecarSaving(false);
+    }
+  }, [
+    loadFiles,
+    managementKey,
+    mergePriorityRotationSidecarResult,
+    priorityRotationSidecarDraftDirty,
+    priorityRotationSidecarStatus?.state.hasSecret,
+    showNotification,
+    t,
+  ]);
+
   useEffect(() => {
     if (!priorityRotationSidecarCommittedDraftDirty) {
       priorityRotationSidecarAutoSaveSignatureRef.current = '';
@@ -1345,6 +1385,22 @@ export function AuthFilesPage() {
     },
     isCurrentLayer ? 15_000 : null
   );
+
+  useEffect(() => {
+    const mutationAt = priorityRotationSidecarStatus?.state.lastMutationAt ?? '';
+    const mutationCount =
+      priorityRotationSidecarStatus?.state.lastMutationAppliedChangeCount ?? 0;
+    if (!mutationAt || mutationCount <= 0) return;
+    if (priorityRotationSidecarLastMutationRef.current === mutationAt) return;
+
+    priorityRotationSidecarLastMutationRef.current = mutationAt;
+    setPriorityRotationPreview(null);
+    void loadFiles({ preserveExisting: true, silent: true });
+  }, [
+    loadFiles,
+    priorityRotationSidecarStatus?.state.lastMutationAppliedChangeCount,
+    priorityRotationSidecarStatus?.state.lastMutationAt,
+  ]);
 
   const getPriorityRotationNoChangeMessage = useCallback(
     (analysis: PriorityRotationAnalysis): { message: string; tone: 'info' | 'warning' } => {
@@ -1879,6 +1935,57 @@ export function AuthFilesPage() {
       ? formatNullableDateTime(priorityRotationSidecarState?.nextRunAt)
       : '-',
   });
+  const priorityRotationSidecarResultValue = (() => {
+    const lastStatus = priorityRotationSidecarState?.lastStatus ?? 'idle';
+    const skippedReason = priorityRotationSidecarState?.lastSkippedReason;
+    if (priorityRotationSidecarState?.running || lastStatus === 'running') {
+      return t('auth_files.priority_rotation_sidecar_result_running');
+    }
+    if (lastStatus === 'applied') {
+      return t('auth_files.priority_rotation_sidecar_result_applied', {
+        count: priorityRotationSidecarState?.lastAppliedChangeCount ?? 0,
+      });
+    }
+    if (lastStatus === 'partial') {
+      return t('auth_files.priority_rotation_sidecar_result_partial');
+    }
+    if (lastStatus === 'failed') {
+      return t('auth_files.priority_rotation_sidecar_result_failed');
+    }
+    if (lastStatus === 'error') {
+      return t('auth_files.priority_rotation_sidecar_result_error');
+    }
+    if (lastStatus === 'dry_run_ready') {
+      return t('auth_files.priority_rotation_sidecar_result_dry_run_ready');
+    }
+    if (lastStatus === 'skipped' && skippedReason === 'missing_secret') {
+      return t('auth_files.priority_rotation_sidecar_result_missing_secret');
+    }
+    if (lastStatus === 'skipped' && skippedReason === 'disabled') {
+      return t('auth_files.priority_rotation_sidecar_result_disabled');
+    }
+    if (lastStatus === 'quota_unknown' || skippedReason === 'quota_unknown') {
+      return t('auth_files.priority_rotation_sidecar_result_quota_unknown');
+    }
+    if (lastStatus === 'no_standby' || skippedReason === 'no_standby') {
+      return t('auth_files.priority_rotation_sidecar_result_no_standby');
+    }
+    if (lastStatus === 'no_changes' || skippedReason === 'no_changes') {
+      return t('auth_files.priority_rotation_sidecar_result_no_changes');
+    }
+    if (lastStatus === 'skipped') {
+      return t('auth_files.priority_rotation_sidecar_result_skipped');
+    }
+    return t('auth_files.priority_rotation_sidecar_result_idle');
+  })();
+  const priorityRotationSidecarResultLabel = t('auth_files.priority_rotation_sidecar_last_result', {
+    result: priorityRotationSidecarResultValue,
+  });
+  const priorityRotationSidecarHasAnomalousNoChanges =
+    priorityRotationSidecarState?.lastStatus === 'no_changes' &&
+    (priorityRotationSidecarState.lastAnalysis?.candidates ?? []).some(
+      (candidate) => candidate.isActive && candidate.belowThreshold === true
+    );
   const priorityRotationDetailTierLabel = priorityRotationDetailTier
     ? priorityRotationTierLabels[priorityRotationDetailTier]
     : '';
@@ -2125,6 +2232,15 @@ export function AuthFilesPage() {
                     <span className={styles.priorityRotationBackgroundMetaItem}>
                       {priorityRotationSidecarLastRunLabel}
                     </span>
+                    <span
+                      className={`${styles.priorityRotationBackgroundMetaItem} ${
+                        priorityRotationSidecarHasAnomalousNoChanges
+                          ? styles.priorityRotationBackgroundMetaWarning
+                          : ''
+                      }`}
+                    >
+                      {priorityRotationSidecarResultLabel}
+                    </span>
                     <span className={styles.priorityRotationBackgroundMetaItem}>
                       {priorityRotationSidecarNextRunLabel}
                     </span>
@@ -2326,8 +2442,23 @@ export function AuthFilesPage() {
                   >
                     {t('auth_files.priority_rotation_sidecar_save_secret')}
                   </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={<IconRefreshCw size={15} />}
+                    onClick={() => void runPriorityRotationSidecarNow()}
+                    disabled={!managementKey || priorityRotationSidecarSaving}
+                    loading={priorityRotationSidecarSaving}
+                  >
+                    {t('auth_files.priority_rotation_sidecar_run_now')}
+                  </Button>
                 </div>
               </div>
+              {priorityRotationSidecarHasAnomalousNoChanges && (
+                <div className={styles.priorityRotationBackgroundError}>
+                  {t('auth_files.priority_rotation_sidecar_anomaly_warning')}
+                </div>
+              )}
               {priorityRotationSidecarError && (
                 <div className={styles.priorityRotationBackgroundError}>
                   {priorityRotationSidecarError}

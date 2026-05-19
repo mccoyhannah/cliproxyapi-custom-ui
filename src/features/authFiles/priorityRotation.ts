@@ -12,8 +12,7 @@ import { parsePriorityValue } from './constants';
 const STORAGE_KEY = 'authFilesPage.priorityRotation.v1';
 const DEFAULT_THRESHOLD_PERCENT = 50;
 const DEFAULT_ACTIVE_SLOT_LIMIT = 5;
-const ALL_ACTIVE_BELOW_THRESHOLD_RELAX_PERCENT = 20;
-const MANAGED_CODEX_PLANS = new Set(['team', 'plus']);
+const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_based']);
 
 export type PriorityRotationChangeRole = 'demote' | 'promote';
 export type PriorityRotationChangeReason =
@@ -256,13 +255,8 @@ export const analyzeCodexPriorityRotation = (
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
   );
-  const shouldRelaxThreshold =
-    activeCandidates.length > 0 &&
-    activeCandidates.every((candidate) => candidate.remainingPercent < threshold);
-  const effectiveThreshold = shouldRelaxThreshold
-    ? clampThresholdPercent(threshold - ALL_ACTIVE_BELOW_THRESHOLD_RELAX_PERCENT)
-    : threshold;
-  const thresholdAdjusted = effectiveThreshold < threshold;
+  const effectiveThreshold = threshold;
+  const thresholdAdjusted = false;
   const healthyActiveCandidates = activeCandidates.filter(
     (candidate) => candidate.remainingPercent >= effectiveThreshold
   );
