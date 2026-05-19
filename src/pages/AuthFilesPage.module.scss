@@ -582,35 +582,39 @@
 }
 
 .priorityRotationBar {
+  --priority-rotation-active: #2563eb;
+  --priority-rotation-standby: #0891b2;
+  --priority-rotation-buffer: #64748b;
+  --priority-rotation-sheen: #fff;
   display: grid;
   grid-template-columns:
-    minmax(220px, 0.88fr)
-    minmax(338px, 1fr)
-    minmax(340px, 0.92fr);
-  gap: 14px;
-  align-items: center;
+    minmax(240px, 0.88fr)
+    minmax(324px, 1fr)
+    minmax(326px, 0.86fr);
+  gap: 12px;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
   margin-bottom: 12px;
-  padding: 12px 14px;
+  padding: 12px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--primary-color) 5%, transparent),
-      transparent 58%
+      color-mix(in srgb, var(--primary-color) 4%, transparent),
+      transparent 62%
     ),
-    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent), transparent),
     color-mix(in srgb, var(--surface-card) 94%, var(--surface-panel));
   box-shadow:
-    0 14px 34px -30px color-mix(in srgb, var(--primary-color) 50%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 54%, #14b8a6);
+    0 14px 32px -30px color-mix(in srgb, var(--text-primary) 38%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 14%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--priority-rotation-standby) 56%, var(--primary-color));
 
   @media (max-width: 1320px) {
-    grid-template-columns: minmax(240px, 0.9fr) minmax(320px, 1fr);
+    grid-template-columns: minmax(250px, 0.92fr) minmax(330px, 1fr);
 
     .priorityRotationActions {
       grid-column: 1 / -1;
@@ -638,6 +642,7 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+  padding: 2px 8px 2px 0;
 }
 
 .priorityRotationIcon {
@@ -650,17 +655,18 @@
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
   background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 18%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-rotation-sheen) 18%, transparent), transparent),
     color-mix(in srgb, var(--primary-color) 8%, var(--surface-control));
   color: color-mix(in srgb, var(--primary-color) 88%, #14b8a6);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 16%, transparent);
 }
 
 .priorityRotationCopy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .priorityRotationTitle {
@@ -672,7 +678,7 @@
 
 .priorityRotationMeta {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.35;
   white-space: normal;
@@ -690,29 +696,29 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
-  padding: 0 8px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--tier-color, var(--primary-color)) 28%, transparent);
+  min-height: 23px;
+  padding: 0 7px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--tier-color, var(--primary-color)) 18%, transparent);
   background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
-    color-mix(in srgb, var(--tier-color, var(--primary-color)) 10%, var(--surface-control));
-  color: color-mix(in srgb, var(--tier-color, var(--primary-color)) 82%, var(--text-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent), transparent),
+    color-mix(in srgb, var(--tier-color, var(--primary-color)) 7%, var(--surface-control));
+  color: color-mix(in srgb, var(--tier-color, var(--primary-color)) 74%, var(--text-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .priorityRotationTierActive {
-  --tier-color: #2563eb;
+  --tier-color: var(--priority-rotation-active);
 }
 
 .priorityRotationTierStandby {
-  --tier-color: #0891b2;
+  --tier-color: var(--priority-rotation-standby);
 }
 
 .priorityRotationTierBuffer {
-  --tier-color: #64748b;
+  --tier-color: var(--priority-rotation-buffer);
 }
 
 .priorityRotationTierLabel {
@@ -730,9 +736,9 @@
 
 .priorityRotationControls {
   display: grid;
-  grid-template-columns: minmax(210px, 1fr) minmax(112px, auto);
-  align-items: end;
-  column-gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(136px, auto);
+  align-items: stretch;
+  column-gap: 10px;
   row-gap: 10px;
   width: 100%;
   min-width: 0;
@@ -750,11 +756,18 @@
   gap: 8px;
   min-width: 0;
   min-height: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 76%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 11%, transparent);
   color: var(--text-tertiary);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .priorityRotationSettingHeader {
@@ -771,19 +784,19 @@
   display: grid;
   grid-template-columns: 30px minmax(38px, 46px) 30px;
   align-items: center;
-  height: 30px;
+  height: 32px;
   min-width: 0;
   overflow: hidden;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 14%, var(--border-color));
+  background: color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
   color: var(--text-secondary);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
 }
 
 .priorityRotationSlotStepper {
   width: max-content;
-  min-width: 112px;
+  min-width: 116px;
 }
 
 .priorityRotationStepperButton {
@@ -807,8 +820,8 @@
     transform 0.12s ease;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--primary-color) 10%, transparent);
-    color: color-mix(in srgb, var(--primary-color) 92%, var(--text-primary));
+    background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+    color: color-mix(in srgb, var(--primary-color) 86%, var(--text-primary));
   }
 
   &:active:not(:disabled) {
@@ -835,7 +848,7 @@
   min-width: 0;
   height: 100%;
   padding: 0 4px;
-  border-inline: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-inline: 1px solid color-mix(in srgb, var(--border-color) 42%, transparent);
 
   input {
     width: 38px;
@@ -869,7 +882,6 @@
 
 .priorityRotationThresholdControl {
   display: block;
-  align-items: center;
   min-height: 18px;
   min-width: 0;
 }
@@ -877,7 +889,7 @@
 .priorityRotationSlider {
   width: 100%;
   min-width: 0;
-  height: 18px;
+  height: 19px;
   padding: 0;
   border: 0;
   appearance: none;
@@ -885,9 +897,9 @@
   cursor: pointer;
 
   &::-webkit-slider-runnable-track {
-    height: 6px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--primary-color) 16%, transparent);
+    height: 7px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 13%, transparent);
     background:
       linear-gradient(
         90deg,
@@ -899,20 +911,20 @@
         color-mix(in srgb, var(--border-color) 58%, var(--surface-control)) 100%
       );
     box-shadow:
-      inset 0 1px 1px color-mix(in srgb, #000 14%, transparent),
-      0 0 0 1px color-mix(in srgb, #fff 6%, transparent);
+      inset 0 1px 1px color-mix(in srgb, #000 10%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--priority-rotation-sheen) 5%, transparent);
   }
 
   &::-moz-range-track {
-    height: 6px;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--primary-color) 16%, transparent);
+    height: 7px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 13%, transparent);
     background: color-mix(in srgb, var(--border-color) 58%, var(--surface-control));
   }
 
   &::-moz-range-progress {
-    height: 6px;
-    border-radius: 999px;
+    height: 7px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--primary-color) 82%, #14b8a6);
   }
 
@@ -920,7 +932,7 @@
     width: 16px;
     height: 16px;
     margin-top: -6px;
-    border: 2px solid color-mix(in srgb, #fff 72%, var(--surface-panel));
+    border: 2px solid color-mix(in srgb, var(--priority-rotation-sheen) 72%, var(--surface-panel));
     border-radius: 999px;
     appearance: none;
     background: color-mix(in srgb, var(--primary-color) 92%, #14b8a6);
@@ -935,7 +947,7 @@
   &::-moz-range-thumb {
     width: 14px;
     height: 14px;
-    border: 2px solid color-mix(in srgb, #fff 72%, var(--surface-panel));
+    border: 2px solid color-mix(in srgb, var(--priority-rotation-sheen) 72%, var(--surface-panel));
     border-radius: 999px;
     background: color-mix(in srgb, var(--primary-color) 92%, #14b8a6);
     box-shadow:
@@ -966,9 +978,12 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  height: auto;
+  min-height: 22px;
   min-width: 0;
-  padding: 0;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--primary-color) 7%, var(--surface-control));
   color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
 
   input {
@@ -978,7 +993,7 @@
     border: 0;
     outline: 0;
     background: transparent;
-    color: var(--text-primary);
+    color: color-mix(in srgb, var(--primary-color) 72%, var(--text-primary));
     font-family: var(--font-mono);
     font-size: 13px;
     font-weight: 860;
@@ -1003,12 +1018,12 @@
 
 .priorityRotationActions {
   display: grid;
-  grid-template-columns: minmax(166px, 1fr) minmax(148px, 180px);
+  grid-template-columns: minmax(168px, 1fr) minmax(148px, 176px);
   grid-template-rows: auto auto;
-  align-items: center;
+  align-items: stretch;
   justify-content: end;
   justify-self: end;
-  gap: 8px 10px;
+  gap: 7px 9px;
   width: 100%;
   max-width: 386px;
   min-width: 0;
@@ -1043,7 +1058,7 @@
   grid-column: 1 / -1;
   width: 100%;
   min-width: 0;
-  min-height: 22px;
+  min-height: 24px;
   padding: 0;
 
   @include mobile {
@@ -1051,6 +1066,8 @@
     min-width: 0;
     flex: 0 1 auto;
     justify-content: flex-start;
+    row-gap: 6px;
+    min-height: 36px;
     border-radius: 8px;
   }
 }
@@ -1059,17 +1076,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   min-height: 22px;
   min-width: 0;
   max-width: 100%;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 2px 8px 2px 7px;
+  border-radius: 7px;
   font-size: 11px;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  &::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.44;
+  }
 }
 
 .priorityRotationAutoToggle {
@@ -1079,12 +1107,14 @@
   align-items: center;
   justify-content: center;
   min-height: 38px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-control) 82%, var(--bg-primary));
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-rotation-sheen) 9%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 80%, var(--bg-primary));
   color: var(--text-secondary);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
 
   :global(label) {
     gap: 6px;
@@ -1114,7 +1144,12 @@
 }
 
 .priorityRotationAutoToggleOn {
+  border-color: color-mix(in srgb, var(--success-color) 22%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent), transparent),
+    color-mix(in srgb, var(--success-color) 8%, var(--surface-control));
   color: color-mix(in srgb, var(--success-color) 76%, var(--text-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
 }
 
 .priorityRotationAutoLabel {
@@ -1146,38 +1181,47 @@
 
 .priorityRotationStatusReady {
   color: color-mix(in srgb, var(--primary-color) 82%, var(--text-primary));
-  border: 0;
-  background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, transparent);
+  background: color-mix(in srgb, var(--primary-color) 7%, transparent);
 }
 
 .priorityRotationStatusWarning {
   color: var(--warning-color);
-  border: 0;
-  background: color-mix(in srgb, var(--warning-color) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-color) 16%, transparent);
+  background: color-mix(in srgb, var(--warning-color) 7%, transparent);
 }
 
 .priorityRotationStatusMuted {
   color: var(--text-secondary);
-  border: 0;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 62%, transparent);
+
+  &::before {
+    display: none;
+  }
 }
 
 .priorityRotationStatusInfo {
   color: color-mix(in srgb, var(--success-color) 72%, var(--primary-color));
-  border: 0;
-  background: color-mix(in srgb, var(--success-color) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success-color) 14%, transparent);
+  background: color-mix(in srgb, var(--success-color) 6%, transparent);
+
+  &::before {
+    display: none;
+  }
 }
 
 .priorityRotationButton {
   width: 100%;
   min-width: 0;
+  min-height: 38px;
   white-space: nowrap;
 
   &:global(.btn) {
-    border-color: color-mix(in srgb, var(--primary-color) 76%, var(--border-color));
+    border-color: color-mix(in srgb, var(--primary-color) 58%, var(--border-color));
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--primary-color) 14%, transparent),
-      0 8px 20px color-mix(in srgb, var(--primary-color) 18%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--primary-color) 10%, transparent),
+      0 8px 18px color-mix(in srgb, var(--primary-color) 14%, transparent),
       var(--ops-control-shadow);
   }
 
@@ -2136,6 +2180,45 @@ button.codexSubscriptionValue {
   --codex-plan-shadow: rgba(255, 196, 44, 0.18);
 }
 
+:global([data-theme='dark']) .priorityRotationBar {
+  --priority-rotation-active: #60a5fa;
+  --priority-rotation-standby: #22d3ee;
+  --priority-rotation-buffer: #cbd5e1;
+  --priority-rotation-sheen: #020617;
+}
+
+:global([data-theme='dark']) .priorityBadgeEditor {
+  --priority-badge-sheen: #020617;
+}
+
+:global([data-theme='dark']) .priorityBadgeEditorActive {
+  --priority-dot-color: #60a5fa;
+  --priority-value-surface: color-mix(in srgb, #60a5fa 13%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #60a5fa 28%, transparent);
+  --priority-value-color: color-mix(in srgb, #bfdbfe 86%, var(--text-primary));
+
+  border-color: color-mix(in srgb, #60a5fa 30%, var(--border-color));
+}
+
+:global([data-theme='dark']) .priorityBadgeEditorStandby {
+  --priority-dot-color: #22d3ee;
+  --priority-value-surface: color-mix(in srgb, #22d3ee 11%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #22d3ee 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #a5f3fc 82%, var(--text-primary));
+
+  border-color: color-mix(in srgb, #22d3ee 26%, var(--border-color));
+}
+
+:global([data-theme='dark']) .priorityBadgeEditorBuffer,
+:global([data-theme='dark']) .priorityBadgeEditorFree {
+  --priority-dot-color: #cbd5e1;
+  --priority-value-surface: color-mix(in srgb, #94a3b8 10%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #94a3b8 20%, transparent);
+  --priority-value-color: color-mix(in srgb, #cbd5e1 76%, var(--text-secondary));
+
+  border-color: color-mix(in srgb, #94a3b8 22%, var(--border-color));
+}
+
 .fileCardCompactPlanTeam {
   --compact-plan-card-accent: #0891b2;
   --compact-plan-card-wash: rgba(8, 145, 178, 0.075);
@@ -2497,9 +2580,9 @@ button.codexSubscriptionValue {
   }
 
   .priorityBadgeMain {
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: 1fr;
     gap: 0;
-    padding-inline: 6px;
+    padding-inline: 4px;
   }
 
   .priorityBadgeLabel,
@@ -2507,9 +2590,19 @@ button.codexSubscriptionValue {
     display: none;
   }
 
+  .priorityBadgeValueShell {
+    grid-column: 1;
+    justify-self: center;
+    min-width: 54px;
+  }
+
   .priorityBadgeInput {
     width: 3ch;
     font-size: 17px;
+  }
+
+  .priorityBadgeStepButton {
+    min-height: 36px;
   }
 
   .subscriptionExpiryMeta {
@@ -2839,60 +2932,102 @@ button.codexSubscriptionValue {
 }
 
 .priorityBadgeEditor {
-  --priority-badge-color: var(--primary-color);
+  --priority-badge-color: #2563eb;
+  --priority-badge-sheen: #fff;
+  --priority-dot-color: color-mix(in srgb, var(--priority-badge-color) 80%, var(--text-primary));
+  --priority-value-surface: color-mix(in srgb, var(--priority-badge-color) 5%, var(--surface-control));
+  --priority-value-shadow: none;
+  --priority-value-border: color-mix(in srgb, var(--priority-badge-color) 16%, transparent);
+  --priority-value-color: color-mix(in srgb, var(--priority-badge-color) 78%, var(--text-primary));
+  --priority-prefix-size: 13px;
+  --priority-input-size: 18px;
+  --priority-input-weight: 880;
   position: relative;
   display: inline-grid;
   grid-template-columns: 30px minmax(104px, 1fr) 30px;
   align-items: stretch;
   min-height: 36px;
-  width: min(100%, 178px);
+  width: min(100%, 182px);
   max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
-  border-radius: 9px;
-  border: 1px solid color-mix(in srgb, var(--priority-badge-color) 22%, var(--border-color));
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
   background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--priority-badge-color) 9%, transparent),
-      transparent 62%
-    ),
-    color-mix(in srgb, var(--surface-control) 92%, var(--bg-primary));
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-badge-sheen) 12%, transparent), transparent 100%),
+    color-mix(in srgb, var(--surface-control) 94%, var(--bg-primary));
   box-shadow:
-    0 10px 22px -22px color-mix(in srgb, var(--priority-badge-color) 58%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+    0 10px 22px -24px color-mix(in srgb, var(--text-primary) 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--priority-badge-sheen) 14%, transparent);
 }
 
 .priorityBadgeEditorActive {
   --priority-badge-color: #2563eb;
+  --priority-dot-color: #2563eb;
+  --priority-value-surface: color-mix(in srgb, #2563eb 9%, var(--surface-control));
+  --priority-value-shadow:
+    0 8px 18px -18px color-mix(in srgb, #2563eb 70%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--priority-badge-sheen) 18%, transparent);
+  --priority-value-border: color-mix(in srgb, #2563eb 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #1d4ed8 82%, var(--text-primary));
+  --priority-prefix-size: 14px;
+  --priority-input-size: 19px;
+  --priority-input-weight: 900;
+
+  border-color: color-mix(in srgb, #2563eb 22%, var(--border-color));
 }
 
 .priorityBadgeEditorStandby {
   --priority-badge-color: #0891b2;
+  --priority-dot-color: #0891b2;
+  --priority-value-surface: color-mix(in srgb, #0891b2 8%, var(--surface-control));
+  --priority-value-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-badge-sheen) 18%, transparent);
+  --priority-value-border: color-mix(in srgb, #0891b2 20%, transparent);
+  --priority-value-color: color-mix(in srgb, #0e7490 78%, var(--text-primary));
+  --priority-prefix-size: 13px;
+  --priority-input-size: 18px;
+  --priority-input-weight: 840;
+
+  border-color: color-mix(in srgb, #0891b2 18%, var(--border-color));
 }
 
 .priorityBadgeEditorBuffer {
   --priority-badge-color: #64748b;
+  --priority-dot-color: #94a3b8;
+  --priority-value-surface: color-mix(in srgb, #64748b 5%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #64748b 12%, transparent);
+  --priority-value-color: color-mix(in srgb, #64748b 68%, var(--text-secondary));
+  --priority-prefix-size: 12px;
+  --priority-input-size: 16px;
+  --priority-input-weight: 760;
+
+  border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
 }
 
 .priorityBadgeEditorFree {
   --priority-badge-color: #64748b;
+  --priority-dot-color: #94a3b8;
+  --priority-value-surface: color-mix(in srgb, #64748b 6%, transparent);
+  --priority-value-border: color-mix(in srgb, #64748b 14%, transparent);
+  --priority-value-color: color-mix(in srgb, #64748b 68%, var(--text-secondary));
+  --priority-prefix-size: 12px;
+  --priority-input-size: 16px;
+  --priority-input-weight: 760;
   border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
   background:
     linear-gradient(135deg, color-mix(in srgb, #64748b 4%, transparent), transparent 64%),
     color-mix(in srgb, var(--surface-control) 76%, var(--bg-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-badge-sheen) 10%, transparent);
 
   .priorityBadgeValueShell {
-    color: color-mix(in srgb, #64748b 68%, var(--text-secondary));
+    color: var(--priority-value-color);
   }
 
   .priorityBadgePrefix {
-    font-size: 12px;
     font-weight: 760;
   }
 
   .priorityBadgeInput {
-    font-size: 16px;
     font-weight: 760;
   }
 
@@ -2915,7 +3050,7 @@ button.codexSubscriptionValue {
   gap: 0;
   min-width: 0;
   padding: 3px 8px;
-  border-inline: 1px solid color-mix(in srgb, var(--border-color) 54%, transparent);
+  border-inline: 1px solid color-mix(in srgb, var(--border-color) 30%, transparent);
 }
 
 .priorityBadgeLabel {
@@ -2937,17 +3072,33 @@ button.codexSubscriptionValue {
   display: inline-flex;
   align-items: baseline;
   justify-content: center;
+  gap: 5px;
   grid-column: 2;
   grid-row: 1;
-  min-width: 36px;
-  color: color-mix(in srgb, var(--priority-badge-color) 84%, var(--text-primary));
+  min-width: 48px;
+  padding: 4px 7px 5px;
+  border: 1px solid var(--priority-value-border);
+  border-radius: 8px;
+  background: var(--priority-value-surface);
+  box-shadow: var(--priority-value-shadow);
+  color: var(--priority-value-color);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+
+  &::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--priority-dot-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--priority-dot-color) 11%, transparent);
+  }
 }
 
 .priorityBadgePrefix {
-  font-size: 13px;
+  font-size: var(--priority-prefix-size);
   font-weight: 900;
 }
 
@@ -2962,8 +3113,8 @@ button.codexSubscriptionValue {
   background: transparent;
   color: currentColor;
   font-family: inherit;
-  font-size: 18px;
-  font-weight: 920;
+  font-size: var(--priority-input-size);
+  font-weight: var(--priority-input-weight);
   line-height: 1;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -2983,15 +3134,15 @@ button.codexSubscriptionValue {
   align-items: center;
   justify-content: center;
   min-width: 30px;
-  min-height: 34px;
+  min-height: 36px;
   padding: 0;
   border: 0;
   border-radius: 0;
   appearance: none;
   background: transparent;
-  color: var(--text-tertiary);
-  font-size: 16px;
-  font-weight: 900;
+  color: color-mix(in srgb, var(--text-tertiary) 84%, var(--text-secondary));
+  font-size: 15px;
+  font-weight: 820;
   line-height: 1;
   cursor: pointer;
   transition:
@@ -3000,8 +3151,8 @@ button.codexSubscriptionValue {
     transform $transition-fast;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--priority-badge-color) 10%, transparent);
-    color: color-mix(in srgb, var(--priority-badge-color) 84%, var(--text-primary));
+    background: color-mix(in srgb, var(--priority-badge-color) 8%, transparent);
+    color: color-mix(in srgb, var(--priority-badge-color) 78%, var(--text-primary));
   }
 
   &:active:not(:disabled) {
@@ -3021,9 +3172,9 @@ button.codexSubscriptionValue {
   max-width: 44px;
   margin-left: 7px;
   overflow: hidden;
-  color: color-mix(in srgb, var(--priority-badge-color) 82%, var(--text-primary));
-  font-size: 9px;
-  font-weight: 860;
+  color: color-mix(in srgb, var(--priority-badge-color) 70%, var(--text-secondary));
+  font-size: 10px;
+  font-weight: 740;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4203,6 +4354,7 @@ button.codexSubscriptionValue {
 }
 
 .statusToggle {
+  --status-toggle-sheen: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4215,12 +4367,16 @@ button.codexSubscriptionValue {
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, currentColor 20%, var(--border-color));
   background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--status-toggle-sheen) 9%, transparent), transparent),
     color-mix(in srgb, currentColor 7%, var(--surface-control));
   color: var(--text-tertiary);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--status-toggle-sheen) 10%, transparent),
     0 1px 2px color-mix(in srgb, #000 4%, transparent);
+}
+
+:global([data-theme='dark']) .statusToggle {
+  --status-toggle-sheen: #020617;
 }
 
 .statusToggleActive {

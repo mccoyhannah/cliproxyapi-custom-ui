@@ -27,7 +27,7 @@ import {
   IconInbox,
   IconInfo,
   IconRefreshCw,
-  IconSettings,
+  IconSlidersHorizontal,
 } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
@@ -1543,7 +1543,7 @@ export function AuthFilesPage() {
             <div className={styles.priorityRotationBar}>
               <div className={styles.priorityRotationMain}>
                 <span className={styles.priorityRotationIcon} aria-hidden="true">
-                  <IconSettings size={19} />
+                  <IconSlidersHorizontal size={19} />
                 </span>
                 <span className={styles.priorityRotationCopy}>
                   <span className={styles.priorityRotationTitle}>
@@ -1633,7 +1633,7 @@ export function AuthFilesPage() {
                       aria-label={t('auth_files.priority_rotation_slots_decrease')}
                       onClick={() => adjustPriorityRotationSlots(-PRIORITY_ROTATION_SLOT_STEP)}
                     >
-                      −
+                      -
                     </button>
                     <span className={styles.priorityRotationStepperValue}>
                       <input
@@ -1721,7 +1721,6 @@ export function AuthFilesPage() {
                   onClick={openPriorityRotationPreview}
                   disabled={disableControls || loading || batchPriorityUpdating}
                   loading={batchPriorityUpdating}
-                  title={t('auth_files.priority_rotation_button_aria')}
                   aria-label={t('auth_files.priority_rotation_button_aria')}
                 >
                   {t('auth_files.priority_rotation_button')}
