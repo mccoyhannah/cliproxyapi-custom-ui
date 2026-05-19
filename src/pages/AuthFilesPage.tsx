@@ -22,13 +22,21 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import {
+  IconDownload,
   IconFilterAll,
   IconInfo,
+  IconLayoutDashboard,
   IconMinus,
+  IconModelCluster,
   IconPlus,
   IconRefreshCw,
+  IconScrollText,
+  IconSettings,
   IconSlidersHorizontal,
+  IconTimer,
+  IconTrash2,
   IconUploadCloud,
 } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -41,6 +49,7 @@ import {
   QUOTA_PROVIDER_TYPES,
   clampCardPageSize,
   getAuthFileIcon,
+  getAuthFileStatusMessage,
   getTypeColor,
   getTypeLabel,
   hasAuthFileStatusMessage,
@@ -67,6 +76,7 @@ import {
   readPersistedAuthFilesCompactMode,
   writeAuthFilesUiState,
   writePersistedAuthFilesCompactMode,
+  type AuthFilesFileViewMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
 import {
@@ -105,6 +115,7 @@ import {
   resolveCodexPlanType,
 } from '@/utils/quota';
 import { normalizeApiBase } from '@/utils/connection';
+import { formatFileSize } from '@/utils/format';
 import styles from './AuthFilesPage.module.scss';
 
 const easePower3Out = (progress: number) => 1 - (1 - progress) ** 4;
@@ -116,6 +127,13 @@ const DEFAULT_COMPACT_PAGE_SIZE = 12;
 const PRIORITY_ROTATION_THRESHOLD_STEP = 5;
 const PRIORITY_ROTATION_SLOT_STEP = 1;
 const PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP = 1;
+const HEALTHY_AUTH_FILE_STATUS_MESSAGES = new Set([
+  'ok',
+  'healthy',
+  'ready',
+  'success',
+  'available',
+]);
 
 const escapeWildcardSearchSegment = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -147,6 +165,13 @@ const formatNullableDateTime = (value: string | null | undefined): string => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 };
+const formatAuthFileModified = (file: AuthFileItem): string => {
+  const rawModified = file.modified;
+  if (typeof rawModified !== 'number' || rawModified <= 0) return '-';
+  const modifiedMs = rawModified < 1_000_000_000_000 ? rawModified * 1000 : rawModified;
+  const date = new Date(modifiedMs);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+};
 const normalizePriorityRotationSidecarInterval = (value: unknown): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return 5;
@@ -175,7 +200,6 @@ type PriorityRotationSidecarSaveOptions = {
   notifyError?: boolean;
   committedDraftOnly?: boolean;
   forceDraft?: boolean;
-  autoSave?: boolean;
 };
 
 const DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT: PriorityRotationSidecarDraftSettings = {
@@ -232,6 +256,8 @@ export function AuthFilesPage() {
   });
   const [pageSizeInput, setPageSizeInput] = useState('9');
   const [viewMode, setViewMode] = useState<'diagram' | 'list'>('list');
+  const [authFilesViewMode, setAuthFilesViewMode] =
+    useState<AuthFilesFileViewMode>('grid');
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
   const [batchActionBarVisible, setBatchActionBarVisible] = useState(false);
   const [batchPriorityInput, setBatchPriorityInput] = useState('');
@@ -257,7 +283,6 @@ export function AuthFilesPage() {
     useState<PriorityRotationSidecarStatus | null>(null);
   const [priorityRotationSidecarLoading, setPriorityRotationSidecarLoading] = useState(false);
   const [priorityRotationSidecarSaving, setPriorityRotationSidecarSaving] = useState(false);
-  const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
   const [priorityRotationSidecarIntervalInput, setPriorityRotationSidecarIntervalInput] =
     useState('5');
   const [priorityRotationSidecarError, setPriorityRotationSidecarError] = useState('');
@@ -270,8 +295,6 @@ export function AuthFilesPage() {
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
   const priorityRotationSidecarDraftTouchedRef = useRef(false);
-  const priorityRotationSidecarAutoSaveSignatureRef = useRef('');
-  const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
   const priorityRotationSidecarStatusRequestIdRef = useRef(0);
 
   const {
@@ -526,6 +549,9 @@ export function AuthFilesPage() {
       if (typeof persistedCompactMode !== 'boolean' && typeof persisted.compactMode === 'boolean') {
         setCompactMode(persisted.compactMode);
       }
+      if (persisted.fileViewMode === 'grid' || persisted.fileViewMode === 'list') {
+        setAuthFilesViewMode(persisted.fileViewMode);
+      }
       if (typeof persisted.search === 'string') {
         setSearch(persisted.search);
       }
@@ -565,6 +591,7 @@ export function AuthFilesPage() {
       disabledOnly,
       enabledOnly,
       compactMode,
+      fileViewMode: authFilesViewMode,
       search,
       page,
       pageSize,
@@ -574,6 +601,7 @@ export function AuthFilesPage() {
     });
     writePersistedAuthFilesCompactMode(compactMode);
   }, [
+    authFilesViewMode,
     compactMode,
     disabledOnly,
     enabledOnly,
@@ -1026,8 +1054,6 @@ export function AuthFilesPage() {
   const updatePriorityRotationSettings = useCallback(
     (updates: Partial<PriorityRotationSidecarDraftSettings>) => {
       priorityRotationSidecarDraftTouchedRef.current = true;
-      priorityRotationSidecarAutoSaveSignatureRef.current = '';
-      priorityRotationSidecarAutoSaveFailedAtRef.current = 0;
       setPriorityRotationSettings((current) => {
         const nextSettings = {
           ...current,
@@ -1228,10 +1254,7 @@ export function AuthFilesPage() {
         showNotification(t('auth_files.priority_rotation_sidecar_missing_login'), 'error');
         return false;
       }
-      const setSavingState = options.autoSave
-        ? setPriorityRotationSidecarAutoSaving
-        : setPriorityRotationSidecarSaving;
-      setSavingState(true);
+      setPriorityRotationSidecarSaving(true);
       try {
         const settings = buildPriorityRotationSidecarSettings(updates, {
           committedDraftOnly: options.committedDraftOnly,
@@ -1253,7 +1276,7 @@ export function AuthFilesPage() {
         }
         return false;
       } finally {
-        setSavingState(false);
+        setPriorityRotationSidecarSaving(false);
       }
     },
     [
@@ -1290,49 +1313,68 @@ export function AuthFilesPage() {
     }
   }, [apiBase, managementKey, mergePriorityRotationSidecarResult, showNotification, t]);
 
-  useEffect(() => {
-    if (!priorityRotationSidecarCommittedDraftDirty) {
-      priorityRotationSidecarAutoSaveSignatureRef.current = '';
+  const runPriorityRotationSidecarNow = useCallback(
+    async (options: { requireSavedRules?: boolean; notify?: boolean; hasSecret?: boolean } = {}) => {
+      if (!managementKey) {
+        showNotification(t('auth_files.priority_rotation_sidecar_missing_login'), 'error');
+        return false;
+      }
+      if (options.requireSavedRules !== false && priorityRotationSidecarDraftDirty) {
+        showNotification(t('auth_files.priority_rotation_sidecar_save_required'), 'warning');
+        return false;
+      }
+      if ((options.hasSecret ?? priorityRotationSidecarStatus?.state?.hasSecret === true) !== true) {
+        showNotification(t('auth_files.priority_rotation_sidecar_check_missing_secret'), 'warning');
+        return false;
+      }
+
+      setPriorityRotationSidecarSaving(true);
+      try {
+        const result = await priorityRotationSidecarApi.runNow(managementKey);
+        mergePriorityRotationSidecarResult(result.settings, result.state, true);
+        if (options.notify !== false) {
+          showNotification(t('auth_files.priority_rotation_sidecar_run_complete'), 'success');
+        }
+        return result.state;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setPriorityRotationSidecarError(message);
+        showNotification(t('auth_files.priority_rotation_sidecar_run_failed', { message }), 'error');
+        return false;
+      } finally {
+        setPriorityRotationSidecarSaving(false);
+      }
+    },
+    [
+      managementKey,
+      mergePriorityRotationSidecarResult,
+      priorityRotationSidecarDraftDirty,
+      priorityRotationSidecarStatus?.state?.hasSecret,
+      showNotification,
+      t,
+    ]
+  );
+
+  const savePriorityRotationSidecarAndRun = useCallback(async () => {
+    const savedState = await savePriorityRotationSidecarSettings({}, false);
+    if (!savedState) return;
+    if (!savedState.hasSecret) {
+      showNotification(t('auth_files.priority_rotation_sidecar_auto_apply_missing_secret'), 'warning');
       return;
     }
-    if (!managementKey) return;
-    if (!priorityRotationSidecarStatus) return;
-    if (priorityRotationSidecarError) return;
-    if (priorityRotationSidecarSaving || priorityRotationSidecarAutoSaving) {
-      return;
+    const runState = await runPriorityRotationSidecarNow({
+      requireSavedRules: false,
+      hasSecret: savedState.hasSecret,
+      notify: false,
+    });
+    if (runState) {
+      showNotification(t('auth_files.priority_rotation_sidecar_auto_applied'), 'success');
     }
-
-    const autoSaveSignature = JSON.stringify(
-      buildPriorityRotationSidecarSettings({}, { committedDraftOnly: true })
-    );
-    if (priorityRotationSidecarAutoSaveSignatureRef.current === autoSaveSignature) {
-      const failedAt = priorityRotationSidecarAutoSaveFailedAtRef.current;
-      if (!failedAt || Date.now() - failedAt < 5_000) return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      priorityRotationSidecarAutoSaveSignatureRef.current = autoSaveSignature;
-      void (async () => {
-        const saved = await savePriorityRotationSidecarSettings({}, false, {
-          autoSave: true,
-          committedDraftOnly: true,
-          forceDraft: false,
-          notifyError: false,
-        });
-        priorityRotationSidecarAutoSaveFailedAtRef.current = saved ? 0 : Date.now();
-      })();
-    }, 900);
-
-    return () => window.clearTimeout(timeoutId);
   }, [
-    buildPriorityRotationSidecarSettings,
-    managementKey,
-    priorityRotationSidecarCommittedDraftDirty,
-    priorityRotationSidecarError,
-    priorityRotationSidecarAutoSaving,
-    priorityRotationSidecarSaving,
-    priorityRotationSidecarStatus,
+    runPriorityRotationSidecarNow,
     savePriorityRotationSidecarSettings,
+    showNotification,
+    t,
   ]);
 
   useEffect(() => {
@@ -1879,6 +1921,48 @@ export function AuthFilesPage() {
       ? formatNullableDateTime(priorityRotationSidecarState?.nextRunAt)
       : '-',
   });
+  const priorityRotationSidecarLastAnalysis = priorityRotationSidecarState?.lastAnalysis ?? null;
+  const priorityRotationSidecarSavedSlotsLabel = t(
+    'auth_files.priority_rotation_sidecar_saved_slots',
+    {
+      limit: priorityRotationSidecarSettings?.activeSlotLimit ?? '-',
+    }
+  );
+  const priorityRotationSidecarSavedActiveLabel = t(
+    'auth_files.priority_rotation_sidecar_saved_active',
+    {
+      priority: formatPriorityRotationPriority(
+        priorityRotationSidecarLastAnalysis?.activePriority ?? null
+      ),
+      activeCount: priorityRotationSidecarLastAnalysis?.activeCount ?? '-',
+    }
+  );
+  const priorityRotationSidecarLastStatus = priorityRotationSidecarState?.lastStatus ?? 'idle';
+  const priorityRotationSidecarLastResultLabel =
+    priorityRotationSidecarLastStatus === 'applied'
+      ? t('auth_files.priority_rotation_sidecar_result_applied', {
+          count: priorityRotationSidecarState?.lastAppliedChangeCount ?? 0,
+        })
+      : priorityRotationSidecarLastStatus === 'partial'
+        ? t('auth_files.priority_rotation_sidecar_result_partial')
+        : priorityRotationSidecarLastStatus === 'failed'
+          ? t('auth_files.priority_rotation_sidecar_result_failed')
+          : t(`auth_files.priority_rotation_sidecar_result_${priorityRotationSidecarLastStatus}`, {
+              defaultValue: priorityRotationSidecarLastStatus,
+            });
+  const priorityRotationSidecarBusy =
+    priorityRotationSidecarSaving ||
+    priorityRotationSidecarLoading ||
+    priorityRotationSidecarState?.running === true;
+  const priorityRotationSaveDisabled =
+    !managementKey || priorityRotationSidecarBusy || !priorityRotationSidecarDraftDirty;
+  const priorityRotationSaveRunDisabled =
+    priorityRotationSaveDisabled || !priorityRotationSidecarHasSecret;
+  const priorityRotationRunDisabled =
+    !managementKey ||
+    priorityRotationSidecarBusy ||
+    priorityRotationSidecarDraftDirty ||
+    !priorityRotationSidecarHasSecret;
   const priorityRotationDetailTierLabel = priorityRotationDetailTier
     ? priorityRotationTierLabels[priorityRotationDetailTier]
     : '';
@@ -2128,6 +2212,15 @@ export function AuthFilesPage() {
                     <span className={styles.priorityRotationBackgroundMetaItem}>
                       {priorityRotationSidecarNextRunLabel}
                     </span>
+                    <span className={styles.priorityRotationBackgroundMetaItem}>
+                      {priorityRotationSidecarSavedSlotsLabel}
+                    </span>
+                    <span className={styles.priorityRotationBackgroundMetaItem}>
+                      {priorityRotationSidecarSavedActiveLabel}
+                    </span>
+                    <span className={styles.priorityRotationBackgroundMetaItem}>
+                      {priorityRotationSidecarLastResultLabel}
+                    </span>
                   </span>
                 </span>
                 <div className={styles.priorityRotationRelayControl}>
@@ -2320,6 +2413,33 @@ export function AuthFilesPage() {
                   <Button
                     variant="secondary"
                     size="sm"
+                    onClick={() => void savePriorityRotationSidecarSettings({}, true)}
+                    disabled={priorityRotationSaveDisabled}
+                    loading={priorityRotationSidecarSaving && priorityRotationSidecarDraftDirty}
+                  >
+                    {t('auth_files.priority_rotation_sidecar_save_settings_only')}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => void savePriorityRotationSidecarAndRun()}
+                    disabled={priorityRotationSaveRunDisabled}
+                    loading={priorityRotationSidecarSaving && priorityRotationSidecarDraftDirty}
+                  >
+                    {t('auth_files.priority_rotation_sidecar_save_settings')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void runPriorityRotationSidecarNow()}
+                    disabled={priorityRotationRunDisabled}
+                    loading={priorityRotationSidecarSaving && !priorityRotationSidecarDraftDirty}
+                  >
+                    {t('auth_files.priority_rotation_sidecar_run_now')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => void savePriorityRotationSidecarSecret()}
                     disabled={!managementKey || priorityRotationSidecarSaving}
                     loading={priorityRotationSidecarSaving}
@@ -2379,6 +2499,42 @@ export function AuthFilesPage() {
                 </div>
                 <div className={`${styles.filterItem} ${styles.filterToggleItem}`}>
                   <label>{t('auth_files.display_options_label')}</label>
+                  <div
+                    className={styles.authFilesViewSwitch}
+                    role="group"
+                    aria-label={t('auth_files.view_mode_label')}
+                  >
+                    <button
+                      type="button"
+                      className={`${styles.authFilesViewButton} ${
+                        authFilesViewMode === 'grid' ? styles.authFilesViewButtonActive : ''
+                      }`}
+                      onClick={() => {
+                        setAuthFilesViewMode('grid');
+                        setPage(1);
+                      }}
+                      aria-pressed={authFilesViewMode === 'grid'}
+                      title={t('auth_files.view_mode_grid')}
+                    >
+                      <IconLayoutDashboard size={15} aria-hidden="true" />
+                      <span>{t('auth_files.view_mode_grid')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.authFilesViewButton} ${
+                        authFilesViewMode === 'list' ? styles.authFilesViewButtonActive : ''
+                      }`}
+                      onClick={() => {
+                        setAuthFilesViewMode('list');
+                        setPage(1);
+                      }}
+                      aria-pressed={authFilesViewMode === 'list'}
+                      title={t('auth_files.view_mode_list')}
+                    >
+                      <IconScrollText size={15} aria-hidden="true" />
+                      <span>{t('auth_files.view_mode_list')}</span>
+                    </button>
+                  </div>
                   <div className={styles.filterToggleGroup}>
                     <div className={styles.filterToggleCard}>
                       <ToggleSwitch
@@ -2464,7 +2620,7 @@ export function AuthFilesPage() {
                 description={t('auth_files.search_empty_desc')}
                 className={styles.authFilesEmptyState}
               />
-            ) : (
+            ) : authFilesViewMode === 'grid' ? (
               <div
                 className={`${styles.fileGrid} ${quotaFilterType ? styles.fileGridQuotaManaged : ''} ${compactMode ? styles.fileGridCompact : ''}`}
               >
@@ -2498,6 +2654,178 @@ export function AuthFilesPage() {
                     onToggleSelect={toggleSelect}
                   />
                 ))}
+              </div>
+            ) : (
+              <div className={styles.authFileList} role="table">
+                <div className={styles.authFileListHeader} role="row">
+                  <span>{t('auth_files.list_col_file')}</span>
+                  <span>{t('auth_files.list_col_provider')}</span>
+                  <span>{t('auth_files.list_col_status')}</span>
+                  <span>{t('auth_files.list_col_priority')}</span>
+                  <span>{t('auth_files.list_col_size')}</span>
+                  <span>{t('auth_files.list_col_modified')}</span>
+                  <span>{t('auth_files.list_col_actions')}</span>
+                </div>
+                {pageItems.map((file) => {
+                  const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
+                  const type = file.type || 'unknown';
+                  const typeColor = getTypeColor(type, resolvedTheme);
+                  const providerIcon = getAuthFileIcon(type, resolvedTheme);
+                  const rawStatusMessage = getAuthFileStatusMessage(file);
+                  const hasStatusWarning =
+                    Boolean(rawStatusMessage) &&
+                    !HEALTHY_AUTH_FILE_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
+                  const statusLabel = isRuntimeOnly
+                    ? t('auth_files.type_virtual')
+                    : file.disabled
+                      ? t('auth_files.health_status_disabled')
+                      : hasStatusWarning
+                        ? t('auth_files.health_status_warning')
+                        : t('auth_files.health_status_healthy');
+                  const statusClass = isRuntimeOnly
+                    ? styles.authFileListStatusVirtual
+                    : file.disabled
+                      ? styles.authFileListStatusDisabled
+                      : hasStatusWarning
+                        ? styles.authFileListStatusWarning
+                        : styles.authFileListStatusActive;
+                  const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
+                  const displayName = noteValue || file.name;
+                  const priorityValue = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+                  const showModelsButton = !isRuntimeOnly || type.toLowerCase() === 'aistudio';
+
+                  return (
+                    <div
+                      className={`${styles.authFileListRow} ${
+                        selectedFiles.has(file.name) ? styles.authFileListRowSelected : ''
+                      } ${file.disabled ? styles.authFileListRowDisabled : ''}`}
+                      role="row"
+                      key={file.name}
+                    >
+                      <div className={styles.authFileListIdentity} role="cell">
+                        {!isRuntimeOnly && (
+                          <SelectionCheckbox
+                            checked={selectedFiles.has(file.name)}
+                            onChange={() => toggleSelect(file.name)}
+                            className={styles.authFileListSelection}
+                            aria-label={
+                              selectedFiles.has(file.name)
+                                ? t('auth_files.batch_deselect')
+                                : t('auth_files.batch_select_all')
+                            }
+                            title={
+                              selectedFiles.has(file.name)
+                                ? t('auth_files.batch_deselect')
+                                : t('auth_files.batch_select_all')
+                            }
+                          />
+                        )}
+                        <span className={styles.authFileListNameStack}>
+                          <strong title={displayName}>{displayName}</strong>
+                          <span title={file.name}>{file.name}</span>
+                        </span>
+                      </div>
+                      <div className={styles.authFileListProviderCell} role="cell">
+                        <span
+                          className={styles.authFileListProviderBadge}
+                          style={{
+                            backgroundColor: typeColor.bg,
+                            color: typeColor.text,
+                            ...(typeColor.border ? { border: typeColor.border } : {}),
+                          }}
+                        >
+                          {providerIcon ? (
+                            <img src={providerIcon} alt="" />
+                          ) : (
+                            <span>{getTypeLabel(t, type).slice(0, 1).toUpperCase()}</span>
+                          )}
+                          <span>{getTypeLabel(t, type)}</span>
+                        </span>
+                      </div>
+                      <div className={styles.authFileListStatusCell} role="cell">
+                        <span
+                          className={`${styles.authFileListStatusPill} ${statusClass}`}
+                          title={rawStatusMessage || statusLabel}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <div className={styles.authFileListPriorityCell} role="cell">
+                        P{priorityValue}
+                      </div>
+                      <div className={styles.authFileListMutedCell} role="cell">
+                        {file.size ? formatFileSize(file.size) : '-'}
+                      </div>
+                      <div className={styles.authFileListMutedCell} role="cell">
+                        {formatAuthFileModified(file)}
+                      </div>
+                      <div className={styles.authFileListActions} role="cell">
+                        {showModelsButton && (
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            iconOnly
+                            onClick={() => showModels(file)}
+                            title={t('auth_files.models_button')}
+                            disabled={disableControls}
+                          >
+                            <IconModelCluster size={15} />
+                          </Button>
+                        )}
+                        {!isRuntimeOnly && (
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              iconOnly
+                              onClick={() => handleDownload(file.name)}
+                              title={t('auth_files.download_button')}
+                              disabled={disableControls}
+                            >
+                              <IconDownload size={15} />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              iconOnly
+                              onClick={() => openPrefixProxyEditor(file)}
+                              title={t('auth_files.prefix_proxy_button')}
+                              disabled={disableControls}
+                            >
+                              <IconSettings size={15} />
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              iconOnly
+                              onClick={() => openManualExpiryEditor(file)}
+                              title={t('auth_files.manual_expiry_button')}
+                              disabled={disableControls}
+                            >
+                              <IconTimer size={15} />
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="xs"
+                              iconOnly
+                              onClick={() => handleDelete(file.name)}
+                              title={t('auth_files.delete_button')}
+                              disabled={disableControls || deleting === file.name}
+                            >
+                              <IconTrash2 size={15} />
+                            </Button>
+                            <ToggleSwitch
+                              ariaLabel={t('auth_files.status_toggle_label')}
+                              checked={!file.disabled}
+                              disabled={disableControls || statusUpdating[file.name] === true}
+                              onChange={(value) => handleStatusToggle(file, value)}
+                            />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

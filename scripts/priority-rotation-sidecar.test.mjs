@@ -74,6 +74,24 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
+  const files = Array.from({ length: 6 }, (_, index) =>
+    codexFile(`active-${index + 1}.json`, 10)
+  );
+  const quotas = Object.fromEntries(
+    files.map((file, index) => [file.name, quota(10 + index)])
+  );
+  const result = analyzeCodexPriorityRotation(files, quotas, 50, 5);
+  const overLimitChanges = result.changes.filter(
+    (change) => change.reason === 'over_active_limit'
+  );
+  assert.equal(result.status, 'ready');
+  assert.equal(overLimitChanges.length, 1);
+  assert.equal(overLimitChanges[0].role, 'demote');
+  assert.equal(overLimitChanges[0].toPriority, 9);
+  assert.equal(result.projectedActiveCount, 5);
+}
+
+{
   const files = [codexFile('active-soft-low.json', 10), codexFile('standby-low.json', 5)];
   const result = analyzeCodexPriorityRotation(
     files,

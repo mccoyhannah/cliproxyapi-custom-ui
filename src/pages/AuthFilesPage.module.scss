@@ -543,6 +543,9 @@
 }
 
 .filterControlsPanel {
+  position: sticky;
+  top: 10px;
+  z-index: 12;
   padding: 12px;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
@@ -554,6 +557,10 @@
   box-shadow:
     var(--shadow-control),
     inset 0 1px 0 color-mix(in srgb, #fff 13%, transparent);
+
+  @include mobile {
+    position: static;
+  }
 }
 
 .filterControls {
@@ -930,6 +937,21 @@
   :global(.btn.btn-sm) {
     min-height: 32px;
     padding: 5px 9px;
+  }
+
+  :global(.btn-label) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  @include mobile {
+    justify-content: stretch;
+
+    :global(.btn.btn-sm) {
+      flex: 1 1 calc(50% - 4px);
+    }
   }
 }
 
@@ -1796,6 +1818,82 @@
   }
 }
 
+.authFilesViewSwitch {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 8px;
+  padding: 3px;
+  gap: 3px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 88%, var(--bg-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent),
+    0 1px 2px color-mix(in srgb, #000 4%, transparent);
+
+  @include mobile {
+    width: 100%;
+  }
+}
+
+.authFilesViewButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 82px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color $transition-fast,
+    color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+
+  svg {
+    flex: 0 0 auto;
+  }
+
+  &:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  @include mobile {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.authFilesViewButtonActive {
+  color: var(--text-primary);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 12%, var(--surface-panel));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 6%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--primary-color) 24%, transparent);
+}
+
 .filterToggleCard {
   display: flex;
   align-items: center;
@@ -1874,6 +1972,287 @@
 
 .fileGridCompact {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
+}
+
+.authFileList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 6%, transparent), transparent),
+    color-mix(in srgb, var(--surface-panel) 84%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.authFileListHeader,
+.authFileListRow {
+  display: grid;
+  grid-template-columns:
+    minmax(250px, 1.8fr)
+    minmax(132px, 0.74fr)
+    minmax(104px, 0.52fr)
+    76px
+    92px
+    132px
+    minmax(218px, 0.95fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.authFileListHeader {
+  position: sticky;
+  top: 112px;
+  z-index: 4;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control) 92%, var(--bg-primary));
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.authFileListRow {
+  min-height: 56px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 88%, var(--bg-primary));
+  box-shadow: 0 1px 2px color-mix(in srgb, #000 4%, transparent);
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--surface-card-hover) 92%, var(--bg-primary));
+    box-shadow: 0 14px 28px -26px color-mix(in srgb, var(--primary-color) 48%, transparent);
+  }
+}
+
+.authFileListRowSelected {
+  border-color: color-mix(in srgb, var(--primary-color) 56%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary-color) 26%, transparent),
+    0 14px 30px -28px color-mix(in srgb, var(--primary-color) 70%, transparent);
+}
+
+.authFileListRowDisabled {
+  opacity: 0.72;
+}
+
+.authFileListIdentity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.authFileListSelection {
+  flex: 0 0 auto;
+}
+
+.authFileListNameStack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+
+  strong,
+  span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 790;
+  }
+
+  span {
+    color: var(--text-tertiary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+}
+
+.authFileListProviderCell,
+.authFileListStatusCell,
+.authFileListActions {
+  min-width: 0;
+}
+
+.authFileListProviderBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 54%, transparent);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1;
+
+  img {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    object-fit: contain;
+  }
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.authFileListStatusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.authFileListStatusVirtual {
+  color: color-mix(in srgb, var(--info-color) 84%, var(--text-primary));
+}
+
+.authFileListStatusDisabled {
+  color: var(--text-tertiary);
+}
+
+.authFileListStatusWarning {
+  color: color-mix(in srgb, var(--warning-color) 88%, var(--text-primary));
+}
+
+.authFileListStatusActive {
+  color: color-mix(in srgb, var(--success-color) 84%, var(--text-primary));
+}
+
+.authFileListPriorityCell {
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 860;
+  font-variant-numeric: tabular-nums;
+}
+
+.authFileListMutedCell {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authFileListActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+
+  :global(.btn.btn-xs) {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    padding: 0;
+    border-radius: 7px;
+  }
+
+  :global(label) {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 1180px) {
+  .authFileListHeader {
+    display: none;
+  }
+
+  .authFileListRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'identity actions'
+      'provider actions'
+      'status actions';
+    gap: 7px 10px;
+    align-items: start;
+  }
+
+  .authFileListIdentity {
+    grid-area: identity;
+  }
+
+  .authFileListProviderCell {
+    grid-area: provider;
+  }
+
+  .authFileListStatusCell {
+    grid-area: status;
+  }
+
+  .authFileListPriorityCell,
+  .authFileListMutedCell {
+    display: none;
+  }
+
+  .authFileListActions {
+    grid-area: actions;
+    align-self: center;
+    flex-wrap: wrap;
+    max-width: 132px;
+  }
+}
+
+@include mobile {
+  .authFileList {
+    padding: 6px;
+  }
+
+  .authFileListRow {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'identity'
+      'provider'
+      'status'
+      'actions';
+  }
+
+  .authFileListActions {
+    justify-content: flex-start;
+    max-width: none;
+  }
 }
 
 .authFilesEmptyState:global(.empty-state) {
@@ -2838,7 +3217,7 @@ button.codexSubscriptionValue {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 100%;
+  min-height: 520px;
   box-sizing: border-box;
   transition:
     transform $transition-fast,
@@ -2857,6 +3236,10 @@ button.codexSubscriptionValue {
     box-shadow: 0 18px 42px -34px color-mix(in srgb, var(--primary-color) 58%, transparent);
     border-color: color-mix(in srgb, var(--primary-color) 26%, var(--border-color));
   }
+}
+
+.fileGridCompact .fileCard {
+  min-height: 420px;
 }
 
 .fileCardSelected {
@@ -4345,6 +4728,69 @@ button.codexSubscriptionValue {
   gap: $spacing-md;
   max-height: 60vh;
   overflow: auto;
+}
+
+.prefixProxyDrawerOverlay:global(.modal-overlay) {
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #020617 12%, transparent), transparent 42%),
+    color-mix(in srgb, #020617 44%, var(--bg-body));
+  backdrop-filter: blur(8px) saturate(0.92);
+  -webkit-backdrop-filter: blur(8px) saturate(0.92);
+}
+
+.prefixProxyDrawer:global(.modal) {
+  width: min(760px, 100vw) !important;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0;
+  border-radius: 10px 0 0 10px;
+  border-right: 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 8%, transparent), transparent 180px),
+    var(--surface-card);
+  box-shadow:
+    -28px 0 70px -42px color-mix(in srgb, #020617 72%, transparent),
+    inset 1px 0 0 color-mix(in srgb, #fff 12%, transparent);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+
+  :global(.modal-header) {
+    min-height: 58px;
+    padding-right: 58px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  }
+
+  :global(.modal-body) {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  :global(.modal-footer) {
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  }
+
+  .prefixProxyEditor {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@include mobile {
+  .prefixProxyDrawer:global(.modal) {
+    width: 100vw !important;
+    border-radius: 0;
+  }
+
+  .prefixProxyDrawer :global(.modal-footer) {
+    align-items: stretch;
+
+    :global(.btn) {
+      flex: 1 1 0;
+    }
+  }
 }
 
 .prefixProxyLoading {
