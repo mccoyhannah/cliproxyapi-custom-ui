@@ -203,6 +203,7 @@ const buildAuthFileFieldsPatch = (
   resolveHeadersError: (key: AuthFileHeadersErrorKey) => string
 ): AuthFileFieldsPatch => {
   const original = editor.json ?? {};
+  const hasOriginalPriority = Object.prototype.hasOwnProperty.call(original, 'priority');
   const patch: AuthFileFieldsPatch = {};
 
   const originalPrefix = normalizeTextField(original.prefix);
@@ -221,12 +222,12 @@ const buildAuthFileFieldsPatch = (
   const priorityText = editor.priority.trim();
   const nextPriority = parsePriorityValue(priorityText);
   if (!priorityText) {
-    if (originalPriority !== undefined && originalPriority !== 0) {
+    if (hasOriginalPriority || (originalPriority !== undefined && originalPriority !== 0)) {
       patch.priority = 0;
     }
   } else if (nextPriority !== undefined) {
     if (nextPriority === 0) {
-      if (originalPriority !== undefined && originalPriority !== 0) {
+      if (hasOriginalPriority || (originalPriority !== undefined && originalPriority !== 0)) {
         patch.priority = 0;
       }
     } else if (nextPriority !== originalPriority) {
@@ -414,7 +415,7 @@ export function useAuthFilesPrefixProxyEditor(
           json,
           prefix,
           proxyUrl,
-          priority: priority !== undefined ? String(priority) : '',
+          priority: priority !== undefined && priority !== 0 ? String(priority) : '',
           note,
           noteTouched: false,
           headersText,

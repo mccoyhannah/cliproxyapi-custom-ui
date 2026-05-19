@@ -39,6 +39,28 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
+  const files = [
+    codexFile('active-a.json', 0),
+    codexFile('active-b.json', 0),
+    codexFile('standby-c.json', 0),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(80),
+      'active-b.json': quota(25),
+      'standby-c.json': quota(20),
+    },
+    50,
+    1
+  );
+  assert.equal(result.status, 'ready');
+  assert.ok(result.changes.some((change) => change.toPriority === -1));
+  assert.ok(result.changes.some((change) => change.reason === 'low_remaining'));
+  assert.ok(result.changes.some((change) => change.reason === 'over_active_limit'));
+}
+
+{
   const files = [codexFile('a.json', 10), codexFile('b.json', 10), codexFile('c.json', 5)];
   const result = analyzeCodexPriorityRotation(
     files,

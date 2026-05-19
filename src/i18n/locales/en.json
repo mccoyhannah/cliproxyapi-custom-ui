@@ -737,7 +737,7 @@
     "proxy_url_placeholder": "socks5://username:password@proxy_ip:port/",
     "priority_label": "Priority (priority)",
     "priority_placeholder": "e.g. 10 or -1",
-    "priority_hint": "Integers only. Invalid values are ignored. Larger value means higher priority.",
+    "priority_hint": "Integers only. Invalid values are ignored. Larger value means higher priority. Leave empty or enter 0 for the default; saving omits the priority field.",
     "excluded_models_label": "Excluded models (excluded_models)",
     "excluded_models_placeholder": "Comma or newline separated, e.g. model-a, gpt-5-*, *-preview",
     "excluded_models_hint": "Saved as an array and normalized by trim/lowercase/dedup/sort.",

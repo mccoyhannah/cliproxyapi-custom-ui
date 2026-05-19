@@ -183,7 +183,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
-  const currentPriorityText = priorityValue === undefined ? '' : String(priorityValue);
+  const currentPriorityText =
+    priorityValue === undefined || priorityValue === 0 ? '' : String(priorityValue);
   const [priorityDraft, setPriorityDraft] = useState({
     fileName: file.name,
     value: currentPriorityText,

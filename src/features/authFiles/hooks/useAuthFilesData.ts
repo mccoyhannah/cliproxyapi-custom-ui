@@ -790,7 +790,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     async (item: AuthFileItem, priority: number) => {
       const name = item.name;
       const previousPriority = parsePriorityValue(item.priority ?? item['priority']);
-      if (previousPriority === priority) return;
+      if ((previousPriority ?? 0) === (priority ?? 0)) return;
 
       setPriorityUpdating((prev) => ({ ...prev, [name]: true }));
       setFiles((prev) => prev.map((file) => (file.name === name ? { ...file, priority } : file)));
@@ -954,18 +954,18 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       if (batchPriorityPendingRef.current) return;
 
       const uniqueNamesSet = new Set(names);
-      const uniqueNames = Array.from(uniqueNamesSet);
-      if (uniqueNames.length === 0) return;
-      if (uniqueNames.some((name) => priorityUpdating[name] === true)) return;
-
       const originalPriorities = new Map(
         files
           .filter((file) => uniqueNamesSet.has(file.name))
           .map((file) => [file.name, file.priority ?? file['priority']])
       );
-      const targetNames = new Set(originalPriorities.keys());
-      const targetNameList = Array.from(targetNames);
+      const targetNameList = Array.from(originalPriorities.entries())
+        .filter(([, rawPriority]) => (parsePriorityValue(rawPriority) ?? 0) !== priority)
+        .map(([name]) => name);
       if (targetNameList.length === 0) return;
+      if (targetNameList.some((name) => priorityUpdating[name] === true)) return;
+
+      const targetNames = new Set(targetNameList);
 
       batchPriorityPendingRef.current = true;
       setBatchPriorityUpdating(true);
@@ -1054,9 +1054,6 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
 
       const targetNameList = Array.from(changeMap.keys());
       if (targetNameList.length === 0) return { successCount: 0, failCount: 0 };
-      if (targetNameList.some((name) => priorityUpdating[name] === true)) {
-        return { successCount: 0, failCount: targetNameList.length };
-      }
 
       const targetNames = new Set(targetNameList);
       const originalPriorities = new Map(
@@ -1064,8 +1061,17 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
           .filter((file) => targetNames.has(file.name))
           .map((file) => [file.name, file.priority ?? file['priority']])
       );
-      const existingTargetNameList = targetNameList.filter((name) => originalPriorities.has(name));
+      const existingTargetNameList = targetNameList.filter((name) => {
+        if (!originalPriorities.has(name)) return false;
+        const currentPriority = parsePriorityValue(originalPriorities.get(name));
+        const nextPriority = changeMap.get(name) ?? 0;
+        return (currentPriority ?? 0) !== nextPriority;
+      });
       if (existingTargetNameList.length === 0) return { successCount: 0, failCount: 0 };
+      if (existingTargetNameList.some((name) => priorityUpdating[name] === true)) {
+        return { successCount: 0, failCount: existingTargetNameList.length };
+      }
+      const existingTargetNames = new Set(existingTargetNameList);
 
       batchPriorityPendingRef.current = true;
       setBatchPriorityUpdating(true);
@@ -1078,7 +1084,9 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       });
       setFiles((prev) =>
         prev.map((file) =>
-          changeMap.has(file.name) ? { ...file, priority: changeMap.get(file.name) } : file
+          existingTargetNames.has(file.name)
+            ? { ...file, priority: changeMap.get(file.name) }
+            : file
         )
       );
 
