@@ -715,7 +715,7 @@
     "priority_rotation_reason_demote_low": "低于健康线，降到备用层",
     "priority_rotation_reason_demote_over_limit": "超过 {{limit}} 个主力席位，降到备用层",
     "priority_rotation_reason_promote": "备用层健康，接力为主力",
-    "priority_rotation_hint": "确认后只会写入 priority 字段；缓冲层仅用于新号观察，不会被提升。不会修改认证 JSON、有效期、note 或 config.yaml。",
+    "priority_rotation_hint": "前端检测到可调节时会自动写入 priority；这里仅用于查看本次判断。不会修改认证 JSON、有效期、note 或 config.yaml。",
     "priority_rotation_sidecar_title": "接力控制",
     "priority_rotation_sidecar_loading": "读取中",
     "priority_rotation_sidecar_offline": "未连接",

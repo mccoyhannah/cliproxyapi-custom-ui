@@ -701,7 +701,7 @@
     "priority_rotation_reason_demote_low": "Ниже линии здоровья, перевести в резерв",
     "priority_rotation_reason_demote_over_limit": "Сверх {{limit}} активных мест, перевести в резерв",
     "priority_rotation_reason_promote": "Здоровый резерв становится активным",
-    "priority_rotation_hint": "Применение записывает только поле priority. Буферный уровень нужен только для наблюдения за новыми аккаунтами и не повышается. JSON авторизации, срок действия, note и config.yaml не меняются.",
+    "priority_rotation_hint": "Когда фронтенд видит нужные изменения, он автоматически записывает priority. Этот экран только показывает текущее решение. JSON авторизации, срок действия, note и config.yaml не меняются.",
     "priority_rotation_sidecar_title": "Управление передачей",
     "priority_rotation_sidecar_loading": "Проверка фона",
     "priority_rotation_sidecar_offline": "Фон недоступен",

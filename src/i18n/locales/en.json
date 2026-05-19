@@ -715,7 +715,7 @@
     "priority_rotation_reason_demote_low": "Below health line, move to standby",
     "priority_rotation_reason_demote_over_limit": "Over {{limit}} active slots, move to standby",
     "priority_rotation_reason_promote": "Healthy standby takes over",
-    "priority_rotation_hint": "Applying only writes the priority field. The buffer tier is observation-only for new accounts and is never promoted. Auth JSON, expiry, note, and config.yaml are not modified.",
+    "priority_rotation_hint": "When the frontend detects adjustable priority changes, it writes priority automatically. This preview only shows the current decision. Auth JSON, expiry, note, and config.yaml are not modified.",
     "priority_rotation_sidecar_title": "Relay control",
     "priority_rotation_sidecar_loading": "Loading",
     "priority_rotation_sidecar_offline": "Offline",
