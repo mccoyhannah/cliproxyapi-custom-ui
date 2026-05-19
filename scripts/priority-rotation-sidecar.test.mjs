@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { analyzeCodexPriorityRotation } from './priority-rotation-sidecar.mjs';
+import {
+  analyzeCodexPriorityRotation,
+  validateManagementKey,
+} from './priority-rotation-sidecar.mjs';
 
 const codexFile = (name, priority, planType = 'team') => ({
   name,
@@ -84,6 +87,45 @@ const quota = (usedPercent, planType = 'team') => ({
     5
   );
   assert.equal(result.managedCount, 1);
+}
+
+{
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  let releaseFirstRequest;
+  const firstRequestStarted = new Promise((resolve) => {
+    releaseFirstRequest = () => resolve();
+  });
+  let allowFirstRequest;
+  const firstRequestCanFinish = new Promise((resolve) => {
+    allowFirstRequest = resolve;
+  });
+  globalThis.fetch = async (url, options = {}) => {
+    const authorization = String(options.headers?.Authorization ?? '');
+    requests.push(`${authorization}:${String(url)}`);
+    if (authorization === 'Bearer key-a') {
+      releaseFirstRequest();
+      await firstRequestCanFinish;
+    }
+    return new Response('{}', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+  try {
+    const first = validateManagementKey('key-a', 'http://127.0.0.1:9999');
+    await firstRequestStarted;
+    await validateManagementKey('key-b');
+    allowFirstRequest();
+    await first;
+  } finally {
+    allowFirstRequest?.();
+    globalThis.fetch = originalFetch;
+  }
+  assert.deepEqual(requests, [
+    'Bearer key-a:http://127.0.0.1:9999/v0/management/config',
+    'Bearer key-b:http://127.0.0.1:8317/v0/management/config',
+  ]);
 }
 
 console.log('priority-rotation-sidecar tests passed');

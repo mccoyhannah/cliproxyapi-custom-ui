@@ -103,11 +103,7 @@ export const priorityRotationSidecarApi = {
       }
     ),
 
-  saveSecret: (
-    managementKey: string,
-    apiBase: string,
-    settings: Partial<PriorityRotationSidecarSettings>
-  ) =>
+  saveSecret: (managementKey: string, apiBase: string) =>
     requestSidecar<{
       saved: boolean;
       settings: PriorityRotationSidecarSettings;
@@ -115,7 +111,7 @@ export const priorityRotationSidecarApi = {
     }>('/secret', {
       method: 'POST',
       managementKey,
-      body: JSON.stringify({ managementKey, apiBase, settings }),
+      body: JSON.stringify({ managementKey, apiBase }),
     }),
 
   runNow: (managementKey: string) =>

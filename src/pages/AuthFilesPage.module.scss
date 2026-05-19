@@ -588,9 +588,8 @@
   --priority-rotation-sheen: #fff;
   display: grid;
   grid-template-columns:
-    minmax(240px, 0.88fr)
-    minmax(324px, 1fr)
-    minmax(326px, 0.86fr);
+    minmax(240px, 0.94fr)
+    minmax(324px, 1fr);
   gap: 12px;
   align-items: stretch;
   width: 100%;
@@ -638,10 +637,10 @@
 }
 
 .priorityRotationBackgroundPanel {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.72fr) minmax(260px, 1fr) minmax(420px, 1.28fr);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
+  align-items: stretch;
   min-width: 0;
   padding: 10px 12px;
   margin-top: -4px;
@@ -658,11 +657,6 @@
   box-shadow:
     0 12px 28px -28px color-mix(in srgb, var(--text-primary) 32%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 11%, transparent);
-
-  @media (max-width: 1320px) {
-    grid-template-columns: 1fr;
-    align-items: stretch;
-  }
 }
 
 .priorityRotationBackgroundHeader {
@@ -716,14 +710,27 @@
 
 .priorityRotationBackgroundControls {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 10px;
   min-width: 0;
-  flex-wrap: wrap;
+  width: 100%;
 
   :global(.btn) {
     min-width: 0;
+  }
+}
+
+.priorityRotationBackgroundRules {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.82fr) minmax(220px, 0.9fr);
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+
+  @include tablet {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -739,7 +746,7 @@
 }
 
 .priorityRotationBackgroundButtons {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;

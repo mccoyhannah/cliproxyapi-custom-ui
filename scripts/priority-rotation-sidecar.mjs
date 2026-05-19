@@ -385,13 +385,14 @@ function extractErrorMessage(value) {
 }
 
 async function managementJson(endpoint, key, options = {}) {
+  const targetApiBase = options.apiBase ?? settings.apiBase;
   const headers = {
     Accept: 'application/json',
     Authorization: `Bearer ${key}`,
     ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers ?? {}),
   };
-  return fetchJson(managementUrl(settings.apiBase, endpoint), {
+  return fetchJson(managementUrl(targetApiBase, endpoint), {
     method: options.method ?? 'GET',
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -399,15 +400,12 @@ async function managementJson(endpoint, key, options = {}) {
   });
 }
 
-async function validateManagementKey(key, apiBase = settings.apiBase) {
-  const previousBase = settings.apiBase;
-  settings = { ...settings, apiBase: normalizeApiBase(apiBase) };
-  try {
-    await managementJson('/config', key, { timeoutMs: 20_000 });
-    return true;
-  } finally {
-    settings = { ...settings, apiBase: previousBase };
-  }
+export async function validateManagementKey(key, apiBase = settings.apiBase) {
+  await managementJson('/config', key, {
+    apiBase,
+    timeoutMs: 20_000,
+  });
+  return true;
 }
 
 async function validateControlKey(req, body = {}) {
@@ -1128,7 +1126,6 @@ async function handleRequest(req, res) {
     if (!key) throw new HttpError(400, 'Management key is empty');
     const apiBase = normalizeApiBase(body.apiBase ?? settings.apiBase);
     await validateManagementKey(key, apiBase);
-    await persistSettings({ ...(body.settings ?? {}), apiBase });
     await saveSecret(key);
     sendJson(req, res, 200, {
       saved: true,
