@@ -523,14 +523,13 @@ const fetchCodexQuota = async (
   const planTypeFromFile = resolveCodexPlanType(file);
   const subscriptionSnapshotPromise = resolveCodexSubscriptionSnapshot(file);
   const accountId = resolveCodexChatgptAccountId(file);
-  if (!accountId) {
-    throw new Error(t('codex_quota.missing_account_id'));
-  }
 
   const requestHeader: Record<string, string> = {
     ...CODEX_REQUEST_HEADERS,
-    'Chatgpt-Account-Id': accountId,
   };
+  if (accountId) {
+    requestHeader['Chatgpt-Account-Id'] = accountId;
+  }
 
   const result = await apiCallApi.request({
     authIndex,
