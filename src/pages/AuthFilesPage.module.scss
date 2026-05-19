@@ -1508,27 +1508,47 @@
   }
 }
 
-.priorityRotationButton {
+.priorityRotationButtonGroup {
   grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
   justify-self: end;
+  min-width: 0;
+  max-width: 100%;
+
+  @include mobile {
+    width: 100%;
+    justify-self: stretch;
+
+    :global(.btn) {
+      flex: 1 1 0;
+    }
+  }
+}
+
+.priorityRotationButton {
   width: fit-content;
   min-width: 0;
   min-height: 36px;
   padding-inline: 14px;
   white-space: nowrap;
 
+  @include mobile {
+    min-width: 0;
+    width: auto;
+  }
+}
+
+.priorityRotationDirectButton {
   &:global(.btn) {
     border-color: color-mix(in srgb, var(--primary-color) 58%, var(--border-color));
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--primary-color) 10%, transparent),
       0 8px 18px color-mix(in srgb, var(--primary-color) 14%, transparent),
       var(--ops-control-shadow);
-  }
-
-  @include mobile {
-    min-width: 0;
-    width: 100%;
-    justify-self: stretch;
   }
 }
 

@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   activeSlotLimit: 5,
   checkIntervalMinutes: 5,
 };
+const ALL_ACTIVE_BELOW_THRESHOLD_RELAX_PERCENT = 20;
 const MAX_BODY_BYTES = 1024 * 1024;
 const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8317',
@@ -668,17 +669,11 @@ export function analyzeCodexPriorityRotation(
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
   );
-  const activeAndStandbyCandidates = [...activeCandidates, ...standbyCandidates];
-  const highestActiveOrStandbyRemaining = activeAndStandbyCandidates.reduce(
-    (highest, candidate) => Math.max(highest, candidate.remainingPercent),
-    0
-  );
   const shouldRelaxThreshold =
     activeCandidates.length > 0 &&
-    standbyCandidates.length > 0 &&
-    highestActiveOrStandbyRemaining < threshold;
+    activeCandidates.every((candidate) => candidate.remainingPercent < threshold);
   const effectiveThreshold = shouldRelaxThreshold
-    ? clampInteger(Math.floor(highestActiveOrStandbyRemaining), threshold, 0, 100)
+    ? clampInteger(threshold - ALL_ACTIVE_BELOW_THRESHOLD_RELAX_PERCENT, threshold, 0, 100)
     : threshold;
   const thresholdAdjusted = effectiveThreshold < threshold;
   const healthyActiveCandidates = activeCandidates.filter(

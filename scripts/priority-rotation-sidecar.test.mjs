@@ -31,10 +31,7 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.equal(result.status, 'ready');
   assert.deepEqual(
     result.changes.map((change) => [change.name, change.role, change.toPriority]),
-    [
-      ['active-low.json', 'demote', 5],
-      ['standby-good.json', 'promote', 10],
-    ]
+    [['standby-good.json', 'promote', 10]]
   );
 }
 
@@ -77,11 +74,11 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('active-low.json', 10), codexFile('standby-low.json', 5)];
+  const files = [codexFile('active-soft-low.json', 10), codexFile('standby-low.json', 5)];
   const result = analyzeCodexPriorityRotation(
     files,
     {
-      'active-low.json': quota(80),
+      'active-soft-low.json': quota(65),
       'standby-low.json': quota(85),
     },
     50,
@@ -89,6 +86,7 @@ const quota = (usedPercent, planType = 'team') => ({
   );
   assert.equal(result.status, 'no_standby');
   assert.equal(result.thresholdAdjusted, true);
+  assert.equal(result.effectiveThresholdPercent, 30);
 }
 
 {
