@@ -649,10 +649,10 @@
 .priorityRotationBackgroundPanel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   align-items: stretch;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 10px 12px;
   margin-top: -2px;
   margin-bottom: 10px;
   border-radius: 8px;
@@ -670,10 +670,16 @@
 }
 
 .priorityRotationBackgroundHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
+
+  @include mobile {
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+  }
 }
 
 .priorityRotationBackgroundIcon {
@@ -692,7 +698,15 @@
 .priorityRotationBackgroundCopy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.priorityRotationBackgroundTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -703,38 +717,44 @@
   line-height: 1.25;
 }
 
-.priorityRotationBackgroundMeta {
-  color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.priorityRotationBackgroundStatusGroup {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-
 .priorityRotationBackgroundMetaLine {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   min-width: 0;
+}
+
+.priorityRotationBackgroundMetaItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 62%, transparent);
   color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 650;
-  line-height: 1.3;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-  span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.priorityRotationBackgroundMetaSuccess {
+  border-color: color-mix(in srgb, var(--success-color) 17%, transparent);
+  background: color-mix(in srgb, var(--success-color) 7%, transparent);
+  color: color-mix(in srgb, var(--success-color) 76%, var(--text-primary));
+}
+
+.priorityRotationBackgroundMetaWarning {
+  border-color: color-mix(in srgb, var(--warning-color) 18%, transparent);
+  background: color-mix(in srgb, var(--warning-color) 7%, transparent);
+  color: color-mix(in srgb, var(--warning-color) 82%, var(--text-primary));
 }
 
 .priorityRotationBackgroundControls {
@@ -742,7 +762,7 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
   width: 100%;
 
@@ -751,46 +771,49 @@
   }
 }
 
-.priorityRotationRelayToggle {
+.priorityRotationRelayControl {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
+  justify-content: flex-end;
+  gap: 9px;
   min-width: 0;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
-  border-radius: 8px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--surface-control) 78%, var(--bg-primary));
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--text-primary);
+  text-align: left;
+
+  @include mobile {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+.priorityRotationRelaySwitch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  min-width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
   appearance: none;
-  text-align: left;
-  transition:
-    border-color $transition-fast,
-    background-color $transition-fast,
-    box-shadow $transition-fast,
-    transform $transition-fast;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-1px);
-    border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
-    box-shadow: 0 10px 22px -20px color-mix(in srgb, var(--primary-color) 46%, transparent);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
 
   &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 16%, transparent);
+
+    .priorityRotationRelayTrack {
+      box-shadow:
+        inset 0 1px 2px color-mix(in srgb, #000 16%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+    }
   }
 
   &:disabled {
@@ -799,28 +822,19 @@
   }
 }
 
-.priorityRotationRelayToggleOn {
-  border-color: color-mix(in srgb, var(--success-color) 28%, var(--border-color));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--success-color) 8%, var(--surface-control));
-}
-
 .priorityRotationRelayTrack {
   position: relative;
-  flex: 0 0 42px;
-  width: 42px;
-  height: 24px;
+  display: block;
+  width: 46px;
+  height: 26px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-tertiary) 20%, var(--surface-control));
   box-shadow: inset 0 1px 2px color-mix(in srgb, #000 16%, transparent);
-  transition: background-color $transition-fast;
+  transition:
+    background-color $transition-fast,
+    box-shadow $transition-fast;
 
-  .priorityRotationRelayToggleOn & {
+  .priorityRotationRelaySwitchOn & {
     background: color-mix(in srgb, var(--primary-color) 88%, var(--success-color));
   }
 }
@@ -829,15 +843,15 @@
   position: absolute;
   top: 4px;
   left: 4px;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 4px 10px -5px color-mix(in srgb, #000 80%, transparent);
   transition: transform $transition-fast;
 
-  .priorityRotationRelayToggleOn & {
-    transform: translateX(18px);
+  .priorityRotationRelaySwitchOn & {
+    transform: translateX(20px);
   }
 }
 
@@ -873,7 +887,7 @@
 .priorityRotationBackgroundRules {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(162px, 0.7fr) minmax(182px, 0.78fr);
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
   width: 100%;
 

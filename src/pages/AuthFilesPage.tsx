@@ -1849,6 +1849,9 @@ export function AuthFilesPage() {
   const priorityRotationSidecarSecretLabel = priorityRotationSidecarHasSecret
     ? t('auth_files.priority_rotation_sidecar_secret_ready')
     : t('auth_files.priority_rotation_sidecar_secret_missing');
+  const priorityRotationSidecarSecretToneClass = priorityRotationSidecarHasSecret
+    ? styles.priorityRotationBackgroundMetaSuccess
+    : styles.priorityRotationBackgroundMetaWarning;
   const priorityRotationSidecarLastRunLabel = t('auth_files.priority_rotation_sidecar_last_run', {
     time: formatNullableDateTime(priorityRotationSidecarState?.lastCompletedAt),
   });
@@ -2071,49 +2074,38 @@ export function AuthFilesPage() {
                   <IconRefreshCw size={16} />
                 </span>
                 <span className={styles.priorityRotationBackgroundCopy}>
-                  <span className={styles.priorityRotationBackgroundTitle}>
-                    {t('auth_files.priority_rotation_sidecar_title')}
+                  <span className={styles.priorityRotationBackgroundTitleRow}>
+                    <span className={styles.priorityRotationBackgroundTitle}>
+                      {t('auth_files.priority_rotation_sidecar_title')}
+                    </span>
+                    <span
+                      className={`${styles.priorityRotationStatus} ${priorityRotationSidecarStatusTone}`}
+                    >
+                      {priorityRotationSidecarLiveStatusLabel}
+                    </span>
+                    {priorityRotationDraftStatusLabel && (
+                      <span
+                        className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
+                      >
+                        {priorityRotationDraftStatusLabel}
+                      </span>
+                    )}
                   </span>
-                  <span className={styles.priorityRotationBackgroundMeta}>
-                    {priorityRotationSidecarLastRunLabel}
+                  <span className={styles.priorityRotationBackgroundMetaLine}>
+                    <span
+                      className={`${styles.priorityRotationBackgroundMetaItem} ${priorityRotationSidecarSecretToneClass}`}
+                    >
+                      {priorityRotationSidecarSecretLabel}
+                    </span>
+                    <span className={styles.priorityRotationBackgroundMetaItem}>
+                      {priorityRotationSidecarLastRunLabel}
+                    </span>
+                    <span className={styles.priorityRotationBackgroundMetaItem}>
+                      {priorityRotationSidecarNextRunLabel}
+                    </span>
                   </span>
                 </span>
-              </div>
-              <div className={styles.priorityRotationBackgroundStatusGroup}>
-                <span
-                  className={`${styles.priorityRotationStatus} ${priorityRotationSidecarStatusTone}`}
-                >
-                  {priorityRotationSidecarLiveStatusLabel}
-                </span>
-                {priorityRotationDraftStatusLabel && (
-                  <span
-                    className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
-                  >
-                    {priorityRotationDraftStatusLabel}
-                  </span>
-                )}
-              </div>
-              <div className={styles.priorityRotationBackgroundMetaLine}>
-                <span>{priorityRotationSidecarSecretLabel}</span>
-                <span>{priorityRotationSidecarNextRunLabel}</span>
-              </div>
-              <div className={styles.priorityRotationBackgroundControls}>
-                <button
-                  type="button"
-                  className={`${styles.priorityRotationRelayToggle} ${
-                    priorityRotationSidecarEnabled ? styles.priorityRotationRelayToggleOn : ''
-                  }`}
-                  role="switch"
-                  aria-checked={priorityRotationSidecarEnabled}
-                  aria-label={t('auth_files.priority_rotation_sidecar_enable')}
-                  disabled={priorityRotationSidecarSaving}
-                  onClick={() => {
-                    updatePriorityRotationSettings({ enabled: !priorityRotationSidecarEnabled });
-                  }}
-                >
-                  <span className={styles.priorityRotationRelayTrack} aria-hidden="true">
-                    <span className={styles.priorityRotationRelayThumb} />
-                  </span>
+                <div className={styles.priorityRotationRelayControl}>
                   <span className={styles.priorityRotationRelayCopy}>
                     <strong>{t('auth_files.priority_rotation_sidecar_enable')}</strong>
                     <span>
@@ -2122,7 +2114,26 @@ export function AuthFilesPage() {
                         : t('auth_files.priority_rotation_auto_status_off')}
                     </span>
                   </span>
-                </button>
+                  <button
+                    type="button"
+                    className={`${styles.priorityRotationRelaySwitch} ${
+                      priorityRotationSidecarEnabled ? styles.priorityRotationRelaySwitchOn : ''
+                    }`}
+                    role="switch"
+                    aria-checked={priorityRotationSidecarEnabled}
+                    aria-label={t('auth_files.priority_rotation_sidecar_enable')}
+                    disabled={priorityRotationSidecarSaving}
+                    onClick={() => {
+                      updatePriorityRotationSettings({ enabled: !priorityRotationSidecarEnabled });
+                    }}
+                  >
+                    <span className={styles.priorityRotationRelayTrack} aria-hidden="true">
+                      <span className={styles.priorityRotationRelayThumb} />
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <div className={styles.priorityRotationBackgroundControls}>
                 <div className={styles.priorityRotationBackgroundRules}>
                   <label className={styles.priorityRotationSetting}>
                     <span className={styles.priorityRotationSettingHeader}>
