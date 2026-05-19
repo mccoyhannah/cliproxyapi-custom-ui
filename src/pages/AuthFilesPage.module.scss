@@ -698,8 +698,8 @@
 
 .priorityRotationBackgroundTitle {
   color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 780;
+  font-size: 15px;
+  font-weight: 820;
   line-height: 1.25;
 }
 
@@ -732,6 +732,125 @@
   }
 }
 
+.priorityRotationRelayToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent),
+      transparent
+    ),
+    color-mix(in srgb, var(--surface-control) 78%, var(--bg-primary));
+  color: var(--text-primary);
+  cursor: pointer;
+  appearance: none;
+  text-align: left;
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    box-shadow $transition-fast,
+    transform $transition-fast;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
+    box-shadow: 0 10px 22px -20px color-mix(in srgb, var(--primary-color) 46%, transparent);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 16%, transparent);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.72;
+  }
+}
+
+.priorityRotationRelayToggleOn {
+  border-color: color-mix(in srgb, var(--success-color) 28%, var(--border-color));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent),
+      transparent
+    ),
+    color-mix(in srgb, var(--success-color) 8%, var(--surface-control));
+}
+
+.priorityRotationRelayTrack {
+  position: relative;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-tertiary) 20%, var(--surface-control));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 16%, transparent);
+  transition: background-color $transition-fast;
+
+  .priorityRotationRelayToggleOn & {
+    background: color-mix(in srgb, var(--primary-color) 88%, var(--success-color));
+  }
+}
+
+.priorityRotationRelayThumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 4px 10px -5px color-mix(in srgb, #000 80%, transparent);
+  transition: transform $transition-fast;
+
+  .priorityRotationRelayToggleOn & {
+    transform: translateX(18px);
+  }
+}
+
+.priorityRotationRelayCopy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+
+  strong {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 840;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  span {
+    color: color-mix(in srgb, var(--primary-color) 72%, var(--text-secondary));
+    font-size: 12px;
+    font-weight: 760;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  @include mobile {
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
+}
+
 .priorityRotationBackgroundRules {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(162px, 0.7fr) minmax(182px, 0.78fr);
@@ -741,6 +860,16 @@
 
   @include tablet {
     grid-template-columns: 1fr;
+  }
+
+  @include mobile {
+    display: flex;
+    flex-direction: column;
+
+    > * {
+      width: 100%;
+      box-sizing: border-box;
+    }
   }
 }
 
@@ -753,6 +882,22 @@
   font-size: 11px;
   font-weight: 760;
   white-space: nowrap;
+
+  @include mobile {
+    justify-content: space-between;
+    min-height: 50px;
+    padding: 9px 10px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+    border-radius: 8px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent),
+        transparent
+      ),
+      color-mix(in srgb, var(--surface-control) 76%, var(--bg-primary));
+    white-space: normal;
+  }
 }
 
 .priorityRotationBackgroundButtons {
@@ -979,6 +1124,11 @@
   font-weight: 800;
   letter-spacing: 0;
   text-transform: none;
+
+  @include mobile {
+    justify-content: flex-start;
+    min-height: 58px;
+  }
 }
 
 .priorityRotationSettingHeader {
@@ -989,6 +1139,10 @@
   min-width: 0;
   line-height: 1;
   white-space: nowrap;
+
+  @include mobile {
+    width: 100%;
+  }
 }
 
 .priorityRotationStepper {
@@ -1008,6 +1162,12 @@
 .priorityRotationSlotStepper {
   width: max-content;
   min-width: 116px;
+
+  @include mobile {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+  }
 }
 
 .priorityRotationStepperButton {
@@ -1310,93 +1470,6 @@
     border-radius: 50%;
     background: currentColor;
     opacity: 0.44;
-  }
-}
-
-.priorityRotationAutoToggle {
-  width: 100%;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
-  border-radius: 8px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 9%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--surface-control) 80%, var(--bg-primary));
-  color: var(--text-secondary);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
-
-  :global(label) {
-    gap: 6px;
-    min-width: 0;
-  }
-
-  :global(.track) {
-    flex-basis: 36px;
-    width: 36px;
-    height: 20px;
-  }
-
-  :global(.thumb) {
-    width: 14px;
-    height: 14px;
-  }
-
-  :global(input:checked + .track .thumb) {
-    transform: translateX(16px);
-  }
-
-  @include mobile {
-    width: 100%;
-    min-width: 0;
-    flex: 0 1 auto;
-  }
-}
-
-.priorityRotationAutoToggleOn {
-  border-color: color-mix(in srgb, var(--success-color) 22%, var(--border-color));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--success-color) 8%, var(--surface-control));
-  color: color-mix(in srgb, var(--success-color) 76%, var(--text-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
-}
-
-.priorityRotationAutoLabel {
-  display: inline-flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  line-height: 1;
-
-  span:first-child {
-    color: var(--text-primary);
-    font-size: 11px;
-    font-weight: 820;
-    white-space: nowrap;
-
-    &::after {
-      content: ':';
-    }
-  }
-
-  span:last-child {
-    color: currentColor;
-    font-size: 11px;
-    font-weight: 760;
-    white-space: nowrap;
   }
 }
 
