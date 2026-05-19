@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import {
   analyzeCodexPriorityRotation,
+  getLatestModelRequestAtMs,
+  isModelRequestLogName,
+  parseModelRequestLogTimeMs,
+  shouldStopForIdle,
   validateManagementKey,
 } from './priority-rotation-sidecar.mjs';
 
@@ -16,6 +20,48 @@ const quota = (usedPercent, planType = 'team') => ({
   planType,
   windows: [{ id: 'five-hour', usedPercent }],
 });
+
+{
+  assert.equal(isModelRequestLogName('v1-responses-2026-05-20T051955-57644c1f.log'), true);
+  assert.equal(isModelRequestLogName('main.log'), false);
+  assert.equal(
+    getLatestModelRequestAtMs([
+      'main.log',
+      'v1-responses-2026-05-20T051955-57644c1f.log',
+      'v1-chat-completions-2026-05-20T052001-11111111.log',
+    ]),
+    parseModelRequestLogTimeMs('v1-chat-completions-2026-05-20T052001-11111111.log')
+  );
+}
+
+{
+  const lastActivityAtMs = 1_000_000;
+  assert.equal(
+    shouldStopForIdle({
+      nowMs: lastActivityAtMs + 9 * 60_000 + 59_999,
+      lastActivityAtMs,
+      idleMinutes: 10,
+    }),
+    false
+  );
+  assert.equal(
+    shouldStopForIdle({
+      nowMs: lastActivityAtMs + 10 * 60_000,
+      lastActivityAtMs,
+      idleMinutes: 10,
+    }),
+    true
+  );
+  assert.equal(
+    shouldStopForIdle({
+      nowMs: lastActivityAtMs + 30 * 60_000,
+      lastActivityAtMs,
+      idleMinutes: 10,
+      running: true,
+    }),
+    false
+  );
+}
 
 {
   const files = [codexFile('active-low.json', 10), codexFile('standby-good.json', 5)];

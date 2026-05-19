@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -11,6 +11,7 @@ const MANAGEMENT_PREFIX = '/v0/management';
 const CODEX_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage';
 const FIVE_HOUR_SECONDS = 18_000;
 const WEEK_SECONDS = 604_800;
+const DEFAULT_IDLE_SHUTDOWN_MINUTES = 10;
 const DEFAULT_SETTINGS = {
   enabled: false,
   apiBase: 'http://127.0.0.1:8317',
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS = {
   checkIntervalMinutes: 5,
 };
 const MAX_BODY_BYTES = 1024 * 1024;
+const MODEL_ACTIVITY_SCAN_MIN_MS = 30_000;
 const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8317',
   'http://localhost:8317',
@@ -31,13 +33,20 @@ const MAX_ROTATION_PASSES = 8;
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
   console.log(
-    'Usage: node scripts/priority-rotation-sidecar.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--port 8318]'
+    'Usage: node scripts/priority-rotation-sidecar.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--port 8318] [--idle-shutdown-minutes 10]'
   );
   process.exit(0);
 }
 const installDir = args['install-dir'] ?? DEFAULT_INSTALL_DIR;
 const host = args.host ?? DEFAULT_HOST;
 const port = normalizePort(args.port ?? DEFAULT_PORT);
+const idleShutdownMinutes = clampInteger(
+  args['idle-shutdown-minutes'] ?? DEFAULT_IDLE_SHUTDOWN_MINUTES,
+  DEFAULT_IDLE_SHUTDOWN_MINUTES,
+  1,
+  180
+);
+const idleShutdownMs = idleShutdownMinutes * 60_000;
 const dataDir = args['data-dir'] ?? path.join(installDir, 'priority-rotation');
 const customUiDir = args['custom-ui-dir'] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const settingsPath = path.join(dataDir, 'settings.json');
@@ -67,6 +76,11 @@ let state = {
 };
 let runInFlight = null;
 let loopTimer = null;
+let idleShutdownTimer = null;
+let serverRef = null;
+let shuttingDown = false;
+let lastModelRequestAt = Date.now();
+let lastModelActivityScanAt = 0;
 
 function parseArgs(rawArgs) {
   const parsed = {};
@@ -95,6 +109,58 @@ function clampInteger(value, fallback, min, max) {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(min, Math.min(max, Math.round(numeric)));
+}
+
+export function shouldStopForIdle({
+  nowMs = Date.now(),
+  lastActivityAtMs,
+  idleMinutes = DEFAULT_IDLE_SHUTDOWN_MINUTES,
+  running = false,
+} = {}) {
+  const normalizedIdleMinutes = clampInteger(
+    idleMinutes,
+    DEFAULT_IDLE_SHUTDOWN_MINUTES,
+    1,
+    180
+  );
+  const activityAt = Number(lastActivityAtMs);
+  if (running || !Number.isFinite(activityAt)) return false;
+  return nowMs - activityAt >= normalizedIdleMinutes * 60_000;
+}
+
+export function parseModelRequestLogTimeMs(fileName) {
+  const match =
+    /^v1-(?:responses|chat-completions|completions)-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-/i.exec(
+      String(fileName ?? '')
+    );
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  const value = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  ).getTime();
+  return Number.isFinite(value) ? value : null;
+}
+
+export function isModelRequestLogName(fileName) {
+  return parseModelRequestLogTimeMs(fileName) !== null;
+}
+
+export function getLatestModelRequestAtMs(entries, fallback = null) {
+  let latest = Number.isFinite(Number(fallback)) ? Number(fallback) : null;
+  for (const entry of entries ?? []) {
+    const name = typeof entry === 'string' ? entry : entry?.name;
+    const parsedTime = parseModelRequestLogTimeMs(name);
+    const mtimeMs = typeof entry === 'object' ? Number(entry?.mtimeMs) : NaN;
+    const candidate = parsedTime ?? (Number.isFinite(mtimeMs) ? mtimeMs : null);
+    if (candidate === null) continue;
+    latest = latest === null ? candidate : Math.max(latest, candidate);
+  }
+  return latest;
 }
 
 function normalizeSettings(input) {
@@ -195,6 +261,101 @@ async function updateState(patch) {
     updatedAt: new Date().toISOString(),
   };
   await writeJsonAtomic(statePath, state);
+}
+
+function getIdleShutdownAtIso() {
+  return new Date(lastModelRequestAt + idleShutdownMs).toISOString();
+}
+
+function scheduleIdleShutdown() {
+  if (idleShutdownTimer) clearTimeout(idleShutdownTimer);
+  const delayMs = Math.max(1_000, lastModelRequestAt + idleShutdownMs - Date.now());
+  idleShutdownTimer = setTimeout(() => {
+    shutdownForIdle().catch(async (error) => {
+      await logLine('error', 'idle shutdown failed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, delayMs);
+  idleShutdownTimer.unref?.();
+}
+
+async function refreshModelRequestActivity({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - lastModelActivityScanAt < MODEL_ACTIVITY_SCAN_MIN_MS) {
+    return lastModelRequestAt;
+  }
+  lastModelActivityScanAt = now;
+  try {
+    const entries = await readdir(logsDir, { withFileTypes: true });
+    const latest = getLatestModelRequestAtMs(
+      entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+      lastModelRequestAt
+    );
+    if (latest !== null && latest > lastModelRequestAt) {
+      lastModelRequestAt = latest;
+      scheduleIdleShutdown();
+    }
+  } catch {
+    // If logs are temporarily unavailable, keep the last known request time.
+  }
+  return lastModelRequestAt;
+}
+
+async function persistDisabledForIdleShutdown() {
+  settings = normalizeSettings({ ...settings, enabled: false });
+  await writeJsonAtomic(settingsPath, settings);
+  await updateState({
+    running: false,
+    enabled: false,
+    lastStatus: 'skipped',
+    lastSkippedReason: 'idle_timeout',
+    lastError: null,
+    nextRunAt: null,
+  });
+}
+
+async function shutdownForIdle() {
+  if (shuttingDown) return;
+  if (
+    !shouldStopForIdle({
+      nowMs: Date.now(),
+      lastActivityAtMs: await refreshModelRequestActivity({ force: true }),
+      idleMinutes: idleShutdownMinutes,
+      running: Boolean(runInFlight),
+    })
+  ) {
+    scheduleIdleShutdown();
+    return;
+  }
+
+  shuttingDown = true;
+  if (loopTimer) {
+    clearInterval(loopTimer);
+    loopTimer = null;
+  }
+  if (idleShutdownTimer) {
+    clearTimeout(idleShutdownTimer);
+    idleShutdownTimer = null;
+  }
+
+  await persistDisabledForIdleShutdown();
+  await logLine('info', 'priority rotation sidecar idle shutdown', {
+    idleShutdownMinutes,
+    lastModelRequestAt: new Date(lastModelRequestAt).toISOString(),
+  });
+
+  if (!serverRef) {
+    process.exit(0);
+    return;
+  }
+
+  const forceExitTimer = setTimeout(() => process.exit(0), 2_000);
+  forceExitTimer.unref?.();
+  serverRef.close(() => {
+    clearTimeout(forceExitTimer);
+    process.exit(0);
+  });
 }
 
 async function loadRuntimeState() {
@@ -1269,6 +1430,7 @@ async function handleRequest(req, res) {
   }
 
   const url = new URL(req.url ?? '/', `http://${host}:${port}`);
+  await refreshModelRequestActivity();
   if (req.method === 'GET' && (url.pathname === '/health' || url.pathname === '/status')) {
     sendJson(req, res, 200, {
       ok: true,
@@ -1276,6 +1438,8 @@ async function handleRequest(req, res) {
       host,
       port,
       customUiDir,
+      idleShutdownMinutes,
+      idleShutdownAt: getIdleShutdownAtIso(),
       settings: sanitizeSettingsForResponse(),
       state: sanitizeStateForResponse(),
     });
@@ -1286,6 +1450,8 @@ async function handleRequest(req, res) {
     sendJson(req, res, 200, {
       settings: sanitizeSettingsForResponse(),
       hasSecret: await hasSecretFile(),
+      idleShutdownMinutes,
+      idleShutdownAt: getIdleShutdownAtIso(),
     });
     return;
   }
@@ -1342,11 +1508,15 @@ function startLoop() {
 async function startServer() {
   await ensureDataDirs();
   await loadRuntimeState();
+  lastModelRequestAt = Date.now();
+  await refreshModelRequestActivity({ force: true });
+  scheduleIdleShutdown();
   startLoop();
 
   const server = createServer((req, res) => {
     handleRequest(req, res).catch((error) => sendError(req, res, error));
   });
+  serverRef = server;
   server.listen(port, host, async () => {
     await logLine('info', 'priority rotation sidecar started', {
       host,
@@ -1354,6 +1524,7 @@ async function startServer() {
       installDir,
       dataDir,
       customUiDir,
+      idleShutdownMinutes,
     });
   });
 }

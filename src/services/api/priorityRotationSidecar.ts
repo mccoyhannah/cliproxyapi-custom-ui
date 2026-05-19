@@ -72,6 +72,8 @@ export type PriorityRotationSidecarStatus = {
   pid: number;
   host: string;
   port: number;
+  idleShutdownMinutes?: number;
+  idleShutdownAt?: string | null;
   settings: PriorityRotationSidecarSettings;
   state: PriorityRotationSidecarState;
 };
