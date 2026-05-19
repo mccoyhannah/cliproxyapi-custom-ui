@@ -637,6 +637,129 @@
   }
 }
 
+.priorityRotationBackgroundPanel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(260px, 1fr) minmax(420px, 1.28fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+  margin-top: -4px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--priority-rotation-standby) 18%, var(--border-color));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--priority-rotation-sheen) 8%, transparent),
+      transparent
+    ),
+    color-mix(in srgb, var(--surface-panel) 90%, var(--bg-primary));
+  box-shadow:
+    0 12px 28px -28px color-mix(in srgb, var(--text-primary) 32%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 11%, transparent);
+
+  @media (max-width: 1320px) {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+.priorityRotationBackgroundHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.priorityRotationBackgroundIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 31px;
+  width: 31px;
+  height: 31px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--priority-rotation-standby) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--priority-rotation-standby) 8%, var(--surface-control));
+  color: color-mix(in srgb, var(--priority-rotation-standby) 86%, var(--text-primary));
+}
+
+.priorityRotationBackgroundCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.priorityRotationBackgroundTitle {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 780;
+  line-height: 1.25;
+}
+
+.priorityRotationBackgroundMeta {
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.priorityRotationBackgroundStatusGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.priorityRotationBackgroundControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+
+  :global(.btn) {
+    min-width: 0;
+  }
+}
+
+.priorityRotationBackgroundInterval {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.priorityRotationBackgroundButtons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.priorityRotationBackgroundError {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--warning-color) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--warning-color) 8%, var(--surface-control));
+  color: color-mix(in srgb, var(--warning-color) 86%, var(--text-primary));
+  font-size: 12px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .priorityRotationMain {
   display: flex;
   align-items: center;

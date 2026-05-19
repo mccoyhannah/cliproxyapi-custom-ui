@@ -10,5 +10,6 @@ export * from './authFiles';
 export * from './oauth';
 export * from './logs';
 export * from './models';
+export * from './priorityRotationSidecar';
 export * from './transformers';
 export * from './vertex';
