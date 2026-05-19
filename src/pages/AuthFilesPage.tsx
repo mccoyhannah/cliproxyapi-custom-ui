@@ -95,8 +95,12 @@ import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from
 import type { AuthFileItem, CodexQuotaState } from '@/types';
 import {
   compareCodexMinRemainingPercentAsc,
+  getCodexFiveHourRemainingPercent,
   getCodexMinRemainingPercent,
+  isCodexFile,
+  isDisabledAuthFile,
   normalizePlanType,
+  resolveCodexPlanType,
 } from '@/utils/quota';
 import { normalizeApiBase } from '@/utils/connection';
 import styles from './AuthFilesPage.module.scss';
@@ -132,6 +136,10 @@ const getPrioritySortValue = (file: AuthFileItem): number =>
 const formatPriorityRotationPercent = (value: number): string => `${Math.round(value)}%`;
 const formatPriorityRotationPriority = (value: number | null): string =>
   value === null ? '-' : `P${value}`;
+const getAuthFileDisplayName = (file: AuthFileItem): string => {
+  const note = typeof file.note === 'string' ? file.note.trim() : '';
+  return note || file.name;
+};
 const formatNullableDateTime = (value: string | null | undefined): string => {
   if (!value) return '-';
   const date = new Date(value);
@@ -143,6 +151,20 @@ const normalizePriorityRotationSidecarInterval = (value: unknown): number => {
   return Math.max(1, Math.min(180, Math.round(numeric)));
 };
 type AuthFilePriorityTier = 'active' | 'standby' | 'buffer';
+type PriorityRotationTierDetailItem = {
+  name: string;
+  displayName: string;
+  priorityLabel: string;
+  planLabel: string;
+  fiveHourRemaining: number | null;
+  fiveHourRemainingLabel: string;
+  minRemaining: number | null;
+  minRemainingLabel: string;
+  resetLabel: string;
+  subscriptionLabel: string;
+  quotaStatusLabel: string;
+  quotaStatusTone: 'ready' | 'warning' | 'muted';
+};
 type PriorityRotationSidecarDraftSettings = Pick<
   PriorityRotationSidecarSettings,
   'enabled' | 'thresholdPercent' | 'activeSlotLimit' | 'checkIntervalMinutes'
@@ -229,6 +251,8 @@ export function AuthFilesPage() {
   );
   const [priorityRotationPreview, setPriorityRotationPreview] =
     useState<PriorityRotationAnalysis | null>(null);
+  const [priorityRotationDetailTier, setPriorityRotationDetailTier] =
+    useState<AuthFilePriorityTier | null>(null);
   const [priorityRotationSidecarStatus, setPriorityRotationSidecarStatus] =
     useState<PriorityRotationSidecarStatus | null>(null);
   const [priorityRotationSidecarLoading, setPriorityRotationSidecarLoading] = useState(false);
@@ -703,8 +727,105 @@ export function AuthFilesPage() {
       return matchType && matchSearch;
     });
   }, [filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
+  const codexSnapshotFiles = priorityRotationDetailTier ? files : filtered;
   const { authTokenSnapshots, subscriptionSnapshots: codexSubscriptionSnapshots } =
-    useCodexAuthFileSnapshots(filtered);
+    useCodexAuthFileSnapshots(codexSnapshotFiles);
+
+  const priorityRotationTierDetailGroups = useMemo(() => {
+    const groups: Record<AuthFilePriorityTier, PriorityRotationTierDetailItem[]> = {
+      active: [],
+      standby: [],
+      buffer: [],
+    };
+
+    const getPlanLabel = (planType: string | null): string => {
+      if (!planType) {
+        return t('common.unknown', { defaultValue: '未知' });
+      }
+      return planType === 'team' ? 'Team' : planType === 'plus' ? 'Plus' : planType.toUpperCase();
+    };
+
+    const getQuotaStatusTone = (
+      status: CodexQuotaState['status']
+    ): PriorityRotationTierDetailItem['quotaStatusTone'] =>
+      status === 'success' ? 'ready' : status === 'error' ? 'warning' : 'muted';
+
+    files.forEach((file) => {
+      if (!isCodexFile(file) || isDisabledAuthFile(file) || isRuntimeOnlyAuthFile(file)) {
+        return;
+      }
+
+      const tier = priorityTierByFile.get(file.name);
+      if (!tier) return;
+
+      const quota = codexQuota[file.name] as CodexQuotaState | undefined;
+      const planType = normalizePlanType(
+        quota?.status === 'success'
+          ? (quota.planType ?? resolveCodexPlanType(file))
+          : resolveCodexPlanType(file)
+      );
+      const fiveHourRemaining = getCodexFiveHourRemainingPercent(quota);
+      const minRemaining = getCodexMinRemainingPercent(quota);
+      const fiveHourWindow = quota?.windows.find((window) => window.id === 'five-hour');
+      const subscription = codexSubscriptionSnapshots.get(file.name);
+
+      groups[tier].push({
+        name: file.name,
+        displayName: getAuthFileDisplayName(file),
+        priorityLabel: formatPriorityRotationPriority(
+          parsePriorityValue(file.priority ?? file['priority']) ?? 0
+        ),
+        planLabel: getPlanLabel(planType),
+        fiveHourRemaining,
+        fiveHourRemainingLabel:
+          fiveHourRemaining === null
+            ? t('auth_files.priority_rotation_detail_quota_unknown', { defaultValue: '额度未知' })
+            : formatPriorityRotationPercent(fiveHourRemaining),
+        minRemaining,
+        minRemainingLabel:
+          minRemaining === null
+            ? t('auth_files.priority_rotation_detail_quota_unknown', { defaultValue: '额度未知' })
+            : formatPriorityRotationPercent(minRemaining),
+        resetLabel: fiveHourWindow?.resetLabel ?? '-',
+        subscriptionLabel:
+          subscription?.subscriptionStatus === 'found'
+            ? (subscription.subscriptionActiveUntil ??
+              t('common.unknown', { defaultValue: '未知' }))
+            : subscription?.subscriptionStatus === 'read_error'
+              ? t('auth_files.priority_rotation_detail_subscription_error', {
+                  defaultValue: '订阅读取失败',
+                })
+              : t('auth_files.priority_rotation_detail_subscription_missing', {
+                  defaultValue: '未读取',
+                }),
+        quotaStatusLabel:
+          quota?.status === 'loading'
+            ? t('common.loading')
+            : quota?.status === 'error'
+              ? t('common.error')
+              : quota?.status === 'success'
+                ? t('auth_files.priority_rotation_detail_quota_ready', {
+                    defaultValue: '额度就绪',
+                  })
+                : t('auth_files.priority_rotation_detail_quota_missing', {
+                    defaultValue: '未读取',
+                  }),
+        quotaStatusTone: getQuotaStatusTone(quota?.status ?? 'idle'),
+      });
+    });
+
+    (Object.keys(groups) as AuthFilePriorityTier[]).forEach((tier) => {
+      groups[tier].sort((a, b) => {
+        const remainingCompare = compareCodexMinRemainingPercentAsc(a.minRemaining, b.minRemaining);
+        if (remainingCompare !== 0) return remainingCompare;
+        const priorityCompare = Number(b.priorityLabel.slice(1)) - Number(a.priorityLabel.slice(1));
+        if (Number.isFinite(priorityCompare) && priorityCompare !== 0) return priorityCompare;
+        return a.name.localeCompare(b.name);
+      });
+    });
+
+    return groups;
+  }, [codexQuota, codexSubscriptionSnapshots, files, priorityTierByFile, t]);
 
   const sorted = useMemo(() => {
     const originalIndexMap = new Map(filtered.map((file, index) => [file.name, index]));
@@ -1613,24 +1734,59 @@ export function AuthFilesPage() {
     : t('auth_files.priority_rotation_sidecar_saved');
   const priorityRotationLayerLabel = t('auth_files.priority_rotation_layers_short');
   const priorityRotationLayerTitle = t('auth_files.priority_rotation_layers_title');
-  const priorityRotationTierItems = [
+  const priorityRotationTierLabels: Record<AuthFilePriorityTier, string> = {
+    active: t('auth_files.priority_rotation_tier_active'),
+    standby: t('auth_files.priority_rotation_tier_standby'),
+    buffer: t('auth_files.priority_rotation_tier_buffer'),
+  };
+  const priorityRotationTierPriorityMap: Record<AuthFilePriorityTier, number | null> = {
+    active: priorityRotationAnalysis.activePriority,
+    standby: priorityRotationAnalysis.standbyPriority,
+    buffer: priorityRotationAnalysis.reservePriority,
+  };
+  const priorityRotationTierItems: Array<{
+    key: AuthFilePriorityTier;
+    label: string;
+    value: string;
+    className: string;
+    count: number;
+    ariaLabel: string;
+  }> = [
     {
       key: 'active',
-      label: t('auth_files.priority_rotation_tier_active'),
-      value: formatPriorityRotationPriority(priorityRotationAnalysis.activePriority),
+      label: priorityRotationTierLabels.active,
+      value: formatPriorityRotationPriority(priorityRotationTierPriorityMap.active),
       className: styles.priorityRotationTierActive,
+      count: priorityRotationTierDetailGroups.active.length,
+      ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
+        tier: priorityRotationTierLabels.active,
+        count: priorityRotationTierDetailGroups.active.length,
+        defaultValue: `查看${priorityRotationTierLabels.active}详情（${priorityRotationTierDetailGroups.active.length} 个）`,
+      }),
     },
     {
       key: 'standby',
-      label: t('auth_files.priority_rotation_tier_standby'),
-      value: formatPriorityRotationPriority(priorityRotationAnalysis.standbyPriority),
+      label: priorityRotationTierLabels.standby,
+      value: formatPriorityRotationPriority(priorityRotationTierPriorityMap.standby),
       className: styles.priorityRotationTierStandby,
+      count: priorityRotationTierDetailGroups.standby.length,
+      ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
+        tier: priorityRotationTierLabels.standby,
+        count: priorityRotationTierDetailGroups.standby.length,
+        defaultValue: `查看${priorityRotationTierLabels.standby}详情（${priorityRotationTierDetailGroups.standby.length} 个）`,
+      }),
     },
     {
       key: 'buffer',
-      label: t('auth_files.priority_rotation_tier_buffer'),
-      value: formatPriorityRotationPriority(priorityRotationAnalysis.reservePriority),
+      label: priorityRotationTierLabels.buffer,
+      value: formatPriorityRotationPriority(priorityRotationTierPriorityMap.buffer),
       className: styles.priorityRotationTierBuffer,
+      count: priorityRotationTierDetailGroups.buffer.length,
+      ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
+        tier: priorityRotationTierLabels.buffer,
+        count: priorityRotationTierDetailGroups.buffer.length,
+        defaultValue: `查看${priorityRotationTierLabels.buffer}详情（${priorityRotationTierDetailGroups.buffer.length} 个）`,
+      }),
     },
   ];
   const getPriorityRotationChangeReason = (
@@ -1738,6 +1894,22 @@ export function AuthFilesPage() {
       ? formatNullableDateTime(priorityRotationSidecarState?.nextRunAt)
       : '-',
   });
+  const priorityRotationDetailTierLabel = priorityRotationDetailTier
+    ? priorityRotationTierLabels[priorityRotationDetailTier]
+    : '';
+  const priorityRotationDetailPriority = priorityRotationDetailTier
+    ? priorityRotationTierPriorityMap[priorityRotationDetailTier]
+    : null;
+  const priorityRotationDetailItems = priorityRotationDetailTier
+    ? priorityRotationTierDetailGroups[priorityRotationDetailTier]
+    : [];
+  const priorityRotationDetailTitle = priorityRotationDetailTier
+    ? t('auth_files.priority_rotation_detail_title', {
+        tier: priorityRotationDetailTierLabel,
+        priority: formatPriorityRotationPriority(priorityRotationDetailPriority),
+        defaultValue: `${priorityRotationDetailTierLabel} ${formatPriorityRotationPriority(priorityRotationDetailPriority)}`,
+      })
+    : '';
 
   return (
     <div className={styles.container}>
@@ -1852,13 +2024,18 @@ export function AuthFilesPage() {
                     aria-label={t('auth_files.priority_rotation_tiers_aria')}
                   >
                     {priorityRotationTierItems.map((tier) => (
-                      <span
-                        className={`${styles.priorityRotationTier} ${tier.className}`}
+                      <button
+                        type="button"
+                        className={`${styles.priorityRotationTier} ${styles.priorityRotationTierButton} ${tier.className}`}
                         key={tier.key}
+                        onClick={() => setPriorityRotationDetailTier(tier.key)}
+                        aria-label={tier.ariaLabel}
+                        title={tier.ariaLabel}
                       >
                         <span className={styles.priorityRotationTierLabel}>{tier.label}</span>
                         <span className={styles.priorityRotationTierValue}>{tier.value}</span>
-                      </span>
+                        <span className={styles.priorityRotationTierCount}>{tier.count}</span>
+                      </button>
                     ))}
                   </span>
                 </span>
@@ -2437,6 +2614,113 @@ export function AuthFilesPage() {
         onSave={handlePrefixProxySave}
         onChange={handlePrefixProxyChange}
       />
+
+      <Modal
+        open={Boolean(priorityRotationDetailTier)}
+        title={
+          <span className={styles.priorityRotationTierDetailTitle}>
+            {priorityRotationDetailTitle}
+          </span>
+        }
+        onClose={() => setPriorityRotationDetailTier(null)}
+        width={720}
+        className={styles.priorityRotationTierModal}
+        overlayClassName={styles.priorityRotationOverlay}
+      >
+        <div className={styles.priorityRotationTierDetail}>
+          <div className={styles.priorityRotationTierDetailSummary}>
+            <div className={styles.priorityRotationTierDetailMetric}>
+              <span>
+                {t('auth_files.priority_rotation_detail_accounts', { defaultValue: '账号' })}
+              </span>
+              <strong>{priorityRotationDetailItems.length}</strong>
+            </div>
+            <div className={styles.priorityRotationTierDetailMetric}>
+              <span>{t('auth_files.priority_rotation_col_priority')}</span>
+              <strong>{formatPriorityRotationPriority(priorityRotationDetailPriority)}</strong>
+            </div>
+            <div className={styles.priorityRotationTierDetailMetric}>
+              <span>{t('auth_files.priority_rotation_threshold_label')}</span>
+              <strong>
+                {t('auth_files.priority_rotation_detail_threshold_value', {
+                  threshold: priorityRotationAnalysis.effectiveThresholdPercent,
+                  defaultValue: `${priorityRotationAnalysis.effectiveThresholdPercent}%`,
+                })}
+              </strong>
+            </div>
+          </div>
+
+          {priorityRotationDetailItems.length === 0 ? (
+            <div className={styles.priorityRotationTierDetailEmpty}>
+              {t('auth_files.priority_rotation_detail_empty', {
+                tier: priorityRotationDetailTierLabel,
+                defaultValue: `这一级还没有可工作的 ${priorityRotationDetailTierLabel} 账号。`,
+              })}
+            </div>
+          ) : (
+            <div className={styles.priorityRotationTierDetailList}>
+              {priorityRotationDetailItems.map((item) => (
+                <div className={styles.priorityRotationTierDetailRow} key={item.name}>
+                  <div className={styles.priorityRotationTierDetailIdentity}>
+                    <span
+                      className={styles.priorityRotationTierDetailName}
+                      title={item.displayName}
+                    >
+                      {item.displayName}
+                    </span>
+                    <span className={styles.priorityRotationTierDetailFile} title={item.name}>
+                      {item.name}
+                    </span>
+                  </div>
+                  <div className={styles.priorityRotationTierDetailFacts}>
+                    <span className={styles.priorityRotationTierDetailFact}>
+                      <span>
+                        {t('auth_files.priority_rotation_detail_plan', { defaultValue: '计划' })}
+                      </span>
+                      <strong>{item.planLabel}</strong>
+                    </span>
+                    <span
+                      className={`${styles.priorityRotationTierDetailFact} ${
+                        item.quotaStatusTone === 'ready'
+                          ? styles.priorityRotationTierDetailFactReady
+                          : item.quotaStatusTone === 'warning'
+                            ? styles.priorityRotationTierDetailFactWarning
+                            : styles.priorityRotationTierDetailFactMuted
+                      }`}
+                      title={item.quotaStatusLabel}
+                    >
+                      <span>{t('auth_files.priority_rotation_col_remaining')}</span>
+                      <strong>{item.fiveHourRemainingLabel}</strong>
+                    </span>
+                    <span className={styles.priorityRotationTierDetailFact}>
+                      <span>
+                        {t('auth_files.priority_rotation_detail_min_remaining', {
+                          defaultValue: '最低',
+                        })}
+                      </span>
+                      <strong>{item.minRemainingLabel}</strong>
+                    </span>
+                    <span className={styles.priorityRotationTierDetailFact}>
+                      <span>
+                        {t('auth_files.priority_rotation_detail_reset', { defaultValue: '重置' })}
+                      </span>
+                      <strong>{item.resetLabel}</strong>
+                    </span>
+                    <span className={styles.priorityRotationTierDetailFact}>
+                      <span>
+                        {t('auth_files.priority_rotation_detail_subscription', {
+                          defaultValue: '订阅',
+                        })}
+                      </span>
+                      <strong>{item.subscriptionLabel}</strong>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         open={Boolean(manualExpiryEditorFile)}
