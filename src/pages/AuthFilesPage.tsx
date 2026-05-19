@@ -147,6 +147,14 @@ type PriorityRotationSidecarDraftSettings = Pick<
   PriorityRotationSidecarSettings,
   'enabled' | 'thresholdPercent' | 'activeSlotLimit' | 'checkIntervalMinutes'
 >;
+type PriorityRotationSidecarRunOptions = {
+  allowUnsaved?: boolean;
+  notify?: boolean;
+};
+type PriorityRotationSidecarRunResult = {
+  ok: boolean;
+  message?: string;
+};
 
 const DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT: PriorityRotationSidecarDraftSettings = {
   enabled: false,
@@ -212,9 +220,7 @@ export function AuthFilesPage() {
   const [manualExpiryDateInput, setManualExpiryDateInput] = useState('');
   const [manualExpiryTimeInput, setManualExpiryTimeInput] = useState('');
   const [priorityRotationSettings, setPriorityRotationSettings] =
-    useState<PriorityRotationSidecarDraftSettings>(
-      DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT
-    );
+    useState<PriorityRotationSidecarDraftSettings>(DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT);
   const [priorityRotationThresholdInput, setPriorityRotationThresholdInput] = useState(() =>
     String(priorityRotationSettings.thresholdPercent)
   );
@@ -240,6 +246,7 @@ export function AuthFilesPage() {
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
   const priorityRotationSidecarDraftTouchedRef = useRef(false);
+  const priorityRotationSidecarAutoApplyRequestedRef = useRef(false);
   const priorityRotationSidecarStatusRequestIdRef = useRef(0);
 
   const {
@@ -358,13 +365,17 @@ export function AuthFilesPage() {
   const priorityRotationSidecarSettings = priorityRotationSidecarStatus?.settings ?? null;
   const priorityRotationSidecarDraftDirty = useMemo(() => {
     if (!priorityRotationSidecarSettings) return false;
-    if (isPriorityRotationSidecarDraftDirty(priorityRotationSettings, priorityRotationSidecarSettings)) {
+    if (
+      isPriorityRotationSidecarDraftDirty(priorityRotationSettings, priorityRotationSidecarSettings)
+    ) {
       return true;
     }
     return (
       normalizeApiBase(apiBase) !== normalizeApiBase(priorityRotationSidecarSettings.apiBase) ||
-      priorityRotationThresholdInput.trim() !== String(priorityRotationSidecarSettings.thresholdPercent) ||
-      priorityRotationSlotsInput.trim() !== String(priorityRotationSidecarSettings.activeSlotLimit) ||
+      priorityRotationThresholdInput.trim() !==
+        String(priorityRotationSidecarSettings.thresholdPercent) ||
+      priorityRotationSlotsInput.trim() !==
+        String(priorityRotationSidecarSettings.activeSlotLimit) ||
       priorityRotationSidecarIntervalInput.trim() !==
         String(priorityRotationSidecarSettings.checkIntervalMinutes)
     );
@@ -890,6 +901,7 @@ export function AuthFilesPage() {
   const updatePriorityRotationSettings = useCallback(
     (updates: Partial<PriorityRotationSidecarDraftSettings>) => {
       priorityRotationSidecarDraftTouchedRef.current = true;
+      priorityRotationSidecarAutoApplyRequestedRef.current = true;
       setPriorityRotationSettings((current) => {
         const nextSettings = {
           ...current,
@@ -981,9 +993,7 @@ export function AuthFilesPage() {
       setPriorityRotationSidecarStatus(status);
       setPriorityRotationSidecarError('');
 
-      const shouldSyncDraft =
-        options.forceDraft ||
-        !priorityRotationSidecarDraftTouchedRef.current;
+      const shouldSyncDraft = options.forceDraft || !priorityRotationSidecarDraftTouchedRef.current;
 
       if (shouldSyncDraft) {
         syncPriorityRotationDraftSettings(status.settings);
@@ -1055,14 +1065,17 @@ export function AuthFilesPage() {
       state: PriorityRotationSidecarStatus['state'],
       forceDraft = false
     ) => {
-      hydratePriorityRotationSidecarStatus({
-        ok: true,
-        pid: priorityRotationSidecarStatus?.pid ?? 0,
-        host: priorityRotationSidecarStatus?.host ?? '127.0.0.1',
-        port: priorityRotationSidecarStatus?.port ?? 8318,
-        settings,
-        state,
-      }, { forceDraft });
+      hydratePriorityRotationSidecarStatus(
+        {
+          ok: true,
+          pid: priorityRotationSidecarStatus?.pid ?? 0,
+          host: priorityRotationSidecarStatus?.host ?? '127.0.0.1',
+          port: priorityRotationSidecarStatus?.port ?? 8318,
+          settings,
+          state,
+        },
+        { forceDraft }
+      );
     },
     [
       hydratePriorityRotationSidecarStatus,
@@ -1076,19 +1089,17 @@ export function AuthFilesPage() {
     async (updates: Partial<PriorityRotationSidecarSettings> = {}, notify = true) => {
       if (!managementKey) {
         showNotification(t('auth_files.priority_rotation_sidecar_missing_login'), 'error');
-        return;
+        return false;
       }
       setPriorityRotationSidecarSaving(true);
       try {
         const settings = buildPriorityRotationSidecarSettings(updates);
-        const result = await priorityRotationSidecarApi.updateSettings(
-          settings,
-          managementKey
-        );
+        const result = await priorityRotationSidecarApi.updateSettings(settings, managementKey);
         mergePriorityRotationSidecarResult(result.settings, result.state, true);
         if (notify) {
           showNotification(t('auth_files.priority_rotation_sidecar_settings_saved'), 'success');
         }
+        return true;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         setPriorityRotationSidecarError(message);
@@ -1096,6 +1107,7 @@ export function AuthFilesPage() {
           t('auth_files.priority_rotation_sidecar_settings_failed', { message }),
           'error'
         );
+        return false;
       } finally {
         setPriorityRotationSidecarSaving(false);
       }
@@ -1125,47 +1137,136 @@ export function AuthFilesPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setPriorityRotationSidecarError(message);
-      showNotification(t('auth_files.priority_rotation_sidecar_secret_failed', { message }), 'error');
+      showNotification(
+        t('auth_files.priority_rotation_sidecar_secret_failed', { message }),
+        'error'
+      );
     } finally {
       setPriorityRotationSidecarSaving(false);
     }
+  }, [apiBase, managementKey, mergePriorityRotationSidecarResult, showNotification, t]);
+
+  const runPriorityRotationSidecarNow = useCallback(
+    async (
+      options: PriorityRotationSidecarRunOptions = {}
+    ): Promise<PriorityRotationSidecarRunResult> => {
+      if (!managementKey) {
+        const message = t('auth_files.priority_rotation_sidecar_missing_login');
+        showNotification(message, 'error');
+        return { ok: false, message };
+      }
+      if (priorityRotationSidecarDraftDirty && !options.allowUnsaved) {
+        const message = t('auth_files.priority_rotation_sidecar_save_required');
+        showNotification(message, 'warning');
+        return { ok: false, message };
+      }
+      setPriorityRotationSidecarRunning(true);
+      try {
+        const result = await priorityRotationSidecarApi.runNow(managementKey);
+        mergePriorityRotationSidecarResult(result.settings, result.state);
+        if (options.notify !== false) {
+          showNotification(t('auth_files.priority_rotation_sidecar_run_complete'), 'success');
+        }
+        await loadFiles({ preserveExisting: true, silent: true });
+        return { ok: true };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setPriorityRotationSidecarError(message);
+        if (options.notify !== false) {
+          showNotification(
+            t('auth_files.priority_rotation_sidecar_run_failed', { message }),
+            'error'
+          );
+        }
+        return { ok: false, message };
+      } finally {
+        setPriorityRotationSidecarRunning(false);
+      }
+    },
+    [
+      loadFiles,
+      managementKey,
+      mergePriorityRotationSidecarResult,
+      priorityRotationSidecarDraftDirty,
+      showNotification,
+      t,
+    ]
+  );
+
+  const applyPriorityRotationSidecarSettings = useCallback(async () => {
+    priorityRotationSidecarAutoApplyRequestedRef.current = false;
+    const hasChanges = priorityRotationSidecarDraftDirty;
+    if (hasChanges) {
+      const saved = await savePriorityRotationSidecarSettings({}, false);
+      if (!saved) return false;
+    }
+
+    if (priorityRotationSidecarStatus?.state?.hasSecret !== true) {
+      showNotification(
+        t(
+          hasChanges
+            ? 'auth_files.priority_rotation_sidecar_auto_apply_missing_secret'
+            : 'auth_files.priority_rotation_sidecar_check_missing_secret'
+        ),
+        'warning'
+      );
+      return true;
+    }
+
+    const runResult = await runPriorityRotationSidecarNow({
+      allowUnsaved: true,
+      notify: false,
+    });
+    if (!runResult.ok) {
+      showNotification(
+        hasChanges
+          ? t('auth_files.priority_rotation_sidecar_auto_apply_failed', {
+              message: runResult.message ?? t('common.unknown_error'),
+            })
+          : t('auth_files.priority_rotation_sidecar_run_failed', {
+              message: runResult.message ?? t('common.unknown_error'),
+            }),
+        'warning'
+      );
+      return false;
+    }
+
+    showNotification(
+      hasChanges
+        ? t('auth_files.priority_rotation_sidecar_auto_applied')
+        : t('auth_files.priority_rotation_sidecar_run_complete'),
+      'success'
+    );
+    return true;
   }, [
-    apiBase,
-    managementKey,
-    mergePriorityRotationSidecarResult,
+    priorityRotationSidecarDraftDirty,
+    priorityRotationSidecarStatus?.state?.hasSecret,
+    runPriorityRotationSidecarNow,
+    savePriorityRotationSidecarSettings,
     showNotification,
     t,
   ]);
 
-  const runPriorityRotationSidecarNow = useCallback(async () => {
-    if (!managementKey) {
-      showNotification(t('auth_files.priority_rotation_sidecar_missing_login'), 'error');
+  useEffect(() => {
+    if (!priorityRotationSidecarDraftDirty) {
+      priorityRotationSidecarAutoApplyRequestedRef.current = false;
       return;
     }
-    if (priorityRotationSidecarDraftDirty) {
-      showNotification(t('auth_files.priority_rotation_sidecar_save_required'), 'warning');
-      return;
-    }
-    setPriorityRotationSidecarRunning(true);
-    try {
-      const result = await priorityRotationSidecarApi.runNow(managementKey);
-      mergePriorityRotationSidecarResult(result.settings, result.state);
-      showNotification(t('auth_files.priority_rotation_sidecar_run_complete'), 'success');
-      await loadFiles({ preserveExisting: true, silent: true });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setPriorityRotationSidecarError(message);
-      showNotification(t('auth_files.priority_rotation_sidecar_run_failed', { message }), 'error');
-    } finally {
-      setPriorityRotationSidecarRunning(false);
-    }
+    if (!priorityRotationSidecarAutoApplyRequestedRef.current) return;
+    if (!priorityRotationSidecarStatus) return;
+    if (priorityRotationSidecarSaving || priorityRotationSidecarRunning) return;
+
+    const timeoutId = window.setTimeout(() => {
+      void applyPriorityRotationSidecarSettings();
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
   }, [
-    loadFiles,
-    managementKey,
-    mergePriorityRotationSidecarResult,
+    applyPriorityRotationSidecarSettings,
     priorityRotationSidecarDraftDirty,
-    showNotification,
-    t,
+    priorityRotationSidecarRunning,
+    priorityRotationSidecarSaving,
+    priorityRotationSidecarStatus,
   ]);
 
   useEffect(() => {
@@ -1215,11 +1316,7 @@ export function AuthFilesPage() {
     }
 
     setPriorityRotationPreview(priorityRotationAnalysis);
-  }, [
-    getPriorityRotationNoChangeMessage,
-    priorityRotationAnalysis,
-    showNotification,
-  ]);
+  }, [getPriorityRotationNoChangeMessage, priorityRotationAnalysis, showNotification]);
 
   const closePriorityRotationPreview = useCallback(() => {
     setPriorityRotationPreview(null);
@@ -1242,12 +1339,7 @@ export function AuthFilesPage() {
     if (result.failCount === 0) {
       closePriorityRotationPreview();
     }
-  }, [
-    batchSetPriorities,
-    closePriorityRotationPreview,
-    loadFiles,
-    priorityRotationPreview,
-  ]);
+  }, [batchSetPriorities, closePriorityRotationPreview, loadFiles, priorityRotationPreview]);
 
   const commitBatchPriority = useCallback(() => {
     const trimmed = batchPriorityInput.trim();
@@ -1606,8 +1698,8 @@ export function AuthFilesPage() {
       ]
     : [];
   const priorityRotationSidecarState = priorityRotationSidecarStatus?.state ?? null;
-  const priorityRotationSidecarOnline = Boolean(priorityRotationSidecarStatus) &&
-    !priorityRotationSidecarError;
+  const priorityRotationSidecarOnline =
+    Boolean(priorityRotationSidecarStatus) && !priorityRotationSidecarError;
   const priorityRotationSidecarSavedEnabled = priorityRotationSidecarSettings?.enabled === true;
   const priorityRotationSidecarEnabled = priorityRotationSettings.enabled === true;
   const priorityRotationSidecarHasSecret = priorityRotationSidecarState?.hasSecret === true;
@@ -1752,10 +1844,7 @@ export function AuthFilesPage() {
                   <span className={styles.priorityRotationTitle}>
                     {t('auth_files.priority_rotation_title')}
                   </span>
-                  <span
-                    className={styles.priorityRotationMeta}
-                    title={priorityRotationLayerTitle}
-                  >
+                  <span className={styles.priorityRotationMeta} title={priorityRotationLayerTitle}>
                     {priorityRotationLayerLabel}
                   </span>
                   <span
@@ -2068,7 +2157,7 @@ export function AuthFilesPage() {
                   <Button
                     variant={priorityRotationSidecarDraftDirty ? 'primary' : 'secondary'}
                     size="sm"
-                    onClick={() => void savePriorityRotationSidecarSettings()}
+                    onClick={() => void applyPriorityRotationSidecarSettings()}
                     disabled={
                       !managementKey ||
                       priorityRotationSidecarSaving ||
