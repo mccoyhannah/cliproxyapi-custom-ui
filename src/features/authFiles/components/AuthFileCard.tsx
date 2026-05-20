@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -23,11 +23,6 @@ import {
   type CodexAuthTokenSnapshot,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
-import {
-  normalizeRecentRequestAuthIndex,
-  normalizeRecentRequestBuckets,
-  statusBarDataFromRecentRequests,
-} from '@/utils/recentRequests';
 import { formatFileSize } from '@/utils/format';
 import {
   QUOTA_PROVIDER_TYPES,
@@ -56,12 +51,12 @@ export type AuthFileCardProps = {
   selected: boolean;
   resolvedTheme: ResolvedTheme;
   disableControls: boolean;
-  deleting: string | null;
-  statusUpdating: Record<string, boolean>;
-  priorityUpdating: Record<string, boolean>;
-  noteUpdating: Record<string, boolean>;
+  deleting: boolean;
+  statusUpdating: boolean;
+  priorityUpdating: boolean;
+  noteUpdating: boolean;
   quotaFilterType: QuotaProviderType | null;
-  statusBarCache: Map<string, AuthFileStatusBarData>;
+  statusData: AuthFileStatusBarData;
   authTokenSnapshot?: CodexAuthTokenSnapshot | null;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   manualExpiryMs?: number | null;
@@ -84,7 +79,7 @@ const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
   return provider as QuotaProviderType;
 };
 
-export function AuthFileCard(props: AuthFileCardProps) {
+export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps) {
   const { t } = useTranslation();
   const {
     file,
@@ -97,7 +92,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     priorityUpdating,
     noteUpdating,
     quotaFilterType,
-    statusBarCache,
+    statusData,
     authTokenSnapshot,
     codexSubscriptionSnapshot,
     manualExpiryMs,
@@ -114,7 +109,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
     onToggleSelect,
   } = props;
 
-  const recentBuckets = normalizeRecentRequestBuckets(file.recent_requests ?? file.recentRequests);
   const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
   const isAistudio = (file.type || '').toLowerCase() === 'aistudio';
   const showModelsButton = !isRuntimeOnly || isAistudio;
@@ -169,11 +163,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
       defaultValue: '没有 refresh_token，且无法识别 access_token 到期时间',
     });
 
-  const rawAuthIndex = file['auth_index'] ?? file.authIndex;
-  const authIndexKey = normalizeRecentRequestAuthIndex(rawAuthIndex);
-  const statusData =
-    (authIndexKey && statusBarCache.get(authIndexKey)) ||
-    statusBarDataFromRecentRequests(recentBuckets);
   const fileStats = {
     success: statusData.totalSuccess,
     failure: statusData.totalFailure,
@@ -208,8 +197,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
   const displayNameInputRef = useRef<HTMLInputElement | null>(null);
   const skipDisplayNameBlurRef = useRef(false);
   const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-  const prioritySaving = priorityUpdating[file.name] === true;
-  const displayNameSaving = noteUpdating[file.name] === true;
+  const prioritySaving = priorityUpdating;
+  const displayNameSaving = noteUpdating;
   const showPriorityTier =
     Boolean(priorityTier) &&
     resolvedQuotaType === 'codex' &&
@@ -715,9 +704,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
                     onClick={() => onDelete(file.name)}
                     className={styles.iconButton}
                     title={t('auth_files.delete_button')}
-                    disabled={disableControls || deleting === file.name}
+                    disabled={disableControls || deleting}
                   >
-                    {deleting === file.name ? (
+                    {deleting ? (
                       <LoadingSpinner size={14} />
                     ) : (
                       <IconTrash2 className={styles.actionIcon} size={16} />
@@ -754,7 +743,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
                 <ToggleSwitch
                   ariaLabel={t('auth_files.status_toggle_label')}
                   checked={!file.disabled}
-                  disabled={disableControls || statusUpdating[file.name] === true}
+                  disabled={disableControls || statusUpdating}
                   onChange={(value) => onToggleStatus(file, value)}
                 />
               </div>
@@ -764,4 +753,4 @@ export function AuthFileCard(props: AuthFileCardProps) {
       </div>
     </div>
   );
-}
+});

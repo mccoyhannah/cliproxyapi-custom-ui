@@ -58,7 +58,10 @@ import { useAuthFilesData } from '@/features/authFiles/hooks/useAuthFilesData';
 import { useAuthFilesModels } from '@/features/authFiles/hooks/useAuthFilesModels';
 import { useAuthFilesOauth } from '@/features/authFiles/hooks/useAuthFilesOauth';
 import { useAuthFilesPrefixProxyEditor } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
-import { useAuthFilesStatusBarCache } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
+import {
+  useAuthFilesStatusBarCache,
+  type AuthFileStatusBarData,
+} from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { useCodexAuthFileSnapshots } from '@/features/authFiles/hooks/useCodexAuthFileSnapshots';
 import {
   isAuthFilesSortMode,
@@ -93,6 +96,11 @@ import {
 } from '@/services/api/priorityRotationSidecar';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
+import {
+  normalizeRecentRequestAuthIndex,
+  normalizeRecentRequestBuckets,
+  statusBarDataFromRecentRequests,
+} from '@/utils/recentRequests';
 import {
   compareCodexMinRemainingPercentAsc,
   getCodexFiveHourRemainingPercent,
@@ -290,6 +298,7 @@ export function AuthFilesPage() {
     error,
     uploading,
     uploadProgress,
+    batchProgress,
     deleting,
     deletingAll,
     statusUpdating,
@@ -739,7 +748,34 @@ export function AuthFilesPage() {
       return matchType && matchSearch;
     });
   }, [filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
-  const codexSnapshotFiles = priorityRotationDetailTier ? files : filtered;
+
+  const isExpirySortMode = sortMode === 'expiry_soon' || sortMode === 'expiry_long';
+  const baseSorted = useMemo(() => {
+    const copy = [...filtered];
+    if (sortMode === 'default') {
+      copy.sort((a, b) => {
+        const providerA = normalizeProviderKey(String(a.provider ?? a.type ?? 'unknown'));
+        const providerB = normalizeProviderKey(String(b.provider ?? b.type ?? 'unknown'));
+        const providerCompare = providerA.localeCompare(providerB);
+        if (providerCompare !== 0) return providerCompare;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sortMode === 'az') {
+      copy.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortMode === 'priority') {
+      copy.sort(comparePriorityThenName);
+    }
+    return copy;
+  }, [filtered, sortMode]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * pageSize;
+  const codexSnapshotFiles = priorityRotationDetailTier
+    ? files
+    : isExpirySortMode
+      ? filtered
+      : baseSorted.slice(start, start + pageSize);
   const { authTokenSnapshots, subscriptionSnapshots: codexSubscriptionSnapshots } =
     useCodexAuthFileSnapshots(codexSnapshotFiles);
 
@@ -840,6 +876,8 @@ export function AuthFilesPage() {
   }, [codexQuota, codexSubscriptionSnapshots, files, priorityTierByFile, t]);
 
   const sorted = useMemo(() => {
+    if (!isExpirySortMode) return baseSorted;
+
     const originalIndexMap = new Map(filtered.map((file, index) => [file.name, index]));
 
     const getEffectiveSubscriptionExpiry = (file: AuthFileItem) => {
@@ -876,46 +914,48 @@ export function AuthFilesPage() {
     };
 
     const copy = [...filtered];
-    if (sortMode === 'default') {
-      copy.sort((a, b) => {
-        const providerA = normalizeProviderKey(String(a.provider ?? a.type ?? 'unknown'));
-        const providerB = normalizeProviderKey(String(b.provider ?? b.type ?? 'unknown'));
-        const providerCompare = providerA.localeCompare(providerB);
-        if (providerCompare !== 0) return providerCompare;
-        return a.name.localeCompare(b.name);
-      });
-    } else if (sortMode === 'az') {
-      copy.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortMode === 'priority') {
-      copy.sort(comparePriorityThenName);
-    } else if (sortMode === 'expiry_soon' || sortMode === 'expiry_long') {
-      const direction = sortMode === 'expiry_soon' ? 1 : -1;
-      copy.sort((a, b) => {
-        const expiryA = getEffectiveSubscriptionExpiry(a);
-        const expiryB = getEffectiveSubscriptionExpiry(b);
+    const direction = sortMode === 'expiry_soon' ? 1 : -1;
+    copy.sort((a, b) => {
+      const expiryA = getEffectiveSubscriptionExpiry(a);
+      const expiryB = getEffectiveSubscriptionExpiry(b);
 
-        if (expiryA === null && expiryB === null) return compareExpiryTie(a, b);
-        if (expiryA === null) return 1;
-        if (expiryB === null) return -1;
+      if (expiryA === null && expiryB === null) return compareExpiryTie(a, b);
+      if (expiryA === null) return 1;
+      if (expiryB === null) return -1;
 
-        const expiryCompare = (expiryA - expiryB) * direction;
-        return expiryCompare !== 0 ? expiryCompare : compareExpiryTie(a, b);
-      });
-    }
+      const expiryCompare = (expiryA - expiryB) * direction;
+      return expiryCompare !== 0 ? expiryCompare : compareExpiryTie(a, b);
+    });
     return copy;
   }, [
     authTokenSnapshots,
+    baseSorted,
     codexQuota,
     codexSubscriptionSnapshots,
     filtered,
+    isExpirySortMode,
     manualExpiryByFile,
     sortMode,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const start = (currentPage - 1) * pageSize;
-  const pageItems = sorted.slice(start, start + pageSize);
+  const pageItems = useMemo(() => sorted.slice(start, start + pageSize), [sorted, start, pageSize]);
+  const statusDataByFileName = useMemo(() => {
+    const next = new Map<string, AuthFileStatusBarData>();
+
+    pageItems.forEach((file) => {
+      const rawAuthIndex = file['auth_index'] ?? file.authIndex;
+      const authIndexKey = normalizeRecentRequestAuthIndex(rawAuthIndex);
+      next.set(
+        file.name,
+        (authIndexKey && statusBarCache.get(authIndexKey)) ||
+          statusBarDataFromRecentRequests(
+            normalizeRecentRequestBuckets(file.recent_requests ?? file.recentRequests)
+          )
+      );
+    });
+
+    return next;
+  }, [pageItems, statusBarCache]);
   const selectablePageItems = useMemo(
     () => pageItems.filter((file) => !isRuntimeOnlyAuthFile(file)),
     [pageItems]
@@ -943,6 +983,16 @@ export function AuthFilesPage() {
     selectedNames.length === 0 ||
     batchPriorityUpdating ||
     selectedHasPriorityUpdating;
+  const batchProgressLabel =
+    batchProgress.phase === 'idle'
+      ? ''
+      : t('auth_files.batch_progress', {
+          completed: batchProgress.completed,
+          total: batchProgress.total,
+          success: batchProgress.success,
+          failed: batchProgress.failed,
+          defaultValue: `${batchProgress.completed}/${batchProgress.total}`,
+        });
 
   const handlePriorityInvalid = useCallback(() => {
     showNotification(t('auth_files.priority_invalid'), 'error');
@@ -1436,26 +1486,42 @@ export function AuthFilesPage() {
   ]);
 
   const togglePriorityRotationSidecarEnabled = useCallback(async () => {
-    const nextEnabled = priorityRotationSettings.enabled !== true;
-    updatePriorityRotationSettings({ enabled: nextEnabled });
-
+    if (connectionStatus !== 'connected') {
+      showNotification(
+        t('auth_files.priority_rotation_sidecar_connection_required', {
+          defaultValue: '管理接口未连接，自动接力设置未更新。',
+        }),
+        'error'
+      );
+      return;
+    }
     if (!managementKey) {
       showNotification(t('auth_files.priority_rotation_sidecar_missing_login'), 'error');
       return;
     }
 
-    await savePriorityRotationSidecarSettings(
+    const previousEnabled = priorityRotationSettings.enabled === true;
+    const nextEnabled = !previousEnabled;
+    priorityRotationSidecarDraftTouchedRef.current = true;
+    priorityRotationSidecarAutoSaveSignatureRef.current = '';
+    priorityRotationSidecarAutoSaveFailedAtRef.current = 0;
+    setPriorityRotationSettings((current) => ({ ...current, enabled: nextEnabled }));
+
+    const saved = await savePriorityRotationSidecarSettings(
       { enabled: nextEnabled },
       true,
       { forceDraft: true }
     );
+    if (!saved) {
+      setPriorityRotationSettings((current) => ({ ...current, enabled: previousEnabled }));
+    }
   }, [
+    connectionStatus,
     managementKey,
     priorityRotationSettings.enabled,
     savePriorityRotationSidecarSettings,
     showNotification,
     t,
-    updatePriorityRotationSettings,
   ]);
 
   useEffect(() => {
@@ -2616,16 +2682,16 @@ export function AuthFilesPage() {
                     selected={selectedFiles.has(file.name)}
                     resolvedTheme={resolvedTheme}
                     disableControls={disableControls}
-                    deleting={deleting}
-                    statusUpdating={statusUpdating}
+                    deleting={deleting === file.name}
+                    statusUpdating={statusUpdating[file.name] === true}
                     quotaFilterType={quotaFilterType}
-                    statusBarCache={statusBarCache}
+                    statusData={statusDataByFileName.get(file.name)!}
                     authTokenSnapshot={authTokenSnapshots.get(file.name)}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
                     priorityTier={priorityTierByFile.get(file.name) ?? null}
-                    priorityUpdating={priorityUpdating}
-                    noteUpdating={noteUpdating}
+                    priorityUpdating={priorityUpdating[file.name] === true}
+                    noteUpdating={noteUpdating[file.name] === true}
                     onShowModels={showModels}
                     onDownload={handleDownload}
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
@@ -2894,7 +2960,9 @@ export function AuthFilesPage() {
               <div className={styles.batchActionBar}>
                 <div className={styles.batchActionLeft}>
                   <span className={styles.batchSelectionText}>
-                    {t('auth_files.batch_selected', { count: selectionCount })}
+                    {batchProgressLabel
+                      ? `${t('auth_files.batch_selected', { count: selectionCount })} ${batchProgressLabel}`
+                      : t('auth_files.batch_selected', { count: selectionCount })}
                   </span>
                   <Button
                     variant="secondary"

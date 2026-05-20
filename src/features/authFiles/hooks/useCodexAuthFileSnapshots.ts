@@ -22,6 +22,32 @@ export type CodexAuthFileSnapshots = {
   subscriptionSnapshots: Map<string, CodexSubscriptionSnapshot>;
 };
 
+const CODEX_AUTH_SNAPSHOT_CONCURRENCY = 5;
+
+const runSnapshotDownloads = async <T>(
+  downloads: Array<{ file: AuthFileItem; signature: string }>,
+  worker: (download: { file: AuthFileItem; signature: string }) => Promise<T>
+): Promise<T[]> => {
+  const results = new Array<T>(downloads.length);
+  let nextIndex = 0;
+
+  const runNext = async () => {
+    while (nextIndex < downloads.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(downloads[index] as { file: AuthFileItem; signature: string });
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(CODEX_AUTH_SNAPSHOT_CONCURRENCY, downloads.length) },
+      () => runNext()
+    )
+  );
+  return results;
+};
+
 const buildFileSignature = (file: AuthFileItem): string =>
   [
     file.name,
@@ -75,8 +101,9 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
 
     if (downloads.length === 0) return;
 
-    void Promise.all(
-      downloads.map(async ({ file, signature }) => {
+    void runSnapshotDownloads(
+      downloads,
+      async ({ file, signature }) => {
         try {
           const authJson = await authFilesApi.downloadJsonObject(file.name);
           return {
@@ -101,7 +128,7 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
             },
           };
         }
-      })
+      }
     ).then((results) => {
       if (cancelled) return;
       setCache((prev) => {

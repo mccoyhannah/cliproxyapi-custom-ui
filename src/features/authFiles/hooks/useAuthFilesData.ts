@@ -51,12 +51,20 @@ export type AuthFilePriorityBatchChange = { name: string; priority: number };
 export type AuthFilePriorityBatchOptions = { notify?: boolean };
 export type AuthFilePriorityBatchResult = { successCount: number; failCount: number };
 export type AuthFileUploadStage = 'idle' | 'validating' | 'uploading' | 'refreshing';
+export type AuthFileBatchProgressPhase = 'idle' | 'status' | 'priority';
 export type AuthFileUploadProgress = {
   stage: AuthFileUploadStage;
   total: number;
   accepted: number;
   rejected: number;
   uploaded: number;
+};
+export type AuthFileBatchProgress = {
+  phase: AuthFileBatchProgressPhase;
+  total: number;
+  completed: number;
+  success: number;
+  failed: number;
 };
 type ApiErrorLike = Error & {
   status?: number;
@@ -75,6 +83,7 @@ export type UseAuthFilesDataResult = {
   error: string;
   uploading: boolean;
   uploadProgress: AuthFileUploadProgress;
+  batchProgress: AuthFileBatchProgress;
   deleting: string | null;
   deletingAll: boolean;
   statusUpdating: Record<string, boolean>;
@@ -121,6 +130,49 @@ const IDLE_UPLOAD_PROGRESS: AuthFileUploadProgress = {
   accepted: 0,
   rejected: 0,
   uploaded: 0,
+};
+
+const IDLE_BATCH_PROGRESS: AuthFileBatchProgress = {
+  phase: 'idle',
+  total: 0,
+  completed: 0,
+  success: 0,
+  failed: 0,
+};
+
+const AUTH_FILE_BATCH_CONCURRENCY = 5;
+
+const runConcurrentBatch = async <TItem, TResult>(
+  items: TItem[],
+  worker: (item: TItem, index: number) => Promise<TResult>,
+  onSettled: (result: PromiseSettledResult<TResult>, index: number) => void,
+  concurrency = AUTH_FILE_BATCH_CONCURRENCY
+): Promise<PromiseSettledResult<TResult>[]> => {
+  const results = new Array<PromiseSettledResult<TResult>>(items.length);
+  let nextIndex = 0;
+
+  const runNext = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+
+      try {
+        const value = await worker(items[index] as TItem, index);
+        const result: PromiseFulfilledResult<TResult> = { status: 'fulfilled', value };
+        results[index] = result;
+        onSettled(result, index);
+      } catch (reason) {
+        const result: PromiseRejectedResult = { status: 'rejected', reason };
+        results[index] = result;
+        onSettled(result, index);
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => runNext())
+  );
+  return results;
 };
 
 const isAuthFileNotFoundError = (err: unknown): boolean => {
@@ -255,6 +307,8 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] =
     useState<AuthFileUploadProgress>(IDLE_UPLOAD_PROGRESS);
+  const [batchProgress, setBatchProgress] =
+    useState<AuthFileBatchProgress>(IDLE_BATCH_PROGRESS);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
@@ -265,9 +319,44 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const loadFilesRequestSeqRef = useRef(0);
+  const loadFilesLoadingSeqRef = useRef(0);
+  const batchProgressRunRef = useRef(0);
   const batchStatusPendingRef = useRef(false);
   const batchPriorityPendingRef = useRef(false);
   const selectionCount = selectedFiles.size;
+
+  const beginBatchProgress = useCallback((phase: Exclude<AuthFileBatchProgressPhase, 'idle'>, total: number) => {
+    const runId = batchProgressRunRef.current + 1;
+    batchProgressRunRef.current = runId;
+    setBatchProgress({
+      phase,
+      total,
+      completed: 0,
+      success: 0,
+      failed: 0,
+    });
+    return runId;
+  }, []);
+
+  const updateBatchProgress = useCallback((runId: number, succeeded: boolean) => {
+    setBatchProgress((prev) => {
+      if (batchProgressRunRef.current !== runId || prev.phase === 'idle') return prev;
+      return {
+        ...prev,
+        completed: Math.min(prev.total, prev.completed + 1),
+        success: prev.success + (succeeded ? 1 : 0),
+        failed: prev.failed + (succeeded ? 0 : 1),
+      };
+    });
+  }, []);
+
+  const finishBatchProgress = useCallback((runId: number) => {
+    if (batchProgressRunRef.current === runId) {
+      setBatchProgress(IDLE_BATCH_PROGRESS);
+    }
+  }, []);
+
   const toggleSelect = useCallback((name: string) => {
     setSelectedFiles((prev) => {
       const next = new Set(prev);
@@ -360,18 +449,29 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   }, [files, selectedFiles.size]);
 
   const loadFiles = useCallback(async (options: LoadAuthFilesOptions = {}) => {
+    const requestSeq = loadFilesRequestSeqRef.current + 1;
+    loadFilesRequestSeqRef.current = requestSeq;
     if (!options.silent) {
+      loadFilesLoadingSeqRef.current = requestSeq;
       setLoading(true);
     }
     setError('');
     try {
       const data = await authFilesApi.list();
-      setFiles(data?.files || []);
+      if (requestSeq !== loadFilesRequestSeqRef.current) return;
+      const nextFiles = data?.files || [];
+      setFiles((prev) => {
+        if (options.preserveExisting && prev.length > 0 && nextFiles.length === 0) {
+          return prev;
+        }
+        return nextFiles;
+      });
     } catch (err: unknown) {
+      if (requestSeq !== loadFilesRequestSeqRef.current) return;
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(errorMessage);
     } finally {
-      if (!options.silent) {
+      if (!options.silent && requestSeq === loadFilesLoadingSeqRef.current) {
         setLoading(false);
       }
     }
@@ -919,6 +1019,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       const nextDisabled = !enabled;
 
       batchStatusPendingRef.current = true;
+      const progressRunId = beginBatchProgress('status', targetNameList.length);
       setBatchStatusUpdating(true);
       setStatusUpdating((prev) => {
         const next = { ...prev };
@@ -934,8 +1035,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       );
 
       try {
-        const results = await Promise.allSettled(
-          targetNameList.map((name) => authFilesApi.setStatus(name, nextDisabled))
+        const results = await runConcurrentBatch(
+          targetNameList,
+          (name) => authFilesApi.setStatus(name, nextDisabled),
+          (result) => updateBatchProgress(progressRunId, result.status === 'fulfilled')
         );
 
         let successCount = 0;
@@ -979,6 +1082,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       } finally {
         batchStatusPendingRef.current = false;
         setBatchStatusUpdating(false);
+        finishBatchProgress(progressRunId);
         setStatusUpdating((prev) => {
           const next = { ...prev };
           targetNameList.forEach((name) => {
@@ -988,7 +1092,16 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         });
       }
     },
-    [deselectAll, files, showNotification, statusUpdating, t]
+    [
+      beginBatchProgress,
+      deselectAll,
+      files,
+      finishBatchProgress,
+      showNotification,
+      statusUpdating,
+      t,
+      updateBatchProgress,
+    ]
   );
 
   const batchSetPriority = useCallback(
@@ -1010,6 +1123,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       const targetNames = new Set(targetNameList);
 
       batchPriorityPendingRef.current = true;
+      const progressRunId = beginBatchProgress('priority', targetNameList.length);
       setBatchPriorityUpdating(true);
       setPriorityUpdating((prev) => {
         const next = { ...prev };
@@ -1023,8 +1137,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       );
 
       try {
-        const results = await Promise.allSettled(
-          targetNameList.map((name) => authFilesApi.patchFields(name, { priority }))
+        const results = await runConcurrentBatch(
+          targetNameList,
+          (name) => authFilesApi.patchFields(name, { priority }),
+          (result) => updateBatchProgress(progressRunId, result.status === 'fulfilled')
         );
 
         let successCount = 0;
@@ -1068,6 +1184,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       } finally {
         batchPriorityPendingRef.current = false;
         setBatchPriorityUpdating(false);
+        finishBatchProgress(progressRunId);
         setPriorityUpdating((prev) => {
           const next = { ...prev };
           targetNameList.forEach((name) => {
@@ -1077,7 +1194,16 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         });
       }
     },
-    [deselectAll, files, priorityUpdating, showNotification, t]
+    [
+      beginBatchProgress,
+      deselectAll,
+      files,
+      finishBatchProgress,
+      priorityUpdating,
+      showNotification,
+      t,
+      updateBatchProgress,
+    ]
   );
 
   const batchSetPriorities = useCallback(
@@ -1116,6 +1242,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       const existingTargetNames = new Set(existingTargetNameList);
 
       batchPriorityPendingRef.current = true;
+      const progressRunId = beginBatchProgress('priority', existingTargetNameList.length);
       setBatchPriorityUpdating(true);
       setPriorityUpdating((prev) => {
         const next = { ...prev };
@@ -1133,10 +1260,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       );
 
       try {
-        const results = await Promise.allSettled(
-          existingTargetNameList.map((name) =>
-            authFilesApi.patchFields(name, { priority: changeMap.get(name) ?? 0 })
-          )
+        const results = await runConcurrentBatch(
+          existingTargetNameList,
+          (name) => authFilesApi.patchFields(name, { priority: changeMap.get(name) ?? 0 }),
+          (result) => updateBatchProgress(progressRunId, result.status === 'fulfilled')
         );
 
         let successCount = 0;
@@ -1181,6 +1308,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       } finally {
         batchPriorityPendingRef.current = false;
         setBatchPriorityUpdating(false);
+        finishBatchProgress(progressRunId);
         setPriorityUpdating((prev) => {
           const next = { ...prev };
           existingTargetNameList.forEach((name) => {
@@ -1190,7 +1318,15 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         });
       }
     },
-    [files, priorityUpdating, showNotification, t]
+    [
+      beginBatchProgress,
+      files,
+      finishBatchProgress,
+      priorityUpdating,
+      showNotification,
+      t,
+      updateBatchProgress,
+    ]
   );
 
   const batchDownload = useCallback(
@@ -1293,6 +1429,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     error,
     uploading,
     uploadProgress,
+    batchProgress,
     deleting,
     deletingAll,
     statusUpdating,

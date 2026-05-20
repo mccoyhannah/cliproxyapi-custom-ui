@@ -6,6 +6,8 @@
   flex-direction: column;
   gap: 20px;
   min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
   padding-bottom: calc(
     var(--auth-files-action-bar-height, 0px) + 16px + env(safe-area-inset-bottom)
   );
@@ -6656,33 +6658,30 @@ button.codexSubscriptionValue {
 }
 
 .filterSection {
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 11px;
-  border-radius: 8px;
-  border: 1px solid var(--auth-command-line-strong);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 3%, transparent), transparent),
-    color-mix(in srgb, var(--surface-panel) 70%, var(--bg-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .filterRail,
 .filterControlsPanel,
 .priorityRotationBar,
 .priorityRotationBackgroundPanel {
-  border-color: var(--auth-command-line);
+  border-color: color-mix(in srgb, var(--auth-command-line) 70%, transparent);
   background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 3%, transparent), transparent),
-    var(--auth-command-panel);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+    linear-gradient(180deg, color-mix(in srgb, #fff 2%, transparent), transparent),
+    color-mix(in srgb, var(--auth-command-panel) 76%, transparent);
+  box-shadow: none;
 }
 
 .filterRail {
   gap: 7px;
-  padding: 0 0 9px;
+  padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--auth-command-line);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -6695,8 +6694,8 @@ button.codexSubscriptionValue {
 .filterTag {
   min-height: 28px;
   padding: 3px 8px 3px 5px;
-  border-color: color-mix(in srgb, var(--border-color) 52%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 42%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 24%, transparent);
   color: var(--text-secondary);
   box-shadow: none;
 
@@ -6708,18 +6707,18 @@ button.codexSubscriptionValue {
   &:hover {
     transform: none;
     color: var(--text-primary);
-    border-color: color-mix(in srgb, var(--filter-color) 28%, var(--border-color));
-    background: color-mix(in srgb, var(--filter-surface) 12%, var(--surface-control));
+    border-color: color-mix(in srgb, var(--filter-color) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--filter-surface) 8%, var(--surface-control));
     box-shadow: none;
   }
 }
 
 .filterTagActive {
-  border-color: color-mix(in srgb, var(--filter-color) 40%, var(--border-color));
+  border-color: color-mix(in srgb, var(--filter-color) 34%, var(--border-color));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--filter-surface) 18%, transparent), transparent),
-    color-mix(in srgb, var(--surface-control) 54%, var(--bg-primary));
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--filter-color) 68%, transparent);
+    linear-gradient(90deg, color-mix(in srgb, var(--filter-surface) 12%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 38%, var(--bg-primary));
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--filter-color) 52%, transparent);
 }
 
 .filterTagIconWrap {
@@ -6745,14 +6744,14 @@ button.codexSubscriptionValue {
   min-height: 48px;
   padding: 8px 10px;
   border-style: solid;
-  border-color: color-mix(in srgb, var(--auth-command-accent) 22%, var(--border-color));
+  border-color: color-mix(in srgb, var(--auth-command-accent) 16%, var(--border-color));
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--auth-command-accent) 5%, transparent),
+      color-mix(in srgb, var(--auth-command-accent) 3%, transparent),
       transparent 46%
     ),
-    color-mix(in srgb, var(--surface-control) 48%, var(--bg-primary));
+    color-mix(in srgb, var(--surface-control) 30%, var(--bg-primary));
   box-shadow: none;
 
   &::after {
@@ -6762,26 +6761,26 @@ button.codexSubscriptionValue {
   &:hover,
   &:focus-visible {
     transform: none;
-    border-color: color-mix(in srgb, var(--auth-command-accent) 36%, var(--border-color));
+    border-color: color-mix(in srgb, var(--auth-command-accent) 26%, var(--border-color));
     background:
       linear-gradient(
         90deg,
-        color-mix(in srgb, var(--auth-command-accent) 8%, transparent),
+        color-mix(in srgb, var(--auth-command-accent) 5%, transparent),
         transparent 48%
       ),
-      color-mix(in srgb, var(--surface-control) 56%, var(--bg-primary));
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-command-accent) 7%, transparent);
+      color-mix(in srgb, var(--surface-control) 38%, var(--bg-primary));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--auth-command-accent) 5%, transparent);
   }
 }
 
 .uploadDropPoolActive {
-  border-color: color-mix(in srgb, #14b8a6 52%, var(--border-color));
+  border-color: color-mix(in srgb, #14b8a6 42%, var(--border-color));
   background:
-    linear-gradient(90deg, color-mix(in srgb, #14b8a6 10%, transparent), transparent 52%),
-    color-mix(in srgb, var(--surface-control) 58%, var(--bg-primary));
+    linear-gradient(90deg, color-mix(in srgb, #14b8a6 7%, transparent), transparent 52%),
+    color-mix(in srgb, var(--surface-control) 42%, var(--bg-primary));
   box-shadow:
-    inset 2px 0 0 #14b8a6,
-    0 0 0 2px color-mix(in srgb, #14b8a6 8%, transparent);
+    inset 2px 0 0 color-mix(in srgb, #14b8a6 72%, transparent),
+    0 0 0 2px color-mix(in srgb, #14b8a6 5%, transparent);
 }
 
 .uploadDropPoolDisabled {
@@ -6843,13 +6842,11 @@ button.codexSubscriptionValue {
   gap: 10px;
   margin-bottom: 0;
   padding: 8px 9px;
-  border-color: var(--auth-command-line);
+  border-color: color-mix(in srgb, #0891b2 12%, var(--border-color));
   background:
-    linear-gradient(90deg, color-mix(in srgb, #0891b2 5%, transparent), transparent 48%),
-    var(--auth-command-panel);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
-    inset 2px 0 0 color-mix(in srgb, #0891b2 52%, transparent);
+    linear-gradient(90deg, color-mix(in srgb, #0891b2 3%, transparent), transparent 48%),
+    color-mix(in srgb, var(--auth-command-panel) 74%, transparent);
+  box-shadow: none;
 }
 
 .priorityRotationMain {
@@ -6962,13 +6959,11 @@ button.codexSubscriptionValue {
   gap: 8px;
   margin: 0;
   padding: 9px;
-  border-color: var(--auth-command-line);
+  border-color: color-mix(in srgb, var(--success-color) 10%, var(--border-color));
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--success-color) 4%, transparent), transparent 48%),
-    var(--auth-command-panel);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent),
-    inset 2px 0 0 color-mix(in srgb, var(--success-color) 26%, transparent);
+    linear-gradient(90deg, color-mix(in srgb, var(--success-color) 2%, transparent), transparent 48%),
+    color-mix(in srgb, var(--auth-command-panel) 70%, transparent);
+  box-shadow: none;
 }
 
 .priorityRotationBackgroundHeader {
@@ -6990,7 +6985,7 @@ button.codexSubscriptionValue {
   padding: 1px 5px;
   border-color: transparent;
   background: transparent;
-  color: var(--text-tertiary);
+  color: color-mix(in srgb, var(--text-tertiary) 86%, transparent);
   font-size: 10px;
   font-weight: 620;
 }
@@ -7092,6 +7087,11 @@ button.codexSubscriptionValue {
     background: transparent;
     color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
   }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-color) 16%, transparent);
+  }
 }
 
 .priorityRotationSlider {
@@ -7129,7 +7129,12 @@ button.codexSubscriptionValue {
 }
 
 .filterControlsPanel {
-  padding: 9px;
+  padding: 9px 0 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--auth-command-line) 58%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .filterControls {
@@ -7162,8 +7167,8 @@ button.codexSubscriptionValue {
 .filterToggleCard {
   min-height: 36px;
   padding-inline: 6px;
-  border-color: color-mix(in srgb, var(--border-color) 44%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 34%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 22%, transparent);
   box-shadow: none;
 
   &:has(input:checked) {
@@ -7204,11 +7209,11 @@ button.codexSubscriptionValue {
 
 .fileCard {
   padding: 12px;
-  border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 42%, transparent);
   background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 3%, transparent), transparent 96px),
-    color-mix(in srgb, var(--surface-card) 92%, var(--bg-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+    linear-gradient(180deg, color-mix(in srgb, #fff 2%, transparent), transparent 84px),
+    color-mix(in srgb, var(--surface-card) 88%, var(--bg-primary));
+  box-shadow: none;
 
   &::before {
     content: '';
@@ -7230,13 +7235,11 @@ button.codexSubscriptionValue {
 
   &:hover {
     transform: none;
-    border-color: color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
+    border-color: color-mix(in srgb, var(--primary-color) 12%, var(--border-color));
     background:
-      linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent 96px),
-      color-mix(in srgb, var(--surface-card-hover) 90%, var(--bg-primary));
-    box-shadow:
-      0 8px 22px -24px color-mix(in srgb, var(--text-primary) 34%, transparent),
-      inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent);
+      linear-gradient(180deg, color-mix(in srgb, #fff 2%, transparent), transparent 84px),
+      color-mix(in srgb, var(--surface-card-hover) 82%, var(--bg-primary));
+    box-shadow: none;
   }
 }
 
@@ -7247,7 +7250,7 @@ button.codexSubscriptionValue {
     color-mix(in srgb, var(--surface-card) 92%, var(--bg-primary));
   box-shadow:
     inset 2px 0 0 color-mix(in srgb, var(--primary-color) 70%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--primary-color) 10%, transparent);
 }
 
 .fileCardDisabled {
@@ -7305,10 +7308,27 @@ button.codexSubscriptionValue {
   box-shadow: none;
 }
 
+.typeBadge {
+  opacity: 0.74;
+  border-color: color-mix(in srgb, currentColor 10%, var(--border-color));
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  color: color-mix(in srgb, currentColor 76%, var(--text-secondary));
+  font-weight: 640;
+}
+
+.fileCard:hover .typeBadge {
+  opacity: 0.82;
+}
+
+.stateBadge {
+  font-weight: 790;
+}
+
 .refreshTokenWarningBadge {
   color: color-mix(in srgb, #0e7490 74%, var(--text-primary));
-  border-color: color-mix(in srgb, #0e7490 22%, var(--border-color));
-  background: color-mix(in srgb, #0e7490 7%, var(--surface-control));
+  border-color: color-mix(in srgb, #0e7490 20%, var(--border-color));
+  border-style: solid;
+  background: color-mix(in srgb, #0e7490 6%, var(--surface-control));
   box-shadow: none;
 
   &::before {
@@ -7317,9 +7337,9 @@ button.codexSubscriptionValue {
 }
 
 .fileName {
-  font-size: 13px;
-  font-weight: 760;
-  line-height: 1.32;
+  font-size: 14px;
+  font-weight: 820;
+  line-height: 1.34;
 }
 
 .displayNameButton {
@@ -7362,9 +7382,9 @@ button.codexSubscriptionValue {
 
 .metaItem {
   gap: 4px;
-  padding: 2px 5px;
-  border-color: color-mix(in srgb, var(--border-color) 28%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 20%, transparent);
+  padding: 1px 2px;
+  border-color: transparent;
+  background: transparent;
 }
 
 .metaLabel {
@@ -7383,8 +7403,8 @@ button.codexSubscriptionValue {
   grid-template-columns: 26px minmax(88px, 1fr) 26px;
   min-height: 31px;
   width: min(100%, 158px);
-  border-color: color-mix(in srgb, var(--border-color) 48%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 42%, transparent);
+  border-color: color-mix(in srgb, var(--priority-badge-color) 22%, var(--border-color));
+  background: color-mix(in srgb, var(--priority-badge-color) 5%, var(--surface-control));
   box-shadow: none;
 }
 
@@ -7402,7 +7422,7 @@ button.codexSubscriptionValue {
   min-width: 42px;
   padding: 3px 6px 4px;
   border-radius: 7px;
-  box-shadow: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--priority-badge-color) 5%, transparent);
 }
 
 .priorityBadgeStepButton {
@@ -7413,6 +7433,29 @@ button.codexSubscriptionValue {
   &:hover:not(:disabled) {
     background: transparent;
     color: color-mix(in srgb, var(--priority-badge-color) 78%, var(--text-primary));
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px
+      color-mix(in srgb, var(--priority-badge-color) 18%, transparent);
+  }
+}
+
+.priorityBadgeEditorFree .priorityBadgeStepButton:hover:not(:disabled) {
+  background: transparent;
+  color: color-mix(in srgb, #64748b 76%, var(--text-primary));
+}
+
+.priorityStepButton {
+  &:hover:not(:disabled) {
+    background: transparent;
+    color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-color) 16%, transparent);
   }
 }
 
@@ -7442,6 +7485,7 @@ button.codexSubscriptionValue {
 .subscriptionExpiryAccessTokenOnly {
   color: color-mix(in srgb, #0e7490 72%, var(--text-primary));
   border-color: color-mix(in srgb, #0e7490 20%, var(--border-color));
+  border-style: solid;
   background: color-mix(in srgb, #0e7490 6%, var(--surface-control));
   box-shadow: none;
 }
@@ -7449,8 +7493,8 @@ button.codexSubscriptionValue {
 .cardInsights {
   gap: 6px;
   padding: 6px;
-  border-color: color-mix(in srgb, var(--border-color) 24%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 18%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 18%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 12%, transparent);
 }
 
 .cardInsightsCompact {
@@ -7482,8 +7526,8 @@ button.codexSubscriptionValue {
 .statusPanel,
 .quotaSection {
   border-radius: 7px;
-  border-color: color-mix(in srgb, var(--border-color) 28%, transparent);
-  background: color-mix(in srgb, var(--surface-panel) 36%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 20%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 24%, transparent);
   box-shadow: none;
 }
 
@@ -7522,12 +7566,13 @@ button.codexSubscriptionValue {
 
 .quotaRow {
   padding: 6px 7px;
-  border-color: color-mix(in srgb, var(--border-color) 26%, transparent);
-  background: color-mix(in srgb, var(--bg-primary) 26%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 18%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 18%, transparent);
 }
 
 .quotaModel {
   font-size: 12px;
+  font-weight: 760;
 }
 
 .quotaBar {
@@ -7535,8 +7580,19 @@ button.codexSubscriptionValue {
 }
 
 .codexCompactQuotaLine {
-  border-color: color-mix(in srgb, var(--border-color) 28%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 18%, transparent);
+  border-color: color-mix(in srgb, var(--auth-command-accent) 16%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent) 5%, transparent);
+  box-shadow: none;
+}
+
+.quotaAmount,
+.quotaPercent,
+.codexCompactQuotaPercent {
+  font-weight: 820;
+}
+
+.quotaSection button.codexSubscriptionValue:hover {
+  transform: none;
   box-shadow: none;
 }
 
@@ -7558,12 +7614,14 @@ button.codexSubscriptionValue {
 }
 
 .modelsActionButton:global(.btn.btn-sm) {
-  border-color: color-mix(in srgb, var(--auth-command-accent-2) 14%, var(--border-color));
-  background: color-mix(in srgb, var(--auth-command-accent-2) 5%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--auth-command-accent-2) 10%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent-2) 4%, var(--bg-secondary));
 
   &:hover {
-    border-color: color-mix(in srgb, var(--auth-command-accent-2) 26%, var(--border-color));
-    background: color-mix(in srgb, var(--auth-command-accent-2) 8%, var(--bg-secondary));
+    transform: none;
+    border-color: color-mix(in srgb, var(--auth-command-accent-2) 18%, var(--border-color));
+    background: color-mix(in srgb, var(--auth-command-accent-2) 6%, var(--bg-secondary));
+    box-shadow: none;
   }
 }
 
@@ -7615,23 +7673,23 @@ button.codexSubscriptionValue {
 }
 
 .batchActionContainer {
-  width: min(1040px, calc(100vw - 28px));
+  width: min(980px, calc(100vw - 28px));
 }
 
 .batchActionBar {
   gap: 8px;
   padding: 8px;
-  border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  border-color: color-mix(in srgb, var(--primary-color) 14%, var(--border-color));
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--primary-color) 5%, transparent),
+      color-mix(in srgb, var(--primary-color) 3%, transparent),
       transparent 36%
     ),
-    color-mix(in srgb, var(--floating-surface) 90%, transparent);
+    color-mix(in srgb, var(--floating-surface) 88%, transparent);
   box-shadow:
-    0 16px 36px -28px color-mix(in srgb, #000 42%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+    0 10px 26px -24px color-mix(in srgb, #000 38%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
 }
 
 .batchActionLeft,
@@ -7664,6 +7722,15 @@ button.codexSubscriptionValue {
   background: color-mix(in srgb, var(--surface-control) 38%, transparent);
 }
 
+.authFilesPanel,
+.fileCard,
+.batchActionBar {
+  :global(.btn:hover:not(:disabled)) {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
 @media (max-width: 1320px) {
   .priorityRotationBar {
     grid-template-columns: 1fr;
@@ -7675,6 +7742,57 @@ button.codexSubscriptionValue {
 
   .priorityRotationStatusGroup {
     justify-content: flex-start;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1100px) {
+  .filterControls {
+    grid-template-columns: minmax(260px, 1fr) minmax(118px, 0.38fr);
+  }
+
+  .filterItem:nth-child(3),
+  .filterToggleItem {
+    grid-column: 1 / -1;
+  }
+
+  .filterToggleGroup {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .priorityRotationBar {
+    grid-template-columns: 1fr;
+  }
+
+  .priorityRotationActions {
+    align-self: stretch;
+    max-width: none;
+  }
+
+  .priorityRotationStatusGroup {
+    justify-content: flex-start;
+  }
+
+  .fileGridQuotaManaged {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  }
+
+  .batchActionContainer {
+    width: min(860px, calc(100vw - 24px));
+  }
+
+  .batchActionBar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .batchActionLeft,
+  .batchActionRight {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .batchActionRight {
+    margin-left: 0;
   }
 }
 
@@ -7695,17 +7813,26 @@ button.codexSubscriptionValue {
 }
 
 @include mobile {
+  .container {
+    overflow-x: hidden;
+  }
+
   .filterSection {
     gap: 8px;
-    padding: 8px;
+    padding: 0;
   }
 
   .filterRail {
-    padding-bottom: 8px;
+    padding-bottom: 6px;
   }
 
   .filterTag {
     width: 100%;
+    min-width: 0;
+  }
+
+  .filterTagText {
+    max-width: 100%;
   }
 
   .uploadDropPool {
@@ -7737,6 +7864,24 @@ button.codexSubscriptionValue {
     min-width: min(100%, 92px);
   }
 
+  .priorityRotationMain,
+  .priorityRotationBackgroundHeader,
+  .priorityRotationRelayControl,
+  .fileCardLayout,
+  .fileCardMain,
+  .cardHeaderContent,
+  .cardActionsMain {
+    min-width: 0;
+  }
+
+  .priorityRotationBackgroundHeader {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+
+  .priorityRotationRelayCopy span {
+    overflow-wrap: anywhere;
+  }
+
   .filterToggleGroup {
     grid-template-columns: 1fr;
     gap: 6px;
@@ -7758,7 +7903,7 @@ button.codexSubscriptionValue {
 
   .cardActionsMain {
     flex: 1 1 auto;
-    min-width: min(100%, 216px);
+    min-width: 0;
   }
 
   .statusToggle {
@@ -7766,14 +7911,17 @@ button.codexSubscriptionValue {
   }
 
   .batchActionContainer {
-    width: calc(100vw - 16px);
-    max-width: calc(100vw - 16px);
+    width: calc(100vw - 12px);
+    max-width: calc(100vw - 12px);
     bottom: calc(10px + env(safe-area-inset-bottom));
   }
 
   .batchActionBar {
     gap: 7px;
     padding: 7px;
+    max-height: min(54vh, calc(100vh - 128px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .batchActionLeft,
@@ -7783,5 +7931,15 @@ button.codexSubscriptionValue {
 
   .batchActionBar :global(.btn) {
     flex: 1 1 calc(50% - 4px);
+  }
+
+  .batchPriorityControl {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .batchPriorityInput {
+    width: auto;
+    flex: 1 1 70px;
   }
 }
