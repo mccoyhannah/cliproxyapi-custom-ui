@@ -196,6 +196,12 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     displayNameDraft.fileName === file.name && displayNameDraft.editing;
   const displayNameInputRef = useRef<HTMLInputElement | null>(null);
   const skipDisplayNameBlurRef = useRef(false);
+  const [utilityActionsState, setUtilityActionsState] = useState({
+    fileName: file.name,
+    open: false,
+  });
+  const utilityActionsOpen =
+    utilityActionsState.fileName === file.name && utilityActionsState.open;
   const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const prioritySaving = priorityUpdating;
   const displayNameSaving = noteUpdating;
@@ -399,6 +405,11 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     <div
       className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${compactPlanToneClass} ${cardToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
+      {isRuntimeOnly && (
+        <div className={styles.runtimeLockRibbon}>
+          {t('auth_files.table_status_runtime', { defaultValue: '只读 / Runtime' })}
+        </div>
+      )}
       <div className={styles.fileCardLayout}>
         <div className={styles.fileCardMain}>
           <div className={styles.cardHeader}>
@@ -493,12 +504,12 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   {displayNameSaving && <LoadingSpinner size={12} />}
                 </button>
               )}
-              {!compact && noteValue && (
-                <div className={styles.fileNameSource} title={file.name}>
-                  <span className={styles.noteLabel}>{t('auth_files.file_name_display')}</span>
-                  <span className={styles.noteValue}>{file.name}</span>
-                </div>
-              )}
+              <div className={styles.fileNameSource} title={file.name}>
+                <span className={styles.noteLabel}>
+                  {t('auth_files.file_name_display', { defaultValue: '真实文件名' })}
+                </span>
+                <span className={styles.noteValue}>{file.name}</span>
+              </div>
             </div>
           </div>
 
@@ -604,7 +615,12 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     }
                   }}
                 >
-                  {subscriptionExpiryDisplayLabel}
+                  {manualExpiry && (
+                    <span className={styles.localExpiryMarker}>
+                      {t('auth_files.local_override_short', { defaultValue: '本地' })}
+                    </span>
+                  )}
+                  <span>{subscriptionExpiryDisplayLabel}</span>
                 </span>
               </div>
             )}
@@ -666,52 +682,73 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 </Button>
               )}
               {!isRuntimeOnly && (
-                <div className={styles.cardUtilityActions}>
+                <div className={styles.cardUtilityActionsWrap}>
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => onDownload(file.name)}
-                    className={styles.iconButton}
-                    title={t('auth_files.download_button')}
-                    disabled={disableControls}
+                    className={styles.cardMoreButton}
+                    onClick={() =>
+                      setUtilityActionsState((current) => ({
+                        fileName: file.name,
+                        open: current.fileName === file.name ? !current.open : true,
+                      }))
+                    }
+                    aria-expanded={utilityActionsOpen}
+                    title={t('auth_files.more_actions', { defaultValue: '更多操作' })}
                   >
-                    <IconDownload className={styles.actionIcon} size={16} />
+                    ...
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onOpenPrefixProxyEditor(file)}
-                    className={styles.iconButton}
-                    title={t('auth_files.prefix_proxy_button')}
-                    disabled={disableControls}
+                  <div
+                    className={`${styles.cardUtilityActions} ${
+                      utilityActionsOpen ? styles.cardUtilityActionsOpen : ''
+                    }`}
                   >
-                    <IconSettings className={styles.actionIcon} size={16} />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onManualExpiryEdit(file)}
-                    className={`${styles.iconButton} ${manualExpiry ? styles.manualExpiryActionActive : ''}`}
-                    title={t('auth_files.manual_expiry_button', {
-                      defaultValue: '手动有效期',
-                    })}
-                  >
-                    <IconTimer className={styles.actionIcon} size={16} />
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => onDelete(file.name)}
-                    className={styles.iconButton}
-                    title={t('auth_files.delete_button')}
-                    disabled={disableControls || deleting}
-                  >
-                    {deleting ? (
-                      <LoadingSpinner size={14} />
-                    ) : (
-                      <IconTrash2 className={styles.actionIcon} size={16} />
-                    )}
-                  </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onDownload(file.name)}
+                      className={styles.iconButton}
+                      title={t('auth_files.download_button')}
+                      disabled={disableControls}
+                    >
+                      <IconDownload className={styles.actionIcon} size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onOpenPrefixProxyEditor(file)}
+                      className={styles.iconButton}
+                      title={t('auth_files.prefix_proxy_button')}
+                      disabled={disableControls}
+                    >
+                      <IconSettings className={styles.actionIcon} size={16} />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onManualExpiryEdit(file)}
+                      className={`${styles.iconButton} ${manualExpiry ? styles.manualExpiryActionActive : ''}`}
+                      title={t('auth_files.manual_expiry_button', {
+                        defaultValue: '手动有效期',
+                      })}
+                    >
+                      <IconTimer className={styles.actionIcon} size={16} />
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => onDelete(file.name)}
+                      className={styles.iconButton}
+                      title={t('auth_files.delete_button')}
+                      disabled={disableControls || deleting}
+                    >
+                      {deleting ? (
+                        <LoadingSpinner size={14} />
+                      ) : (
+                        <IconTrash2 className={styles.actionIcon} size={16} />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

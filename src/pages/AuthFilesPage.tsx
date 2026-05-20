@@ -7,14 +7,12 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type DragEvent,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { animate } from 'motion/mini';
-import type { AnimationPlaybackControlsWithThen } from 'motion-dom';
 import { useInterval } from '@/hooks/useInterval';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
@@ -23,15 +21,24 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
+  IconCircleAlert,
+  IconDownload,
   IconFilterAll,
   IconMinus,
+  IconModelCluster,
   IconPlus,
   IconRefreshCw,
+  IconSettings,
   IconSlidersHorizontal,
+  IconTimer,
+  IconTrash2,
   IconUploadCloud,
 } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Modal } from '@/components/ui/Modal';
+import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
+import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { copyToClipboard } from '@/utils/clipboard';
 import {
@@ -40,6 +47,7 @@ import {
   QUOTA_PROVIDER_TYPES,
   clampCardPageSize,
   getAuthFileIcon,
+  getAuthFileStatusMessage,
   getTypeColor,
   getTypeLabel,
   hasAuthFileStatusMessage,
@@ -103,20 +111,20 @@ import {
 } from '@/utils/recentRequests';
 import {
   compareCodexMinRemainingPercentAsc,
+  formatCodexSubscriptionShortDate,
   getCodexFiveHourRemainingPercent,
   getCodexMinRemainingPercent,
   isCodexFile,
   isDisabledAuthFile,
   normalizePlanType,
+  resolveAuthProvider,
   resolveCodexPlanType,
+  type CodexAuthTokenSnapshot,
+  type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
 import { normalizeApiBase } from '@/utils/connection';
 import styles from './AuthFilesPage.module.scss';
 
-const easePower3Out = (progress: number) => 1 - (1 - progress) ** 4;
-const easePower2In = (progress: number) => progress ** 3;
-const BATCH_BAR_BASE_TRANSFORM = 'translateX(-50%)';
-const BATCH_BAR_HIDDEN_TRANSFORM = 'translateX(-50%) translateY(56px)';
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
 const PRIORITY_ROTATION_THRESHOLD_STEP = 5;
@@ -218,6 +226,482 @@ const isPriorityRotationSidecarDraftDirty = (
   );
 };
 
+type AuthFileTableRowProps = {
+  file: AuthFileItem;
+  selected: boolean;
+  resolvedTheme: ResolvedTheme;
+  disableControls: boolean;
+  deleting: boolean;
+  statusUpdating: boolean;
+  priorityUpdating: boolean;
+  noteUpdating: boolean;
+  statusData: AuthFileStatusBarData;
+  authTokenSnapshot?: CodexAuthTokenSnapshot | null;
+  codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
+  codexQuotaState?: CodexQuotaState;
+  manualExpiryMs?: number | null;
+  priorityTier?: AuthFilePriorityTier | null;
+  onShowModels: (file: AuthFileItem) => void;
+  onDownload: (name: string) => void;
+  onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
+  onManualExpiryEdit: (file: AuthFileItem) => void;
+  onDelete: (name: string) => void;
+  onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
+  onPriorityChange: (file: AuthFileItem, priority: number) => Promise<void>;
+  onDisplayNameChange: (file: AuthFileItem, note: string) => Promise<void>;
+  onPriorityInvalid: () => void;
+  onToggleSelect: (name: string) => void;
+};
+
+function AuthFileTableRow({
+  file,
+  selected,
+  resolvedTheme,
+  disableControls,
+  deleting,
+  statusUpdating,
+  priorityUpdating,
+  noteUpdating,
+  statusData,
+  authTokenSnapshot,
+  codexSubscriptionSnapshot,
+  codexQuotaState,
+  manualExpiryMs,
+  priorityTier,
+  onShowModels,
+  onDownload,
+  onOpenPrefixProxyEditor,
+  onManualExpiryEdit,
+  onDelete,
+  onToggleStatus,
+  onPriorityChange,
+  onDisplayNameChange,
+  onPriorityInvalid,
+  onToggleSelect,
+}: AuthFileTableRowProps) {
+  const { t } = useTranslation();
+  const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
+  const isAistudio = (file.type || '').toLowerCase() === 'aistudio';
+  const showModelsButton = !isRuntimeOnly || isAistudio;
+  const provider = resolveAuthProvider(file);
+  const providerType = file.type || provider || 'unknown';
+  const typeColor = getTypeColor(providerType, resolvedTheme);
+  const typeLabel = getTypeLabel(t, providerType);
+  const providerIcon = getAuthFileIcon(providerType, resolvedTheme);
+  const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
+  const displayName = noteValue || file.name;
+  const rawStatusMessage = getAuthFileStatusMessage(file);
+  const hasStatusWarning =
+    Boolean(rawStatusMessage) && !['ok', 'healthy', 'ready', 'success', 'available'].includes(rawStatusMessage.toLowerCase());
+  const resolvedQuotaType = QUOTA_PROVIDER_TYPES.has(provider as QuotaProviderType)
+    ? (provider as QuotaProviderType)
+    : null;
+  const currentCodexPlanType =
+    resolvedQuotaType === 'codex' && codexQuotaState?.status === 'success'
+      ? normalizePlanType(codexQuotaState.planType)
+      : null;
+  const effectiveCodexPlanType =
+    resolvedQuotaType === 'codex'
+      ? currentCodexPlanType ?? normalizePlanType(resolveCodexPlanType(file))
+      : null;
+  const codexPlanCanHaveSubscriptionExpiry =
+    resolvedQuotaType === 'codex' &&
+    Boolean(effectiveCodexPlanType) &&
+    effectiveCodexPlanType !== 'free';
+  const accessTokenOnly =
+    resolvedQuotaType === 'codex' && authTokenSnapshot?.hasRefreshToken === false;
+  const priorityValue = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+  const [priorityDraft, setPriorityDraft] = useState({
+    fileName: file.name,
+    value: priorityValue === 0 ? '' : String(priorityValue),
+    dirty: false,
+  });
+  const priorityInput =
+    priorityDraft.fileName === file.name && priorityDraft.dirty
+      ? priorityDraft.value
+      : priorityValue === 0
+        ? ''
+        : String(priorityValue);
+  const [displayNameDraft, setDisplayNameDraft] = useState({
+    fileName: file.name,
+    value: noteValue,
+    editing: false,
+  });
+  const displayNameEditing =
+    displayNameDraft.fileName === file.name && displayNameDraft.editing;
+  const displayNameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!displayNameEditing) return;
+    displayNameInputRef.current?.focus();
+    displayNameInputRef.current?.select();
+  }, [displayNameEditing]);
+
+  const commitDisplayName = async () => {
+    if (!displayNameEditing || noteUpdating) return;
+    const nextNote = displayNameDraft.value.trim();
+    if (nextNote !== noteValue) {
+      await onDisplayNameChange(file, nextNote);
+    }
+    setDisplayNameDraft({ fileName: file.name, value: nextNote, editing: false });
+  };
+
+  const commitPriority = () => {
+    const trimmed = priorityInput.trim();
+    const nextPriority = trimmed ? parsePriorityValue(trimmed) : 0;
+    if (nextPriority === undefined) {
+      onPriorityInvalid();
+      setPriorityDraft({
+        fileName: file.name,
+        value: priorityValue === 0 ? '' : String(priorityValue),
+        dirty: false,
+      });
+      return;
+    }
+    if (nextPriority !== priorityValue) {
+      void onPriorityChange(file, nextPriority);
+    }
+    setPriorityDraft({
+      fileName: file.name,
+      value: nextPriority === 0 ? '' : String(nextPriority),
+      dirty: false,
+    });
+  };
+
+  const stepPriority = (delta: number) => {
+    const draftPriority = parsePriorityValue(priorityInput.trim());
+    const nextPriority = (draftPriority ?? priorityValue) + delta;
+    setPriorityDraft({ fileName: file.name, value: String(nextPriority), dirty: false });
+    void onPriorityChange(file, nextPriority);
+  };
+
+  const planLabel =
+    effectiveCodexPlanType === 'team'
+      ? 'Team'
+      : effectiveCodexPlanType === 'plus'
+        ? 'Plus'
+        : effectiveCodexPlanType
+          ? effectiveCodexPlanType.toUpperCase()
+          : typeLabel;
+  const expiryLabel = (() => {
+    if (isRuntimeOnly) {
+      return t('auth_files.type_virtual', { defaultValue: '运行态只读' });
+    }
+    if (accessTokenOnly) {
+      return (
+        formatCodexSubscriptionShortDate(
+          authTokenSnapshot?.accessTokenExpiresAtMs,
+          authTokenSnapshot?.accessTokenExpiresAt
+        ) ||
+        t('auth_files.access_token_expiry_unknown', {
+          defaultValue: '无法识别',
+        })
+      );
+    }
+    if (manualExpiryMs !== null && manualExpiryMs !== undefined) {
+      return formatCodexSubscriptionShortDate(manualExpiryMs, null);
+    }
+    if (codexSubscriptionSnapshot?.subscriptionStatus === 'found') {
+      return (
+        formatCodexSubscriptionShortDate(
+          codexSubscriptionSnapshot.subscriptionActiveUntilMs,
+          codexSubscriptionSnapshot.subscriptionActiveUntil
+        ) || '-'
+      );
+    }
+    if (codexPlanCanHaveSubscriptionExpiry) {
+      return t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' });
+    }
+    return '-';
+  })();
+  const statusLabel = isRuntimeOnly
+    ? t('auth_files.table_status_runtime', { defaultValue: '只读 / Runtime' })
+    : file.disabled
+      ? t('auth_files.health_status_disabled')
+      : hasStatusWarning
+        ? t('auth_files.health_status_warning')
+        : t('auth_files.health_status_healthy');
+  const priorityTierLabel =
+    priorityTier === 'active'
+      ? t('auth_files.priority_rotation_tier_active')
+      : priorityTier === 'standby'
+        ? t('auth_files.priority_rotation_tier_standby')
+        : priorityTier === 'buffer'
+          ? t('auth_files.priority_rotation_tier_buffer')
+          : '';
+
+  return (
+    <tr
+      className={`${styles.authFileTableRow} ${selected ? styles.authFileTableRowSelected : ''} ${
+        file.disabled ? styles.authFileTableRowDisabled : ''
+      } ${isRuntimeOnly ? styles.authFileTableRowRuntime : ''}`}
+    >
+      <td className={styles.authFileTableSelectCell}>
+        <SelectionCheckbox
+          checked={selected}
+          disabled={isRuntimeOnly}
+          onChange={() => onToggleSelect(file.name)}
+          ariaLabel={selected ? t('auth_files.batch_deselect') : t('auth_files.batch_select_all')}
+          title={
+            isRuntimeOnly
+              ? t('auth_files.table_runtime_readonly', { defaultValue: '运行态文件只读' })
+              : selected
+                ? t('auth_files.batch_deselect')
+                : t('auth_files.batch_select_all')
+          }
+          className={styles.authFileTableSelect}
+        />
+      </td>
+      <td className={styles.authFileTableFileCell}>
+        <div className={styles.authFileTableIdentity}>
+          {displayNameEditing ? (
+            <input
+              ref={displayNameInputRef}
+              className={styles.authFileTableDisplayInput}
+              value={displayNameDraft.value}
+              placeholder={file.name}
+              disabled={disableControls || noteUpdating}
+              onChange={(event) =>
+                setDisplayNameDraft({
+                  fileName: file.name,
+                  value: event.currentTarget.value,
+                  editing: true,
+                })
+              }
+              onBlur={() => void commitDisplayName()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur();
+                } else if (event.key === 'Escape') {
+                  setDisplayNameDraft({ fileName: file.name, value: noteValue, editing: false });
+                  event.currentTarget.blur();
+                }
+              }}
+              aria-label={t('auth_files.display_name_edit')}
+            />
+          ) : (
+            <button
+              type="button"
+              className={styles.authFileTableDisplayName}
+              title={noteValue ? `${noteValue} (${file.name})` : file.name}
+              disabled={disableControls || isRuntimeOnly || noteUpdating}
+              onClick={() =>
+                setDisplayNameDraft({ fileName: file.name, value: noteValue, editing: true })
+              }
+            >
+              <span>{displayName}</span>
+              {noteUpdating && <LoadingSpinner size={12} />}
+            </button>
+          )}
+          <span className={styles.authFileTableRealName} title={file.name}>
+            {file.name}
+          </span>
+        </div>
+      </td>
+      <td className={styles.authFileTableProviderCell}>
+        <span
+          className={styles.authFileTableProvider}
+          style={{
+            backgroundColor: typeColor.bg,
+            color: typeColor.text,
+            ...(typeColor.border ? { border: typeColor.border } : {}),
+          }}
+          title={typeLabel}
+        >
+          {providerIcon ? (
+            <img src={providerIcon} alt="" className={styles.authFileTableProviderIcon} />
+          ) : (
+            <span className={styles.authFileTableProviderFallback}>
+              {typeLabel.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <span>{planLabel}</span>
+        </span>
+      </td>
+      <td className={styles.authFileTablePriorityCell}>
+        {isRuntimeOnly ? (
+          <span className={styles.authFileTableReadonlyPill}>
+            {t('auth_files.table_readonly_short', { defaultValue: '只读' })}
+          </span>
+        ) : (
+          <div className={styles.authFileTablePriority}>
+            <button
+              type="button"
+              onClick={() => stepPriority(-1)}
+              disabled={disableControls || priorityUpdating}
+              aria-label={t('auth_files.priority_decrease')}
+            >
+              <IconMinus size={14} />
+            </button>
+            <label>
+              <span>P</span>
+              <input
+                value={priorityInput}
+                placeholder="0"
+                inputMode="numeric"
+                onChange={(event) =>
+                  setPriorityDraft({
+                    fileName: file.name,
+                    value: event.currentTarget.value,
+                    dirty: true,
+                  })
+                }
+                onBlur={commitPriority}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  } else if (event.key === 'Escape') {
+                    setPriorityDraft({
+                      fileName: file.name,
+                      value: priorityValue === 0 ? '' : String(priorityValue),
+                      dirty: false,
+                    });
+                    event.currentTarget.blur();
+                  }
+                }}
+                disabled={disableControls || priorityUpdating}
+                aria-label={t('auth_files.priority_display')}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => stepPriority(1)}
+              disabled={disableControls || priorityUpdating}
+              aria-label={t('auth_files.priority_increase')}
+            >
+              <IconPlus size={14} />
+            </button>
+            {priorityUpdating && <LoadingSpinner size={12} />}
+            {priorityTierLabel && (
+              <span className={styles.authFileTablePriorityTier}>{priorityTierLabel}</span>
+            )}
+          </div>
+        )}
+      </td>
+      <td className={styles.authFileTableStatusCell}>
+        <div className={styles.authFileTableStatus}>
+          <span
+            className={`${styles.authFileTableStatePill} ${
+              isRuntimeOnly
+                ? styles.authFileTableStateRuntime
+                : file.disabled
+                  ? styles.authFileTableStateDisabled
+                  : hasStatusWarning
+                    ? styles.authFileTableStateWarning
+                    : styles.authFileTableStateActive
+            }`}
+            title={rawStatusMessage || statusLabel}
+          >
+            {hasStatusWarning && <IconCircleAlert size={13} />}
+            {statusLabel}
+          </span>
+          <ProviderStatusBar statusData={statusData} styles={styles} />
+          {!isRuntimeOnly && (
+            <ToggleSwitch
+              ariaLabel={t('auth_files.status_toggle_label')}
+              checked={!file.disabled}
+              disabled={disableControls || statusUpdating}
+              onChange={(value) => onToggleStatus(file, value)}
+            />
+          )}
+        </div>
+      </td>
+      <td className={styles.authFileTableExpiryCell}>
+        <button
+          type="button"
+          className={`${styles.authFileTableExpiry} ${
+            manualExpiryMs !== null && manualExpiryMs !== undefined
+              ? styles.authFileTableExpiryLocal
+              : ''
+          } ${accessTokenOnly ? styles.authFileTableExpiryTemporary : ''}`}
+          onClick={() => {
+            if (!accessTokenOnly && !isRuntimeOnly) {
+              onManualExpiryEdit(file);
+            }
+          }}
+          disabled={accessTokenOnly || isRuntimeOnly}
+          title={
+            manualExpiryMs !== null && manualExpiryMs !== undefined
+              ? t('auth_files.manual_expiry_hint', {
+                  defaultValue: '只保存在当前浏览器，用于卡片显示、排序和提醒，不会修改认证文件。',
+                })
+              : expiryLabel
+          }
+        >
+          {manualExpiryMs !== null && manualExpiryMs !== undefined && (
+            <span>{t('auth_files.local_override_short', { defaultValue: '本地' })}</span>
+          )}
+          {accessTokenOnly && (
+            <span>{t('auth_files.missing_refresh_token_badge', { defaultValue: '临时' })}</span>
+          )}
+          <strong>{expiryLabel}</strong>
+        </button>
+      </td>
+      <td className={styles.authFileTableActionsCell}>
+        <div className={styles.authFileTableActions}>
+          {showModelsButton && (
+            <Button
+              variant="secondary"
+              size="xs"
+              iconOnly
+              onClick={() => onShowModels(file)}
+              title={t('auth_files.models_button', { defaultValue: '模型' })}
+              disabled={disableControls}
+            >
+              <IconModelCluster size={15} />
+            </Button>
+          )}
+          {!isRuntimeOnly && (
+            <>
+              <Button
+                variant="secondary"
+                size="xs"
+                iconOnly
+                onClick={() => onDownload(file.name)}
+                title={t('auth_files.download_button')}
+                disabled={disableControls}
+              >
+                <IconDownload size={15} />
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                iconOnly
+                onClick={() => onOpenPrefixProxyEditor(file)}
+                title={t('auth_files.prefix_proxy_button')}
+                disabled={disableControls}
+              >
+                <IconSettings size={15} />
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                iconOnly
+                onClick={() => onManualExpiryEdit(file)}
+                title={t('auth_files.manual_expiry_button', {
+                  defaultValue: '手动有效期',
+                })}
+              >
+                <IconTimer size={15} />
+              </Button>
+              <Button
+                variant="danger"
+                size="xs"
+                iconOnly
+                onClick={() => onDelete(file.name)}
+                title={t('auth_files.delete_button')}
+                disabled={disableControls || deleting}
+              >
+                {deleting ? <LoadingSpinner size={13} /> : <IconTrash2 size={15} />}
+              </Button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export function AuthFilesPage() {
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
@@ -278,9 +762,7 @@ export function AuthFilesPage() {
   const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
-  const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
-  const previousSelectionCountRef = useRef(0);
-  const selectionCountRef = useRef(0);
+  const pageDragDepthRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
   const priorityRotationSidecarDraftTouchedRef = useRef(false);
@@ -458,12 +940,12 @@ export function AuthFilesPage() {
     priorityRotationAnalysis.standbyPriority,
   ]);
 
-  const stopUploadDropEvent = (event: DragEvent<HTMLElement>) => {
+  const stopUploadDropEvent = (event: ReactDragEvent<HTMLElement>) => {
     event.preventDefault();
     event.stopPropagation();
   };
 
-  const hasDraggedFiles = (event: DragEvent<HTMLElement>) =>
+  const hasDraggedFiles = (event: ReactDragEvent<HTMLElement>) =>
     Array.from(event.dataTransfer.types).includes('Files');
 
   const handleUploadPoolClick = useCallback(() => {
@@ -481,7 +963,7 @@ export function AuthFilesPage() {
   );
 
   const handleUploadPoolDragEnter = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
+    (event: ReactDragEvent<HTMLDivElement>) => {
       stopUploadDropEvent(event);
       if (!uploadDropDisabled && hasDraggedFiles(event)) {
         setUploadDropActive(true);
@@ -491,7 +973,7 @@ export function AuthFilesPage() {
   );
 
   const handleUploadPoolDragOver = useCallback(
-    (event: DragEvent<HTMLDivElement>) => {
+    (event: ReactDragEvent<HTMLDivElement>) => {
       stopUploadDropEvent(event);
       event.dataTransfer.dropEffect = uploadDropDisabled ? 'none' : 'copy';
       if (!uploadDropDisabled && hasDraggedFiles(event)) {
@@ -501,7 +983,7 @@ export function AuthFilesPage() {
     [uploadDropDisabled]
   );
 
-  const handleUploadPoolDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+  const handleUploadPoolDragLeave = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
     stopUploadDropEvent(event);
     const nextTarget = event.relatedTarget;
     if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
@@ -509,7 +991,7 @@ export function AuthFilesPage() {
   }, []);
 
   const handleUploadPoolDrop = useCallback(
-    async (event: DragEvent<HTMLDivElement>) => {
+    async (event: ReactDragEvent<HTMLDivElement>) => {
       stopUploadDropEvent(event);
       setUploadDropActive(false);
       if (uploadDropDisabled) return;
@@ -519,6 +1001,69 @@ export function AuthFilesPage() {
     },
     [uploadAuthFiles, uploadDropDisabled]
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const hasGlobalDraggedFiles = (event: globalThis.DragEvent) =>
+      Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
+    const stopGlobalDropEvent = (event: globalThis.DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleWindowDragEnter = (event: globalThis.DragEvent) => {
+      if (!hasGlobalDraggedFiles(event)) return;
+      stopGlobalDropEvent(event);
+      pageDragDepthRef.current += 1;
+      if (!uploadDropDisabled) {
+        setUploadDropActive(true);
+      }
+    };
+
+    const handleWindowDragOver = (event: globalThis.DragEvent) => {
+      if (!hasGlobalDraggedFiles(event)) return;
+      stopGlobalDropEvent(event);
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = uploadDropDisabled ? 'none' : 'copy';
+      }
+      if (!uploadDropDisabled) {
+        setUploadDropActive(true);
+      }
+    };
+
+    const handleWindowDragLeave = (event: globalThis.DragEvent) => {
+      if (!hasGlobalDraggedFiles(event)) return;
+      stopGlobalDropEvent(event);
+      pageDragDepthRef.current = Math.max(0, pageDragDepthRef.current - 1);
+      if (pageDragDepthRef.current === 0) {
+        setUploadDropActive(false);
+      }
+    };
+
+    const handleWindowDrop = (event: globalThis.DragEvent) => {
+      if (!hasGlobalDraggedFiles(event)) return;
+      stopGlobalDropEvent(event);
+      pageDragDepthRef.current = 0;
+      setUploadDropActive(false);
+      if (uploadDropDisabled) return;
+      void uploadAuthFiles(Array.from(event.dataTransfer?.files ?? []));
+    };
+
+    window.addEventListener('dragenter', handleWindowDragEnter);
+    window.addEventListener('dragover', handleWindowDragOver);
+    window.addEventListener('dragleave', handleWindowDragLeave);
+    window.addEventListener('drop', handleWindowDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleWindowDragEnter);
+      window.removeEventListener('dragover', handleWindowDragOver);
+      window.removeEventListener('dragleave', handleWindowDragLeave);
+      window.removeEventListener('drop', handleWindowDrop);
+      pageDragDepthRef.current = 0;
+    };
+  }, [uploadAuthFiles, uploadDropDisabled]);
 
   useEffect(() => {
     setManualExpiryByFile(bootstrapAuthFilesManualExpiry());
@@ -1727,67 +2272,8 @@ export function AuthFilesPage() {
   }, [batchActionBarVisible, selectionCount]);
 
   useEffect(() => {
-    selectionCountRef.current = selectionCount;
-    if (selectionCount > 0) {
-      setBatchActionBarVisible(true);
-    }
+    setBatchActionBarVisible(selectionCount > 0);
   }, [selectionCount]);
-
-  useLayoutEffect(() => {
-    if (!batchActionBarVisible) return;
-    const currentCount = selectionCount;
-    const previousCount = previousSelectionCountRef.current;
-    const actionsEl = floatingBatchActionsRef.current;
-    if (!actionsEl) return;
-
-    batchActionAnimationRef.current?.stop();
-    batchActionAnimationRef.current = null;
-
-    if (currentCount > 0 && previousCount === 0) {
-      batchActionAnimationRef.current = animate(
-        actionsEl,
-        {
-          transform: [BATCH_BAR_HIDDEN_TRANSFORM, BATCH_BAR_BASE_TRANSFORM],
-          opacity: [0, 1],
-        },
-        {
-          duration: 0.28,
-          ease: easePower3Out,
-          onComplete: () => {
-            actionsEl.style.transform = BATCH_BAR_BASE_TRANSFORM;
-            actionsEl.style.opacity = '1';
-          },
-        }
-      );
-    } else if (currentCount === 0 && previousCount > 0) {
-      batchActionAnimationRef.current = animate(
-        actionsEl,
-        {
-          transform: [BATCH_BAR_BASE_TRANSFORM, BATCH_BAR_HIDDEN_TRANSFORM],
-          opacity: [1, 0],
-        },
-        {
-          duration: 0.22,
-          ease: easePower2In,
-          onComplete: () => {
-            if (selectionCountRef.current === 0) {
-              setBatchActionBarVisible(false);
-            }
-          },
-        }
-      );
-    }
-
-    previousSelectionCountRef.current = currentCount;
-  }, [batchActionBarVisible, selectionCount]);
-
-  useEffect(
-    () => () => {
-      batchActionAnimationRef.current?.stop();
-      batchActionAnimationRef.current = null;
-    },
-    []
-  );
 
   const renderFilterTags = () => (
     <div className={styles.filterRail}>
@@ -2376,11 +2862,11 @@ export function AuthFilesPage() {
                   >
                     {advancedControlSignals.map((signal) => (
                       <span
-                        className={`${styles.advancedControlsSignal} ${signal.className}`}
+                        className={`${styles.advancedControlsSignalDot} ${signal.className}`}
                         key={signal.key}
-                        title={signal.title}
+                        title={signal.title || signal.label}
                       >
-                        {signal.label}
+                        <span className={styles.srOnly}>{signal.label}</span>
                       </span>
                     ))}
                   </span>
@@ -2882,40 +3368,94 @@ export function AuthFilesPage() {
                 className={styles.authFilesEmptyState}
               />
             ) : (
-              <div
-                className={`${styles.fileGrid} ${quotaFilterType ? styles.fileGridQuotaManaged : ''} ${compactMode ? styles.fileGridCompact : ''}`}
-              >
-                {pageItems.map((file) => (
-                  <AuthFileCard
-                    key={file.name}
-                    file={file}
-                    compact={compactMode}
-                    selected={selectedFiles.has(file.name)}
-                    resolvedTheme={resolvedTheme}
-                    disableControls={disableControls}
-                    deleting={deleting === file.name}
-                    statusUpdating={statusUpdating[file.name] === true}
-                    quotaFilterType={quotaFilterType}
-                    statusData={statusDataByFileName.get(file.name)!}
-                    authTokenSnapshot={authTokenSnapshots.get(file.name)}
-                    codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
-                    manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
-                    priorityTier={priorityTierByFile.get(file.name) ?? null}
-                    priorityUpdating={priorityUpdating[file.name] === true}
-                    noteUpdating={noteUpdating[file.name] === true}
-                    onShowModels={showModels}
-                    onDownload={handleDownload}
-                    onOpenPrefixProxyEditor={openPrefixProxyEditor}
-                    onManualExpiryEdit={openManualExpiryEditor}
-                    onDelete={handleDelete}
-                    onToggleStatus={handleStatusToggle}
-                    onPriorityChange={handlePriorityChange}
-                    onDisplayNameChange={handleDisplayNameChange}
-                    onPriorityInvalid={handlePriorityInvalid}
-                    onToggleSelect={toggleSelect}
-                  />
-                ))}
-              </div>
+              <>
+                <div className={styles.authFileTableShell}>
+                  <table className={styles.authFileTable}>
+                    <thead>
+                      <tr>
+                        <th className={styles.authFileTableSelectHeader}>
+                          <span className={styles.srOnly}>
+                            {t('auth_files.batch_select_all')}
+                          </span>
+                        </th>
+                        <th>{t('auth_files.table_file_column', { defaultValue: '文件' })}</th>
+                        <th>{t('auth_files.table_provider_column', { defaultValue: 'Provider' })}</th>
+                        <th>{t('auth_files.table_priority_column', { defaultValue: '优先级' })}</th>
+                        <th>{t('auth_files.table_status_column', { defaultValue: '状态' })}</th>
+                        <th>{t('auth_files.table_expiry_column', { defaultValue: '有效期' })}</th>
+                        <th className={styles.authFileTableActionsHeader}>
+                          {t('auth_files.table_actions_column', { defaultValue: '操作' })}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageItems.map((file) => (
+                        <AuthFileTableRow
+                          key={file.name}
+                          file={file}
+                          selected={selectedFiles.has(file.name)}
+                          resolvedTheme={resolvedTheme}
+                          disableControls={disableControls}
+                          deleting={deleting === file.name}
+                          statusUpdating={statusUpdating[file.name] === true}
+                          priorityUpdating={priorityUpdating[file.name] === true}
+                          noteUpdating={noteUpdating[file.name] === true}
+                          statusData={statusDataByFileName.get(file.name)!}
+                          authTokenSnapshot={authTokenSnapshots.get(file.name)}
+                          codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
+                          codexQuotaState={codexQuota[file.name] as CodexQuotaState | undefined}
+                          manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
+                          priorityTier={priorityTierByFile.get(file.name) ?? null}
+                          onShowModels={showModels}
+                          onDownload={handleDownload}
+                          onOpenPrefixProxyEditor={openPrefixProxyEditor}
+                          onManualExpiryEdit={openManualExpiryEditor}
+                          onDelete={handleDelete}
+                          onToggleStatus={handleStatusToggle}
+                          onPriorityChange={handlePriorityChange}
+                          onDisplayNameChange={handleDisplayNameChange}
+                          onPriorityInvalid={handlePriorityInvalid}
+                          onToggleSelect={toggleSelect}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div
+                  className={`${styles.fileGrid} ${quotaFilterType ? styles.fileGridQuotaManaged : ''} ${compactMode ? styles.fileGridCompact : ''}`}
+                >
+                  {pageItems.map((file) => (
+                    <AuthFileCard
+                      key={file.name}
+                      file={file}
+                      compact={compactMode}
+                      selected={selectedFiles.has(file.name)}
+                      resolvedTheme={resolvedTheme}
+                      disableControls={disableControls}
+                      deleting={deleting === file.name}
+                      statusUpdating={statusUpdating[file.name] === true}
+                      quotaFilterType={quotaFilterType}
+                      statusData={statusDataByFileName.get(file.name)!}
+                      authTokenSnapshot={authTokenSnapshots.get(file.name)}
+                      codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
+                      manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
+                      priorityTier={priorityTierByFile.get(file.name) ?? null}
+                      priorityUpdating={priorityUpdating[file.name] === true}
+                      noteUpdating={noteUpdating[file.name] === true}
+                      onShowModels={showModels}
+                      onDownload={handleDownload}
+                      onOpenPrefixProxyEditor={openPrefixProxyEditor}
+                      onManualExpiryEdit={openManualExpiryEditor}
+                      onDelete={handleDelete}
+                      onToggleStatus={handleStatusToggle}
+                      onPriorityChange={handlePriorityChange}
+                      onDisplayNameChange={handleDisplayNameChange}
+                      onPriorityInvalid={handlePriorityInvalid}
+                      onToggleSelect={toggleSelect}
+                    />
+                  ))}
+                </div>
+              </>
             )}
 
             {sorted.length > pageSize && (
@@ -3290,6 +3830,24 @@ export function AuthFilesPage() {
             document.body
           )
         : null}
+      {uploadDropActive && (
+        <div className={styles.globalUploadOverlay} aria-hidden={uploadDropDisabled}>
+          <div className={styles.globalUploadOverlayPanel}>
+            <IconUploadCloud size={34} />
+            <strong>
+              {uploadDropDisabled
+                ? t('auth_files.upload_pool_disabled', { defaultValue: '当前无法上传' })
+                : t('auth_files.upload_overlay_title', { defaultValue: '松开即可上传 JSON' })}
+            </strong>
+            <span>
+              {uploadDropProgressMeta ||
+                t('auth_files.upload_overlay_hint', {
+                  defaultValue: '支持多文件拖拽，上传完成后列表会自动刷新。',
+                })}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
