@@ -8635,401 +8635,6 @@ button.codexSubscriptionValue {
   color: #2563eb;
 }
 
-.authFileTableShell {
-  order: 4;
-  display: none;
-  min-width: 0;
-  overflow-x: auto;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent 88px),
-    color-mix(in srgb, var(--surface-card) 94%, var(--bg-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
-}
-
-.authFileTable {
-  width: 100%;
-  min-width: 860px;
-  border-collapse: collapse;
-  table-layout: fixed;
-  color: var(--text-primary);
-}
-
-.authFileTable th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 9px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-  background:
-    linear-gradient(90deg, color-mix(in srgb, #0f766e 5%, transparent), transparent 52%),
-    color-mix(in srgb, var(--surface-panel) 96%, var(--bg-primary));
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 820;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.authFileTable th:nth-child(1) {
-  width: 38px;
-}
-
-.authFileTable th:nth-child(2) {
-  width: 30%;
-}
-
-.authFileTable th:nth-child(3) {
-  width: 13%;
-}
-
-.authFileTable th:nth-child(4) {
-  width: 14%;
-}
-
-.authFileTable th:nth-child(5) {
-  width: 21%;
-}
-
-.authFileTable th:nth-child(6) {
-  width: 13%;
-}
-
-.authFileTable th:nth-child(7) {
-  width: 136px;
-}
-
-.authFileTable td {
-  min-width: 0;
-  padding: 8px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 38%, transparent);
-  vertical-align: middle;
-}
-
-.authFileTable tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.authFileTableRow {
-  transition:
-    background-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.authFileTableRow:hover {
-  background: color-mix(in srgb, #0f766e 4%, transparent);
-}
-
-.authFileTableRowSelected {
-  background: color-mix(in srgb, var(--primary-color) 7%, transparent);
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--primary-color) 70%, transparent);
-}
-
-.authFileTableRowDisabled {
-  opacity: 0.78;
-}
-
-.authFileTableRowRuntime {
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      color-mix(in srgb, var(--text-tertiary) 5%, transparent) 0,
-      color-mix(in srgb, var(--text-tertiary) 5%, transparent) 8px,
-      transparent 8px,
-      transparent 18px
-    ),
-    color-mix(in srgb, var(--surface-control) 42%, transparent);
-}
-
-.authFileTableSelectCell,
-.authFileTableSelectHeader {
-  text-align: center;
-}
-
-.authFileTableSelect {
-  justify-content: center;
-}
-
-.authFileTableIdentity {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.authFileTableDisplayName {
-  min-width: 0;
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.3;
-  font-weight: 820;
-  text-align: left;
-  cursor: pointer;
-}
-
-.authFileTableDisplayName span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.authFileTableDisplayName:disabled {
-  cursor: default;
-}
-
-.authFileTableDisplayInput {
-  width: 100%;
-  min-width: 0;
-  height: 28px;
-  padding: 3px 7px;
-  border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 72%, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 760;
-  box-sizing: border-box;
-}
-
-.authFileTableDisplayInput:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--primary-color) 70%, var(--border-color));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
-}
-
-.authFileTableRealName {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-tertiary);
-  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.authFileTableProvider {
-  max-width: 100%;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 7px;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 780;
-  overflow: hidden;
-}
-
-.authFileTableProvider span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.authFileTableProviderIcon {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 auto;
-  object-fit: contain;
-}
-
-.authFileTableProviderFallback {
-  width: 15px;
-  height: 15px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  font-size: 10px;
-  font-weight: 840;
-}
-
-.authFileTablePriority {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-}
-
-.authFileTablePriority button {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  padding: 0;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 66%, transparent);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.authFileTablePriority button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.authFileTablePriority label {
-  height: 26px;
-  min-width: 58px;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 6px;
-  border-radius: 7px;
-  border: 1px solid color-mix(in srgb, #2563eb 18%, var(--border-color));
-  background: color-mix(in srgb, #2563eb 5%, var(--surface-control));
-  color: color-mix(in srgb, #2563eb 78%, var(--text-primary));
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.authFileTablePriority input {
-  width: 34px;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  outline: none;
-}
-
-.authFileTablePriorityTier {
-  max-width: 54px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.authFileTableReadonlyPill,
-.authFileTableStatePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 24px;
-  max-width: 100%;
-  padding: 0 7px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 54%, transparent);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 780;
-  white-space: nowrap;
-}
-
-.authFileTableStatus {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(74px, max-content) minmax(70px, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-}
-
-.authFileTableStatus :global(.provider-status-bar),
-.authFileTableStatus .providerStatusBar {
-  min-width: 68px;
-}
-
-.authFileTableStateActive {
-  border-color: color-mix(in srgb, #0f766e 26%, var(--border-color));
-  background: color-mix(in srgb, #0f766e 8%, transparent);
-  color: color-mix(in srgb, #0f766e 78%, var(--text-primary));
-}
-
-.authFileTableStateDisabled,
-.authFileTableStateRuntime {
-  background: color-mix(in srgb, var(--surface-control) 52%, transparent);
-}
-
-.authFileTableStateWarning {
-  border-color: color-mix(in srgb, #d97706 28%, var(--border-color));
-  background: color-mix(in srgb, #d97706 9%, transparent);
-  color: color-mix(in srgb, #d97706 82%, var(--text-primary));
-}
-
-.authFileTableExpiry {
-  max-width: 100%;
-  min-height: 28px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 7px;
-  border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 34%, transparent);
-  color: var(--text-secondary);
-  text-align: left;
-  cursor: pointer;
-}
-
-.authFileTableExpiry:disabled {
-  cursor: default;
-}
-
-.authFileTableExpiry span {
-  flex: 0 0 auto;
-  padding: 1px 4px;
-  border-radius: 5px;
-  background: color-mix(in srgb, #2563eb 10%, transparent);
-  color: color-mix(in srgb, #2563eb 82%, var(--text-primary));
-  font-size: 10px;
-  font-weight: 820;
-}
-
-.authFileTableExpiry strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.authFileTableExpiryTemporary span {
-  background: color-mix(in srgb, #d97706 12%, transparent);
-  color: color-mix(in srgb, #d97706 82%, var(--text-primary));
-}
-
-.authFileTableActionsHeader,
-.authFileTableActionsCell {
-  text-align: right;
-}
-
-.authFileTableActions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  min-width: 0;
-}
-
-.authFileTableActions :global(.btn.btn-xs) {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
-  padding: 0;
-  border-radius: 6px;
-}
-
 .fileCard {
   position: relative;
 }
@@ -9142,10 +8747,6 @@ button.codexSubscriptionValue {
 }
 
 @media (min-width: 1024px) {
-  .authFileTableShell {
-    display: none;
-  }
-
   .fileGrid,
   .fileGridQuotaManaged,
   .fileGridCompact {
@@ -9154,10 +8755,6 @@ button.codexSubscriptionValue {
 }
 
 @media (max-width: 1023px) {
-  .authFileTableShell {
-    display: none;
-  }
-
   .cardUtilityActionsWrap {
     position: relative;
   }
@@ -9213,5 +8810,165 @@ button.codexSubscriptionValue {
 
   .oauthConfigSection {
     padding: 10px;
+  }
+}
+
+.fileCard {
+  border-color: color-mix(in srgb, var(--border-color) 54%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent 118px),
+    color-mix(in srgb, var(--surface-card) 98%, var(--bg-primary));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 3%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.fileCard:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #0f766e 22%, var(--border-color));
+  box-shadow:
+    0 18px 36px -34px color-mix(in srgb, #0f766e 46%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.fileCardLayout {
+  gap: 13px;
+}
+
+.fileName {
+  letter-spacing: 0;
+}
+
+.fileNameSource {
+  opacity: 0.86;
+  border: 1px solid color-mix(in srgb, var(--border-color) 26%, transparent);
+}
+
+.noteValue {
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+}
+
+.cardMeta {
+  gap: 7px 8px;
+  border-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 18%, transparent);
+}
+
+.cardInsights {
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.cardStats {
+  display: none;
+}
+
+.statusPanel {
+  gap: 7px;
+  padding: 10px;
+  border-color: color-mix(in srgb, #0f766e 16%, var(--border-color));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #0f766e 4%, transparent), transparent 62%),
+    color-mix(in srgb, var(--surface-control) 34%, transparent);
+}
+
+.statusPanelLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: color-mix(in srgb, #0f766e 74%, var(--text-tertiary));
+}
+
+.statusPanelStats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 1px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.statusPanelStats span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.statusPanelStats strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusPanelStatsCompact {
+  font-size: 10px;
+}
+
+.statusPanelStatsCompact strong {
+  font-size: 10px;
+}
+
+.quotaSection {
+  border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 20%, transparent);
+}
+
+.cardUtilityActions {
+  display: none;
+  opacity: 0.74;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease;
+}
+
+.cardUtilityActionsOpen {
+  display: inline-flex;
+}
+
+.cardMoreButton:global(.btn.btn-sm) {
+  display: inline-flex;
+}
+
+.fileCard:hover .cardUtilityActions,
+.cardUtilityActions:focus-within {
+  opacity: 1;
+}
+
+.cardActions {
+  border-top-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+}
+
+@media (min-width: 1024px) {
+  .fileGrid,
+  .fileGridQuotaManaged,
+  .fileGridCompact {
+    display: grid;
+  }
+}
+
+@include mobile {
+  .statusPanel {
+    padding: 8px;
+  }
+
+  .statusPanelStats {
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .cardMeta {
+    gap: 6px;
+  }
+
+  .cardUtilityActions {
+    opacity: 1;
   }
 }

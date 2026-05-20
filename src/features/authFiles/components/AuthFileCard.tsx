@@ -627,22 +627,24 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           </div>
 
           <div className={`${styles.cardInsights} ${compact ? styles.cardInsightsCompact : ''}`}>
-            <div className={`${styles.cardStats} ${compact ? styles.cardStatsCompact : ''}`}>
-              <div className={`${styles.statPill} ${styles.statSuccess}`}>
-                <span className={styles.statLabel}>{t('stats.recent_success')}</span>
-                <span className={styles.statValue}>{fileStats.success}</span>
-              </div>
-              <div className={`${styles.statPill} ${styles.statFailure}`}>
-                <span className={styles.statLabel}>{t('stats.recent_failure')}</span>
-                <span className={styles.statValue}>{fileStats.failure}</span>
-              </div>
-            </div>
-
             <div className={`${styles.statusPanel} ${compact ? styles.statusPanelCompact : ''}`}>
               <div className={styles.statusPanelLabel}>
                 <span>{t('auth_files.health_status_label')}</span>
               </div>
               <ProviderStatusBar statusData={statusData} styles={styles} />
+              <div
+                className={`${styles.statusPanelStats} ${compact ? styles.statusPanelStatsCompact : ''}`}
+                title={`${t('stats.recent_success')}: ${fileStats.success} · ${t('stats.recent_failure')}: ${fileStats.failure}`}
+              >
+                <span>
+                  {t('stats.recent_success')}
+                  <strong>{fileStats.success}</strong>
+                </span>
+                <span>
+                  {t('stats.recent_failure')}
+                  <strong>{fileStats.failure}</strong>
+                </span>
+              </div>
             </div>
 
             {showQuotaLayout && quotaType && (
