@@ -8972,3 +8972,225 @@ button.codexSubscriptionValue {
     opacity: 1;
   }
 }
+
+// Fourth-pass card polish: keep the card model, make priority controls calmer and clearer.
+.priorityBadgeEditor {
+  --priority-badge-color: #64748b;
+  --priority-dot-color: #94a3b8;
+  grid-template-columns: 38px minmax(118px, 1fr) 38px;
+  min-height: 38px;
+  width: min(100%, 196px);
+  border-radius: 9px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.priorityBadgeEditor:hover,
+.priorityBadgeEditor:focus-within {
+  border-color: color-mix(in srgb, var(--priority-badge-color) 34%, var(--border-color));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--priority-badge-color) 9%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.priorityBadgeEditorActive {
+  --priority-badge-color: #16a34a;
+  --priority-dot-color: #16a34a;
+  --priority-value-surface: color-mix(in srgb, #16a34a 9%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #16a34a 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #15803d 84%, var(--text-primary));
+}
+
+.priorityBadgeEditorStandby {
+  --priority-badge-color: #d97706;
+  --priority-dot-color: #d97706;
+  --priority-value-surface: color-mix(in srgb, #d97706 9%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #d97706 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #b45309 86%, var(--text-primary));
+}
+
+.priorityBadgeEditorBuffer,
+.priorityBadgeEditorFree,
+.priorityBadgeEditorUnassigned {
+  --priority-badge-color: #64748b;
+  --priority-dot-color: #94a3b8;
+  --priority-value-surface: color-mix(in srgb, #64748b 6%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #64748b 16%, transparent);
+  --priority-value-color: color-mix(in srgb, #64748b 76%, var(--text-secondary));
+}
+
+.priorityBadgeEditorUnassigned {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #64748b 4%, transparent), transparent 62%),
+    color-mix(in srgb, var(--surface-control) 70%, var(--bg-primary));
+}
+
+.priorityBadgeStepButton {
+  min-width: 38px;
+  min-height: 38px;
+  color: color-mix(in srgb, var(--priority-badge-color) 72%, var(--text-secondary));
+}
+
+.priorityBadgeStepButton svg {
+  display: block;
+  stroke-width: 2.4;
+}
+
+.priorityBadgeMain {
+  grid-template-columns: minmax(32px, 0.72fr) auto minmax(34px, 0.8fr);
+  padding: 3px 6px;
+}
+
+.priorityBadgeValueShell {
+  min-width: 58px;
+  padding: 5px 8px 6px;
+}
+
+.priorityBadgeInput {
+  width: 3ch;
+  min-width: 3ch;
+  max-width: 3ch;
+}
+
+.priorityBadgeEditorUnassigned .priorityBadgePrefix,
+.priorityBadgeEditorUnassigned .priorityBadgeInput {
+  color: color-mix(in srgb, #64748b 74%, var(--text-tertiary));
+}
+
+.priorityBadgeTier {
+  max-width: 56px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--priority-badge-color) 9%, transparent);
+  color: color-mix(in srgb, var(--priority-badge-color) 82%, var(--text-primary));
+  font-weight: 820;
+}
+
+.fileCardCompact .priorityBadgeEditor {
+  grid-template-columns: 31px minmax(76px, 1fr) 31px;
+  min-height: 32px;
+  width: min(100%, 148px);
+}
+
+.fileCardCompact .priorityBadgeStepButton {
+  min-width: 31px;
+  min-height: 32px;
+}
+
+.fileCardCompact .priorityBadgeLabel {
+  display: none;
+}
+
+.fileCardCompact .priorityBadgeMain {
+  grid-template-columns: auto minmax(0, auto);
+  gap: 5px;
+  padding-inline: 4px;
+}
+
+.fileCardCompact .priorityBadgeValueShell {
+  grid-column: 1;
+  min-width: 46px;
+  padding-inline: 6px;
+}
+
+.fileCardCompact .priorityBadgeTier {
+  grid-column: 2;
+  max-width: 44px;
+  margin-left: 0;
+  padding-inline: 4px;
+}
+
+.advancedControlsSignalDot.advancedControlsSignalReady {
+  background: #16a34a;
+  color: #16a34a;
+}
+
+.advancedControlsSignalDot.advancedControlsSignalMuted {
+  background: #64748b;
+  color: #64748b;
+}
+
+.priorityRotationBackgroundMetaLine {
+  color: var(--text-secondary);
+}
+
+.priorityRotationBackgroundButtons :global(.btn.btn-sm) {
+  min-width: 0;
+}
+
+.batchPriorityControl {
+  min-height: 34px;
+  gap: 4px;
+  padding: 3px;
+}
+
+.batchPriorityLabel {
+  min-width: 0;
+  max-width: 168px;
+  padding-inline: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batchPriorityInput {
+  width: 74px;
+  min-width: 58px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+@include mobile {
+  .priorityBadgeEditor {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .priorityBadgeStepButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .priorityBadgeMain {
+    grid-template-columns: auto minmax(0, auto);
+    grid-template-rows: auto auto;
+    gap: 3px 7px;
+  }
+
+  .priorityBadgeLabel {
+    grid-column: 1 / -1;
+    justify-self: center;
+    max-width: none;
+    margin: 0;
+  }
+
+  .priorityBadgeValueShell {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .priorityBadgeTier {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    margin-left: 0;
+  }
+
+  .batchPriorityControl {
+    align-items: stretch;
+  }
+
+  .batchPriorityLabel {
+    flex: 1 1 100%;
+    max-width: 100%;
+    padding-block: 4px;
+  }
+}

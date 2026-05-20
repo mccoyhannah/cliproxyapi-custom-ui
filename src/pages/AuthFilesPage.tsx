@@ -146,10 +146,23 @@ const getAuthFileDisplayName = (file: AuthFileItem): string => {
   const note = typeof file.note === 'string' ? file.note.trim() : '';
   return note || file.name;
 };
-const formatNullableDateTime = (value: string | null | undefined): string => {
+const formatRelativeDateTime = (value: string | null | undefined): string => {
   if (!value) return '-';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return '-';
+
+  const diffMs = date.getTime() - Date.now();
+  const absoluteMs = Math.abs(diffMs);
+  if (absoluteMs < 60 * 1000) return '刚刚';
+
+  const units: Array<{ label: string; ms: number }> = [
+    { label: '天', ms: 24 * 60 * 60 * 1000 },
+    { label: '小时', ms: 60 * 60 * 1000 },
+    { label: '分钟', ms: 60 * 1000 },
+  ];
+  const unit = units.find((item) => absoluteMs >= item.ms) ?? units[units.length - 1];
+  const amount = Math.max(1, Math.round(absoluteMs / unit.ms));
+  return `${amount}${unit.label}${diffMs < 0 ? '前' : '后'}`;
 };
 const normalizePriorityRotationSidecarInterval = (value: unknown): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -2012,11 +2025,11 @@ export function AuthFilesPage() {
       ? styles.priorityRotationBackgroundMetaWarning
       : styles.priorityRotationBackgroundMetaUnknown;
   const priorityRotationSidecarLastRunLabel = t('auth_files.priority_rotation_sidecar_last_run', {
-    time: formatNullableDateTime(priorityRotationSidecarState?.lastCompletedAt),
+    time: formatRelativeDateTime(priorityRotationSidecarState?.lastCompletedAt),
   });
   const priorityRotationSidecarNextRunLabel = t('auth_files.priority_rotation_sidecar_next_run', {
     time: priorityRotationSidecarSavedEnabled
-      ? formatNullableDateTime(priorityRotationSidecarState?.nextRunAt)
+      ? formatRelativeDateTime(priorityRotationSidecarState?.nextRunAt)
       : '-',
   });
   const priorityRotationSidecarResultValue = (() => {
@@ -2172,12 +2185,27 @@ export function AuthFilesPage() {
     sidecar: priorityRotationSidecarLiveStatusLabel,
     defaultValue: `${priorityRotationStatusLabel} · ${priorityRotationSlotLabel} · ${priorityRotationSidecarLiveStatusLabel}`,
   });
+  const advancedControlSidecarSignalClass =
+    priorityRotationSidecarError || !priorityRotationSidecarOnline
+      ? styles.advancedControlsSignalDanger
+      : priorityRotationSidecarState?.running || priorityRotationSidecarWaking
+        ? styles.advancedControlsSignalReady
+        : priorityRotationSidecarSavedEnabled
+          ? styles.advancedControlsSignalReady
+          : styles.advancedControlsSignalInfo;
   const advancedControlSignals: Array<{
     key: string;
     label: string;
     className: string;
     title?: string;
-  }> = [];
+  }> = [
+    {
+      key: 'sidecar',
+      label: priorityRotationSidecarLiveStatusLabel,
+      className: advancedControlSidecarSignalClass,
+      title: advancedControlSummary,
+    },
+  ];
   if (priorityRotationDraftStatusLabel) {
     advancedControlSignals.push({
       key: 'draft',
@@ -3246,13 +3274,21 @@ export function AuthFilesPage() {
                     {t('auth_files.batch_disable')}
                   </Button>
                   <div className={styles.batchPriorityControl}>
+                    <span className={styles.batchPriorityLabel}>
+                      {t('auth_files.batch_priority_context_label', {
+                        count: selectionCount,
+                        defaultValue: `设置 ${selectionCount} 文件的优先级`,
+                      })}
+                    </span>
                     <input
                       className={styles.batchPriorityInput}
-                      type="number"
-                      step={1}
+                      type="text"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       value={batchPriorityInput}
-                      onChange={(event) => setBatchPriorityInput(event.currentTarget.value)}
+                      onChange={(event) =>
+                        setBatchPriorityInput(event.currentTarget.value.replace(/\D/g, ''))
+                      }
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           commitBatchPriority();

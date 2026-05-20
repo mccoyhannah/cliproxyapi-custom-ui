@@ -7,7 +7,9 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconCircleAlert,
   IconDownload,
+  IconMinus,
   IconModelCluster,
+  IconPlus,
   IconSettings,
   IconTimer,
   IconTrash2,
@@ -173,7 +175,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
-    priorityValue === undefined || priorityValue === 0 ? '' : String(priorityValue);
+    priorityValue === undefined || priorityValue === 0 ? '0' : String(priorityValue);
   const [priorityDraft, setPriorityDraft] = useState({
     fileName: file.name,
     value: currentPriorityText,
@@ -202,8 +204,18 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   });
   const utilityActionsOpen =
     utilityActionsState.fileName === file.name && utilityActionsState.open;
+  const priorityHoldDelayRef = useRef<number | null>(null);
+  const priorityHoldIntervalRef = useRef<number | null>(null);
+  const priorityHoldValueRef = useRef(priorityValue ?? 0);
   const priorityInputId = `auth-priority-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const prioritySaving = priorityUpdating;
+  const priorityToneValue = parsePriorityValue(priorityInput.trim() || '0') ?? 0;
+  const priorityIsUnassigned = priorityToneValue === 0;
+  const priorityEditorTitle = priorityIsUnassigned
+    ? t('auth_files.priority_unassigned_hint', {
+        defaultValue: '未分配优先级（已排除/P0）',
+      })
+    : t('auth_files.priority_hint');
   const displayNameSaving = noteUpdating;
   const showPriorityTier =
     Boolean(priorityTier) &&
@@ -368,10 +380,34 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     savePriorityValue(nextPriority);
   };
 
-  const stepPriorityInput = (delta: number) => {
+  const stepPriorityInput = (delta: number, baseOverride?: number) => {
     const draftPriority = parsePriorityValue(priorityInput.trim());
-    const basePriority = draftPriority ?? priorityValue ?? 0;
-    savePriorityValue(basePriority + delta);
+    const basePriority = baseOverride ?? draftPriority ?? priorityValue ?? 0;
+    const nextPriority = Math.max(0, basePriority + delta);
+    savePriorityValue(nextPriority);
+    return nextPriority;
+  };
+
+  const stopPriorityHold = () => {
+    if (priorityHoldDelayRef.current !== null) {
+      window.clearTimeout(priorityHoldDelayRef.current);
+      priorityHoldDelayRef.current = null;
+    }
+    if (priorityHoldIntervalRef.current !== null) {
+      window.clearInterval(priorityHoldIntervalRef.current);
+      priorityHoldIntervalRef.current = null;
+    }
+  };
+
+  const startPriorityHold = (delta: number) => {
+    if (disableControls || prioritySaving) return;
+    stopPriorityHold();
+    priorityHoldValueRef.current = stepPriorityInput(delta);
+    priorityHoldDelayRef.current = window.setTimeout(() => {
+      priorityHoldIntervalRef.current = window.setInterval(() => {
+        priorityHoldValueRef.current = stepPriorityInput(delta, priorityHoldValueRef.current);
+      }, 120);
+    }, 360);
   };
 
   const handlePriorityKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -382,6 +418,19 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       event.currentTarget.blur();
     }
   };
+
+  useEffect(
+    () => () => {
+      if (priorityHoldDelayRef.current !== null) {
+        window.clearTimeout(priorityHoldDelayRef.current);
+      }
+      if (priorityHoldIntervalRef.current !== null) {
+        window.clearInterval(priorityHoldIntervalRef.current);
+      }
+    },
+    []
+  );
+
   const stateLabel = isRuntimeOnly
     ? t('auth_files.type_virtual') || '虚拟认证文件'
     : file.disabled
@@ -528,18 +577,29 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
               <div
                 className={`${styles.priorityBadgeEditor} ${
                   showPriorityTier ? priorityTierClass : ''
-                } ${isFreeCodexPriority ? styles.priorityBadgeEditorFree : ''}`}
+                } ${isFreeCodexPriority ? styles.priorityBadgeEditorFree : ''} ${
+                  priorityIsUnassigned ? styles.priorityBadgeEditorUnassigned : ''
+                }`}
+                title={priorityEditorTitle}
               >
                 <button
                   type="button"
                   className={styles.priorityBadgeStepButton}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => stepPriorityInput(-1)}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    startPriorityHold(-1);
+                  }}
+                  onPointerUp={stopPriorityHold}
+                  onPointerLeave={stopPriorityHold}
+                  onPointerCancel={stopPriorityHold}
+                  onClick={(event) => {
+                    if (event.detail === 0) stepPriorityInput(-1);
+                  }}
                   disabled={disableControls || prioritySaving}
                   aria-label={t('auth_files.priority_decrease')}
                   title={t('auth_files.priority_decrease')}
                 >
-                  -
+                  <IconMinus size={15} />
                 </button>
                 <label className={styles.priorityBadgeMain} htmlFor={priorityInputId}>
                   <span className={styles.priorityBadgeLabel}>
@@ -561,7 +621,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                       onKeyDown={handlePriorityKeyDown}
                       disabled={disableControls || prioritySaving}
                       aria-label={t('auth_files.priority_display')}
-                      title={t('auth_files.priority_hint')}
+                      title={priorityEditorTitle}
                     />
                   </span>
                   {showPriorityTier && (
@@ -571,13 +631,21 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 <button
                   type="button"
                   className={styles.priorityBadgeStepButton}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => stepPriorityInput(1)}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    startPriorityHold(1);
+                  }}
+                  onPointerUp={stopPriorityHold}
+                  onPointerLeave={stopPriorityHold}
+                  onPointerCancel={stopPriorityHold}
+                  onClick={(event) => {
+                    if (event.detail === 0) stepPriorityInput(1);
+                  }}
                   disabled={disableControls || prioritySaving}
                   aria-label={t('auth_files.priority_increase')}
                   title={t('auth_files.priority_increase')}
                 >
-                  +
+                  <IconPlus size={15} />
                 </button>
                 {prioritySaving && (
                   <span className={styles.priorityBadgeSpinner}>
