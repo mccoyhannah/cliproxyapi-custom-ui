@@ -5825,95 +5825,475 @@ button.codexSubscriptionValue {
   }
 }
 
-// Auth files control-room polish.
+// Auth files medium control-console polish.
 .authFilesPanel {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-secondary) 14%, transparent),
+      transparent 180px
+    ),
+    var(--surface-card);
   box-shadow:
-    var(--shadow-card),
-    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+    var(--shadow-control),
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.filterSection {
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.filterRail,
+.filterControlsPanel,
+.priorityRotationBar,
+.priorityRotationBackgroundPanel {
+  border-color: color-mix(in srgb, var(--border-color) 70%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent),
+    color-mix(in srgb, var(--surface-panel) 76%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.filterRail {
+  gap: 8px;
+  padding: 9px;
+}
+
+.filterTags {
+  gap: 6px;
+}
+
+.filterTag {
+  min-height: 30px;
+  padding: 4px 9px 4px 6px;
+  border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 72%, var(--bg-primary));
+  box-shadow: none;
+
+  &::after {
+    display: none;
+  }
+
+  &:hover {
+    transform: none;
+    border-color: color-mix(in srgb, var(--filter-color) 30%, var(--border-color));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--filter-color) 6%, transparent);
+  }
+}
+
+.filterTagActive {
+  border-color: color-mix(in srgb, var(--filter-color) 46%, var(--border-color));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--filter-surface) 26%, transparent),
+      transparent 58%
+    ),
+    color-mix(in srgb, var(--surface-control) 80%, var(--bg-primary));
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--filter-color) 60%, transparent);
+}
+
+.filterTagIconWrap {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-tertiary) 42%, transparent);
+}
+
+.filterTagText {
+  max-width: 168px;
 }
 
 .uploadDropPool {
-  border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border-color: color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
   background:
-    radial-gradient(
-      circle at 8% 12%,
-      color-mix(in srgb, var(--primary-color) 11%, transparent),
-      transparent 34%
-    ),
     linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--surface-panel) 90%, var(--primary-color) 5%),
-      color-mix(in srgb, var(--bg-primary) 88%, var(--success-color) 4%)
-    );
+      90deg,
+      color-mix(in srgb, var(--primary-color) 5%, transparent),
+      transparent 54%
+    ),
+    color-mix(in srgb, var(--surface-panel) 80%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+
+  &::after {
+    inset: 6px;
+  }
+
+  &:hover,
+  &:focus-visible {
+    transform: none;
+    border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--primary-color) 6%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  }
+}
+
+.uploadDropPoolActive {
+  transform: none;
+  border-color: color-mix(in srgb, #14b8a6 48%, var(--primary-color));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #14b8a6 9%, transparent), transparent 56%),
+    color-mix(in srgb, var(--surface-panel) 78%, var(--bg-primary));
+  box-shadow:
+    inset 3px 0 0 #14b8a6,
+    0 0 0 3px color-mix(in srgb, #14b8a6 9%, transparent);
+}
+
+.uploadDropPoolDisabled {
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  }
+}
+
+.uploadDropPoolIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control) 78%, var(--primary-color) 6%);
+  box-shadow: none;
+}
+
+.uploadDropPoolCopy {
+  gap: 2px;
+}
+
+.uploadDropPoolTitle {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.uploadDropPoolHint {
+  font-size: 12px;
+}
+
+.uploadDropPoolStatus {
+  min-width: 58px;
+  height: 26px;
+  padding: 0 9px;
+  border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 56%, transparent);
+  font-weight: 720;
+}
+
+.filterContent {
+  gap: 10px;
+}
+
+.priorityRotationBar {
+  grid-template-columns: minmax(0, 1fr) minmax(210px, auto);
+  gap: 8px;
+  margin-bottom: 0;
+  padding: 9px;
+  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--priority-rotation-standby) 34%, transparent);
+}
+
+.priorityRotationMain {
+  gap: 8px;
+  padding: 0;
+}
+
+.priorityRotationIcon {
+  flex-basis: 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--primary-color) 7%, var(--surface-control));
+  box-shadow: none;
+}
+
+.priorityRotationCopy {
+  gap: 5px;
+}
+
+.priorityRotationTitle,
+.priorityRotationBackgroundTitle {
+  font-size: 14px;
+  font-weight: 780;
+}
+
+.priorityRotationMeta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.priorityRotationTiers {
+  gap: 5px;
+}
+
+.priorityRotationTier {
+  min-height: 21px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--tier-color, var(--primary-color)) 6%, var(--surface-control));
+  box-shadow: none;
+}
+
+.priorityRotationTierButton {
+  &:hover {
+    transform: none;
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--tier-color, var(--primary-color)) 7%, transparent);
+  }
+}
+
+.priorityRotationActions {
+  max-width: 260px;
+}
+
+.priorityRotationStatusGroup {
+  justify-content: flex-end;
+  gap: 5px;
+  min-height: 0;
+}
+
+.priorityRotationStatus {
+  min-height: 19px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.priorityRotationStatusReady,
+.priorityRotationStatusInfo,
+.priorityRotationStatusMuted {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--border-color) 42%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 42%, transparent);
+}
+
+.priorityRotationStatusWarning {
+  border-color: color-mix(in srgb, var(--warning-color) 24%, transparent);
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
 }
 
 .priorityRotationBackgroundPanel {
-  position: relative;
-  overflow: hidden;
-  border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--primary-color) 5%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--success-color) 4%, transparent),
-      transparent 56%
-    ),
-    color-mix(in srgb, var(--surface-panel) 92%, var(--bg-primary));
-  background-size:
-    24px 24px,
-    auto,
-    auto;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  overflow: visible;
+  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
   box-shadow:
-    0 16px 38px -34px color-mix(in srgb, var(--primary-color) 58%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 54%, var(--success-color));
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--success-color) 20%, transparent);
+}
+
+.priorityRotationBackgroundHeader {
+  grid-template-columns: 28px minmax(0, 1fr) minmax(170px, auto);
+  gap: 8px;
 }
 
 .priorityRotationBackgroundIcon {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--primary-color) 13%, var(--surface-control)),
-      color-mix(in srgb, var(--success-color) 8%, var(--surface-control))
-    );
-  color: color-mix(in srgb, var(--primary-color) 82%, var(--text-primary));
+  background: color-mix(in srgb, var(--surface-control) 80%, var(--priority-rotation-standby) 6%);
+  color: color-mix(in srgb, var(--priority-rotation-standby) 72%, var(--text-primary));
+}
+
+.priorityRotationBackgroundTitleRow,
+.priorityRotationBackgroundMetaLine {
+  gap: 4px;
+}
+
+.priorityRotationBackgroundMetaItem {
+  min-height: 19px;
+  padding: 1px 6px;
+  border-color: color-mix(in srgb, var(--border-color) 42%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 44%, transparent);
+  font-weight: 620;
+}
+
+.priorityRotationBackgroundMetaSuccess {
+  border-color: color-mix(in srgb, var(--success-color) 16%, transparent);
+  background: color-mix(in srgb, var(--success-color) 6%, transparent);
+}
+
+.priorityRotationBackgroundMetaWarning {
+  border-color: color-mix(in srgb, var(--warning-color) 24%, transparent);
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
+}
+
+.priorityRotationRelayControl {
+  gap: 8px;
+}
+
+.priorityRotationRelayCopy {
+  gap: 6px;
+
+  strong {
+    font-size: 12px;
+    font-weight: 760;
+  }
+
+  span {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 680;
+  }
+}
+
+.priorityRotationRelayTrack {
+  width: 42px;
+  height: 24px;
+  background: color-mix(in srgb, var(--text-tertiary) 16%, var(--surface-control));
+}
+
+.priorityRotationRelayThumb {
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+
+  .priorityRotationRelaySwitchOn & {
+    transform: translateX(18px);
+  }
+}
+
+.priorityRotationBackgroundHint {
+  padding: 7px 9px;
+  border-color: color-mix(in srgb, var(--info-color) 12%, var(--border-color));
+  background: color-mix(in srgb, var(--surface-control) 48%, transparent);
+  font-size: 12px;
+}
+
+.priorityRotationBackgroundRules {
+  grid-template-columns: minmax(0, 1fr) minmax(138px, 0.55fr) minmax(156px, 0.62fr);
+  gap: 6px;
+}
+
+.priorityRotationSetting {
+  gap: 6px;
+  padding: 8px 9px;
+  border-color: color-mix(in srgb, var(--border-color) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 56%, var(--bg-primary));
+  box-shadow: none;
+}
+
+.priorityRotationStepper,
+.priorityRotationThresholdValue {
+  border-color: color-mix(in srgb, var(--border-color) 52%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 66%, var(--bg-primary));
+  box-shadow: none;
+}
+
+.priorityRotationSlider {
+  &::-webkit-slider-runnable-track {
+    border-color: color-mix(in srgb, var(--border-color) 46%, transparent);
+    box-shadow: none;
+  }
+
+  &::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 9%, transparent);
+  }
+
+  &::-moz-range-track {
+    border-color: color-mix(in srgb, var(--border-color) 46%, transparent);
+  }
 }
 
 .priorityRotationBackgroundButtons {
-  padding-top: 2px;
+  gap: 6px;
+  padding-top: 0;
 
   :global(.btn.btn-sm) {
-    box-shadow: var(--shadow-control);
+    min-height: 30px;
+    box-shadow: none;
   }
 }
 
+.priorityRotationBackgroundError {
+  border-color: color-mix(in srgb, var(--warning-color) 32%, var(--border-color));
+  background: color-mix(in srgb, var(--warning-color) 8%, var(--surface-control));
+}
+
+.filterControlsPanel {
+  padding: 10px;
+}
+
+.filterControls {
+  grid-template-columns: minmax(280px, 1.7fr) minmax(96px, 0.34fr) minmax(180px, 0.66fr);
+  gap: 10px;
+
+  :global(.input) {
+    height: 38px;
+  }
+}
+
+.filterItem {
+  gap: 5px;
+
+  label {
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-weight: 680;
+    text-transform: none;
+  }
+}
+
+.filterToggleGroup {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 6px;
+}
+
+.filterToggleCard {
+  min-height: 38px;
+  border-color: color-mix(in srgb, var(--border-color) 54%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 62%, var(--bg-primary));
+}
+
+.filterToggleLabel {
+  font-size: 12px;
+  font-weight: 590;
+}
+
+.pageSizeSelect {
+  height: 38px;
+  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
+  font-size: 13px;
+}
+
+.fileGrid {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+}
+
+.fileGridQuotaManaged {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 344px), 1fr));
+}
+
+.fileGridCompact {
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+}
+
 .fileCard {
+  padding: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent 120px),
+    var(--surface-card);
+  border-color: color-mix(in srgb, var(--border-color) 70%, transparent);
   box-shadow:
-    var(--shadow-control),
-    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+    0 1px 2px color-mix(in srgb, #000 4%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
 
   &::after {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto;
-    height: 2px;
-    background: linear-gradient(
-      90deg,
-      color-mix(in srgb, currentColor 0%, transparent),
-      color-mix(in srgb, var(--primary-color) 22%, transparent),
-      color-mix(in srgb, var(--success-color) 16%, transparent)
-    );
-    opacity: 0;
-    transition: opacity $transition-fast;
-    pointer-events: none;
+    display: none;
   }
 
-  &:hover::after {
-    opacity: 1;
+  &:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+    box-shadow:
+      0 10px 24px -24px color-mix(in srgb, var(--text-primary) 36%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
   }
 }
 
@@ -5921,33 +6301,330 @@ button.codexSubscriptionValue {
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--primary-color) 7%, transparent),
-      transparent 150px
+      color-mix(in srgb, var(--primary-color) 5%, transparent),
+      transparent 120px
     ),
     var(--surface-card);
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 62%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+
+.fileCardCompact {
+  padding: 9px;
+
+  .fileCardMain {
+    gap: 5px;
+  }
+}
+
+.cardHeader {
+  gap: 9px;
 }
 
 .providerAvatar {
-  box-shadow:
-    0 12px 24px -20px currentColor,
-    inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
+  width: 38px;
+  height: 38px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
+}
+
+.providerAvatarImage {
+  width: 20px;
+  height: 20px;
+}
+
+.cardHeaderContent {
+  gap: 5px;
+}
+
+.cardBadgeRow {
+  gap: 6px;
+}
+
+.typeBadge,
+.stateBadge {
+  min-height: 22px;
+  padding: 3px 8px;
+  box-shadow: none;
+}
+
+.refreshTokenWarningBadge {
+  color: color-mix(in srgb, var(--warning-text) 74%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--warning-border) 42%, transparent);
+  background: color-mix(in srgb, var(--warning-bg) 48%, var(--surface-control));
+  box-shadow: none;
+
+  &::before {
+    display: none;
+  }
+}
+
+.fileName {
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.fileNameSource {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.cardMeta {
+  gap: 5px 6px;
+  padding: 0;
+}
+
+.metaItem {
+  padding: 2px 6px;
+  border-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 30%, transparent);
+}
+
+.metaLabel {
+  font-size: 10px;
+  font-weight: 520;
+}
+
+.metaValue {
+  font-size: 11px;
+  font-weight: 590;
+}
+
+.priorityBadgeEditor {
+  grid-template-columns: 28px minmax(96px, 1fr) 28px;
+  min-height: 34px;
+  width: min(100%, 172px);
+  border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 72%, var(--bg-primary));
+  box-shadow: none;
+}
+
+.priorityBadgeStepButton {
+  width: 28px;
+}
+
+.subscriptionExpiryPill {
+  min-height: 20px;
+  max-width: 164px;
+  padding: 2px 7px;
+  font-weight: 720;
+  box-shadow: none;
+}
+
+.subscriptionExpiryHealthy {
+  color: color-mix(in srgb, var(--primary-color) 62%, var(--text-secondary));
+  border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 6%, var(--surface-control));
+}
+
+.subscriptionExpiryWarning {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warning-bg) 18%, transparent);
+}
+
+.subscriptionExpiryAccessTokenOnly {
+  box-shadow: none;
+}
+
+.cardInsights {
+  gap: 7px;
+  padding: 7px;
+  border-color: color-mix(in srgb, var(--border-color) 28%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 28%, transparent);
+}
+
+.cardInsightsCompact {
+  gap: 5px;
+  padding: 5px;
+}
+
+.cardStats {
+  gap: 6px;
+}
+
+.statPill {
+  padding: 3px 8px;
+  border-color: color-mix(in srgb, currentColor 9%, transparent);
+  box-shadow: none;
+}
+
+.statLabel {
+  font-size: 10px;
+}
+
+.statValue {
+  font-size: 12px;
 }
 
 .statusPanel,
 .quotaSection {
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent),
-    color-mix(in srgb, var(--surface-panel) 68%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 50%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+
+.statusBar {
+  padding: 5px 7px;
+  border-color: color-mix(in srgb, var(--border-color) 24%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 26%, transparent);
+}
+
+.cardActions {
+  gap: 7px;
+  padding-top: 7px;
+  border-top-color: color-mix(in srgb, var(--border-color) 32%, transparent);
+}
+
+.primaryActionButton:global(.btn.btn-sm) {
+  min-width: 66px;
+  max-width: 96px;
+}
+
+.modelsActionButton:global(.btn.btn-sm) {
+  background: color-mix(in srgb, var(--primary-color) 5%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--primary-color) 12%, var(--border-color));
+}
+
+.modelsActionIconWrap {
+  background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+}
+
+.cardUtilityActions {
+  border-color: color-mix(in srgb, var(--border-color) 24%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 28%, transparent);
+}
+
+.statusToggle {
+  min-height: 30px;
+  min-width: 66px;
+  border-color: color-mix(in srgb, currentColor 14%, var(--border-color));
+  background: color-mix(in srgb, currentColor 5%, var(--surface-control));
+  box-shadow: none;
+}
+
+.statusToggleStateDot {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.statusToggleLabel {
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.iconButton:global(.btn.btn-sm) {
+  width: 29px;
+  height: 29px;
+  min-width: 29px;
 }
 
 .batchActionBar {
-  border-color: color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+  border-color: color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--primary-color) 9%, transparent),
+      color-mix(in srgb, var(--primary-color) 7%, transparent),
       transparent 42%
     ),
     color-mix(in srgb, var(--floating-surface) 92%, transparent);
+}
+
+@media (max-width: 1320px) {
+  .priorityRotationBar {
+    grid-template-columns: 1fr;
+  }
+
+  .priorityRotationActions {
+    max-width: none;
+  }
+
+  .priorityRotationStatusGroup {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1180px) {
+  .filterControls {
+    grid-template-columns: minmax(220px, 1fr) minmax(96px, 0.36fr) minmax(176px, 0.72fr);
+  }
+
+  .priorityRotationBackgroundHeader {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .priorityRotationRelayControl {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-top: 2px;
+  }
+}
+
+@include mobile {
+  .filterSection {
+    gap: 9px;
+  }
+
+  .filterRail,
+  .filterControlsPanel,
+  .priorityRotationBar,
+  .priorityRotationBackgroundPanel {
+    padding: 8px;
+  }
+
+  .uploadDropPool {
+    grid-template-columns: 34px minmax(0, 1fr);
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .uploadDropPoolStatus {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .priorityRotationTiers,
+  .priorityRotationStatusGroup,
+  .priorityRotationBackgroundMetaLine,
+  .priorityRotationBackgroundButtons {
+    align-items: stretch;
+  }
+
+  .priorityRotationTier {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: min(100%, 96px);
+  }
+
+  .filterControls {
+    grid-template-columns: 1fr;
+  }
+
+  .filterToggleGroup {
+    gap: 7px;
+  }
+
+  .fileGrid,
+  .fileGridQuotaManaged,
+  .fileGridCompact {
+    grid-template-columns: 1fr;
+  }
+
+  .fileCard {
+    padding: 11px;
+  }
+
+  .cardActions {
+    align-items: stretch;
+  }
+
+  .cardActionsMain {
+    flex: 1 1 auto;
+    min-width: min(100%, 220px);
+  }
+
+  .statusToggle {
+    margin-left: 0;
+  }
 }
