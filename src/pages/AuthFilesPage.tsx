@@ -2100,6 +2100,135 @@ export function AuthFilesPage() {
         defaultValue: `${priorityRotationDetailTierLabel} ${formatPriorityRotationPriority(priorityRotationDetailPriority)}`,
       })
     : '';
+  const manageableFileCount = files.filter((file) => !isRuntimeOnlyAuthFile(file)).length;
+  const enabledFileCount = files.filter(
+    (file) => !isRuntimeOnlyAuthFile(file) && file.disabled !== true
+  ).length;
+  const disabledFileCount = files.filter(
+    (file) => !isRuntimeOnlyAuthFile(file) && file.disabled === true
+  ).length;
+  const problemFileCount = files.filter(hasAuthFileStatusMessage).length;
+  const runtimeOnlyFileCount = files.length - manageableFileCount;
+  const currentProviderLabel =
+    filter === 'all'
+      ? t('auth_files.summary_provider_all', { defaultValue: '全部渠道' })
+      : getTypeLabel(t, filter);
+  const visibleRangeLabel =
+    sorted.length === 0
+      ? t('auth_files.summary_visible_empty', { defaultValue: '无匹配凭证' })
+      : t('auth_files.summary_visible_range', {
+          shown: pageItems.length,
+          total: sorted.length,
+          defaultValue: `本页 ${pageItems.length} / 筛选 ${sorted.length}`,
+        });
+  const commandSummaryItems = [
+    {
+      key: 'total',
+      label: t('auth_files.summary_total', { defaultValue: '认证文件' }),
+      value: files.length,
+      meta: visibleRangeLabel,
+    },
+    {
+      key: 'enabled',
+      label: t('auth_files.summary_enabled', { defaultValue: '启用中' }),
+      value: enabledFileCount,
+      meta: t('auth_files.summary_manageable', {
+        count: manageableFileCount,
+        defaultValue: `${manageableFileCount} 个可管理`,
+      }),
+    },
+    {
+      key: 'problem',
+      label: t('auth_files.summary_problem', { defaultValue: '需关注' }),
+      value: problemFileCount,
+      meta:
+        problemFileCount > 0
+          ? t('auth_files.summary_problem_hint', { defaultValue: '有状态提示' })
+          : t('auth_files.summary_problem_clear', { defaultValue: '状态平稳' }),
+    },
+    {
+      key: 'disabled',
+      label: t('auth_files.summary_disabled', { defaultValue: '已停用' }),
+      value: disabledFileCount,
+      meta:
+        runtimeOnlyFileCount > 0
+          ? t('auth_files.summary_runtime_only', {
+              count: runtimeOnlyFileCount,
+              defaultValue: `${runtimeOnlyFileCount} 个运行态`,
+            })
+          : t('auth_files.summary_runtime_none', { defaultValue: '无运行态占位' }),
+    },
+  ];
+  const listHeaderTitle = t('auth_files.list_header_title', {
+    provider: currentProviderLabel,
+    defaultValue: `${currentProviderLabel}认证文件`,
+  });
+  const listHeaderMeta = t('auth_files.list_header_meta', {
+    shown: pageItems.length,
+    total: sorted.length,
+    page: currentPage,
+    totalPages,
+    defaultValue: `${pageItems.length}/${sorted.length} 项，第 ${currentPage}/${totalPages} 页`,
+  });
+  const advancedControlSummary = t('auth_files.advanced_control_summary', {
+    status: priorityRotationStatusLabel,
+    slots: priorityRotationSlotLabel,
+    sidecar: priorityRotationSidecarLiveStatusLabel,
+    defaultValue: `${priorityRotationStatusLabel} · ${priorityRotationSlotLabel} · ${priorityRotationSidecarLiveStatusLabel}`,
+  });
+  const advancedControlSignals: Array<{
+    key: string;
+    label: string;
+    className: string;
+    title?: string;
+  }> = [];
+  if (priorityRotationDraftStatusLabel) {
+    advancedControlSignals.push({
+      key: 'draft',
+      label: priorityRotationDraftStatusLabel,
+      className: styles.advancedControlsSignalWarning,
+    });
+  }
+  if (priorityRotationSidecarError) {
+    advancedControlSignals.push({
+      key: 'error',
+      label: t('auth_files.advanced_control_signal_error', {
+        defaultValue: '接力异常',
+      }),
+      className: styles.advancedControlsSignalDanger,
+      title: priorityRotationSidecarError,
+    });
+  }
+  if (priorityRotationSidecarHasAnomalousNoChanges) {
+    advancedControlSignals.push({
+      key: 'anomaly',
+      label: t('auth_files.advanced_control_signal_anomaly', {
+        defaultValue: '疑似未接力',
+      }),
+      className: styles.advancedControlsSignalWarning,
+    });
+  }
+  if (priorityRotationSidecarOnline && !priorityRotationSidecarHasSecret) {
+    advancedControlSignals.push({
+      key: 'secret',
+      label: priorityRotationSidecarSecretLabel,
+      className: styles.advancedControlsSignalWarning,
+    });
+  }
+  if (
+    priorityRotationSidecarWaking ||
+    priorityRotationSidecarSaving ||
+    priorityRotationSidecarSecretSaving ||
+    priorityRotationSidecarRunSaving
+  ) {
+    advancedControlSignals.push({
+      key: 'busy',
+      label: t('auth_files.advanced_control_signal_busy', {
+        defaultValue: '处理中',
+      }),
+      className: styles.advancedControlsSignalInfo,
+    });
+  }
 
   return (
     <div className={styles.container}>
@@ -2107,6 +2236,35 @@ export function AuthFilesPage() {
         <h1 className={styles.pageTitle}>{t('auth_files.title')}</h1>
         <p className={styles.description}>{t('auth_files.description')}</p>
       </div>
+
+      <section className={styles.commandOverview} aria-label={t('auth_files.title_section')}>
+        <div className={styles.commandOverviewMain}>
+          <span className={styles.commandEyebrow}>
+            {t('auth_files.command_eyebrow', { defaultValue: 'AUTH OPS' })}
+          </span>
+          <div className={styles.commandOverviewTitleRow}>
+            <h2 className={styles.commandOverviewTitle}>
+              {t('auth_files.command_title', { defaultValue: '凭证运营台' })}
+            </h2>
+            <span className={styles.commandOverviewStatus}>{currentProviderLabel}</span>
+          </div>
+          <p className={styles.commandOverviewCopy}>
+            {t('auth_files.command_copy', {
+              defaultValue:
+                '日常筛选、启停、优先级和健康状态放在前面；接力配置收进高级区域，OAuth 配置独立成组。',
+            })}
+          </p>
+        </div>
+        <div className={styles.commandSummaryGrid}>
+          {commandSummaryItems.map((item) => (
+            <div className={styles.commandSummaryCard} key={item.key}>
+              <span className={styles.commandSummaryLabel}>{item.label}</span>
+              <strong className={styles.commandSummaryValue}>{item.value}</strong>
+              <span className={styles.commandSummaryMeta}>{item.meta}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <Card
         className={styles.authFilesPanel}
@@ -2203,343 +2361,386 @@ export function AuthFilesPage() {
           </div>
 
           <div className={styles.filterContent}>
-            <div className={styles.priorityRotationBar}>
-              <div className={styles.priorityRotationMain}>
-                <span className={styles.priorityRotationIcon} aria-hidden="true">
-                  <IconSlidersHorizontal size={19} />
+            <details className={styles.advancedControls}>
+              <summary className={styles.advancedControlsSummary}>
+                <span className={styles.advancedControlsTitle}>
+                  {t('auth_files.advanced_control_title', { defaultValue: '高级接力控制' })}
                 </span>
-                <span className={styles.priorityRotationCopy}>
-                  <span className={styles.priorityRotationTitle}>
-                    {t('auth_files.priority_rotation_title')}
-                  </span>
-                  <span className={styles.priorityRotationMeta} title={priorityRotationLayerTitle}>
-                    {priorityRotationLayerLabel}
-                  </span>
+                <span className={styles.advancedControlsMeta}>{advancedControlSummary}</span>
+                {advancedControlSignals.length > 0 && (
                   <span
-                    className={styles.priorityRotationTiers}
-                    aria-label={t('auth_files.priority_rotation_tiers_aria')}
+                    className={styles.advancedControlsSignals}
+                    aria-label={t('auth_files.advanced_control_signals', {
+                      defaultValue: '接力状态提示',
+                    })}
                   >
-                    {priorityRotationTierItems.map((tier) => (
-                      <button
-                        type="button"
-                        className={`${styles.priorityRotationTier} ${styles.priorityRotationTierButton} ${tier.className}`}
-                        key={tier.key}
-                        onClick={() => setPriorityRotationDetailTier(tier.key)}
-                        aria-label={tier.ariaLabel}
-                        title={tier.ariaLabel}
+                    {advancedControlSignals.map((signal) => (
+                      <span
+                        className={`${styles.advancedControlsSignal} ${signal.className}`}
+                        key={signal.key}
+                        title={signal.title}
                       >
-                        <span className={styles.priorityRotationTierLabel}>{tier.label}</span>
-                        <span className={styles.priorityRotationTierValue}>{tier.value}</span>
-                        <span className={styles.priorityRotationTierCount}>{tier.count}</span>
-                      </button>
+                        {signal.label}
+                      </span>
                     ))}
                   </span>
-                </span>
-              </div>
-              <div className={styles.priorityRotationActions}>
-                <div className={styles.priorityRotationStatusGroup}>
-                  <span
-                    className={`${styles.priorityRotationStatus} ${priorityRotationStatusClass}`}
-                  >
-                    {priorityRotationStatusLabel}
-                  </span>
-                  <span
-                    className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusInfo}`}
-                  >
-                    {priorityRotationSlotLabel}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.priorityRotationBackgroundPanel}>
-              <div className={styles.priorityRotationBackgroundHeader}>
-                <span className={styles.priorityRotationBackgroundIcon} aria-hidden="true">
-                  <IconRefreshCw size={16} />
-                </span>
-                <span className={styles.priorityRotationBackgroundCopy}>
-                  <span className={styles.priorityRotationBackgroundTitleRow}>
-                    <span className={styles.priorityRotationBackgroundTitle}>
-                      {t('auth_files.priority_rotation_sidecar_title')}
-                    </span>
-                    <span
-                      className={`${styles.priorityRotationStatus} ${priorityRotationSidecarStatusTone}`}
-                    >
-                      {priorityRotationSidecarLiveStatusLabel}
-                    </span>
-                    {priorityRotationDraftStatusLabel && (
-                      <span
-                        className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
-                      >
-                        {priorityRotationDraftStatusLabel}
-                      </span>
-                    )}
-                  </span>
-                  <span className={styles.priorityRotationBackgroundMetaLine}>
-                    <span
-                      className={`${styles.priorityRotationBackgroundMetaItem} ${priorityRotationSidecarSecretToneClass}`}
-                    >
-                      {priorityRotationSidecarSecretLabel}
-                    </span>
-                    <span className={styles.priorityRotationBackgroundMetaItem}>
-                      {priorityRotationSidecarLastRunLabel}
-                    </span>
-                    <span
-                      className={`${styles.priorityRotationBackgroundMetaItem} ${
-                        priorityRotationSidecarHasAnomalousNoChanges
-                          ? styles.priorityRotationBackgroundMetaWarning
-                          : ''
-                      }`}
-                    >
-                      {priorityRotationSidecarResultLabel}
-                    </span>
-                    <span className={styles.priorityRotationBackgroundMetaItem}>
-                      {priorityRotationSidecarNextRunLabel}
-                    </span>
-                  </span>
-                </span>
-                <div className={styles.priorityRotationRelayControl}>
-                  <span className={styles.priorityRotationRelayCopy}>
-                    <strong>{t('auth_files.priority_rotation_sidecar_enable')}</strong>
-                    <span>
-                      {priorityRotationSidecarEnabled
-                        ? t('auth_files.priority_rotation_auto_status_on')
-                        : t('auth_files.priority_rotation_auto_status_off')}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className={`${styles.priorityRotationRelaySwitch} ${
-                      priorityRotationSidecarEnabled ? styles.priorityRotationRelaySwitchOn : ''
-                    } ${priorityRotationSidecarWaking ? styles.priorityRotationRelaySwitchWaking : ''}`}
-                    role="switch"
-                    aria-checked={priorityRotationSidecarEnabled}
-                    aria-label={t('auth_files.priority_rotation_sidecar_enable')}
-                    disabled={priorityRotationSidecarSaving || priorityRotationSidecarWaking}
-                    onClick={() => void togglePriorityRotationSidecarEnabled()}
-                  >
-                    <span className={styles.priorityRotationRelayTrack} aria-hidden="true">
-                      <span className={styles.priorityRotationRelayThumb} />
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <div className={styles.priorityRotationBackgroundControls}>
-                {priorityRotationSidecarHint && (
-                  <div className={styles.priorityRotationBackgroundHint}>
-                    {priorityRotationSidecarHint}
-                  </div>
                 )}
-                <div className={styles.priorityRotationBackgroundRules}>
-                  <label className={styles.priorityRotationSetting}>
-                    <span className={styles.priorityRotationSettingHeader}>
-                      <span>{t('auth_files.priority_rotation_threshold_label')}</span>
-                      <span className={styles.priorityRotationThresholdValue}>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={priorityRotationThresholdInput}
-                          disabled={priorityRotationSidecarSaving}
-                          aria-label={t('auth_files.priority_rotation_threshold_label')}
-                          onChange={(event) => {
-                            priorityRotationSidecarDraftTouchedRef.current = true;
-                            setPriorityRotationThresholdInput(event.currentTarget.value);
-                          }}
-                          onBlur={(event) =>
-                            commitPriorityRotationThresholdInput(event.currentTarget.value)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.currentTarget.blur();
-                            }
-                          }}
-                        />
-                        <span>%</span>
+              </summary>
+              <div className={styles.advancedControlsBody}>
+                <div className={styles.priorityRotationBar}>
+                  <div className={styles.priorityRotationMain}>
+                    <span className={styles.priorityRotationIcon} aria-hidden="true">
+                      <IconSlidersHorizontal size={19} />
+                    </span>
+                    <span className={styles.priorityRotationCopy}>
+                      <span className={styles.priorityRotationTitle}>
+                        {t('auth_files.priority_rotation_title')}
+                      </span>
+                      <span
+                        className={styles.priorityRotationMeta}
+                        title={priorityRotationLayerTitle}
+                      >
+                        {priorityRotationLayerLabel}
+                      </span>
+                      <span
+                        className={styles.priorityRotationTiers}
+                        aria-label={t('auth_files.priority_rotation_tiers_aria')}
+                      >
+                        {priorityRotationTierItems.map((tier) => (
+                          <button
+                            type="button"
+                            className={`${styles.priorityRotationTier} ${styles.priorityRotationTierButton} ${tier.className}`}
+                            key={tier.key}
+                            onClick={() => setPriorityRotationDetailTier(tier.key)}
+                            aria-label={tier.ariaLabel}
+                            title={tier.ariaLabel}
+                          >
+                            <span className={styles.priorityRotationTierLabel}>{tier.label}</span>
+                            <span className={styles.priorityRotationTierValue}>{tier.value}</span>
+                            <span className={styles.priorityRotationTierCount}>{tier.count}</span>
+                          </button>
+                        ))}
                       </span>
                     </span>
-                    <span className={styles.priorityRotationThresholdControl}>
-                      <input
-                        className={styles.priorityRotationSlider}
-                        type="range"
-                        min={0}
-                        max={100}
-                        step={PRIORITY_ROTATION_THRESHOLD_STEP}
-                        value={priorityRotationEffectiveThresholdPercent}
-                        disabled={priorityRotationSidecarSaving}
-                        aria-label={t('auth_files.priority_rotation_threshold_label')}
-                        style={
-                          {
-                            '--priority-rotation-slider-progress': `${priorityRotationEffectiveThresholdPercent}%`,
-                          } as CSSProperties
-                        }
-                        onChange={(event) =>
-                          commitPriorityRotationThresholdInput(event.currentTarget.value)
-                        }
-                      />
-                    </span>
-                  </label>
-                  <label className={styles.priorityRotationSetting}>
-                    <span className={styles.priorityRotationSettingHeader}>
-                      <span>{t('auth_files.priority_rotation_slots_label')}</span>
-                    </span>
-                    <span
-                      className={`${styles.priorityRotationStepper} ${styles.priorityRotationSlotStepper}`}
-                    >
-                      <button
-                        type="button"
-                        className={styles.priorityRotationStepperButton}
-                        disabled={priorityRotationSidecarSaving}
-                        aria-label={t('auth_files.priority_rotation_slots_decrease')}
-                        onClick={() => adjustPriorityRotationSlots(-PRIORITY_ROTATION_SLOT_STEP)}
+                  </div>
+                  <div className={styles.priorityRotationActions}>
+                    <div className={styles.priorityRotationStatusGroup}>
+                      <span
+                        className={`${styles.priorityRotationStatus} ${priorityRotationStatusClass}`}
                       >
-                        <IconMinus size={16} />
-                      </button>
-                      <span className={styles.priorityRotationStepperValue}>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={priorityRotationSlotsInput}
-                          disabled={priorityRotationSidecarSaving}
-                          aria-label={t('auth_files.priority_rotation_slots_label')}
-                          onChange={(event) => {
-                            priorityRotationSidecarDraftTouchedRef.current = true;
-                            setPriorityRotationSlotsInput(event.currentTarget.value);
-                          }}
-                          onBlur={(event) =>
-                            commitPriorityRotationSlotsInput(event.currentTarget.value)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.currentTarget.blur();
-                            }
-                          }}
-                        />
+                        {priorityRotationStatusLabel}
                       </span>
-                      <button
-                        type="button"
-                        className={styles.priorityRotationStepperButton}
-                        disabled={priorityRotationSidecarSaving}
-                        aria-label={t('auth_files.priority_rotation_slots_increase')}
-                        onClick={() => adjustPriorityRotationSlots(PRIORITY_ROTATION_SLOT_STEP)}
+                      <span
+                        className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusInfo}`}
                       >
-                        <IconPlus size={16} />
-                      </button>
-                    </span>
-                  </label>
-                  <label className={styles.priorityRotationSetting}>
-                    <span className={styles.priorityRotationSettingHeader}>
-                      <span>{t('auth_files.priority_rotation_sidecar_interval')}</span>
-                    </span>
-                    <span
-                      className={`${styles.priorityRotationStepper} ${styles.priorityRotationIntervalStepper}`}
-                    >
-                      <button
-                        type="button"
-                        className={styles.priorityRotationStepperButton}
-                        disabled={priorityRotationSidecarSaving}
-                        aria-label={t('auth_files.priority_rotation_sidecar_interval_decrease')}
-                        onClick={() =>
-                          adjustPriorityRotationSidecarInterval(
-                            -PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP
-                          )
-                        }
-                      >
-                        <IconMinus size={16} />
-                      </button>
-                      <span className={styles.priorityRotationStepperValue}>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={priorityRotationSidecarIntervalInput}
-                          disabled={priorityRotationSidecarSaving}
-                          aria-label={t('auth_files.priority_rotation_sidecar_interval')}
-                          onChange={(event) => {
-                            priorityRotationSidecarDraftTouchedRef.current = true;
-                            setPriorityRotationSidecarIntervalInput(event.currentTarget.value);
-                          }}
-                          onBlur={(event) =>
-                            commitPriorityRotationSidecarIntervalInput(event.currentTarget.value)
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.currentTarget.blur();
-                            }
-                          }}
-                        />
-                        <span>{t('auth_files.priority_rotation_sidecar_interval_unit')}</span>
+                        {priorityRotationSlotLabel}
                       </span>
-                      <button
-                        type="button"
-                        className={styles.priorityRotationStepperButton}
-                        disabled={priorityRotationSidecarSaving}
-                        aria-label={t('auth_files.priority_rotation_sidecar_interval_increase')}
-                        onClick={() =>
-                          adjustPriorityRotationSidecarInterval(
-                            PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP
-                          )
-                        }
-                      >
-                        <IconPlus size={16} />
-                      </button>
-                    </span>
-                  </label>
+                    </div>
+                  </div>
                 </div>
-                <div className={styles.priorityRotationBackgroundButtons}>
-                  {!priorityRotationSidecarOnline && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      leftIcon={<IconRefreshCw size={15} />}
-                      onClick={() => void wakePriorityRotationSidecar()}
-                      disabled={priorityRotationSidecarWaking}
-                      loading={priorityRotationSidecarWaking}
-                    >
-                      {t('auth_files.priority_rotation_sidecar_wake_button')}
-                    </Button>
+
+                <div className={styles.priorityRotationBackgroundPanel}>
+                  <div className={styles.priorityRotationBackgroundHeader}>
+                    <span className={styles.priorityRotationBackgroundIcon} aria-hidden="true">
+                      <IconRefreshCw size={16} />
+                    </span>
+                    <span className={styles.priorityRotationBackgroundCopy}>
+                      <span className={styles.priorityRotationBackgroundTitleRow}>
+                        <span className={styles.priorityRotationBackgroundTitle}>
+                          {t('auth_files.priority_rotation_sidecar_title')}
+                        </span>
+                        <span
+                          className={`${styles.priorityRotationStatus} ${priorityRotationSidecarStatusTone}`}
+                        >
+                          {priorityRotationSidecarLiveStatusLabel}
+                        </span>
+                        {priorityRotationDraftStatusLabel && (
+                          <span
+                            className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
+                          >
+                            {priorityRotationDraftStatusLabel}
+                          </span>
+                        )}
+                      </span>
+                      <span className={styles.priorityRotationBackgroundMetaLine}>
+                        <span
+                          className={`${styles.priorityRotationBackgroundMetaItem} ${priorityRotationSidecarSecretToneClass}`}
+                        >
+                          {priorityRotationSidecarSecretLabel}
+                        </span>
+                        <span className={styles.priorityRotationBackgroundMetaItem}>
+                          {priorityRotationSidecarLastRunLabel}
+                        </span>
+                        <span
+                          className={`${styles.priorityRotationBackgroundMetaItem} ${
+                            priorityRotationSidecarHasAnomalousNoChanges
+                              ? styles.priorityRotationBackgroundMetaWarning
+                              : ''
+                          }`}
+                        >
+                          {priorityRotationSidecarResultLabel}
+                        </span>
+                        <span className={styles.priorityRotationBackgroundMetaItem}>
+                          {priorityRotationSidecarNextRunLabel}
+                        </span>
+                      </span>
+                    </span>
+                    <div className={styles.priorityRotationRelayControl}>
+                      <span className={styles.priorityRotationRelayCopy}>
+                        <strong>{t('auth_files.priority_rotation_sidecar_enable')}</strong>
+                        <span>
+                          {priorityRotationSidecarEnabled
+                            ? t('auth_files.priority_rotation_auto_status_on')
+                            : t('auth_files.priority_rotation_auto_status_off')}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className={`${styles.priorityRotationRelaySwitch} ${
+                          priorityRotationSidecarEnabled
+                            ? styles.priorityRotationRelaySwitchOn
+                            : ''
+                        } ${priorityRotationSidecarWaking ? styles.priorityRotationRelaySwitchWaking : ''}`}
+                        role="switch"
+                        aria-checked={priorityRotationSidecarEnabled}
+                        aria-label={t('auth_files.priority_rotation_sidecar_enable')}
+                        disabled={priorityRotationSidecarSaving || priorityRotationSidecarWaking}
+                        onClick={() => void togglePriorityRotationSidecarEnabled()}
+                      >
+                        <span className={styles.priorityRotationRelayTrack} aria-hidden="true">
+                          <span className={styles.priorityRotationRelayThumb} />
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles.priorityRotationBackgroundControls}>
+                    {priorityRotationSidecarHint && (
+                      <div className={styles.priorityRotationBackgroundHint}>
+                        {priorityRotationSidecarHint}
+                      </div>
+                    )}
+                    <div className={styles.priorityRotationBackgroundRules}>
+                      <label className={styles.priorityRotationSetting}>
+                        <span className={styles.priorityRotationSettingHeader}>
+                          <span>{t('auth_files.priority_rotation_threshold_label')}</span>
+                          <span className={styles.priorityRotationThresholdValue}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={priorityRotationThresholdInput}
+                              disabled={priorityRotationSidecarSaving}
+                              aria-label={t('auth_files.priority_rotation_threshold_label')}
+                              onChange={(event) => {
+                                priorityRotationSidecarDraftTouchedRef.current = true;
+                                setPriorityRotationThresholdInput(event.currentTarget.value);
+                              }}
+                              onBlur={(event) =>
+                                commitPriorityRotationThresholdInput(event.currentTarget.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                            <span>%</span>
+                          </span>
+                        </span>
+                        <span className={styles.priorityRotationThresholdControl}>
+                          <input
+                            className={styles.priorityRotationSlider}
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={PRIORITY_ROTATION_THRESHOLD_STEP}
+                            value={priorityRotationEffectiveThresholdPercent}
+                            disabled={priorityRotationSidecarSaving}
+                            aria-label={t('auth_files.priority_rotation_threshold_label')}
+                            style={
+                              {
+                                '--priority-rotation-slider-progress': `${priorityRotationEffectiveThresholdPercent}%`,
+                              } as CSSProperties
+                            }
+                            onChange={(event) =>
+                              commitPriorityRotationThresholdInput(event.currentTarget.value)
+                            }
+                          />
+                        </span>
+                      </label>
+                      <label className={styles.priorityRotationSetting}>
+                        <span className={styles.priorityRotationSettingHeader}>
+                          <span>{t('auth_files.priority_rotation_slots_label')}</span>
+                        </span>
+                        <span
+                          className={`${styles.priorityRotationStepper} ${styles.priorityRotationSlotStepper}`}
+                        >
+                          <button
+                            type="button"
+                            className={styles.priorityRotationStepperButton}
+                            disabled={priorityRotationSidecarSaving}
+                            aria-label={t('auth_files.priority_rotation_slots_decrease')}
+                            onClick={() =>
+                              adjustPriorityRotationSlots(-PRIORITY_ROTATION_SLOT_STEP)
+                            }
+                          >
+                            <IconMinus size={16} />
+                          </button>
+                          <span className={styles.priorityRotationStepperValue}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={priorityRotationSlotsInput}
+                              disabled={priorityRotationSidecarSaving}
+                              aria-label={t('auth_files.priority_rotation_slots_label')}
+                              onChange={(event) => {
+                                priorityRotationSidecarDraftTouchedRef.current = true;
+                                setPriorityRotationSlotsInput(event.currentTarget.value);
+                              }}
+                              onBlur={(event) =>
+                                commitPriorityRotationSlotsInput(event.currentTarget.value)
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                          </span>
+                          <button
+                            type="button"
+                            className={styles.priorityRotationStepperButton}
+                            disabled={priorityRotationSidecarSaving}
+                            aria-label={t('auth_files.priority_rotation_slots_increase')}
+                            onClick={() => adjustPriorityRotationSlots(PRIORITY_ROTATION_SLOT_STEP)}
+                          >
+                            <IconPlus size={16} />
+                          </button>
+                        </span>
+                      </label>
+                      <label className={styles.priorityRotationSetting}>
+                        <span className={styles.priorityRotationSettingHeader}>
+                          <span>{t('auth_files.priority_rotation_sidecar_interval')}</span>
+                        </span>
+                        <span
+                          className={`${styles.priorityRotationStepper} ${styles.priorityRotationIntervalStepper}`}
+                        >
+                          <button
+                            type="button"
+                            className={styles.priorityRotationStepperButton}
+                            disabled={priorityRotationSidecarSaving}
+                            aria-label={t(
+                              'auth_files.priority_rotation_sidecar_interval_decrease'
+                            )}
+                            onClick={() =>
+                              adjustPriorityRotationSidecarInterval(
+                                -PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP
+                              )
+                            }
+                          >
+                            <IconMinus size={16} />
+                          </button>
+                          <span className={styles.priorityRotationStepperValue}>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={priorityRotationSidecarIntervalInput}
+                              disabled={priorityRotationSidecarSaving}
+                              aria-label={t('auth_files.priority_rotation_sidecar_interval')}
+                              onChange={(event) => {
+                                priorityRotationSidecarDraftTouchedRef.current = true;
+                                setPriorityRotationSidecarIntervalInput(
+                                  event.currentTarget.value
+                                );
+                              }}
+                              onBlur={(event) =>
+                                commitPriorityRotationSidecarIntervalInput(
+                                  event.currentTarget.value
+                                )
+                              }
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                            <span>{t('auth_files.priority_rotation_sidecar_interval_unit')}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className={styles.priorityRotationStepperButton}
+                            disabled={priorityRotationSidecarSaving}
+                            aria-label={t(
+                              'auth_files.priority_rotation_sidecar_interval_increase'
+                            )}
+                            onClick={() =>
+                              adjustPriorityRotationSidecarInterval(
+                                PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP
+                              )
+                            }
+                          >
+                            <IconPlus size={16} />
+                          </button>
+                        </span>
+                      </label>
+                    </div>
+                    <div className={styles.priorityRotationBackgroundButtons}>
+                      {!priorityRotationSidecarOnline && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          leftIcon={<IconRefreshCw size={15} />}
+                          onClick={() => void wakePriorityRotationSidecar()}
+                          disabled={priorityRotationSidecarWaking}
+                          loading={priorityRotationSidecarWaking}
+                        >
+                          {t('auth_files.priority_rotation_sidecar_wake_button')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void savePriorityRotationSidecarSecret()}
+                        disabled={
+                          !managementKey ||
+                          priorityRotationSidecarWaking ||
+                          priorityRotationSidecarSecretSaving
+                        }
+                        loading={priorityRotationSidecarSecretSaving}
+                      >
+                        {t('auth_files.priority_rotation_sidecar_save_secret')}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        leftIcon={<IconRefreshCw size={15} />}
+                        onClick={() => void runPriorityRotationSidecarNow()}
+                        disabled={
+                          !managementKey ||
+                          priorityRotationSidecarWaking ||
+                          priorityRotationSidecarRunSaving
+                        }
+                        loading={priorityRotationSidecarRunSaving}
+                      >
+                        {t('auth_files.priority_rotation_sidecar_run_now')}
+                      </Button>
+                    </div>
+                  </div>
+                  {priorityRotationSidecarHasAnomalousNoChanges && (
+                    <div className={styles.priorityRotationBackgroundError}>
+                      {t('auth_files.priority_rotation_sidecar_anomaly_warning')}
+                    </div>
                   )}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => void savePriorityRotationSidecarSecret()}
-                    disabled={
-                      !managementKey ||
-                      priorityRotationSidecarWaking ||
-                      priorityRotationSidecarSecretSaving
-                    }
-                    loading={priorityRotationSidecarSecretSaving}
-                  >
-                    {t('auth_files.priority_rotation_sidecar_save_secret')}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    leftIcon={<IconRefreshCw size={15} />}
-                    onClick={() => void runPriorityRotationSidecarNow()}
-                    disabled={
-                      !managementKey ||
-                      priorityRotationSidecarWaking ||
-                      priorityRotationSidecarRunSaving
-                    }
-                    loading={priorityRotationSidecarRunSaving}
-                  >
-                    {t('auth_files.priority_rotation_sidecar_run_now')}
-                  </Button>
+                  {priorityRotationSidecarError && (
+                    <div className={styles.priorityRotationBackgroundError}>
+                      {priorityRotationSidecarError}
+                    </div>
+                  )}
                 </div>
               </div>
-              {priorityRotationSidecarHasAnomalousNoChanges && (
-                <div className={styles.priorityRotationBackgroundError}>
-                  {t('auth_files.priority_rotation_sidecar_anomaly_warning')}
-                </div>
-              )}
-              {priorityRotationSidecarError && (
-                <div className={styles.priorityRotationBackgroundError}>
-                  {priorityRotationSidecarError}
-                </div>
-              )}
-            </div>
+            </details>
 
             <div className={styles.filterControlsPanel}>
               <div className={styles.filterControls}>
@@ -2654,6 +2855,16 @@ export function AuthFilesPage() {
               </div>
             </div>
 
+            <div className={styles.fileListHeader}>
+              <div className={styles.fileListHeaderText}>
+                <span className={styles.fileListKicker}>
+                  {t('auth_files.list_kicker', { defaultValue: '日常管理' })}
+                </span>
+                <h3 className={styles.fileListTitle}>{listHeaderTitle}</h3>
+              </div>
+              <div className={styles.fileListMeta}>{listHeaderMeta}</div>
+            </div>
+
             {loading && files.length === 0 ? (
               <EmptyState
                 title={t('common.loading')}
@@ -2738,31 +2949,53 @@ export function AuthFilesPage() {
         </div>
       </Card>
 
-      <OAuthExcludedCard
-        disableControls={disableControls}
-        excludedError={excludedError}
-        excluded={excluded}
-        onAdd={() => openExcludedEditor()}
-        onEdit={openExcludedEditor}
-        onDelete={deleteExcluded}
-      />
+      <section
+        className={styles.oauthConfigSection}
+        aria-label={t('auth_files.oauth_config_title', { defaultValue: 'OAuth 配置' })}
+      >
+        <div className={styles.oauthConfigHeader}>
+          <div className={styles.oauthConfigHeaderText}>
+            <span className={styles.oauthConfigKicker}>
+              {t('auth_files.oauth_config_kicker', { defaultValue: '高级配置' })}
+            </span>
+            <h2 className={styles.oauthConfigTitle}>
+              {t('auth_files.oauth_config_title', { defaultValue: 'OAuth 配置' })}
+            </h2>
+          </div>
+          <p className={styles.oauthConfigCopy}>
+            {t('auth_files.oauth_config_copy', {
+              defaultValue: '模型禁用与别名映射保留为独立配置区，和日常认证文件管理分开阅读。',
+            })}
+          </p>
+        </div>
+        <div className={styles.oauthConfigGrid}>
+          <OAuthExcludedCard
+            disableControls={disableControls}
+            excludedError={excludedError}
+            excluded={excluded}
+            onAdd={() => openExcludedEditor()}
+            onEdit={openExcludedEditor}
+            onDelete={deleteExcluded}
+          />
 
-      <OAuthModelAliasCard
-        disableControls={disableControls}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        onAdd={() => openModelAliasEditor()}
-        onEditProvider={openModelAliasEditor}
-        onDeleteProvider={deleteModelAlias}
-        modelAliasError={modelAliasError}
-        modelAlias={modelAlias}
-        allProviderModels={allProviderModels}
-        onUpdate={handleMappingUpdate}
-        onDeleteLink={handleDeleteLink}
-        onToggleFork={handleToggleFork}
-        onRenameAlias={handleRenameAlias}
-        onDeleteAlias={handleDeleteAlias}
-      />
+          <OAuthModelAliasCard
+            disableControls={disableControls}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onAdd={() => openModelAliasEditor()}
+            onEditProvider={openModelAliasEditor}
+            onDeleteProvider={deleteModelAlias}
+            modelAliasError={modelAliasError}
+            modelAlias={modelAlias}
+            allProviderModels={allProviderModels}
+            onUpdate={handleMappingUpdate}
+            onDeleteLink={handleDeleteLink}
+            onToggleFork={handleToggleFork}
+            onRenameAlias={handleRenameAlias}
+            onDeleteAlias={handleDeleteAlias}
+          />
+        </div>
+      </section>
 
       <AuthFileModelsModal
         open={modelsModalOpen}
