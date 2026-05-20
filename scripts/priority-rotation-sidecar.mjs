@@ -11,7 +11,7 @@ const MANAGEMENT_PREFIX = '/v0/management';
 const CODEX_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage';
 const FIVE_HOUR_SECONDS = 18_000;
 const WEEK_SECONDS = 604_800;
-const DEFAULT_IDLE_SHUTDOWN_MINUTES = 10;
+const DEFAULT_IDLE_SHUTDOWN_MINUTES = 20;
 const DEFAULT_SETTINGS = {
   enabled: false,
   apiBase: 'http://127.0.0.1:8317',
@@ -33,7 +33,7 @@ const MAX_ROTATION_PASSES = 8;
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
   console.log(
-    'Usage: node scripts/priority-rotation-sidecar.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--port 8318] [--idle-shutdown-minutes 10]'
+    'Usage: node scripts/priority-rotation-sidecar.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--port 8318] [--idle-shutdown-minutes 20] [--model-request-logs-dir D:\\CLIProxyAPI\\logs]'
   );
   process.exit(0);
 }
@@ -49,10 +49,11 @@ const idleShutdownMinutes = clampInteger(
 const idleShutdownMs = idleShutdownMinutes * 60_000;
 const dataDir = args['data-dir'] ?? path.join(installDir, 'priority-rotation');
 const customUiDir = args['custom-ui-dir'] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const modelRequestLogsDir = args['model-request-logs-dir'] ?? path.join(installDir, 'logs');
 const settingsPath = path.join(dataDir, 'settings.json');
 const statePath = path.join(dataDir, 'state.json');
 const secretPath = path.join(dataDir, 'management-key.dpapi');
-const logsDir = path.join(dataDir, 'logs');
+const sidecarLogsDir = path.join(dataDir, 'logs');
 
 let settings = { ...DEFAULT_SETTINGS };
 let state = {
@@ -163,6 +164,18 @@ export function getLatestModelRequestAtMs(entries, fallback = null) {
   return latest;
 }
 
+export async function readLatestModelRequestAtMs(logDirectory, fallback = null) {
+  try {
+    const entries = await readdir(logDirectory, { withFileTypes: true });
+    return getLatestModelRequestAtMs(
+      entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+      fallback
+    );
+  } catch {
+    return Number.isFinite(Number(fallback)) ? Number(fallback) : null;
+  }
+}
+
 function normalizeSettings(input) {
   const source = input && typeof input === 'object' ? input : {};
   return {
@@ -206,7 +219,7 @@ function managementUrl(apiBase, endpoint) {
 
 async function ensureDataDirs() {
   await mkdir(dataDir, { recursive: true });
-  await mkdir(logsDir, { recursive: true });
+  await mkdir(sidecarLogsDir, { recursive: true });
 }
 
 async function readJson(filePath, fallback) {
@@ -300,18 +313,10 @@ async function refreshModelRequestActivity({ force = false } = {}) {
     return lastModelRequestAt;
   }
   lastModelActivityScanAt = now;
-  try {
-    const entries = await readdir(logsDir, { withFileTypes: true });
-    const latest = getLatestModelRequestAtMs(
-      entries.filter((entry) => entry.isFile()).map((entry) => entry.name),
-      lastModelRequestAt
-    );
-    if (latest !== null && latest > lastModelRequestAt) {
-      lastModelRequestAt = latest;
-      scheduleIdleShutdown();
-    }
-  } catch {
-    // If logs are temporarily unavailable, keep the last known request time.
+  const latest = await readLatestModelRequestAtMs(modelRequestLogsDir, lastModelRequestAt);
+  if (latest !== null && latest > lastModelRequestAt) {
+    lastModelRequestAt = latest;
+    scheduleIdleShutdown();
   }
   return lastModelRequestAt;
 }
@@ -387,7 +392,7 @@ async function logLine(level, message, details = {}) {
   delete safeDetails.secret;
   delete safeDetails.authorization;
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const logPath = path.join(logsDir, `sidecar-${today}.log`);
+  const logPath = path.join(sidecarLogsDir, `sidecar-${today}.log`);
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     level,
@@ -1443,6 +1448,7 @@ async function handleRequest(req, res) {
       host,
       port,
       customUiDir,
+      modelRequestLogsDir,
       idleShutdownMinutes,
       idleShutdownAt: getIdleShutdownAtIso(),
       settings: sanitizeSettingsForResponse(),
@@ -1455,6 +1461,7 @@ async function handleRequest(req, res) {
     sendJson(req, res, 200, {
       settings: sanitizeSettingsForResponse(),
       hasSecret: await hasSecretFile(),
+      modelRequestLogsDir,
       idleShutdownMinutes,
       idleShutdownAt: getIdleShutdownAtIso(),
     });
@@ -1529,6 +1536,7 @@ async function startServer() {
       installDir,
       dataDir,
       customUiDir,
+      modelRequestLogsDir,
       idleShutdownMinutes,
     });
   });

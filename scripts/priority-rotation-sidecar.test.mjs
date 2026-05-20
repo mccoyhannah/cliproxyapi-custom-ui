@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   analyzeCodexPriorityRotation,
   buildIdleShutdownStatePatch,
   getLatestModelRequestAtMs,
   isModelRequestLogName,
   parseModelRequestLogTimeMs,
+  readLatestModelRequestAtMs,
   shouldStopForIdle,
   validateManagementKey,
 } from './priority-rotation-sidecar.mjs';
@@ -33,6 +37,32 @@ const quota = (usedPercent, planType = 'team') => ({
     ]),
     parseModelRequestLogTimeMs('v1-chat-completions-2026-05-20T052001-11111111.log')
   );
+}
+
+{
+  const root = await mkdtemp(path.join(tmpdir(), 'priority-rotation-logs-'));
+  const modelRequestLogsDir = path.join(root, 'logs');
+  const sidecarLogsDir = path.join(root, 'priority-rotation', 'logs');
+  try {
+    await mkdir(modelRequestLogsDir, { recursive: true });
+    await mkdir(sidecarLogsDir, { recursive: true });
+    await writeFile(
+      path.join(sidecarLogsDir, 'v1-responses-2026-05-20T090000-sidecar.log'),
+      'not a model request log'
+    );
+    await writeFile(
+      path.join(modelRequestLogsDir, 'v1-responses-2026-05-20T080000-real.log'),
+      'real model request log'
+    );
+
+    assert.equal(
+      await readLatestModelRequestAtMs(modelRequestLogsDir),
+      parseModelRequestLogTimeMs('v1-responses-2026-05-20T080000-real.log')
+    );
+    assert.equal(await readLatestModelRequestAtMs(path.join(root, 'missing'), 1234), 1234);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 }
 
 {

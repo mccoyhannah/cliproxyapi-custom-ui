@@ -4,6 +4,7 @@ param(
     [string]$CustomUiDir = "D:\CLIProxyAPI_Maintenance\custom-ui",
     [string]$ProtocolName = "cpamc-priority-rotation",
     [int]$Port = 8318,
+    [int]$IdleShutdownMinutes = 20,
     [switch]$StartNow,
     [switch]$SkipStartup
 )
@@ -12,6 +13,10 @@ $ErrorActionPreference = "Stop"
 
 if ($Port -lt 1 -or $Port -gt 65535) {
     throw "Port must be between 1 and 65535."
+}
+
+if ($IdleShutdownMinutes -lt 1 -or $IdleShutdownMinutes -gt 180) {
+    throw "IdleShutdownMinutes must be between 1 and 180."
 }
 
 $wscript = Join-Path $env:WINDIR "System32\wscript.exe"
@@ -93,7 +98,7 @@ function Register-UrlProtocol {
     Set-Item -Path $commandKey -Value $CommandLine
 }
 
-$taskArguments = "//B //NoLogo `"$hiddenRunner`" `"$InstallDir`" `"$CustomUiDir`" `"$Port`""
+$taskArguments = "//B //NoLogo `"$hiddenRunner`" `"$InstallDir`" `"$CustomUiDir`" `"$Port`" `"$IdleShutdownMinutes`""
 $protocolCommand = "`"$wscript`" $taskArguments `"%1`""
 $registeredBy = if ($SkipStartup) { "Skipped" } else { "ScheduledTasks" }
 $fallbackReason = $null
@@ -153,6 +158,7 @@ if (-not $SkipStartup) {
     InstallDir = $InstallDir
     CustomUiDir = $CustomUiDir
     Port = $Port
+    IdleShutdownMinutes = $IdleShutdownMinutes
     ProtocolName = $ProtocolName
     ProtocolCommand = $protocolCommand
     Execute = $wscript

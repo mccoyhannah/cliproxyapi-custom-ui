@@ -2,7 +2,8 @@ param(
     [string]$InstallDir = "D:\CLIProxyAPI",
     [string]$CustomUiDir = "D:\CLIProxyAPI_Maintenance\custom-ui",
     [string]$ProtocolName = "cpamc-priority-rotation",
-    [int]$Port = 8318
+    [int]$Port = 8318,
+    [int]$IdleShutdownMinutes = 20
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,4 +18,5 @@ if (-not (Test-Path -LiteralPath $registerScript)) {
     -CustomUiDir $CustomUiDir `
     -ProtocolName $ProtocolName `
     -Port $Port `
+    -IdleShutdownMinutes $IdleShutdownMinutes `
     -SkipStartup

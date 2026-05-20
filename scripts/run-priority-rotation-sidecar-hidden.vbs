@@ -1,6 +1,6 @@
 Option Explicit
 
-Dim shell, fso, scriptDir, installDir, customUiDir, port, nodePath, scriptPath, command
+Dim shell, fso, scriptDir, installDir, customUiDir, port, idleShutdownMinutes, nodePath, scriptPath, command
 
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -25,6 +25,12 @@ Else
     port = "8318"
 End If
 
+If WScript.Arguments.Count >= 4 And IsNumeric(WScript.Arguments.Item(3)) Then
+    idleShutdownMinutes = WScript.Arguments.Item(3)
+Else
+    idleShutdownMinutes = "20"
+End If
+
 nodePath = "D:\install\nodejs\node.exe"
 If Not fso.FileExists(nodePath) Then
     nodePath = fso.BuildPath(shell.ExpandEnvironmentStrings("%ProgramFiles%"), "nodejs\node.exe")
@@ -41,7 +47,7 @@ If Not fso.FileExists(scriptPath) Then
     WScript.Quit 2
 End If
 
-command = Quote(nodePath) & " " & Quote(scriptPath) & " --install-dir " & Quote(installDir) & " --custom-ui-dir " & Quote(customUiDir) & " --port " & Quote(port)
+command = Quote(nodePath) & " " & Quote(scriptPath) & " --install-dir " & Quote(installDir) & " --custom-ui-dir " & Quote(customUiDir) & " --port " & Quote(port) & " --idle-shutdown-minutes " & Quote(idleShutdownMinutes)
 shell.Run command, 0, False
 WScript.Quit 0
 
