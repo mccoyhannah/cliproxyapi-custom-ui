@@ -867,6 +867,13 @@ export function analyzeCodexPriorityRotation(
     const quota = codexQuota[file.name];
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
+    if (priority <= 0) {
+      addSkippedCandidate('skipped_unassigned_priority', {
+        planType,
+        remainingPercent,
+      });
+      return;
+    }
 
     if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) {
       addSkippedCandidate('skipped_plan', {
@@ -968,7 +975,13 @@ export function analyzeCodexPriorityRotation(
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
 
-  const promotionSlots = Math.max(0, slotLimit - projectedActiveCount);
+  const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
+    (reason) => reason === 'low_remaining'
+  ).length;
+  const promotionSlots = Math.min(
+    lowRemainingDemotionCount,
+    Math.max(0, slotLimit - projectedActiveCount)
+  );
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
       const remainingCompare = b.remainingPercent - a.remainingPercent;

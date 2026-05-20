@@ -148,10 +148,36 @@ const quota = (usedPercent, planType = 'team') => ({
     50,
     1
   );
-  assert.equal(result.status, 'ready');
-  assert.ok(result.changes.some((change) => change.toPriority === -1));
-  assert.ok(result.changes.some((change) => change.reason === 'low_remaining'));
-  assert.ok(result.changes.some((change) => change.reason === 'over_active_limit'));
+  assert.equal(result.status, 'no_changes');
+  assert.equal(result.managedCount, 0);
+  assert.deepEqual(result.changes, []);
+  assert.equal(
+    result.candidates.filter((candidate) => candidate.decision === 'skipped_unassigned_priority')
+      .length,
+    3
+  );
+}
+
+{
+  const files = [
+    codexFile('manual-active.json', 4),
+    codexFile('old-active-a.json', 2),
+    codexFile('old-active-b.json', 2),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'manual-active.json': quota(20),
+      'old-active-a.json': quota(15),
+      'old-active-b.json': quota(25),
+    },
+    50,
+    2
+  );
+  assert.equal(result.status, 'no_changes');
+  assert.equal(result.activePriority, 4);
+  assert.equal(result.standbyPriority, 2);
+  assert.deepEqual(result.changes, []);
 }
 
 {

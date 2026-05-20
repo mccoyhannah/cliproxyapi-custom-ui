@@ -213,6 +213,7 @@ export const analyzeCodexPriorityRotation = (
 
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
     const priority = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+    if (priority <= 0) return;
 
     if (planType === null || remainingPercent === null) {
       unknownCount++;
@@ -306,7 +307,13 @@ export const analyzeCodexPriorityRotation = (
       role: 'demote',
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
-  const promotionSlots = Math.max(0, slotLimit - projectedActiveCount);
+  const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
+    (reason) => reason === 'low_remaining'
+  ).length;
+  const promotionSlots = Math.min(
+    lowRemainingDemotionCount,
+    Math.max(0, slotLimit - projectedActiveCount)
+  );
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
       const remainingCompare = b.remainingPercent - a.remainingPercent;

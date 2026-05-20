@@ -293,7 +293,6 @@ export function AuthFilesPage() {
   const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
   const priorityRotationSidecarStatusRequestIdRef = useRef(0);
   const priorityRotationSidecarLastMutationRef = useRef('');
-  const priorityRotationAutoApplySignatureRef = useRef('');
 
   const {
     files,
@@ -329,7 +328,6 @@ export function AuthFilesPage() {
     batchDownload,
     batchSetStatus,
     batchSetPriority,
-    batchSetPriorities,
     batchDelete,
   } = useAuthFilesData();
 
@@ -1668,49 +1666,6 @@ export function AuthFilesPage() {
     loadFiles,
     priorityRotationSidecarStatus?.state.lastMutationAppliedChangeCount,
     priorityRotationSidecarStatus?.state.lastMutationAt,
-  ]);
-
-  useEffect(() => {
-    const changes = priorityRotationAnalysis.changes;
-    if (changes.length === 0) {
-      priorityRotationAutoApplySignatureRef.current = '';
-      return;
-    }
-    if (!isCurrentLayer || disableControls || loading || batchPriorityUpdating) return;
-    if (changes.some((change) => priorityUpdating[change.name] === true)) return;
-
-    const signature = JSON.stringify({
-      threshold: priorityRotationEffectiveThresholdPercent,
-      activeSlotLimit: priorityRotationEffectiveActiveSlotLimit,
-      changes: changes
-        .map((change) => [change.name, change.toPriority])
-        .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
-    });
-    if (priorityRotationAutoApplySignatureRef.current === signature) return;
-    priorityRotationAutoApplySignatureRef.current = signature;
-
-    void (async () => {
-      const result = await batchSetPriorities(
-        changes.map((change) => ({
-          name: change.name,
-          priority: change.toPriority,
-        }))
-      );
-      if (result.successCount > 0) {
-        await loadFiles({ preserveExisting: true, silent: true });
-      }
-    })();
-  }, [
-    batchPriorityUpdating,
-    batchSetPriorities,
-    disableControls,
-    isCurrentLayer,
-    loadFiles,
-    loading,
-    priorityRotationAnalysis.changes,
-    priorityRotationEffectiveActiveSlotLimit,
-    priorityRotationEffectiveThresholdPercent,
-    priorityUpdating,
   ]);
 
   const commitBatchPriority = useCallback(() => {
