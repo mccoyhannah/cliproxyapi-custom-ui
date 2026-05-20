@@ -770,6 +770,12 @@
   color: color-mix(in srgb, var(--warning-color) 82%, var(--text-primary));
 }
 
+.priorityRotationBackgroundMetaUnknown {
+  border-color: color-mix(in srgb, var(--info-color) 14%, var(--border-color));
+  background: color-mix(in srgb, var(--info-color) 5%, var(--surface-control));
+  color: color-mix(in srgb, var(--text-secondary) 88%, var(--text-primary));
+}
+
 .priorityRotationBackgroundControls {
   display: flex;
   flex-direction: column;
@@ -782,6 +788,23 @@
   :global(.btn) {
     min-width: 0;
   }
+}
+
+.priorityRotationBackgroundHint {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--info-color) 16%, var(--border-color));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--info-color) 8%, transparent),
+      transparent 58%
+    ),
+    color-mix(in srgb, var(--surface-control) 68%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .priorityRotationRelayControl {
@@ -832,6 +855,29 @@
   &:disabled {
     cursor: wait;
     opacity: 0.72;
+  }
+}
+
+.priorityRotationRelaySwitchWaking {
+  .priorityRotationRelayTrack {
+    background: color-mix(in srgb, var(--info-color) 42%, var(--surface-control));
+    box-shadow:
+      inset 0 1px 2px color-mix(in srgb, #000 14%, transparent),
+      0 0 0 4px color-mix(in srgb, var(--info-color) 10%, transparent);
+  }
+
+  .priorityRotationRelayThumb {
+    animation: priorityRotationWakePulse 760ms ease-in-out infinite alternate;
+  }
+}
+
+@keyframes priorityRotationWakePulse {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(20px);
   }
 }
 
@@ -5777,4 +5823,131 @@ button.codexSubscriptionValue {
       flex: 1 1 0;
     }
   }
+}
+
+// Auth files control-room polish.
+.authFilesPanel {
+  box-shadow:
+    var(--shadow-card),
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+}
+
+.uploadDropPool {
+  border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
+  background:
+    radial-gradient(
+      circle at 8% 12%,
+      color-mix(in srgb, var(--primary-color) 11%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--surface-panel) 90%, var(--primary-color) 5%),
+      color-mix(in srgb, var(--bg-primary) 88%, var(--success-color) 4%)
+    );
+}
+
+.priorityRotationBackgroundPanel {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--success-color) 4%, transparent),
+      transparent 56%
+    ),
+    color-mix(in srgb, var(--surface-panel) 92%, var(--bg-primary));
+  background-size:
+    24px 24px,
+    auto,
+    auto;
+  box-shadow:
+    0 16px 38px -34px color-mix(in srgb, var(--primary-color) 58%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
+    inset 3px 0 0 color-mix(in srgb, var(--primary-color) 54%, var(--success-color));
+}
+
+.priorityRotationBackgroundIcon {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 13%, var(--surface-control)),
+      color-mix(in srgb, var(--success-color) 8%, var(--surface-control))
+    );
+  color: color-mix(in srgb, var(--primary-color) 82%, var(--text-primary));
+}
+
+.priorityRotationBackgroundButtons {
+  padding-top: 2px;
+
+  :global(.btn.btn-sm) {
+    box-shadow: var(--shadow-control);
+  }
+}
+
+.fileCard {
+  box-shadow:
+    var(--shadow-control),
+    inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, currentColor 0%, transparent),
+      color-mix(in srgb, var(--primary-color) 22%, transparent),
+      color-mix(in srgb, var(--success-color) 16%, transparent)
+    );
+    opacity: 0;
+    transition: opacity $transition-fast;
+    pointer-events: none;
+  }
+
+  &:hover::after {
+    opacity: 1;
+  }
+}
+
+.fileCardSelected {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 7%, transparent),
+      transparent 150px
+    ),
+    var(--surface-card);
+}
+
+.providerAvatar {
+  box-shadow:
+    0 12px 24px -20px currentColor,
+    inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
+}
+
+.statusPanel,
+.quotaSection {
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent),
+    color-mix(in srgb, var(--surface-panel) 68%, transparent);
+}
+
+.batchActionBar {
+  border-color: color-mix(in srgb, var(--primary-color) 30%, var(--border-color));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 9%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--floating-surface) 92%, transparent);
 }

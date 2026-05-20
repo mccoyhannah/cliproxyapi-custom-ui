@@ -79,6 +79,19 @@ export type PriorityRotationSidecarStatus = {
 };
 
 const SIDECAR_BASE_URL = 'http://127.0.0.1:8318';
+const SIDECAR_WAKE_URL = 'cpamc-priority-rotation://start';
+
+export const launchPriorityRotationSidecar = (): boolean => {
+  if (typeof document === 'undefined') return false;
+
+  const frame = document.createElement('iframe');
+  frame.style.display = 'none';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.src = SIDECAR_WAKE_URL;
+  document.body.appendChild(frame);
+  window.setTimeout(() => frame.remove(), 5_000);
+  return true;
+};
 
 const buildHeaders = (managementKey?: string): HeadersInit => ({
   'Content-Type': 'application/json',

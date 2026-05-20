@@ -267,6 +267,20 @@ function getIdleShutdownAtIso() {
   return new Date(lastModelRequestAt + idleShutdownMs).toISOString();
 }
 
+export function buildIdleShutdownStatePatch(currentSettings = settings, currentState = state) {
+  const normalizedSettings = normalizeSettings(currentSettings);
+  return {
+    running: false,
+    enabled: normalizedSettings.enabled,
+    lastStatus: 'skipped',
+    lastSkippedReason: 'idle_timeout',
+    lastError: null,
+    nextRunAt: normalizedSettings.enabled
+      ? currentState?.nextRunAt || nextRunIso()
+      : null,
+  };
+}
+
 function scheduleIdleShutdown() {
   if (idleShutdownTimer) clearTimeout(idleShutdownTimer);
   const delayMs = Math.max(1_000, lastModelRequestAt + idleShutdownMs - Date.now());
@@ -302,17 +316,8 @@ async function refreshModelRequestActivity({ force = false } = {}) {
   return lastModelRequestAt;
 }
 
-async function persistDisabledForIdleShutdown() {
-  settings = normalizeSettings({ ...settings, enabled: false });
-  await writeJsonAtomic(settingsPath, settings);
-  await updateState({
-    running: false,
-    enabled: false,
-    lastStatus: 'skipped',
-    lastSkippedReason: 'idle_timeout',
-    lastError: null,
-    nextRunAt: null,
-  });
+async function persistIdleShutdownState() {
+  await updateState(buildIdleShutdownStatePatch(settings, state));
 }
 
 async function shutdownForIdle() {
@@ -339,7 +344,7 @@ async function shutdownForIdle() {
     idleShutdownTimer = null;
   }
 
-  await persistDisabledForIdleShutdown();
+  await persistIdleShutdownState();
   await logLine('info', 'priority rotation sidecar idle shutdown', {
     idleShutdownMinutes,
     lastModelRequestAt: new Date(lastModelRequestAt).toISOString(),

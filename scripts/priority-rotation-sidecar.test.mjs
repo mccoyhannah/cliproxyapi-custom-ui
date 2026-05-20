@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   analyzeCodexPriorityRotation,
+  buildIdleShutdownStatePatch,
   getLatestModelRequestAtMs,
   isModelRequestLogName,
   parseModelRequestLogTimeMs,
@@ -61,6 +62,23 @@ const quota = (usedPercent, planType = 'team') => ({
     }),
     false
   );
+}
+
+{
+  const enabledPatch = buildIdleShutdownStatePatch(
+    { enabled: true, apiBase: 'http://127.0.0.1:8317' },
+    { nextRunAt: '2026-05-20T08:00:00.000Z' }
+  );
+  assert.equal(enabledPatch.enabled, true);
+  assert.equal(enabledPatch.lastSkippedReason, 'idle_timeout');
+  assert.equal(enabledPatch.nextRunAt, '2026-05-20T08:00:00.000Z');
+
+  const disabledPatch = buildIdleShutdownStatePatch(
+    { enabled: false, apiBase: 'http://127.0.0.1:8317' },
+    { nextRunAt: '2026-05-20T08:00:00.000Z' }
+  );
+  assert.equal(disabledPatch.enabled, false);
+  assert.equal(disabledPatch.nextRunAt, null);
 }
 
 {
