@@ -118,7 +118,7 @@ import styles from './AuthFilesPage.module.scss';
 
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
-const PRIORITY_ROTATION_THRESHOLD_STEP = 5;
+const PRIORITY_ROTATION_THRESHOLD_STEP = 1;
 const PRIORITY_ROTATION_SLOT_STEP = 1;
 const PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP = 1;
 const PRIORITY_ROTATION_WAKE_ATTEMPTS = 18;
@@ -2707,24 +2707,32 @@ export function AuthFilesPage() {
                           </span>
                         </span>
                         <span className={styles.priorityRotationThresholdControl}>
-                          <input
-                            className={styles.priorityRotationSlider}
-                            type="range"
-                            min={0}
-                            max={100}
-                            step={PRIORITY_ROTATION_THRESHOLD_STEP}
-                            value={priorityRotationEffectiveThresholdPercent}
-                            disabled={priorityRotationSidecarSaving}
-                            aria-label={t('auth_files.priority_rotation_threshold_label')}
+                          <span
+                            className={styles.priorityRotationSliderShell}
                             style={
                               {
                                 '--priority-rotation-slider-progress': `${priorityRotationEffectiveThresholdPercent}%`,
                               } as CSSProperties
                             }
-                            onChange={(event) =>
-                              commitPriorityRotationThresholdInput(event.currentTarget.value)
-                            }
-                          />
+                          >
+                            <span className={styles.priorityRotationSliderRail} aria-hidden="true">
+                              <span className={styles.priorityRotationSliderFill} />
+                              <span className={styles.priorityRotationSliderMarker} />
+                            </span>
+                            <input
+                              className={styles.priorityRotationSlider}
+                              type="range"
+                              min={0}
+                              max={100}
+                              step={PRIORITY_ROTATION_THRESHOLD_STEP}
+                              value={priorityRotationEffectiveThresholdPercent}
+                              disabled={priorityRotationSidecarSaving}
+                              aria-label={t('auth_files.priority_rotation_threshold_label')}
+                              onChange={(event) =>
+                                commitPriorityRotationThresholdInput(event.currentTarget.value)
+                              }
+                            />
+                          </span>
                         </span>
                       </label>
                       <label className={styles.priorityRotationSetting}>

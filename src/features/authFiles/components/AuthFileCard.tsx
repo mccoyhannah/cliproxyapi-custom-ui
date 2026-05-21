@@ -205,6 +205,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   });
   const utilityActionsOpen =
     utilityActionsState.fileName === file.name && utilityActionsState.open;
+  const utilityActionsButtonRef = useRef<HTMLDivElement | null>(null);
+  const utilityActionsMenuRef = useRef<HTMLDivElement | null>(null);
+  const utilityActionsId = `auth-utility-actions-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const priorityHoldDelayRef = useRef<number | null>(null);
   const priorityHoldIntervalRef = useRef<number | null>(null);
   const priorityHoldValueRef = useRef(priorityValue ?? 0);
@@ -317,9 +320,49 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     input?.select();
   }, [displayNameEditing, file.name]);
 
+  useEffect(() => {
+    if (!utilityActionsOpen) return;
+
+    const closeUtilityActions = () => {
+      setUtilityActionsState({ fileName: file.name, open: false });
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        closeUtilityActions();
+        return;
+      }
+      if (
+        utilityActionsButtonRef.current?.contains(target) ||
+        utilityActionsMenuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      closeUtilityActions();
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeUtilityActions();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [file.name, utilityActionsOpen]);
+
   const startDisplayNameEdit = () => {
     if (disableControls || isRuntimeOnly || displayNameSaving) return;
     setDisplayNameDraft({ fileName: file.name, value: noteValue, editing: true });
+  };
+
+  const closeUtilityActions = () => {
+    setUtilityActionsState({ fileName: file.name, open: false });
   };
 
   const cancelDisplayNameEdit = () => {
@@ -736,152 +779,173 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           </div>
 
           <div className={styles.cardActions}>
-            <div className={styles.cardActionsMain}>
-              {showModelsButton && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => onShowModels(file)}
-                  className={`${styles.primaryActionButton} ${styles.modelsActionButton}`}
-                  title={t('auth_files.models_button', { defaultValue: '模型' })}
-                  disabled={disableControls}
-                >
-                  <>
-                    <span className={styles.modelsActionIconWrap}>
-                      <IconModelCluster className={styles.actionIcon} size={16} />
-                    </span>
-                    <span className={styles.actionButtonLabel}>
-                      {t('auth_files.models_button', { defaultValue: '模型' })}
-                    </span>
-                  </>
-                </Button>
-              )}
-              {!isRuntimeOnly && (
-                <div className={styles.cardUtilityActionsWrap}>
+            <div className={styles.cardActionsTop}>
+              <div className={styles.cardActionsMain}>
+                {showModelsButton && (
                   <Button
                     variant="secondary"
                     size="sm"
-                    className={styles.cardMoreButton}
-                    onClick={() =>
-                      setUtilityActionsState((current) => ({
-                        fileName: file.name,
-                        open: current.fileName === file.name ? !current.open : true,
-                      }))
-                    }
-                    aria-expanded={utilityActionsOpen}
-                    aria-label={t('auth_files.more_actions', { defaultValue: '更多操作' })}
-                    title={t('auth_files.more_actions', { defaultValue: '更多操作' })}
+                    onClick={() => onShowModels(file)}
+                    className={`${styles.primaryActionButton} ${styles.modelsActionButton}`}
+                    title={t('auth_files.models_button', { defaultValue: '模型' })}
+                    disabled={disableControls}
                   >
-                    <IconChevronDown
-                      className={`${styles.actionIcon} ${
-                        utilityActionsOpen ? styles.cardMoreIconOpen : ''
-                      }`}
-                      size={16}
-                    />
+                    <>
+                      <span className={styles.modelsActionIconWrap}>
+                        <IconModelCluster className={styles.actionIcon} size={16} />
+                      </span>
+                      <span className={styles.actionButtonLabel}>
+                        {t('auth_files.models_button', { defaultValue: '模型' })}
+                      </span>
+                    </>
                   </Button>
-                  <div
-                    className={`${styles.cardUtilityActions} ${
-                      utilityActionsOpen ? styles.cardUtilityActionsOpen : ''
-                    }`}
-                  >
+                )}
+                {!isRuntimeOnly && (
+                  <div ref={utilityActionsButtonRef} className={styles.cardUtilityActionsWrap}>
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => onDownload(file.name)}
-                      className={styles.iconButton}
-                      aria-label={t('auth_files.download_button')}
-                      title={t('auth_files.download_button')}
-                      disabled={disableControls}
+                      className={styles.cardMoreButton}
+                      onClick={() =>
+                        setUtilityActionsState((current) => ({
+                          fileName: file.name,
+                          open: current.fileName === file.name ? !current.open : true,
+                        }))
+                      }
+                      aria-controls={utilityActionsId}
+                      aria-expanded={utilityActionsOpen}
+                      aria-label={t('auth_files.more_actions', { defaultValue: '更多操作' })}
+                      title={t('auth_files.more_actions', { defaultValue: '更多操作' })}
                     >
-                      <IconDownload className={styles.actionIcon} size={16} />
-                      <span className={styles.actionButtonLabel}>
-                        {t('auth_files.download_button')}
-                      </span>
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onOpenPrefixProxyEditor(file)}
-                      className={styles.iconButton}
-                      aria-label={t('auth_files.prefix_proxy_button')}
-                      title={t('auth_files.prefix_proxy_button')}
-                      disabled={disableControls}
-                    >
-                      <IconSettings className={styles.actionIcon} size={16} />
-                      <span className={styles.actionButtonLabel}>
-                        {t('auth_files.prefix_proxy_short', { defaultValue: '代理' })}
-                      </span>
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => onManualExpiryEdit(file)}
-                      className={`${styles.iconButton} ${manualExpiry ? styles.manualExpiryActionActive : ''}`}
-                      aria-label={t('auth_files.manual_expiry_button', {
-                        defaultValue: '手动有效期',
-                      })}
-                      title={t('auth_files.manual_expiry_button', {
-                        defaultValue: '手动有效期',
-                      })}
-                    >
-                      <IconTimer className={styles.actionIcon} size={16} />
-                      <span className={styles.actionButtonLabel}>
-                        {t('auth_files.manual_expiry_short', { defaultValue: '有效期' })}
-                      </span>
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => onDelete(file.name)}
-                      className={`${styles.iconButton} ${styles.deleteActionButton}`}
-                      aria-label={t('auth_files.delete_button')}
-                      title={t('auth_files.delete_button')}
-                      disabled={disableControls || deleting}
-                    >
-                      {deleting ? (
-                        <LoadingSpinner size={14} />
-                      ) : (
-                        <IconTrash2 className={styles.actionIcon} size={16} />
-                      )}
-                      <span className={styles.actionButtonLabel}>
-                        {t('auth_files.delete_button')}
-                      </span>
+                      <IconChevronDown
+                        className={`${styles.actionIcon} ${
+                          utilityActionsOpen ? styles.cardMoreIconOpen : ''
+                        }`}
+                        size={16}
+                      />
                     </Button>
                   </div>
+                )}
+              </div>
+              {!isRuntimeOnly && (
+                <div
+                  className={`${styles.statusToggle} ${
+                    file.disabled
+                      ? styles.statusToggleDisabled
+                      : hasStatusWarning
+                        ? styles.statusToggleWarning
+                        : styles.statusToggleActive
+                  }`}
+                >
+                  <span className={styles.statusToggleStateDot} aria-hidden="true" />
+                  <span className={styles.statusToggleLabel}>
+                    {t('auth_files.status_toggle_label')}
+                  </span>
+                  {hasStatusWarning && (
+                    <span
+                      className={styles.stateWarningIconBadge}
+                      title={rawStatusMessage}
+                      aria-label={`${statusWarningLabel}: ${rawStatusMessage}`}
+                      role="img"
+                      tabIndex={0}
+                    >
+                      <IconCircleAlert size={14} aria-hidden="true" />
+                    </span>
+                  )}
+                  <ToggleSwitch
+                    ariaLabel={t('auth_files.status_toggle_label')}
+                    checked={!file.disabled}
+                    disabled={disableControls || statusUpdating}
+                    onChange={(value) => onToggleStatus(file, value)}
+                  />
                 </div>
               )}
             </div>
             {!isRuntimeOnly && (
               <div
-                className={`${styles.statusToggle} ${
-                  file.disabled
-                    ? styles.statusToggleDisabled
-                    : hasStatusWarning
-                      ? styles.statusToggleWarning
-                      : styles.statusToggleActive
+                ref={utilityActionsMenuRef}
+                id={utilityActionsId}
+                role="group"
+                aria-hidden={!utilityActionsOpen}
+                className={`${styles.cardUtilityActions} ${
+                  utilityActionsOpen ? styles.cardUtilityActionsOpen : ''
                 }`}
               >
-                <span className={styles.statusToggleStateDot} aria-hidden="true" />
-                <span className={styles.statusToggleLabel}>
-                  {t('auth_files.status_toggle_label')}
-                </span>
-                {hasStatusWarning && (
-                  <span
-                    className={styles.stateWarningIconBadge}
-                    title={rawStatusMessage}
-                    aria-label={`${statusWarningLabel}: ${rawStatusMessage}`}
-                    role="img"
-                    tabIndex={0}
-                  >
-                    <IconCircleAlert size={14} aria-hidden="true" />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    closeUtilityActions();
+                    onDownload(file.name);
+                  }}
+                  className={styles.iconButton}
+                  aria-label={t('auth_files.download_button')}
+                  title={t('auth_files.download_button')}
+                  disabled={disableControls}
+                >
+                  <IconDownload className={styles.actionIcon} size={16} />
+                  <span className={styles.actionButtonLabel}>
+                    {t('auth_files.download_button')}
                   </span>
-                )}
-                <ToggleSwitch
-                  ariaLabel={t('auth_files.status_toggle_label')}
-                  checked={!file.disabled}
-                  disabled={disableControls || statusUpdating}
-                  onChange={(value) => onToggleStatus(file, value)}
-                />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    closeUtilityActions();
+                    onOpenPrefixProxyEditor(file);
+                  }}
+                  className={styles.iconButton}
+                  aria-label={t('auth_files.prefix_proxy_button')}
+                  title={t('auth_files.prefix_proxy_button')}
+                  disabled={disableControls}
+                >
+                  <IconSettings className={styles.actionIcon} size={16} />
+                  <span className={styles.actionButtonLabel}>
+                    {t('auth_files.prefix_proxy_short', { defaultValue: '代理' })}
+                  </span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    closeUtilityActions();
+                    onManualExpiryEdit(file);
+                  }}
+                  className={`${styles.iconButton} ${manualExpiry ? styles.manualExpiryActionActive : ''}`}
+                  aria-label={t('auth_files.manual_expiry_button', {
+                    defaultValue: '手动有效期',
+                  })}
+                  title={t('auth_files.manual_expiry_button', {
+                    defaultValue: '手动有效期',
+                  })}
+                >
+                  <IconTimer className={styles.actionIcon} size={16} />
+                  <span className={styles.actionButtonLabel}>
+                    {t('auth_files.manual_expiry_short', { defaultValue: '有效期' })}
+                  </span>
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    closeUtilityActions();
+                    onDelete(file.name);
+                  }}
+                  className={`${styles.iconButton} ${styles.deleteActionButton}`}
+                  aria-label={t('auth_files.delete_button')}
+                  title={t('auth_files.delete_button')}
+                  disabled={disableControls || deleting}
+                >
+                  {deleting ? (
+                    <LoadingSpinner size={14} />
+                  ) : (
+                    <IconTrash2 className={styles.actionIcon} size={16} />
+                  )}
+                  <span className={styles.actionButtonLabel}>
+                    {t('auth_files.delete_button')}
+                  </span>
+                </Button>
               </div>
             )}
           </div>
