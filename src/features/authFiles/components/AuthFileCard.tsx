@@ -789,37 +789,52 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                       size="sm"
                       onClick={() => onDownload(file.name)}
                       className={styles.iconButton}
+                      aria-label={t('auth_files.download_button')}
                       title={t('auth_files.download_button')}
                       disabled={disableControls}
                     >
                       <IconDownload className={styles.actionIcon} size={16} />
+                      <span className={styles.actionButtonLabel}>
+                        {t('auth_files.download_button')}
+                      </span>
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => onOpenPrefixProxyEditor(file)}
                       className={styles.iconButton}
+                      aria-label={t('auth_files.prefix_proxy_button')}
                       title={t('auth_files.prefix_proxy_button')}
                       disabled={disableControls}
                     >
                       <IconSettings className={styles.actionIcon} size={16} />
+                      <span className={styles.actionButtonLabel}>
+                        {t('auth_files.prefix_proxy_short', { defaultValue: '代理' })}
+                      </span>
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => onManualExpiryEdit(file)}
                       className={`${styles.iconButton} ${manualExpiry ? styles.manualExpiryActionActive : ''}`}
+                      aria-label={t('auth_files.manual_expiry_button', {
+                        defaultValue: '手动有效期',
+                      })}
                       title={t('auth_files.manual_expiry_button', {
                         defaultValue: '手动有效期',
                       })}
                     >
                       <IconTimer className={styles.actionIcon} size={16} />
+                      <span className={styles.actionButtonLabel}>
+                        {t('auth_files.manual_expiry_short', { defaultValue: '有效期' })}
+                      </span>
                     </Button>
                     <Button
                       variant="danger"
                       size="sm"
                       onClick={() => onDelete(file.name)}
-                      className={styles.iconButton}
+                      className={`${styles.iconButton} ${styles.deleteActionButton}`}
+                      aria-label={t('auth_files.delete_button')}
                       title={t('auth_files.delete_button')}
                       disabled={disableControls || deleting}
                     >
@@ -828,6 +843,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                       ) : (
                         <IconTrash2 className={styles.actionIcon} size={16} />
                       )}
+                      <span className={styles.actionButtonLabel}>
+                        {t('auth_files.delete_button')}
+                      </span>
                     </Button>
                   </div>
                 </div>

@@ -11705,3 +11705,111 @@ button.codexSubscriptionValue {
     padding-inline: 10px;
   }
 }
+
+// Follow-up polish: expanded utility actions must read as commands, not loose icons.
+.cardUtilityActionsOpen {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 5px;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 28%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 42%, var(--surface-card));
+  opacity: 1;
+}
+
+.cardUtilityActionsOpen .iconButton:global(.btn.btn-sm) {
+  width: auto;
+  min-width: 68px;
+  max-width: 104px;
+  height: 30px;
+  padding-inline: 9px;
+  gap: 5px;
+  justify-content: center;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.cardUtilityActionsOpen .actionButtonLabel {
+  display: block;
+  max-width: 68px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.deleteActionButton:global(.btn.btn-sm) {
+  color: color-mix(in srgb, var(--danger-color) 78%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--danger-color) 30%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent),
+    color-mix(in srgb, var(--danger-color) 8%, var(--surface-control));
+}
+
+.deleteActionButton:global(.btn.btn-sm):hover:not(:disabled) {
+  color: color-mix(in srgb, var(--danger-color) 92%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--danger-color) 46%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 13%, var(--surface-control));
+}
+
+@include mobile {
+  .cardUtilityActionsOpen {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .cardUtilityActionsOpen .iconButton:global(.btn.btn-sm) {
+    flex: 1 1 calc(50% - 3px);
+    min-width: 0;
+    max-width: none;
+    min-height: 36px;
+  }
+
+  .cardUtilityActionsOpen .actionButtonLabel {
+    max-width: none;
+  }
+}
+
+// Keep the health threshold slider visually inside the rail.
+.priorityRotationSlider {
+  height: 16px;
+
+  &::-webkit-slider-runnable-track {
+    height: 6px;
+  }
+
+  &::-moz-range-track,
+  &::-moz-range-progress {
+    height: 6px;
+  }
+
+  &::-webkit-slider-thumb {
+    width: 10px;
+    height: 10px;
+    margin-top: -2px;
+    border-width: 2px;
+    box-shadow: 0 1px 3px color-mix(in srgb, #000 12%, transparent);
+  }
+
+  &::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-width: 2px;
+    box-shadow: 0 1px 3px color-mix(in srgb, #000 12%, transparent);
+  }
+
+  &:hover:not(:disabled)::-webkit-slider-thumb,
+  &:focus-visible::-webkit-slider-thumb {
+    transform: none;
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--primary-color) 10%, transparent),
+      0 1px 4px color-mix(in srgb, #000 14%, transparent);
+  }
+}
