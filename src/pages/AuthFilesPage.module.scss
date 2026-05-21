@@ -12063,3 +12063,271 @@ button.codexSubscriptionValue {
     min-height: 38px;
   }
 }
+
+// Auth card density pass: keep the card mode, but stop low-value metadata from
+// stealing width from the real file name and routine status controls.
+.fileCardMain {
+  gap: 8px;
+}
+
+.cardHeader {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 4px;
+}
+
+.cardSelection {
+  margin-top: 5px;
+}
+
+.providerAvatar {
+  width: 38px;
+  height: 38px;
+}
+
+.providerAvatarImage {
+  width: 20px;
+  height: 20px;
+}
+
+.cardHeaderContent {
+  gap: 5px;
+  padding-top: 1px;
+}
+
+.cardBadgeRow {
+  gap: 5px;
+}
+
+.typeBadge,
+.stateBadge {
+  min-height: 20px;
+  padding: 3px 8px;
+  border-radius: 7px;
+}
+
+.displayNameButton {
+  padding: 0;
+}
+
+.displayNameText {
+  -webkit-line-clamp: 1;
+}
+
+.fileNameSource {
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-height: 27px;
+  margin-left: 0;
+  padding: 4px 9px;
+  box-sizing: border-box;
+  gap: 7px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 26%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 24%, transparent);
+}
+
+.noteLabel {
+  flex: 0 0 auto;
+  padding: 0;
+  background: transparent;
+  color: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-secondary));
+  font-size: 11px;
+  font-weight: 720;
+  letter-spacing: 0;
+}
+
+.noteValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.cardMeta:empty {
+  display: none;
+}
+
+.priorityBadgeEditor {
+  flex: 0 1 158px;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  width: min(100%, 158px);
+  min-height: 32px;
+  border-radius: 8px;
+}
+
+.priorityBadgeStepButton {
+  min-width: 30px;
+  min-height: 32px;
+}
+
+.priorityBadgeStepButton svg {
+  width: 13px;
+  height: 13px;
+}
+
+.priorityBadgeMain {
+  grid-template-columns: auto minmax(0, auto);
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+.priorityBadgeLabel {
+  display: none;
+}
+
+.priorityBadgeValueShell {
+  grid-column: 1;
+  min-width: 42px;
+  padding: 3px 5px 4px;
+  gap: 4px;
+  border-radius: 7px;
+}
+
+.priorityBadgeValueShell::before {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--priority-dot-color) 10%, transparent);
+}
+
+.priorityBadgePrefix {
+  font-size: 11px;
+}
+
+.priorityBadgeInput {
+  width: 3ch;
+  min-width: 2ch;
+  max-width: 3ch;
+  font-size: 15px;
+}
+
+.priorityBadgeTier {
+  grid-column: 2;
+  max-width: 46px;
+  margin-left: 0;
+  padding: 1px 4px;
+  font-size: 9px;
+}
+
+.fileCardCompact .priorityBadgeEditor {
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  width: min(100%, 150px);
+  min-height: 30px;
+}
+
+.fileCardCompact .priorityBadgeStepButton {
+  min-width: 28px;
+  min-height: 30px;
+}
+
+.fileCardCompact .priorityBadgeValueShell {
+  min-width: 40px;
+  padding-inline: 5px;
+}
+
+.fileCardCompact .priorityBadgeTier {
+  max-width: 44px;
+}
+
+.cardInsights {
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.statusPanel {
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.statusPanelLabel {
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.statusBar {
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.statusBlocks {
+  gap: 3px;
+}
+
+.statusPanelStats {
+  padding-inline: 2px;
+}
+
+.quotaSection {
+  padding: 7px 8px;
+}
+
+.cardActions {
+  padding-top: 8px;
+}
+
+@include mobile {
+  .fileNameSource {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    padding: 4px 7px;
+  }
+
+  .priorityBadgeEditor,
+  .fileCardCompact .priorityBadgeEditor {
+    flex: 0 1 164px;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    width: min(100%, 164px);
+    min-height: 40px;
+  }
+
+  .priorityBadgeStepButton,
+  .fileCardCompact .priorityBadgeStepButton {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .priorityBadgeMain,
+  .fileCardCompact .priorityBadgeMain {
+    grid-template-columns: auto minmax(0, auto);
+    grid-template-rows: none;
+    gap: 5px;
+    padding: 2px 5px;
+    overflow: hidden;
+  }
+
+  .priorityBadgeValueShell,
+  .fileCardCompact .priorityBadgeValueShell {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 46px;
+  }
+
+  .priorityBadgeTier,
+  .fileCardCompact .priorityBadgeTier {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 42px;
+    overflow: hidden;
+  }
+}

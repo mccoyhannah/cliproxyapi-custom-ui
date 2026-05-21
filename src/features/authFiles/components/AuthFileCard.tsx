@@ -26,10 +26,8 @@ import {
   type CodexAuthTokenSnapshot,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
-import { formatFileSize } from '@/utils/format';
 import {
   QUOTA_PROVIDER_TYPES,
-  formatModified,
   getAuthFileIcon,
   getAuthFileStatusMessage,
   getTypeColor,
@@ -601,26 +599,17 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   {displayNameSaving && <LoadingSpinner size={12} />}
                 </button>
               )}
-              <div className={styles.fileNameSource} title={file.name}>
-                <span className={styles.noteLabel}>
-                  {t('auth_files.file_name_display', { defaultValue: '真实文件名' })}
-                </span>
-                <span className={styles.noteValue}>{file.name}</span>
-              </div>
             </div>
           </div>
 
+          <div className={styles.fileNameSource} title={file.name}>
+            <span className={styles.noteLabel}>
+              {t('auth_files.file_name_display', { defaultValue: '真实文件名' })}
+            </span>
+            <span className={styles.noteValue}>{file.name}</span>
+          </div>
+
           <div className={`${styles.cardMeta} ${compact ? styles.cardMetaCompact : ''}`}>
-            <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>{t('auth_files.file_size')}</span>
-              <span className={styles.metaValue}>
-                {file.size ? formatFileSize(file.size) : '-'}
-              </span>
-            </div>
-            <div className={styles.metaItem}>
-              <span className={styles.metaLabel}>{t('auth_files.file_modified')}</span>
-              <span className={styles.metaValue}>{formatModified(file)}</span>
-            </div>
             {!isRuntimeOnly && (
               <div
                 className={`${styles.priorityBadgeEditor} ${
