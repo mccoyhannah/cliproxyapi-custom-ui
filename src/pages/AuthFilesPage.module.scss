@@ -617,29 +617,15 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  margin-bottom: 10px;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--primary-color) 4%, transparent),
-      transparent 62%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--surface-card) 94%, var(--surface-panel));
-  box-shadow:
-    0 14px 32px -30px color-mix(in srgb, var(--text-primary) 38%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 14%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--priority-rotation-standby) 56%, var(--primary-color));
+  margin-bottom: 0;
+  padding: 12px 14px 13px;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 
-  @media (max-width: 1320px) {
-    grid-template-columns: minmax(240px, 0.92fr) minmax(300px, 0.88fr);
+  @media (max-width: 980px) {
+    grid-template-columns: 1fr;
 
     .priorityRotationActions {
       grid-column: 1 / -1;
@@ -651,7 +637,7 @@
   }
 
   @include tablet {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(230px, 1fr) minmax(200px, 280px);
     align-items: stretch;
   }
 
@@ -665,24 +651,16 @@
 .priorityRotationBackgroundPanel {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 10px;
   align-items: stretch;
   min-width: 0;
-  padding: 10px 12px;
-  margin-top: -2px;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--priority-rotation-standby) 18%, var(--border-color));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 8%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--surface-panel) 90%, var(--bg-primary));
-  box-shadow:
-    0 12px 28px -28px color-mix(in srgb, var(--text-primary) 32%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 11%, transparent);
+  padding: 14px;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .priorityRotationBackgroundHeader {
@@ -705,10 +683,10 @@
   flex: 0 0 28px;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--priority-rotation-standby) 24%, var(--border-color));
-  background: color-mix(in srgb, var(--priority-rotation-standby) 8%, var(--surface-control));
-  color: color-mix(in srgb, var(--priority-rotation-standby) 86%, var(--text-primary));
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 34%, transparent);
+  color: color-mix(in srgb, var(--priority-rotation-standby) 76%, var(--text-secondary));
 }
 
 .priorityRotationBackgroundCopy {
@@ -728,8 +706,8 @@
 
 .priorityRotationBackgroundTitle {
   color: var(--text-primary);
-  font-size: 15px;
-  font-weight: 820;
+  font-size: 14px;
+  font-weight: 780;
   line-height: 1.25;
 }
 
@@ -737,46 +715,53 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  gap: 14px;
   min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .priorityRotationBackgroundMetaItem {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 5px;
   min-width: 0;
   max-width: 100%;
   min-height: 20px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 62%, transparent);
-  color: var(--text-tertiary);
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 660;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.priorityRotationBackgroundMetaSuccess::before,
+.priorityRotationBackgroundMetaWarning::before,
+.priorityRotationBackgroundMetaUnknown::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
 .priorityRotationBackgroundMetaSuccess {
-  border-color: color-mix(in srgb, var(--success-color) 17%, transparent);
-  background: color-mix(in srgb, var(--success-color) 7%, transparent);
-  color: color-mix(in srgb, var(--success-color) 76%, var(--text-primary));
+  color: color-mix(in srgb, var(--success-color) 74%, var(--text-primary));
 }
 
 .priorityRotationBackgroundMetaWarning {
-  border-color: color-mix(in srgb, var(--warning-color) 18%, transparent);
-  background: color-mix(in srgb, var(--warning-color) 7%, transparent);
   color: color-mix(in srgb, var(--warning-color) 82%, var(--text-primary));
 }
 
 .priorityRotationBackgroundMetaUnknown {
-  border-color: color-mix(in srgb, var(--info-color) 14%, var(--border-color));
-  background: color-mix(in srgb, var(--info-color) 5%, var(--surface-control));
-  color: color-mix(in srgb, var(--text-secondary) 88%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-tertiary) 92%, var(--text-primary));
 }
 
 .priorityRotationBackgroundControls {
@@ -834,9 +819,9 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 46px;
-  height: 26px;
-  min-width: 46px;
+  width: 40px;
+  height: 22px;
+  min-width: 40px;
   padding: 0;
   border: 0;
   border-radius: 999px;
@@ -850,8 +835,8 @@
 
     .priorityRotationRelayTrack {
       box-shadow:
-        inset 0 1px 2px color-mix(in srgb, #000 16%, transparent),
-        0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+        inset 0 1px 2px color-mix(in srgb, #000 12%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
     }
   }
 
@@ -863,10 +848,10 @@
 
 .priorityRotationRelaySwitchWaking {
   .priorityRotationRelayTrack {
-    background: color-mix(in srgb, var(--info-color) 42%, var(--surface-control));
+    background: color-mix(in srgb, var(--info-color) 34%, var(--surface-control));
     box-shadow:
-      inset 0 1px 2px color-mix(in srgb, #000 14%, transparent),
-      0 0 0 4px color-mix(in srgb, var(--info-color) 10%, transparent);
+      inset 0 1px 2px color-mix(in srgb, #000 12%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--info-color) 9%, transparent);
   }
 
   .priorityRotationRelayThumb {
@@ -880,40 +865,40 @@
   }
 
   to {
-    transform: translateX(20px);
+    transform: translateX(18px);
   }
 }
 
 .priorityRotationRelayTrack {
   position: relative;
   display: block;
-  width: 46px;
-  height: 26px;
+  width: 40px;
+  height: 22px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text-tertiary) 20%, var(--surface-control));
-  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 16%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, #000 12%, transparent);
   transition:
     background-color $transition-fast,
     box-shadow $transition-fast;
 
   .priorityRotationRelaySwitchOn & {
-    background: color-mix(in srgb, var(--primary-color) 88%, var(--success-color));
+    background: color-mix(in srgb, var(--primary-color) 72%, #374151);
   }
 }
 
 .priorityRotationRelayThumb {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 18px;
-  height: 18px;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 4px 10px -5px color-mix(in srgb, #000 80%, transparent);
+  box-shadow: 0 2px 6px -4px color-mix(in srgb, #000 80%, transparent);
   transition: transform $transition-fast;
 
   .priorityRotationRelaySwitchOn & {
-    transform: translateX(20px);
+    transform: translateX(18px);
   }
 }
 
@@ -932,7 +917,7 @@
   }
 
   span {
-    color: color-mix(in srgb, var(--primary-color) 72%, var(--text-secondary));
+    color: var(--text-secondary);
     font-size: 12px;
     font-weight: 760;
     line-height: 1.15;
@@ -949,7 +934,7 @@
 .priorityRotationBackgroundRules {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(162px, 0.7fr) minmax(182px, 0.78fr);
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
   width: 100%;
 
@@ -1000,40 +985,34 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  padding: 2px 8px 2px 0;
+  padding: 0 8px 0 0;
 }
 
 .priorityRotationIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 38px;
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 18%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--primary-color) 8%, var(--surface-control));
-  color: color-mix(in srgb, var(--primary-color) 88%, #14b8a6);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 16%, transparent);
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 34%, transparent);
+  color: color-mix(in srgb, var(--primary-color) 72%, var(--text-secondary));
+  box-shadow: none;
 }
 
 .priorityRotationCopy {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
   overflow: hidden;
 }
 
 .priorityRotationTitle {
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 780;
   line-height: 1.25;
 }
@@ -1055,26 +1034,30 @@
 }
 
 .priorityRotationTier {
+  --tier-dot-color: var(--tier-color, var(--primary-color));
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 22px;
-  padding: 0 6px;
-  border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--tier-color, var(--primary-color)) 18%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--tier-color, var(--primary-color)) 7%, var(--surface-control));
-  color: color-mix(in srgb, var(--tier-color, var(--primary-color)) 74%, var(--text-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
+  gap: 6px;
+  min-height: 23px;
+  padding: 0 7px;
+  border-radius: 6px;
+  border: 0;
+  background: color-mix(in srgb, var(--surface-control) 66%, transparent);
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 36%, transparent);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   appearance: none;
   font: inherit;
+
+  &::before {
+    content: '';
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--tier-dot-color);
+  }
 }
 
 .priorityRotationTierActive {
@@ -1094,13 +1077,13 @@
 }
 
 .priorityRotationTierLabel {
-  color: color-mix(in srgb, currentColor 70%, var(--text-secondary));
+  color: var(--text-secondary);
   font-size: 10px;
-  font-weight: 820;
+  font-weight: 760;
 }
 
 .priorityRotationTierValue {
-  color: currentColor;
+  color: color-mix(in srgb, var(--tier-dot-color) 72%, var(--text-primary));
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 880;
@@ -1112,10 +1095,11 @@
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: color-mix(in srgb, currentColor 10%, transparent);
-  color: currentColor;
+  padding: 0 0 0 7px;
+  border-left: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
   font-size: 10px;
   font-weight: 820;
   line-height: 1;
@@ -1136,14 +1120,10 @@
 
   &:hover {
     transform: translateY(-1px);
-    border-color: color-mix(
-      in srgb,
-      var(--tier-color, var(--primary-color)) 38%,
-      var(--border-color)
-    );
+    background: color-mix(in srgb, var(--surface-control) 84%, transparent);
     box-shadow:
-      0 10px 18px -18px color-mix(in srgb, var(--tier-color, var(--primary-color)) 60%, transparent),
-      inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 14%, transparent);
+      0 10px 20px -24px color-mix(in srgb, var(--tier-dot-color) 42%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--tier-dot-color) 22%, var(--border-color));
   }
 
   &:active {
@@ -1153,8 +1133,8 @@
   &:focus-visible {
     outline: none;
     box-shadow:
-      0 0 0 3px color-mix(in srgb, var(--tier-color, var(--primary-color)) 14%, transparent),
-      inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
+      0 0 0 3px color-mix(in srgb, var(--tier-dot-color) 14%, transparent),
+      inset 0 0 0 1px color-mix(in srgb, var(--tier-dot-color) 26%, var(--border-color));
   }
 }
 
@@ -1177,20 +1157,14 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 9px;
   min-width: 0;
   min-height: 0;
-  padding: 9px 10px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
   border-radius: 8px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--priority-rotation-sheen) 10%, transparent),
-      transparent
-    ),
-    color-mix(in srgb, var(--surface-control) 76%, var(--bg-primary));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 11%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 42%, transparent);
+  box-shadow: none;
   color: var(--text-tertiary);
   font-size: 10px;
   font-weight: 800;
@@ -1219,16 +1193,16 @@
 
 .priorityRotationStepper {
   display: grid;
-  grid-template-columns: 30px minmax(38px, 46px) 30px;
+  grid-template-columns: 32px minmax(38px, 46px) 32px;
   align-items: center;
-  height: 32px;
+  height: 31px;
   min-width: 0;
   overflow: hidden;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 14%, var(--border-color));
-  background: color-mix(in srgb, var(--surface-panel) 88%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  background: color-mix(in srgb, var(--surface-panel) 76%, var(--bg-primary));
   color: var(--text-secondary);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--priority-rotation-sheen) 12%, transparent);
+  box-shadow: none;
 }
 
 .priorityRotationSlotStepper {
@@ -1257,8 +1231,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 31px;
   padding: 0;
   border: 0;
   appearance: none;
@@ -1280,7 +1254,8 @@
   }
 
   &:hover:not(:disabled) svg {
-    color: color-mix(in srgb, var(--primary-color) 86%, var(--text-primary));
+    color: var(--text-primary);
+    transform: scale(1.04);
   }
 
   &:active:not(:disabled) {
@@ -1307,7 +1282,7 @@
   min-width: 0;
   height: 100%;
   padding: 0 4px;
-  border-inline: 1px solid color-mix(in srgb, var(--border-color) 42%, transparent);
+  border-inline: 0;
 
   input {
     width: 38px;
@@ -1348,7 +1323,7 @@
 .priorityRotationSlider {
   width: 100%;
   min-width: 0;
-  height: 19px;
+  height: 18px;
   padding: 0;
   border: 0;
   appearance: none;
@@ -1356,47 +1331,43 @@
   cursor: pointer;
 
   &::-webkit-slider-runnable-track {
-    height: 7px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--primary-color) 13%, transparent);
+    height: 4px;
+    border-radius: 999px;
+    border: 0;
     background: linear-gradient(
       90deg,
-      color-mix(in srgb, var(--primary-color) 82%, #14b8a6) 0,
-      color-mix(in srgb, var(--primary-color) 82%, #14b8a6)
+      color-mix(in srgb, var(--primary-color) 76%, #0f766e) 0,
+      color-mix(in srgb, var(--primary-color) 76%, #0f766e)
         var(--priority-rotation-slider-progress, 50%),
-      color-mix(in srgb, var(--border-color) 58%, var(--surface-control))
+      color-mix(in srgb, var(--border-color) 68%, var(--surface-control))
         var(--priority-rotation-slider-progress, 50%),
-      color-mix(in srgb, var(--border-color) 58%, var(--surface-control)) 100%
+      color-mix(in srgb, var(--border-color) 68%, var(--surface-control)) 100%
     );
-    box-shadow:
-      inset 0 1px 1px color-mix(in srgb, #000 10%, transparent),
-      0 0 0 1px color-mix(in srgb, var(--priority-rotation-sheen) 5%, transparent);
+    box-shadow: inset 0 1px 1px color-mix(in srgb, #000 8%, transparent);
   }
 
   &::-moz-range-track {
-    height: 7px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--primary-color) 13%, transparent);
-    background: color-mix(in srgb, var(--border-color) 58%, var(--surface-control));
+    height: 4px;
+    border-radius: 999px;
+    border: 0;
+    background: color-mix(in srgb, var(--border-color) 68%, var(--surface-control));
   }
 
   &::-moz-range-progress {
-    height: 7px;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--primary-color) 82%, #14b8a6);
+    height: 4px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-color) 76%, #0f766e);
   }
 
   &::-webkit-slider-thumb {
-    width: 16px;
-    height: 16px;
-    margin-top: -6px;
-    border: 2px solid color-mix(in srgb, var(--priority-rotation-sheen) 72%, var(--surface-panel));
+    width: 15px;
+    height: 15px;
+    margin-top: -5.5px;
+    border: 1px solid color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
     border-radius: 999px;
     appearance: none;
-    background: color-mix(in srgb, var(--primary-color) 92%, #14b8a6);
-    box-shadow:
-      0 0 0 4px color-mix(in srgb, var(--primary-color) 12%, transparent),
-      0 6px 14px color-mix(in srgb, var(--primary-color) 24%, transparent);
+    background: var(--surface-panel);
+    box-shadow: 0 2px 6px color-mix(in srgb, #000 14%, transparent);
     transition:
       transform 0.14s ease,
       box-shadow 0.14s ease;
@@ -1405,20 +1376,18 @@
   &::-moz-range-thumb {
     width: 14px;
     height: 14px;
-    border: 2px solid color-mix(in srgb, var(--priority-rotation-sheen) 72%, var(--surface-panel));
+    border: 1px solid color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
     border-radius: 999px;
-    background: color-mix(in srgb, var(--primary-color) 92%, #14b8a6);
-    box-shadow:
-      0 0 0 4px color-mix(in srgb, var(--primary-color) 12%, transparent),
-      0 6px 14px color-mix(in srgb, var(--primary-color) 24%, transparent);
+    background: var(--surface-panel);
+    box-shadow: 0 2px 6px color-mix(in srgb, #000 14%, transparent);
   }
 
   &:hover:not(:disabled)::-webkit-slider-thumb,
   &:focus-visible::-webkit-slider-thumb {
-    transform: scale(1.08);
+    transform: scale(1.04);
     box-shadow:
-      0 0 0 5px color-mix(in srgb, var(--primary-color) 16%, transparent),
-      0 7px 16px color-mix(in srgb, var(--primary-color) 30%, transparent);
+      0 0 0 4px color-mix(in srgb, var(--primary-color) 12%, transparent),
+      0 2px 8px color-mix(in srgb, #000 18%, transparent);
   }
 
   &:focus-visible {
@@ -1439,7 +1408,7 @@
   min-height: 22px;
   min-width: 0;
   padding: 0 7px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
   border-radius: 7px;
   background: color-mix(in srgb, var(--primary-color) 7%, var(--surface-control));
   color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
@@ -1451,7 +1420,7 @@
     border: 0;
     outline: 0;
     background: transparent;
-    color: color-mix(in srgb, var(--primary-color) 72%, var(--text-primary));
+    color: color-mix(in srgb, var(--primary-color) 74%, var(--text-primary));
     font-family: var(--font-mono);
     font-size: 13px;
     font-weight: 860;
@@ -5906,9 +5875,7 @@ button.codexSubscriptionValue {
 }
 
 .filterRail,
-.filterControlsPanel,
-.priorityRotationBar,
-.priorityRotationBackgroundPanel {
+.filterControlsPanel {
   border-color: color-mix(in srgb, var(--border-color) 70%, transparent);
   background:
     linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent),
@@ -6052,11 +6019,10 @@ button.codexSubscriptionValue {
   grid-template-columns: minmax(0, 1fr) minmax(210px, auto);
   gap: 8px;
   margin-bottom: 0;
-  padding: 9px;
-  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--priority-rotation-standby) 34%, transparent);
+  padding: 12px 14px 13px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .priorityRotationMain {
@@ -6069,7 +6035,7 @@ button.codexSubscriptionValue {
   width: 32px;
   height: 32px;
   border-radius: 7px;
-  background: color-mix(in srgb, var(--primary-color) 7%, var(--surface-control));
+  background: color-mix(in srgb, var(--surface-panel) 72%, transparent);
   box-shadow: none;
 }
 
@@ -6095,8 +6061,8 @@ button.codexSubscriptionValue {
 .priorityRotationTier {
   min-height: 21px;
   padding: 0 6px;
-  background: color-mix(in srgb, var(--tier-color, var(--primary-color)) 6%, var(--surface-control));
-  box-shadow: none;
+  background: color-mix(in srgb, var(--surface-control) 66%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 36%, transparent);
 }
 
 .priorityRotationTierButton {
@@ -6139,14 +6105,14 @@ button.codexSubscriptionValue {
 }
 
 .priorityRotationBackgroundPanel {
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  padding: 10px;
+  padding: 14px;
   overflow: visible;
-  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
-    inset 3px 0 0 color-mix(in srgb, var(--success-color) 20%, transparent);
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .priorityRotationBackgroundHeader {
@@ -6166,20 +6132,20 @@ button.codexSubscriptionValue {
 
 .priorityRotationBackgroundMetaItem {
   min-height: 19px;
-  padding: 1px 6px;
-  border-color: color-mix(in srgb, var(--border-color) 42%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 44%, transparent);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
   font-weight: 620;
 }
 
 .priorityRotationBackgroundMetaSuccess {
-  border-color: color-mix(in srgb, var(--success-color) 16%, transparent);
-  background: color-mix(in srgb, var(--success-color) 6%, transparent);
+  border-color: transparent;
+  background: transparent;
 }
 
 .priorityRotationBackgroundMetaWarning {
-  border-color: color-mix(in srgb, var(--warning-color) 24%, transparent);
-  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
+  border-color: transparent;
+  background: transparent;
 }
 
 .priorityRotationRelayControl {
@@ -6202,14 +6168,14 @@ button.codexSubscriptionValue {
 }
 
 .priorityRotationRelayTrack {
-  width: 42px;
-  height: 24px;
+  width: 40px;
+  height: 22px;
   background: color-mix(in srgb, var(--text-tertiary) 16%, var(--surface-control));
 }
 
 .priorityRotationRelayThumb {
-  top: 4px;
-  left: 4px;
+  top: 3px;
+  left: 3px;
   width: 16px;
   height: 16px;
 
@@ -6592,7 +6558,7 @@ button.codexSubscriptionValue {
     color-mix(in srgb, var(--floating-surface) 92%, transparent);
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 980px) {
   .priorityRotationBar {
     grid-template-columns: 1fr;
   }
@@ -6727,9 +6693,7 @@ button.codexSubscriptionValue {
 }
 
 .filterRail,
-.filterControlsPanel,
-.priorityRotationBar,
-.priorityRotationBackgroundPanel {
+.filterControlsPanel {
   border-color: color-mix(in srgb, var(--auth-command-line) 70%, transparent);
   background:
     linear-gradient(180deg, color-mix(in srgb, #fff 2%, transparent), transparent),
@@ -6900,11 +6864,9 @@ button.codexSubscriptionValue {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   margin-bottom: 0;
-  padding: 8px 9px;
-  border-color: color-mix(in srgb, #0891b2 12%, var(--border-color));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, #0891b2 3%, transparent), transparent 48%),
-    color-mix(in srgb, var(--auth-command-panel) 74%, transparent);
+  padding: 12px 14px 13px;
+  border: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -6947,17 +6909,18 @@ button.codexSubscriptionValue {
 .priorityRotationTier {
   min-height: 20px;
   padding: 0 6px;
-  border-color: color-mix(in srgb, var(--tier-color, var(--primary-color)) 18%, transparent);
-  background: color-mix(in srgb, var(--tier-color, var(--primary-color)) 6%, transparent);
-  box-shadow: none;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--surface-control) 66%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 36%, transparent);
 }
 
 .priorityRotationTierButton {
   &:hover {
     transform: none;
-    border-color: color-mix(in srgb, var(--tier-color, var(--primary-color)) 30%, var(--border-color));
-    background: color-mix(in srgb, var(--tier-color, var(--primary-color)) 9%, transparent);
-    box-shadow: none;
+    border-color: transparent;
+    background: color-mix(in srgb, var(--surface-control) 84%, transparent);
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, var(--tier-color, var(--primary-color)) 22%, var(--border-color));
   }
 }
 
@@ -7015,13 +6978,12 @@ button.codexSubscriptionValue {
 }
 
 .priorityRotationBackgroundPanel {
-  gap: 8px;
+  gap: 10px;
   margin: 0;
-  padding: 9px;
-  border-color: color-mix(in srgb, var(--success-color) 10%, var(--border-color));
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--success-color) 2%, transparent), transparent 48%),
-    color-mix(in srgb, var(--auth-command-panel) 70%, transparent);
+  padding: 14px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -7041,7 +7003,7 @@ button.codexSubscriptionValue {
 
 .priorityRotationBackgroundMetaItem {
   min-height: 18px;
-  padding: 1px 5px;
+  padding: 0;
   border-color: transparent;
   background: transparent;
   color: color-mix(in srgb, var(--text-tertiary) 86%, transparent);
@@ -7051,14 +7013,14 @@ button.codexSubscriptionValue {
 
 .priorityRotationBackgroundMetaSuccess {
   color: color-mix(in srgb, var(--success-color) 68%, var(--text-secondary));
-  border-color: color-mix(in srgb, var(--success-color) 16%, transparent);
-  background: color-mix(in srgb, var(--success-color) 5%, transparent);
+  border-color: transparent;
+  background: transparent;
 }
 
 .priorityRotationBackgroundMetaWarning {
   color: color-mix(in srgb, var(--warning-color) 82%, var(--text-primary));
-  border-color: color-mix(in srgb, var(--warning-color) 28%, transparent);
-  background: color-mix(in srgb, var(--warning-color) 8%, transparent);
+  border-color: transparent;
+  background: transparent;
 }
 
 .priorityRotationRelayControl {
@@ -7144,7 +7106,7 @@ button.codexSubscriptionValue {
 
   &:hover:not(:disabled) {
     background: transparent;
-    color: color-mix(in srgb, var(--primary-color) 76%, var(--text-primary));
+  color: color-mix(in srgb, var(--primary-color) 74%, var(--text-primary));
   }
 
   &:focus-visible {
@@ -7790,7 +7752,7 @@ button.codexSubscriptionValue {
   }
 }
 
-@media (max-width: 1320px) {
+@media (max-width: 980px) {
   .priorityRotationBar {
     grid-template-columns: 1fr;
   }
@@ -8137,10 +8099,13 @@ button.codexSubscriptionValue {
   order: 2;
   min-width: 0;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, #0891b2 16%, var(--border-color));
+  border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
   background:
-    linear-gradient(90deg, color-mix(in srgb, #0891b2 3%, transparent), transparent 54%),
-    color-mix(in srgb, var(--surface-control) 24%, var(--bg-primary));
+    linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent),
+    color-mix(in srgb, var(--surface-card) 96%, var(--bg-primary));
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 3%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
   overflow: hidden;
 }
 
@@ -8150,7 +8115,7 @@ button.codexSubscriptionValue {
   gap: 10px;
   align-items: center;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 10px 14px;
   cursor: pointer;
   list-style: none;
   color: var(--text-primary);
@@ -8160,12 +8125,12 @@ button.codexSubscriptionValue {
   }
 
   &:hover {
-    background: color-mix(in srgb, #0891b2 4%, transparent);
+    background: color-mix(in srgb, var(--surface-control) 24%, transparent);
   }
 }
 
 .advancedControls[open] .advancedControlsSummary {
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 56%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
 }
 
 .advancedControlsTitle {
@@ -8199,13 +8164,13 @@ button.codexSubscriptionValue {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex: 0 0 94px;
-  width: 94px;
-  min-height: 24px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 60%, transparent);
+  flex: 0 0 86px;
+  width: 86px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 780;
@@ -8214,25 +8179,21 @@ button.codexSubscriptionValue {
 }
 
 .advancedControlsConnectionDot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: currentColor;
   box-shadow:
-    0 0 0 3px color-mix(in srgb, currentColor 12%, transparent),
-    0 0 18px color-mix(in srgb, currentColor 24%, transparent);
+    0 0 0 3px color-mix(in srgb, currentColor 9%, transparent),
+    0 0 14px color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .advancedControlsConnectionConnected {
-  border-color: color-mix(in srgb, #16a34a 20%, var(--border-color));
-  background: color-mix(in srgb, #16a34a 7%, var(--surface-control));
   color: #16a34a;
 }
 
 .advancedControlsConnectionDisconnected {
-  border-color: color-mix(in srgb, var(--border-color) 64%, transparent);
-  background: color-mix(in srgb, var(--surface-control) 64%, transparent);
   color: var(--text-tertiary);
 }
 
@@ -8244,20 +8205,16 @@ button.codexSubscriptionValue {
 
 .advancedControlsToggle {
   justify-self: end;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, #0891b2 18%, var(--border-color));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 56%, transparent), transparent),
-    color-mix(in srgb, var(--surface-control) 80%, var(--bg-primary));
-  color: color-mix(in srgb, #0891b2 78%, var(--text-primary));
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent),
-    0 10px 22px -20px color-mix(in srgb, #0891b2 56%, transparent);
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 56%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 36%, transparent);
+  color: var(--text-secondary);
+  box-shadow: none;
   transition:
     transform $transition-fast,
     border-color $transition-fast,
@@ -8269,8 +8226,8 @@ button.codexSubscriptionValue {
   }
 
   .advancedControlsSummary:hover & {
-    border-color: color-mix(in srgb, #0891b2 34%, var(--border-color));
-    color: color-mix(in srgb, #0891b2 88%, var(--text-primary));
+    border-color: color-mix(in srgb, var(--border-color) 72%, var(--text-tertiary));
+    color: var(--text-primary);
   }
 
   .advancedControls[open] & svg {
@@ -8280,13 +8237,14 @@ button.codexSubscriptionValue {
 
 .advancedControlsSignal {
   flex: 0 1 auto;
-  max-width: 140px;
-  min-height: 22px;
+  max-width: 132px;
+  min-height: 21px;
   display: inline-flex;
   align-items: center;
-  padding: 0 7px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
+  gap: 5px;
+  padding: 0;
+  border-radius: 0;
+  border: 1px solid transparent;
   font-size: 11px;
   font-weight: 780;
   line-height: 1;
@@ -8295,29 +8253,38 @@ button.codexSubscriptionValue {
   white-space: nowrap;
 }
 
+.advancedControlsSignal::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
 .advancedControlsSignalWarning {
-  border-color: color-mix(in srgb, #d97706 28%, var(--border-color));
-  background: color-mix(in srgb, #d97706 9%, var(--surface-control));
+  border-color: transparent;
+  background: transparent;
   color: color-mix(in srgb, #d97706 82%, var(--text-primary));
 }
 
 .advancedControlsSignalDanger {
-  border-color: color-mix(in srgb, #dc2626 30%, var(--border-color));
-  background: color-mix(in srgb, #dc2626 9%, var(--surface-control));
+  border-color: transparent;
+  background: transparent;
   color: color-mix(in srgb, #dc2626 84%, var(--text-primary));
 }
 
 .advancedControlsSignalInfo {
-  border-color: color-mix(in srgb, #2563eb 24%, var(--border-color));
-  background: color-mix(in srgb, #2563eb 8%, var(--surface-control));
+  border-color: transparent;
+  background: transparent;
   color: color-mix(in srgb, #2563eb 78%, var(--text-primary));
 }
 
 .advancedControlsBody {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+  gap: 0;
+  padding: 0;
 }
 
 .fileListHeader {
