@@ -13,6 +13,10 @@ const STORAGE_KEY = 'authFilesPage.priorityRotation.v1';
 const DEFAULT_THRESHOLD_PERCENT = 50;
 const DEFAULT_ACTIVE_SLOT_LIMIT = 5;
 const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_based']);
+export const PRIORITY_ROTATION_ACTIVE_PRIORITY = 2;
+export const PRIORITY_ROTATION_STANDBY_PRIORITY = 1;
+export const PRIORITY_ROTATION_BUFFER_PRIORITY = 0;
+export const PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY = 3;
 
 export type PriorityRotationChangeRole = 'demote' | 'promote';
 export type PriorityRotationChangeReason =
@@ -182,9 +186,9 @@ const buildEmptyAnalysis = (
   status,
   managedCount: 0,
   unknownCount,
-  activePriority: null,
-  standbyPriority: null,
-  reservePriority: null,
+  activePriority: PRIORITY_ROTATION_ACTIVE_PRIORITY,
+  standbyPriority: PRIORITY_ROTATION_STANDBY_PRIORITY,
+  reservePriority: PRIORITY_ROTATION_BUFFER_PRIORITY,
   activeCount: 0,
   healthyActiveCount: 0,
   standbyCount: 0,
@@ -207,13 +211,19 @@ export const analyzeCodexPriorityRotation = (
   files.forEach((file) => {
     if (!isCodexFile(file) || isDisabledAuthFile(file) || isRuntimeOnlyAuthFile(file)) return;
 
+    const priority = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
+    if (
+      priority !== PRIORITY_ROTATION_ACTIVE_PRIORITY &&
+      priority !== PRIORITY_ROTATION_STANDBY_PRIORITY
+    ) {
+      return;
+    }
+
     const quota = codexQuota[file.name];
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
     if (planType !== null && !isManagedPlan(planType)) return;
 
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
-    const priority = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
-    if (priority <= 0) return;
 
     if (planType === null || remainingPercent === null) {
       unknownCount++;
@@ -236,20 +246,9 @@ export const analyzeCodexPriorityRotation = (
     );
   }
 
-  const priorities = Array.from(new Set(candidates.map((candidate) => candidate.priority))).sort(
-    (a, b) => b - a
-  );
-  const [activePriority = null, existingStandbyPriority = null, reservePriority = null] =
-    priorities;
-
-  if (activePriority === null) {
-    return {
-      ...buildEmptyAnalysis(threshold, slotLimit, 'insufficient_layers', unknownCount),
-      managedCount: candidates.length,
-    };
-  }
-
-  const standbyPriority = existingStandbyPriority ?? activePriority - 1;
+  const activePriority = PRIORITY_ROTATION_ACTIVE_PRIORITY;
+  const standbyPriority = PRIORITY_ROTATION_STANDBY_PRIORITY;
+  const reservePriority = PRIORITY_ROTATION_BUFFER_PRIORITY;
   const activeCandidates = candidates.filter(
     (candidate) => candidate.priority === activePriority
   );
@@ -307,13 +306,13 @@ export const analyzeCodexPriorityRotation = (
       role: 'demote',
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
+  const activeDeficit = Math.max(0, slotLimit - projectedActiveCount);
   const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
     (reason) => reason === 'low_remaining'
   ).length;
-  const promotionSlots = Math.min(
-    lowRemainingDemotionCount,
-    Math.max(0, slotLimit - projectedActiveCount)
-  );
+  const replacementSlots = Math.min(lowRemainingDemotionCount, activeDeficit);
+  const fillSlots = Math.min(activeDeficit, healthyStandbyCandidates.length);
+  const promotionSlots = Math.max(replacementSlots, fillSlots);
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
       const remainingCompare = b.remainingPercent - a.remainingPercent;
@@ -334,12 +333,15 @@ export const analyzeCodexPriorityRotation = (
   const changes = [...demotions, ...promotions];
 
   if (changes.length === 0) {
+    const missingAdjacentStandby = activeDeficit > 0 && healthyStandbyCandidates.length === 0;
+    const missingReplacementStandby =
+      lowRemainingDemotionCount > 0 && healthyStandbyCandidates.length === 0;
     return {
       thresholdPercent: threshold,
       effectiveThresholdPercent: effectiveThreshold,
       thresholdAdjusted,
       activeSlotLimit: slotLimit,
-      status: promotionSlots > 0 ? 'no_standby' : 'no_changes',
+      status: missingAdjacentStandby || missingReplacementStandby ? 'no_standby' : 'no_changes',
       managedCount: candidates.length,
       unknownCount,
       activePriority,

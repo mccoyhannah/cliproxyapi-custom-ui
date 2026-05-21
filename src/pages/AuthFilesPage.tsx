@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
+  IconChevronDown,
   IconFilterAll,
   IconMinus,
   IconPlus,
@@ -85,6 +86,10 @@ import {
   analyzeCodexPriorityRotation,
   normalizePriorityRotationActiveSlotLimit,
   normalizePriorityRotationThresholdPercent,
+  PRIORITY_ROTATION_ACTIVE_PRIORITY,
+  PRIORITY_ROTATION_BUFFER_PRIORITY,
+  PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY,
+  PRIORITY_ROTATION_STANDBY_PRIORITY,
 } from '@/features/authFiles/priorityRotation';
 import {
   launchPriorityRotationSidecar,
@@ -146,14 +151,23 @@ const getAuthFileDisplayName = (file: AuthFileItem): string => {
   const note = typeof file.note === 'string' ? file.note.trim() : '';
   return note || file.name;
 };
-const formatRelativeDateTime = (value: string | null | undefined): string => {
+const formatRelativeDateTime = (
+  value: string | null | undefined,
+  options: { immediatePast?: string; immediateFuture?: string; pastFallback?: string } = {}
+): string => {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
 
   const diffMs = date.getTime() - Date.now();
+  if (diffMs < 0 && options.pastFallback) return options.pastFallback;
+
   const absoluteMs = Math.abs(diffMs);
-  if (absoluteMs < 60 * 1000) return '刚刚';
+  if (absoluteMs < 60 * 1000) {
+    return diffMs < 0
+      ? (options.immediatePast ?? '1分钟前')
+      : (options.immediateFuture ?? '1分钟后');
+  }
 
   const units: Array<{ label: string; ms: number }> = [
     { label: '天', ms: 24 * 60 * 60 * 1000 },
@@ -169,7 +183,7 @@ const normalizePriorityRotationSidecarInterval = (value: unknown): number => {
   if (!Number.isFinite(numeric)) return 5;
   return Math.max(1, Math.min(180, Math.round(numeric)));
 };
-type AuthFilePriorityTier = 'active' | 'standby' | 'buffer';
+type AuthFilePriorityTier = 'active' | 'standby' | 'buffer' | 'manualLocked';
 type PriorityRotationTierDetailItem = {
   name: string;
   displayName: string;
@@ -269,6 +283,8 @@ export function AuthFilesPage() {
   );
   const [priorityRotationDetailTier, setPriorityRotationDetailTier] =
     useState<AuthFilePriorityTier | null>(null);
+  const [priorityRotationPreviewOpen, setPriorityRotationPreviewOpen] = useState(false);
+  const [priorityRotationPreviewApplying, setPriorityRotationPreviewApplying] = useState(false);
   const [priorityRotationSidecarStatus, setPriorityRotationSidecarStatus] =
     useState<PriorityRotationSidecarStatus | null>(null);
   const [priorityRotationSidecarLoading, setPriorityRotationSidecarLoading] = useState(false);
@@ -328,6 +344,7 @@ export function AuthFilesPage() {
     batchDownload,
     batchSetStatus,
     batchSetPriority,
+    batchSetPriorities,
     batchDelete,
   } = useAuthFilesData();
 
@@ -445,21 +462,18 @@ export function AuthFilesPage() {
     const tiers = new Map<string, AuthFilePriorityTier>();
     files.forEach((file) => {
       const priority = parsePriorityValue(file.priority ?? file['priority']) ?? 0;
-      if (priorityRotationAnalysis.activePriority === priority) {
+      if (priority >= PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY) {
+        tiers.set(file.name, 'manualLocked');
+      } else if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
         tiers.set(file.name, 'active');
-      } else if (priorityRotationAnalysis.standbyPriority === priority) {
+      } else if (priority === PRIORITY_ROTATION_STANDBY_PRIORITY) {
         tiers.set(file.name, 'standby');
-      } else if (priorityRotationAnalysis.reservePriority === priority) {
+      } else if (priority === PRIORITY_ROTATION_BUFFER_PRIORITY) {
         tiers.set(file.name, 'buffer');
       }
     });
     return tiers;
-  }, [
-    files,
-    priorityRotationAnalysis.activePriority,
-    priorityRotationAnalysis.reservePriority,
-    priorityRotationAnalysis.standbyPriority,
-  ]);
+  }, [files]);
 
   const stopUploadDropEvent = (event: ReactDragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -850,6 +864,7 @@ export function AuthFilesPage() {
       active: [],
       standby: [],
       buffer: [],
+      manualLocked: [],
     };
 
     const getPlanLabel = (planType: string | null): string => {
@@ -1551,6 +1566,39 @@ export function AuthFilesPage() {
     wakePriorityRotationSidecar,
   ]);
 
+  const applyPriorityRotationPreview = useCallback(async () => {
+    const changes = priorityRotationAnalysis.changes;
+    if (changes.length === 0) {
+      showNotification(t('auth_files.priority_rotation_no_changes'), 'info');
+      setPriorityRotationPreviewOpen(false);
+      return;
+    }
+
+    setPriorityRotationPreviewApplying(true);
+    try {
+      const result = await batchSetPriorities(
+        changes.map((change) => ({
+          name: change.name,
+          priority: change.toPriority,
+        }))
+      );
+      if (result.successCount > 0) {
+        await loadFiles({ preserveExisting: true, silent: true });
+      }
+      if (result.failCount === 0) {
+        setPriorityRotationPreviewOpen(false);
+      }
+    } finally {
+      setPriorityRotationPreviewApplying(false);
+    }
+  }, [
+    batchSetPriorities,
+    loadFiles,
+    priorityRotationAnalysis.changes,
+    showNotification,
+    t,
+  ]);
+
   const togglePriorityRotationSidecarEnabled = useCallback(async () => {
     if (connectionStatus !== 'connected') {
       showNotification(
@@ -1861,28 +1909,97 @@ export function AuthFilesPage() {
         uploaded: uploadProgress.uploaded,
       })
     : '';
-  const priorityRotationStatusLabel =
-    priorityRotationAnalysis.status === 'quota_unknown'
-      ? t('auth_files.priority_rotation_status_unknown')
-      : priorityRotationAnalysis.status === 'no_standby'
-        ? t('auth_files.priority_rotation_status_no_standby')
-        : t('auth_files.priority_rotation_status_idle');
+  const priorityRotationHasPreviewChanges = priorityRotationAnalysis.changes.length > 0;
   const priorityRotationVisibleActiveCount =
     priorityRotationAnalysis.changes.length > 0
-      ? priorityRotationAnalysis.activeCount
-      : priorityRotationAnalysis.projectedActiveCount;
-  const priorityRotationSlotLabel = t('auth_files.priority_rotation_status_slots', {
-    current: priorityRotationVisibleActiveCount,
-    limit: priorityRotationAnalysis.activeSlotLimit,
-  });
-  const priorityRotationStatusClass =
-    priorityRotationAnalysis.status === 'quota_unknown' ||
-    priorityRotationAnalysis.status === 'no_standby'
+      ? priorityRotationAnalysis.projectedActiveCount
+      : priorityRotationAnalysis.activeCount;
+  const priorityRotationActiveDeficit = Math.max(
+    0,
+    priorityRotationAnalysis.activeSlotLimit - priorityRotationVisibleActiveCount
+  );
+  const priorityRotationStatusLabel = priorityRotationHasPreviewChanges
+    ? t('auth_files.priority_rotation_status_ready', {
+        count: priorityRotationAnalysis.changes.length,
+      })
+    : priorityRotationAnalysis.status === 'quota_unknown'
+      ? t('auth_files.priority_rotation_status_unknown')
+      : priorityRotationAnalysis.status === 'no_standby'
+        ? priorityRotationActiveDeficit > 0
+          ? t('auth_files.priority_rotation_status_no_standby_deficit', {
+              count: priorityRotationActiveDeficit,
+              defaultValue: `缺 ${priorityRotationActiveDeficit} 个，无健康备用`,
+            })
+          : t('auth_files.priority_rotation_status_no_standby')
+        : t('auth_files.priority_rotation_status_idle');
+  const priorityRotationSlotLabel = t(
+    priorityRotationHasPreviewChanges
+      ? 'auth_files.priority_rotation_status_projected_slots'
+      : 'auth_files.priority_rotation_status_slots',
+    {
+      current: priorityRotationVisibleActiveCount,
+      limit: priorityRotationAnalysis.activeSlotLimit,
+      defaultValue: priorityRotationHasPreviewChanges
+        ? `接力后 ${priorityRotationVisibleActiveCount}/${priorityRotationAnalysis.activeSlotLimit}`
+        : `主力 ${priorityRotationVisibleActiveCount}/${priorityRotationAnalysis.activeSlotLimit}`,
+    }
+  );
+  const priorityRotationStatusClass = priorityRotationHasPreviewChanges
+    ? styles.priorityRotationStatusReady
+    : priorityRotationAnalysis.status === 'quota_unknown' ||
+        priorityRotationAnalysis.status === 'no_standby'
       ? styles.priorityRotationStatusWarning
       : styles.priorityRotationStatusMuted;
+  const priorityRotationPreviewDisabled =
+    !priorityRotationHasPreviewChanges ||
+    disableControls ||
+    batchPriorityUpdating ||
+    priorityRotationPreviewApplying;
+  const priorityRotationPreviewSummaryItems = [
+    {
+      key: 'threshold',
+      label: t('auth_files.priority_rotation_summary_threshold_label'),
+      value: t('auth_files.priority_rotation_summary_threshold_value', {
+        threshold: priorityRotationAnalysis.effectiveThresholdPercent,
+      }),
+    },
+    {
+      key: 'slots',
+      label: t('auth_files.priority_rotation_summary_slots_label'),
+      value: t('auth_files.priority_rotation_summary_slots_value', {
+        current: priorityRotationAnalysis.projectedActiveCount,
+        limit: priorityRotationAnalysis.activeSlotLimit,
+      }),
+    },
+    {
+      key: 'tiers',
+      label: t('auth_files.priority_rotation_summary_tiers_label'),
+      value: t('auth_files.priority_rotation_summary_tiers_value', {
+        active: formatPriorityRotationPriority(priorityRotationAnalysis.activePriority),
+        standby: formatPriorityRotationPriority(priorityRotationAnalysis.standbyPriority),
+        buffer: formatPriorityRotationPriority(priorityRotationAnalysis.reservePriority),
+        locked: t('auth_files.priority_rotation_tier_manual_locked_value', {
+          defaultValue: 'P3+',
+        }),
+      }),
+    },
+    {
+      key: 'count',
+      label: t('auth_files.priority_rotation_summary_count_label'),
+      value: t('auth_files.priority_rotation_summary_count_value', {
+        count: priorityRotationAnalysis.changes.length,
+      }),
+    },
+  ];
   const priorityRotationPendingSaveLabel = t('auth_files.priority_rotation_sidecar_unsaved');
   const priorityRotationInputPendingLabel = t('auth_files.priority_rotation_sidecar_input_pending');
-  const priorityRotationDraftStatusLabel = priorityRotationSidecarCommittedDraftDirty
+  const priorityRotationSavingLabel = t('auth_files.priority_rotation_sidecar_saving', {
+    defaultValue: '保存中',
+  });
+  const priorityRotationDraftStatusLabel =
+    priorityRotationSidecarSaving || priorityRotationSidecarAutoSaving
+      ? priorityRotationSavingLabel
+      : priorityRotationSidecarCommittedDraftDirty
     ? priorityRotationPendingSaveLabel
     : priorityRotationSidecarInputDraftDirty
       ? priorityRotationInputPendingLabel
@@ -1893,11 +2010,15 @@ export function AuthFilesPage() {
     active: t('auth_files.priority_rotation_tier_active'),
     standby: t('auth_files.priority_rotation_tier_standby'),
     buffer: t('auth_files.priority_rotation_tier_buffer'),
+    manualLocked: t('auth_files.priority_rotation_tier_manual_locked'),
   };
-  const priorityRotationTierPriorityMap: Record<AuthFilePriorityTier, number | null> = {
-    active: priorityRotationAnalysis.activePriority,
-    standby: priorityRotationAnalysis.standbyPriority,
-    buffer: priorityRotationAnalysis.reservePriority,
+  const priorityRotationTierPriorityLabels: Record<AuthFilePriorityTier, string> = {
+    active: formatPriorityRotationPriority(priorityRotationAnalysis.activePriority),
+    standby: formatPriorityRotationPriority(priorityRotationAnalysis.standbyPriority),
+    buffer: formatPriorityRotationPriority(priorityRotationAnalysis.reservePriority),
+    manualLocked: t('auth_files.priority_rotation_tier_manual_locked_value', {
+      defaultValue: 'P3+',
+    }),
   };
   const priorityRotationTierItems: Array<{
     key: AuthFilePriorityTier;
@@ -1910,7 +2031,7 @@ export function AuthFilesPage() {
     {
       key: 'active',
       label: priorityRotationTierLabels.active,
-      value: formatPriorityRotationPriority(priorityRotationTierPriorityMap.active),
+      value: priorityRotationTierPriorityLabels.active,
       className: styles.priorityRotationTierActive,
       count: priorityRotationTierDetailGroups.active.length,
       ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
@@ -1922,7 +2043,7 @@ export function AuthFilesPage() {
     {
       key: 'standby',
       label: priorityRotationTierLabels.standby,
-      value: formatPriorityRotationPriority(priorityRotationTierPriorityMap.standby),
+      value: priorityRotationTierPriorityLabels.standby,
       className: styles.priorityRotationTierStandby,
       count: priorityRotationTierDetailGroups.standby.length,
       ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
@@ -1934,13 +2055,25 @@ export function AuthFilesPage() {
     {
       key: 'buffer',
       label: priorityRotationTierLabels.buffer,
-      value: formatPriorityRotationPriority(priorityRotationTierPriorityMap.buffer),
+      value: priorityRotationTierPriorityLabels.buffer,
       className: styles.priorityRotationTierBuffer,
       count: priorityRotationTierDetailGroups.buffer.length,
       ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
         tier: priorityRotationTierLabels.buffer,
         count: priorityRotationTierDetailGroups.buffer.length,
         defaultValue: `查看${priorityRotationTierLabels.buffer}详情（${priorityRotationTierDetailGroups.buffer.length} 个）`,
+      }),
+    },
+    {
+      key: 'manualLocked',
+      label: priorityRotationTierLabels.manualLocked,
+      value: priorityRotationTierPriorityLabels.manualLocked,
+      className: styles.priorityRotationTierManualLocked,
+      count: priorityRotationTierDetailGroups.manualLocked.length,
+      ariaLabel: t('auth_files.priority_rotation_detail_open_aria', {
+        tier: priorityRotationTierLabels.manualLocked,
+        count: priorityRotationTierDetailGroups.manualLocked.length,
+        defaultValue: `查看${priorityRotationTierLabels.manualLocked}详情（${priorityRotationTierDetailGroups.manualLocked.length} 个）`,
       }),
     },
   ];
@@ -1980,11 +2113,25 @@ export function AuthFilesPage() {
       ? styles.priorityRotationBackgroundMetaWarning
       : styles.priorityRotationBackgroundMetaUnknown;
   const priorityRotationSidecarLastRunLabel = t('auth_files.priority_rotation_sidecar_last_run', {
-    time: formatRelativeDateTime(priorityRotationSidecarState?.lastCompletedAt),
+    time: formatRelativeDateTime(priorityRotationSidecarState?.lastCompletedAt, {
+      immediatePast: t('auth_files.priority_rotation_sidecar_last_run_recent', {
+        defaultValue: '1分钟前',
+      }),
+    }),
   });
   const priorityRotationSidecarNextRunLabel = t('auth_files.priority_rotation_sidecar_next_run', {
     time: priorityRotationSidecarSavedEnabled
-      ? formatRelativeDateTime(priorityRotationSidecarState?.nextRunAt)
+      ? formatRelativeDateTime(priorityRotationSidecarState?.nextRunAt, {
+          pastFallback: t('auth_files.priority_rotation_sidecar_next_run_due', {
+            defaultValue: '1分钟后',
+          }),
+          immediatePast: t('auth_files.priority_rotation_sidecar_next_run_due', {
+            defaultValue: '1分钟后',
+          }),
+          immediateFuture: t('auth_files.priority_rotation_sidecar_next_run_soon', {
+            defaultValue: '1分钟后',
+          }),
+        })
       : '-',
   });
   const priorityRotationSidecarResultValue = (() => {
@@ -2051,17 +2198,17 @@ export function AuthFilesPage() {
   const priorityRotationDetailTierLabel = priorityRotationDetailTier
     ? priorityRotationTierLabels[priorityRotationDetailTier]
     : '';
-  const priorityRotationDetailPriority = priorityRotationDetailTier
-    ? priorityRotationTierPriorityMap[priorityRotationDetailTier]
-    : null;
+  const priorityRotationDetailPriorityLabel = priorityRotationDetailTier
+    ? priorityRotationTierPriorityLabels[priorityRotationDetailTier]
+    : '-';
   const priorityRotationDetailItems = priorityRotationDetailTier
     ? priorityRotationTierDetailGroups[priorityRotationDetailTier]
     : [];
   const priorityRotationDetailTitle = priorityRotationDetailTier
     ? t('auth_files.priority_rotation_detail_title', {
         tier: priorityRotationDetailTierLabel,
-        priority: formatPriorityRotationPriority(priorityRotationDetailPriority),
-        defaultValue: `${priorityRotationDetailTierLabel} ${formatPriorityRotationPriority(priorityRotationDetailPriority)}`,
+        priority: priorityRotationDetailPriorityLabel,
+        defaultValue: `${priorityRotationDetailTierLabel} ${priorityRotationDetailPriorityLabel}`,
       })
     : '';
   const manageableFileCount = files.filter((file) => !isRuntimeOnlyAuthFile(file)).length;
@@ -2134,33 +2281,31 @@ export function AuthFilesPage() {
     totalPages,
     defaultValue: `${pageItems.length}/${sorted.length} 项，第 ${currentPage}/${totalPages} 页`,
   });
-  const advancedControlSummary = t('auth_files.advanced_control_summary', {
-    status: priorityRotationStatusLabel,
-    slots: priorityRotationSlotLabel,
-    sidecar: priorityRotationSidecarLiveStatusLabel,
-    defaultValue: `${priorityRotationStatusLabel} · ${priorityRotationSlotLabel} · ${priorityRotationSidecarLiveStatusLabel}`,
-  });
-  const advancedControlSidecarSignalClass =
-    priorityRotationSidecarError || !priorityRotationSidecarOnline
-      ? styles.advancedControlsSignalDanger
-      : priorityRotationSidecarState?.running || priorityRotationSidecarWaking
-        ? styles.advancedControlsSignalReady
-        : priorityRotationSidecarSavedEnabled
-          ? styles.advancedControlsSignalReady
-          : styles.advancedControlsSignalInfo;
+  const advancedControlSummary = [
+    priorityRotationStatusLabel,
+    priorityRotationSlotLabel,
+    priorityRotationSidecarLiveStatusLabel,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const advancedControlConnectionLabel = priorityRotationSidecarOnline
+    ? t('auth_files.advanced_control_connected', { defaultValue: '已连接' })
+    : priorityRotationSidecarWaking
+      ? t('auth_files.advanced_control_connecting', { defaultValue: '连接中' })
+      : t('auth_files.advanced_control_disconnected', { defaultValue: '未连接' });
+  const advancedControlConnectionTitle = [
+    priorityRotationSidecarLiveStatusLabel,
+    priorityRotationSidecarSecretLabel,
+    priorityRotationDraftStatusLabel,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const advancedControlSignals: Array<{
     key: string;
     label: string;
     className: string;
     title?: string;
-  }> = [
-    {
-      key: 'sidecar',
-      label: priorityRotationSidecarLiveStatusLabel,
-      className: advancedControlSidecarSignalClass,
-      title: advancedControlSummary,
-    },
-  ];
+  }> = [];
   if (priorityRotationDraftStatusLabel) {
     advancedControlSignals.push({
       key: 'draft',
@@ -2208,6 +2353,22 @@ export function AuthFilesPage() {
       className: styles.advancedControlsSignalInfo,
     });
   }
+  const getPriorityRotationReasonLabel = (
+    reason: (typeof priorityRotationAnalysis.changes)[number]['reason']
+  ): string => {
+    switch (reason) {
+      case 'low_remaining':
+        return t('auth_files.priority_rotation_reason_demote_low');
+      case 'over_active_limit':
+        return t('auth_files.priority_rotation_reason_demote_over_limit', {
+          limit: priorityRotationAnalysis.activeSlotLimit,
+        });
+      case 'promote_standby':
+        return t('auth_files.priority_rotation_reason_promote');
+      default:
+        return String(reason);
+    }
+  };
 
   return (
     <div className={styles.container}>
@@ -2346,24 +2507,38 @@ export function AuthFilesPage() {
                   {t('auth_files.advanced_control_title', { defaultValue: '高级接力控制' })}
                 </span>
                 <span className={styles.advancedControlsMeta}>{advancedControlSummary}</span>
-                {advancedControlSignals.length > 0 && (
+                <span
+                  className={styles.advancedControlsSignals}
+                  aria-label={t('auth_files.advanced_control_signals', {
+                    defaultValue: '接力状态提示',
+                  })}
+                >
+                  {advancedControlSignals.map((signal) => (
+                    <span
+                      className={`${styles.advancedControlsSignal} ${signal.className}`}
+                      key={signal.key}
+                      title={signal.title || signal.label}
+                    >
+                      {signal.label}
+                    </span>
+                  ))}
                   <span
-                    className={styles.advancedControlsSignals}
-                    aria-label={t('auth_files.advanced_control_signals', {
-                      defaultValue: '接力状态提示',
-                    })}
+                    className={`${styles.advancedControlsConnection} ${
+                      priorityRotationSidecarOnline
+                        ? styles.advancedControlsConnectionConnected
+                        : styles.advancedControlsConnectionDisconnected
+                    }`}
+                    title={advancedControlConnectionTitle}
                   >
-                    {advancedControlSignals.map((signal) => (
-                      <span
-                        className={`${styles.advancedControlsSignalDot} ${signal.className}`}
-                        key={signal.key}
-                        title={signal.title || signal.label}
-                      >
-                        <span className={styles.srOnly}>{signal.label}</span>
-                      </span>
-                    ))}
+                    <span className={styles.advancedControlsConnectionDot} aria-hidden="true" />
+                    <span className={styles.advancedControlsConnectionText}>
+                      {advancedControlConnectionLabel}
+                    </span>
                   </span>
-                )}
+                </span>
+                <span className={styles.advancedControlsToggle} aria-hidden="true">
+                  <IconChevronDown size={15} />
+                </span>
               </summary>
               <div className={styles.advancedControlsBody}>
                 <div className={styles.priorityRotationBar}>
@@ -2415,6 +2590,16 @@ export function AuthFilesPage() {
                         {priorityRotationSlotLabel}
                       </span>
                     </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setPriorityRotationPreviewOpen(true)}
+                      disabled={priorityRotationPreviewDisabled}
+                      loading={priorityRotationPreviewApplying}
+                      aria-label={t('auth_files.priority_rotation_button_aria')}
+                    >
+                      {t('auth_files.priority_rotation_button')}
+                    </Button>
                   </div>
                 </div>
 
@@ -3000,6 +3185,111 @@ export function AuthFilesPage() {
       />
 
       <Modal
+        open={priorityRotationPreviewOpen}
+        title={
+          <span className={styles.priorityRotationTierDetailTitle}>
+            {t('auth_files.priority_rotation_modal_title')}
+          </span>
+        }
+        onClose={() => {
+          if (!priorityRotationPreviewApplying) {
+            setPriorityRotationPreviewOpen(false);
+          }
+        }}
+        width={820}
+        className={styles.priorityRotationModal}
+        overlayClassName={styles.priorityRotationOverlay}
+        closeDisabled={priorityRotationPreviewApplying}
+        footer={
+          <div className={styles.priorityRotationFooter}>
+            <span className={styles.priorityRotationFooterHint}>
+              <IconSlidersHorizontal size={14} />
+              {t('auth_files.priority_rotation_hint')}
+            </span>
+            <span className={styles.priorityRotationFooterActions}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPriorityRotationPreviewOpen(false)}
+                disabled={priorityRotationPreviewApplying}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void applyPriorityRotationPreview()}
+                disabled={priorityRotationPreviewDisabled}
+                loading={priorityRotationPreviewApplying}
+              >
+                {t('auth_files.priority_rotation_apply')}
+              </Button>
+            </span>
+          </div>
+        }
+      >
+        <div className={styles.priorityRotationPreview}>
+          <div className={styles.priorityRotationSummary}>
+            {priorityRotationPreviewSummaryItems.map((item) => (
+              <div className={styles.priorityRotationSummaryItem} key={item.key}>
+                <span className={styles.priorityRotationSummaryLabel}>{item.label}</span>
+                <span className={styles.priorityRotationSummaryValue}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {priorityRotationAnalysis.changes.length === 0 ? (
+            <div className={styles.priorityRotationHint}>
+              {t('auth_files.priority_rotation_no_changes')}
+            </div>
+          ) : (
+            <div className={styles.priorityRotationTable}>
+              <div className={styles.priorityRotationHeader}>
+                <span>{t('auth_files.priority_rotation_col_file')}</span>
+                <span>{t('auth_files.priority_rotation_col_priority')}</span>
+                <span>{t('auth_files.priority_rotation_col_remaining')}</span>
+                <span>{t('auth_files.priority_rotation_col_reason')}</span>
+              </div>
+              {priorityRotationAnalysis.changes.map((change) => (
+                <div className={styles.priorityRotationRow} key={change.name}>
+                  <span className={styles.priorityRotationIdentity}>
+                    <span
+                      className={styles.priorityRotationDisplayName}
+                      title={change.displayName}
+                    >
+                      {change.displayName}
+                    </span>
+                    <span className={styles.priorityRotationFileName} title={change.name}>
+                      {change.name}
+                    </span>
+                  </span>
+                  <span
+                    className={`${styles.priorityRotationDirection} ${
+                      change.role === 'promote'
+                        ? styles.priorityRotationDirectionPromote
+                        : styles.priorityRotationDirectionDemote
+                    }`}
+                  >
+                    {formatPriorityRotationPriority(change.fromPriority)}
+                    <span aria-hidden="true">→</span>
+                    {formatPriorityRotationPriority(change.toPriority)}
+                  </span>
+                  <span className={styles.priorityRotationRemaining}>
+                    {formatPriorityRotationPercent(change.remainingPercent)}
+                  </span>
+                  <span
+                    className={styles.priorityRotationReason}
+                    title={getPriorityRotationReasonLabel(change.reason)}
+                  >
+                    {getPriorityRotationReasonLabel(change.reason)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
         open={Boolean(priorityRotationDetailTier)}
         title={
           <span className={styles.priorityRotationTierDetailTitle}>
@@ -3021,7 +3311,7 @@ export function AuthFilesPage() {
             </div>
             <div className={styles.priorityRotationTierDetailMetric}>
               <span>{t('auth_files.priority_rotation_col_priority')}</span>
-              <strong>{formatPriorityRotationPriority(priorityRotationDetailPriority)}</strong>
+              <strong>{priorityRotationDetailPriorityLabel}</strong>
             </div>
             <div className={styles.priorityRotationTierDetailMetric}>
               <span>{t('auth_files.priority_rotation_threshold_label')}</span>

@@ -22,9 +22,11 @@ export type PriorityRotationSidecarCandidate = {
   priority: number | null;
   planType: string | null;
   remainingPercent: number | null;
-  tier: 'active' | 'standby' | 'reserve' | 'other' | string;
+  tier: 'active' | 'standby' | 'buffer' | 'manual_locked' | 'other' | string;
   isActive: boolean;
   isStandby: boolean;
+  isBuffer?: boolean;
+  isManualLocked?: boolean;
   belowThreshold: boolean | null;
   decision: string;
 };

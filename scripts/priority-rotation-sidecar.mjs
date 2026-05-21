@@ -19,6 +19,10 @@ const DEFAULT_SETTINGS = {
   activeSlotLimit: 5,
   checkIntervalMinutes: 5,
 };
+const PRIORITY_ROTATION_ACTIVE_PRIORITY = 2;
+const PRIORITY_ROTATION_STANDBY_PRIORITY = 1;
+const PRIORITY_ROTATION_BUFFER_PRIORITY = 0;
+const PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY = 3;
 const MAX_BODY_BYTES = 1024 * 1024;
 const MODEL_ACTIVITY_SCAN_MIN_MS = 30_000;
 const ALLOWED_ORIGINS = new Set([
@@ -772,6 +776,8 @@ function buildCandidateDetail({
     tier,
     isActive: tier === 'active',
     isStandby: tier === 'standby',
+    isBuffer: tier === 'buffer',
+    isManualLocked: tier === 'manual_locked',
     belowThreshold,
     decision,
   };
@@ -809,9 +815,9 @@ function buildEmptyAnalysis(
     status,
     managedCount: 0,
     unknownCount,
-    activePriority: null,
-    standbyPriority: null,
-    reservePriority: null,
+    activePriority: PRIORITY_ROTATION_ACTIVE_PRIORITY,
+    standbyPriority: PRIORITY_ROTATION_STANDBY_PRIORITY,
+    reservePriority: PRIORITY_ROTATION_BUFFER_PRIORITY,
     activeCount: 0,
     healthyActiveCount: 0,
     standbyCount: 0,
@@ -864,17 +870,35 @@ export function analyzeCodexPriorityRotation(
       return;
     }
 
-    const quota = codexQuota[file.name];
-    const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
-    const remainingPercent = getCodexFiveHourRemainingPercent(quota);
-    if (priority <= 0) {
-      addSkippedCandidate('skipped_unassigned_priority', {
-        planType,
-        remainingPercent,
+    if (priority === PRIORITY_ROTATION_BUFFER_PRIORITY) {
+      addSkippedCandidate('observe_buffer', {
+        tier: 'buffer',
+        belowThreshold: null,
       });
       return;
     }
 
+    if (priority >= PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY) {
+      addSkippedCandidate('manual_locked', {
+        tier: 'manual_locked',
+        belowThreshold: null,
+      });
+      return;
+    }
+
+    if (
+      priority !== PRIORITY_ROTATION_ACTIVE_PRIORITY &&
+      priority !== PRIORITY_ROTATION_STANDBY_PRIORITY
+    ) {
+      addSkippedCandidate('skipped_unmanaged_priority', {
+        belowThreshold: null,
+      });
+      return;
+    }
+
+    const quota = codexQuota[file.name];
+    const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
+    const remainingPercent = getCodexFiveHourRemainingPercent(quota);
     if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) {
       addSkippedCandidate('skipped_plan', {
         planType,
@@ -906,21 +930,9 @@ export function analyzeCodexPriorityRotation(
     );
   }
 
-  const priorities = Array.from(new Set(candidates.map((candidate) => candidate.priority))).sort(
-    (a, b) => b - a
-  );
-  const [activePriority = null, existingStandbyPriority = null, reservePriority = null] =
-    priorities;
-
-  if (activePriority === null) {
-    return {
-      ...buildEmptyAnalysis(threshold, slotLimit, 'insufficient_layers', unknownCount),
-      managedCount: candidates.length,
-      candidates: skippedCandidates.sort((a, b) => a.order - b.order).map(stripCandidateOrder),
-    };
-  }
-
-  const standbyPriority = existingStandbyPriority ?? activePriority - 1;
+  const activePriority = PRIORITY_ROTATION_ACTIVE_PRIORITY;
+  const standbyPriority = PRIORITY_ROTATION_STANDBY_PRIORITY;
+  const reservePriority = PRIORITY_ROTATION_BUFFER_PRIORITY;
   const activeCandidates = candidates.filter((candidate) => candidate.priority === activePriority);
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
@@ -975,13 +987,13 @@ export function analyzeCodexPriorityRotation(
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
 
+  const activeDeficit = Math.max(0, slotLimit - projectedActiveCount);
   const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
     (reason) => reason === 'low_remaining'
   ).length;
-  const promotionSlots = Math.min(
-    lowRemainingDemotionCount,
-    Math.max(0, slotLimit - projectedActiveCount)
-  );
+  const replacementSlots = Math.min(lowRemainingDemotionCount, activeDeficit);
+  const fillSlots = Math.min(activeDeficit, healthyStandbyCandidates.length);
+  const promotionSlots = Math.max(replacementSlots, fillSlots);
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
       const remainingCompare = b.remainingPercent - a.remainingPercent;
@@ -1009,7 +1021,7 @@ export function analyzeCodexPriorityRotation(
         : isStandby
           ? 'standby'
           : candidate.priority === reservePriority
-            ? 'reserve'
+            ? 'buffer'
             : 'other';
       const demotionReason = demotionMap.get(candidate.file.name);
       const decision =
@@ -1038,12 +1050,15 @@ export function analyzeCodexPriorityRotation(
     .map(stripCandidateOrder);
 
   if (changes.length === 0) {
+    const missingAdjacentStandby = activeDeficit > 0 && healthyStandbyCandidates.length === 0;
+    const missingReplacementStandby =
+      lowRemainingDemotionCount > 0 && healthyStandbyCandidates.length === 0;
     return {
       thresholdPercent: threshold,
       effectiveThresholdPercent: effectiveThreshold,
       thresholdAdjusted,
       activeSlotLimit: slotLimit,
-      status: promotionSlots > 0 ? 'no_standby' : 'no_changes',
+      status: missingAdjacentStandby || missingReplacementStandby ? 'no_standby' : 'no_changes',
       managedCount: candidates.length,
       unknownCount,
       activePriority,

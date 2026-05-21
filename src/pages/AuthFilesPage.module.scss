@@ -606,6 +606,7 @@
   --priority-rotation-active: #2563eb;
   --priority-rotation-standby: #0891b2;
   --priority-rotation-buffer: #64748b;
+  --priority-rotation-manual-locked: #be123c;
   --priority-rotation-sheen: #fff;
   display: grid;
   grid-template-columns:
@@ -1086,6 +1087,10 @@
 
 .priorityRotationTierBuffer {
   --tier-color: var(--priority-rotation-buffer);
+}
+
+.priorityRotationTierManualLocked {
+  --tier-color: var(--priority-rotation-manual-locked, #be123c);
 }
 
 .priorityRotationTierLabel {
@@ -2780,6 +2785,7 @@ button.codexSubscriptionValue {
   --priority-rotation-active: #60a5fa;
   --priority-rotation-standby: #22d3ee;
   --priority-rotation-buffer: #cbd5e1;
+  --priority-rotation-manual-locked: #fb7185;
   --priority-rotation-sheen: #020617;
 }
 
@@ -2803,6 +2809,15 @@ button.codexSubscriptionValue {
   --priority-value-color: color-mix(in srgb, #a5f3fc 82%, var(--text-primary));
 
   border-color: color-mix(in srgb, #22d3ee 26%, var(--border-color));
+}
+
+:global([data-theme='dark']) .priorityBadgeEditorManualLocked {
+  --priority-dot-color: #fb7185;
+  --priority-value-surface: color-mix(in srgb, #fb7185 12%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #fb7185 26%, transparent);
+  --priority-value-color: color-mix(in srgb, #fecdd3 84%, var(--text-primary));
+
+  border-color: color-mix(in srgb, #fb7185 28%, var(--border-color));
 }
 
 :global([data-theme='dark']) .priorityBadgeEditorBuffer,
@@ -3606,6 +3621,21 @@ button.codexSubscriptionValue {
   --priority-input-weight: 760;
 
   border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+}
+
+.priorityBadgeEditorManualLocked {
+  --priority-badge-color: #be123c;
+  --priority-dot-color: #be123c;
+  --priority-value-surface: color-mix(in srgb, #be123c 8%, var(--surface-control));
+  --priority-value-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--priority-badge-sheen) 18%, transparent);
+  --priority-value-border: color-mix(in srgb, #be123c 20%, transparent);
+  --priority-value-color: color-mix(in srgb, #9f1239 82%, var(--text-primary));
+  --priority-prefix-size: 13px;
+  --priority-input-size: 18px;
+  --priority-input-weight: 860;
+
+  border-color: color-mix(in srgb, #be123c 20%, var(--border-color));
 }
 
 .priorityBadgeEditorFree {
@@ -4770,7 +4800,7 @@ button.codexSubscriptionValue {
 .priorityRotationTable {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto hidden;
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 78%, transparent);
   background: color-mix(in srgb, var(--surface-panel) 94%, var(--bg-primary));
@@ -4785,7 +4815,7 @@ button.codexSubscriptionValue {
     );
   gap: 10px;
   align-items: center;
-  min-width: 0;
+  min-width: 620px;
 }
 
 .priorityRotationHeader {
@@ -4810,10 +4840,39 @@ button.codexSubscriptionValue {
   }
 }
 
-.priorityRotationName,
+.priorityRotationIdentity,
 .priorityRotationReason {
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priorityRotationIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.priorityRotationDisplayName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priorityRotationFileName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 680;
+  line-height: 1.18;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -8100,21 +8159,6 @@ button.codexSubscriptionValue {
     display: none;
   }
 
-  &::after {
-    content: '+';
-    justify-self: end;
-    width: 22px;
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    border: 1px solid color-mix(in srgb, #0891b2 18%, var(--border-color));
-    color: color-mix(in srgb, #0891b2 76%, var(--text-primary));
-    font-weight: 820;
-    line-height: 1;
-  }
-
   &:hover {
     background: color-mix(in srgb, #0891b2 4%, transparent);
   }
@@ -8122,10 +8166,6 @@ button.codexSubscriptionValue {
 
 .advancedControls[open] .advancedControlsSummary {
   border-bottom: 1px solid color-mix(in srgb, var(--border-color) 56%, transparent);
-
-  &::after {
-    content: '-';
-  }
 }
 
 .advancedControlsTitle {
@@ -8147,13 +8187,99 @@ button.codexSubscriptionValue {
 
 .advancedControlsSignals {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  gap: 5px;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
+.advancedControlsConnection {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 94px;
+  width: 94px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 52%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 60%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 780;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.advancedControlsConnectionDot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, currentColor 12%, transparent),
+    0 0 18px color-mix(in srgb, currentColor 24%, transparent);
+}
+
+.advancedControlsConnectionConnected {
+  border-color: color-mix(in srgb, #16a34a 20%, var(--border-color));
+  background: color-mix(in srgb, #16a34a 7%, var(--surface-control));
+  color: #16a34a;
+}
+
+.advancedControlsConnectionDisconnected {
+  border-color: color-mix(in srgb, var(--border-color) 64%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 64%, transparent);
+  color: var(--text-tertiary);
+}
+
+.advancedControlsConnectionText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.advancedControlsToggle {
+  justify-self: end;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, #0891b2 18%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 56%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 80%, var(--bg-primary));
+  color: color-mix(in srgb, #0891b2 78%, var(--text-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent),
+    0 10px 22px -20px color-mix(in srgb, #0891b2 56%, transparent);
+  transition:
+    transform $transition-fast,
+    border-color $transition-fast,
+    background-color $transition-fast,
+    color $transition-fast;
+
+  svg {
+    transition: transform $transition-fast;
+  }
+
+  .advancedControlsSummary:hover & {
+    border-color: color-mix(in srgb, #0891b2 34%, var(--border-color));
+    color: color-mix(in srgb, #0891b2 88%, var(--text-primary));
+  }
+
+  .advancedControls[open] & svg {
+    transform: rotate(180deg);
+  }
+}
+
 .advancedControlsSignal {
+  flex: 0 1 auto;
   max-width: 140px;
   min-height: 22px;
   display: inline-flex;
@@ -9009,6 +9135,14 @@ button.codexSubscriptionValue {
   --priority-value-surface: color-mix(in srgb, #d97706 9%, var(--surface-control));
   --priority-value-border: color-mix(in srgb, #d97706 24%, transparent);
   --priority-value-color: color-mix(in srgb, #b45309 86%, var(--text-primary));
+}
+
+.priorityBadgeEditorManualLocked {
+  --priority-badge-color: #be123c;
+  --priority-dot-color: #be123c;
+  --priority-value-surface: color-mix(in srgb, #be123c 9%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #be123c 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #9f1239 84%, var(--text-primary));
 }
 
 .priorityBadgeEditorBuffer,

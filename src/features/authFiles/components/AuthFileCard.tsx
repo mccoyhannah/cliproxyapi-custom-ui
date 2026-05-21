@@ -45,7 +45,7 @@ import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
-type AuthFilePriorityTier = 'active' | 'standby' | 'buffer';
+type AuthFilePriorityTier = 'active' | 'standby' | 'buffer' | 'manualLocked';
 
 export type AuthFileCardProps = {
   file: AuthFileItem;
@@ -229,6 +229,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
         ? t('auth_files.priority_rotation_tier_standby')
         : priorityTier === 'buffer'
           ? t('auth_files.priority_rotation_tier_buffer')
+          : priorityTier === 'manualLocked'
+            ? t('auth_files.priority_rotation_tier_manual_locked')
           : '';
   const priorityTierClass =
     priorityTier === 'active'
@@ -237,6 +239,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
         ? styles.priorityBadgeEditorStandby
         : priorityTier === 'buffer'
           ? styles.priorityBadgeEditorBuffer
+          : priorityTier === 'manualLocked'
+            ? styles.priorityBadgeEditorManualLocked
           : '';
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =

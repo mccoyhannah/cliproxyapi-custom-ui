@@ -112,7 +112,7 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('active-low.json', 10), codexFile('standby-good.json', 5)];
+  const files = [codexFile('active-low.json', 2), codexFile('standby-good.json', 1)];
   const result = analyzeCodexPriorityRotation(
     files,
     {
@@ -126,8 +126,8 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.deepEqual(
     result.changes.map((change) => [change.name, change.role, change.toPriority]),
     [
-      ['active-low.json', 'demote', 5],
-      ['standby-good.json', 'promote', 10],
+      ['active-low.json', 'demote', 1],
+      ['standby-good.json', 'promote', 2],
     ]
   );
 }
@@ -152,9 +152,68 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.equal(result.managedCount, 0);
   assert.deepEqual(result.changes, []);
   assert.equal(
-    result.candidates.filter((candidate) => candidate.decision === 'skipped_unassigned_priority')
-      .length,
+    result.candidates.filter((candidate) => candidate.decision === 'observe_buffer').length,
     3
+  );
+}
+
+{
+  const files = [
+    ...Array.from({ length: 19 }, (_, index) => codexFile(`active-${index}.json`, 2)),
+    ...Array.from({ length: 13 }, (_, index) => codexFile(`buffer-${index}.json`, 0)),
+  ];
+  const quotaMap = Object.fromEntries(files.map((file) => [file.name, quota(20)]));
+  const result = analyzeCodexPriorityRotation(files, quotaMap, 50, 3);
+  assert.equal(result.status, 'ready');
+  assert.equal(result.activeCount, 19);
+  assert.equal(result.standbyCount, 0);
+  assert.equal(result.projectedActiveCount, 3);
+  assert.equal(result.changes.length, 16);
+  assert.equal(
+    result.candidates.filter((candidate) => candidate.decision === 'observe_buffer').length,
+    13
+  );
+}
+
+{
+  const files = [
+    ...Array.from({ length: 19 }, (_, index) => codexFile(`active-${index}.json`, 2)),
+    ...Array.from({ length: 17 }, (_, index) => codexFile(`standby-${index}.json`, 1)),
+  ];
+  const quotaMap = Object.fromEntries(files.map((file) => [file.name, quota(20)]));
+  const result = analyzeCodexPriorityRotation(files, quotaMap, 50, 3);
+  assert.equal(result.status, 'ready');
+  assert.equal(result.activeCount, 19);
+  assert.equal(result.standbyCount, 17);
+  assert.equal(result.projectedActiveCount, 3);
+  assert.equal(result.changes.length, 16);
+  assert.equal(result.changes.every((change) => change.fromPriority === 2 && change.toPriority === 1), true);
+}
+
+{
+  const files = [
+    codexFile('manual-locked.json', 3),
+    codexFile('active-a.json', 2),
+    codexFile('active-b.json', 2),
+    codexFile('active-c.json', 2),
+    codexFile('standby-a.json', 1),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    Object.fromEntries(files.map((file) => [file.name, quota(20)])),
+    50,
+    2
+  );
+  assert.equal(result.status, 'ready');
+  assert.equal(result.changes.length, 1);
+  assert.equal(result.changes.some((change) => change.name === 'manual-locked.json'), false);
+  assert.ok(
+    result.candidates.some(
+      (candidate) =>
+        candidate.name === 'manual-locked.json' &&
+        candidate.tier === 'manual_locked' &&
+        candidate.decision === 'manual_locked'
+    )
   );
 }
 
@@ -175,13 +234,114 @@ const quota = (usedPercent, planType = 'team') => ({
     2
   );
   assert.equal(result.status, 'no_changes');
-  assert.equal(result.activePriority, 4);
-  assert.equal(result.standbyPriority, 2);
+  assert.equal(result.activePriority, 2);
+  assert.equal(result.standbyPriority, 1);
+  assert.deepEqual(result.changes, []);
+  assert.ok(
+    result.candidates.some(
+      (candidate) =>
+        candidate.name === 'manual-active.json' &&
+        candidate.tier === 'manual_locked' &&
+        candidate.decision === 'manual_locked'
+    )
+  );
+}
+
+{
+  const files = [
+    codexFile('active-a.json', 2),
+    codexFile('active-b.json', 2),
+    codexFile('standby-low.json', 1),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(15),
+      'active-b.json': quota(15),
+      'standby-low.json': quota(30),
+    },
+    80,
+    3
+  );
+  assert.equal(result.status, 'no_standby');
+  assert.equal(result.activeCount, 2);
+  assert.equal(result.projectedActiveCount, 2);
   assert.deepEqual(result.changes, []);
 }
 
 {
-  const files = [codexFile('a.json', 10), codexFile('b.json', 10), codexFile('c.json', 5)];
+  const files = [codexFile('active-a.json', 2), codexFile('standby-only.json', 1)];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(20),
+      'standby-only.json': quota(10),
+    },
+    50,
+    2
+  );
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.fromPriority, change.toPriority]),
+    [['standby-only.json', 'promote', 1, 2]]
+  );
+}
+
+{
+  const files = [
+    codexFile('active-a.json', 2),
+    codexFile('active-b.json', 2),
+    codexFile('standby-a.json', 1),
+    codexFile('standby-b.json', 1),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(20),
+      'active-b.json': quota(25),
+      'standby-a.json': quota(10),
+      'standby-b.json': quota(15),
+    },
+    50,
+    3
+  );
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.fromPriority, change.toPriority]),
+    [['standby-a.json', 'promote', 1, 2]]
+  );
+}
+
+{
+  const files = [
+    codexFile('active-a.json', 2),
+    codexFile('standby-a.json', 1),
+    codexFile('standby-b.json', 1),
+    codexFile('standby-c.json', 1),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(20),
+      'standby-a.json': quota(10),
+      'standby-b.json': quota(15),
+      'standby-c.json': quota(25),
+    },
+    50,
+    3
+  );
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.fromPriority, change.toPriority]),
+    [
+      ['standby-a.json', 'promote', 1, 2],
+      ['standby-b.json', 'promote', 1, 2],
+    ]
+  );
+}
+
+{
+  const files = [codexFile('a.json', 2), codexFile('b.json', 2), codexFile('c.json', 1)];
   const result = analyzeCodexPriorityRotation(
     files,
     {
@@ -197,7 +357,7 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('active-soft-low.json', 10), codexFile('standby-low.json', 5)];
+  const files = [codexFile('active-soft-low.json', 2), codexFile('standby-low.json', 1)];
   const result = analyzeCodexPriorityRotation(
     files,
     {
@@ -214,17 +374,17 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('unknown.json', 10)];
+  const files = [codexFile('unknown.json', 2)];
   const result = analyzeCodexPriorityRotation(files, {}, 50, 5);
   assert.equal(result.status, 'quota_unknown');
 }
 
 {
   const files = [
-    codexFile('active-a.json', 3),
-    codexFile('active-b.json', 3),
-    codexFile('active-c.json', 3),
-    codexFile('active-d.json', 3),
+    codexFile('active-a.json', 2),
+    codexFile('active-b.json', 2),
+    codexFile('active-c.json', 2),
+    codexFile('active-d.json', 2),
   ];
   const result = analyzeCodexPriorityRotation(
     files,
@@ -250,11 +410,11 @@ const quota = (usedPercent, planType = 'team') => ({
 
 {
   const files = [
-    codexFile('active-low.json', 3),
-    codexFile('active-good-a.json', 3),
-    codexFile('active-good-b.json', 3),
-    codexFile('active-good-c.json', 3),
-    codexFile('standby-good.json', 2),
+    codexFile('active-low.json', 2),
+    codexFile('active-good-a.json', 2),
+    codexFile('active-good-b.json', 2),
+    codexFile('active-good-c.json', 2),
+    codexFile('standby-good.json', 1),
   ];
   const result = analyzeCodexPriorityRotation(
     files,
@@ -274,7 +434,7 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('active-good.json', 3), codexFile('standby-good.json', 2)];
+  const files = [codexFile('active-good.json', 2), codexFile('standby-good.json', 1)];
   const result = analyzeCodexPriorityRotation(
     files,
     {
@@ -298,7 +458,7 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('free.json', 10, 'free'), codexFile('team.json', 5)];
+  const files = [codexFile('free.json', 2, 'free'), codexFile('team.json', 1)];
   const result = analyzeCodexPriorityRotation(
     files,
     {
@@ -312,7 +472,7 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
-  const files = [codexFile('business-team.json', 3, 'self_serve_business_usage_based')];
+  const files = [codexFile('business-team.json', 2, 'self_serve_business_usage_based')];
   const result = analyzeCodexPriorityRotation(
     files,
     {
