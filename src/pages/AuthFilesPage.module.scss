@@ -11779,37 +11779,80 @@ button.codexSubscriptionValue {
 
 // Keep the health threshold slider visually inside the rail.
 .priorityRotationSlider {
-  height: 16px;
+  height: 18px;
 
   &::-webkit-slider-runnable-track {
-    height: 6px;
+    height: 10px;
   }
 
   &::-moz-range-track,
   &::-moz-range-progress {
-    height: 6px;
+    height: 10px;
   }
 
   &::-webkit-slider-thumb {
-    width: 10px;
-    height: 10px;
-    margin-top: -2px;
-    border-width: 2px;
-    box-shadow: 0 1px 3px color-mix(in srgb, #000 12%, transparent);
+    box-sizing: border-box;
+    width: 4px;
+    height: 8px;
+    margin-top: 1px;
+    border: 0;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--surface-panel) 72%, var(--primary-color));
+    box-shadow: none;
   }
 
   &::-moz-range-thumb {
-    width: 10px;
-    height: 10px;
-    border-width: 2px;
-    box-shadow: 0 1px 3px color-mix(in srgb, #000 12%, transparent);
+    box-sizing: border-box;
+    width: 4px;
+    height: 8px;
+    border: 0;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--surface-panel) 72%, var(--primary-color));
+    box-shadow: none;
   }
 
   &:hover:not(:disabled)::-webkit-slider-thumb,
   &:focus-visible::-webkit-slider-thumb {
     transform: none;
+    box-shadow: none;
+  }
+}
+
+@media (min-width: 641px) {
+  .fileCard {
+    overflow: visible;
+  }
+
+  .cardUtilityActionsWrap {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .cardUtilityActionsOpen {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    z-index: 24;
+    width: max-content;
+    max-width: min(340px, calc(100vw - 40px));
+    flex-wrap: nowrap;
+    transform-origin: bottom right;
     box-shadow:
-      0 0 0 2px color-mix(in srgb, var(--primary-color) 10%, transparent),
-      0 1px 4px color-mix(in srgb, #000 14%, transparent);
+      0 14px 32px color-mix(in srgb, #000 10%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--border-color) 24%, transparent);
+    pointer-events: auto;
+  }
+}
+
+@include mobile {
+  .fileCard {
+    overflow: hidden;
+  }
+
+  .cardUtilityActionsOpen {
+    position: static;
+    width: 100%;
+    max-width: none;
+    box-shadow: none;
   }
 }
