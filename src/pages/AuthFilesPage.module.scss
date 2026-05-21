@@ -6712,6 +6712,13 @@ button.codexSubscriptionValue {
 
 .filterTags {
   gap: 5px;
+  overflow: visible;
+  padding-bottom: 0;
+  scrollbar-width: none;
+}
+
+.filterTags::-webkit-scrollbar {
+  display: none;
 }
 
 .filterTag {
@@ -7749,6 +7756,475 @@ button.codexSubscriptionValue {
   :global(.btn:hover:not(:disabled)) {
     transform: none;
     box-shadow: none;
+  }
+}
+
+.container {
+  gap: 16px;
+}
+
+.pageHeader {
+  gap: 4px;
+}
+
+.pageTitle {
+  font-size: 26px;
+}
+
+.description {
+  font-size: 13px;
+}
+
+.authFilesPanel {
+  border-color: color-mix(in srgb, var(--border-color) 66%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 96%, var(--bg-primary));
+  box-shadow: none;
+
+  :global(.card-header) {
+    padding-bottom: 12px;
+    border-bottom-color: color-mix(in srgb, var(--border-color) 42%, transparent);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--auth-command-accent-2) 3%, transparent),
+      transparent 60%
+    );
+  }
+}
+
+.filterRail {
+  border-color: color-mix(in srgb, var(--border-color) 66%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 38%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.filterControlsPanel {
+  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 94%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.fileCard {
+  padding: 12px;
+  border-color: color-mix(in srgb, var(--border-color) 52%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 97%, var(--bg-primary));
+  box-shadow:
+    0 1px 1px color-mix(in srgb, #000 3%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--auth-command-accent-2) 16%, var(--border-color));
+    box-shadow:
+      0 14px 30px -30px color-mix(in srgb, var(--auth-command-accent-2) 28%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+  }
+}
+
+.fileCardSelected {
+  background: color-mix(in srgb, var(--auth-command-accent-2) 4%, var(--surface-card));
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--auth-command-accent-2) 60%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--auth-command-accent-2) 10%, transparent);
+}
+
+.fileCardDisabled {
+  background: color-mix(in srgb, var(--surface-card) 88%, var(--bg-primary));
+}
+
+.fileCardCompact {
+  padding: 9px;
+
+  .fileCardMain {
+    gap: 5px;
+  }
+}
+
+.cardHeader {
+  gap: 8px;
+}
+
+.providerAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+}
+
+.cardHeaderContent {
+  gap: 3px;
+  min-width: 0;
+}
+
+.cardBadgeRow {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.typeBadge,
+.stateBadge {
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  box-shadow: none;
+}
+
+.fileName {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 840;
+  line-height: 1.2;
+}
+
+.displayNameButton {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.displayNameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.displayNameInput {
+  height: 30px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.fileNameSource {
+  gap: 5px;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control) 24%, transparent);
+  color: var(--text-tertiary);
+}
+
+.noteLabel {
+  font-size: 9px;
+  font-weight: 620;
+  letter-spacing: 0;
+}
+
+.noteValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.cardMeta {
+  gap: 6px 8px;
+  padding: 0;
+}
+
+.metaItem {
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-width: 0;
+}
+
+.metaLabel {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.metaValue {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.priorityBadgeEditor {
+  width: min(100%, 166px);
+  min-height: 32px;
+  border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 44%, transparent);
+}
+
+.priorityBadgeMain {
+  padding-inline: 6px;
+}
+
+.priorityBadgeStepButton {
+  min-width: 28px;
+  min-height: 32px;
+}
+
+.cardInsights {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.statusPanel,
+.quotaSection {
+  border-radius: 8px;
+  border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 18%, transparent);
+  box-shadow: none;
+}
+
+.statusPanel {
+  gap: 5px;
+  padding: 7px 8px;
+}
+
+.statusPanelLabel {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-weight: 640;
+}
+
+.statusPanelStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.statusPanelStats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.statusPanelStats strong {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.cardActions {
+  gap: 6px;
+  padding-top: 8px;
+  border-top-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+}
+
+.cardActionsMain {
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.primaryActionButton:global(.btn.btn-sm) {
+  min-width: 56px;
+  min-height: 28px;
+  padding-inline: 7px;
+}
+
+.modelsActionButton:global(.btn.btn-sm) {
+  border-color: color-mix(in srgb, var(--auth-command-accent-2) 10%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent-2) 4%, var(--bg-secondary));
+}
+
+.modelsActionIconWrap {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.cardUtilityActionsWrap {
+  gap: 4px;
+  align-items: center;
+}
+
+.cardUtilityActions {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.cardMoreButton:global(.btn.btn-sm) {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.cardMoreIconOpen {
+  transform: rotate(180deg);
+}
+
+.iconButton:global(.btn.btn-sm) {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 6px;
+}
+
+.manualExpiryActionActive:global(.btn.btn-sm) {
+  color: color-mix(in srgb, var(--auth-command-accent-2) 78%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--auth-command-accent-2) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent-2) 7%, var(--bg-secondary));
+}
+
+.statusToggle {
+  min-height: 28px;
+  min-width: 62px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border-color: color-mix(in srgb, currentColor 14%, var(--border-color));
+  background: color-mix(in srgb, currentColor 4%, var(--surface-control));
+}
+
+.statusToggleStateDot {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.statusToggleLabel {
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.priorityRotationBackgroundPanel {
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 30%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control) 16%, transparent);
+  box-shadow: none;
+}
+
+.priorityRotationBackgroundHeader {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.priorityRotationBackgroundCopy {
+  gap: 3px;
+}
+
+.priorityRotationBackgroundTitle {
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.priorityRotationBackgroundTitleRow,
+.priorityRotationBackgroundMetaLine {
+  gap: 6px;
+}
+
+.priorityRotationBackgroundMetaItem {
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.priorityRotationBackgroundControls {
+  gap: 6px;
+}
+
+.priorityRotationBackgroundHint {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--info-color) 10%, var(--border-color));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control) 22%, transparent);
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.priorityRotationRelayControl {
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.priorityRotationRelayCopy strong {
+  font-size: 11px;
+}
+
+.priorityRotationRelayCopy span {
+  font-size: 10px;
+}
+
+@include mobile {
+  .container {
+    gap: 14px;
+  }
+
+  .pageTitle {
+    font-size: 24px;
+  }
+
+  .authFilesPanel {
+    :global(.card-header) {
+      padding-bottom: 10px;
+    }
+  }
+
+  .fileCard {
+    padding: 10px;
+  }
+
+  .cardHeader {
+    gap: 7px;
+  }
+
+  .providerAvatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .fileName {
+    font-size: 15px;
+  }
+
+  .fileNameSource {
+    width: 100%;
+  }
+
+  .statusPanelStats {
+    gap: 6px 10px;
+  }
+
+  .cardActions {
+    align-items: stretch;
+  }
+
+  .cardActionsMain {
+    width: 100%;
+  }
+
+  .cardUtilityActionsWrap {
+    flex-wrap: wrap;
+  }
+
+  .priorityRotationBackgroundPanel {
+    padding: 10px;
+  }
+
+  .priorityRotationBackgroundHeader {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .priorityRotationBackgroundMetaLine {
+    flex-wrap: wrap;
   }
 }
 
@@ -9294,4 +9770,1220 @@ button.codexSubscriptionValue {
     max-width: 100%;
     padding-block: 4px;
   }
+}
+
+// Final auth-files polish pass: lighter page, softer cards, calmer advanced relay.
+.container {
+  --auth-command-accent: #0f766e;
+  --auth-command-accent-2: #38bdf8;
+  --auth-command-accent-3: #22c55e;
+  gap: 14px;
+}
+
+.pageHeader {
+  gap: 4px;
+}
+
+.pageTitle {
+  font-size: 24px;
+}
+
+.description {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.authFilesPanel {
+  border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 2%, transparent), transparent 140px),
+    color-mix(in srgb, var(--surface-card) 96%, var(--bg-primary));
+  box-shadow: none;
+
+  :global(.card-header) {
+    padding-bottom: 10px;
+    border-bottom-color: color-mix(in srgb, var(--border-color) 42%, transparent);
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--auth-command-accent-2) 3%, transparent),
+      transparent 68%
+    );
+  }
+}
+
+.filterSection {
+  gap: 10px;
+}
+
+.filterRail {
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 56%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--auth-command-accent) 3%, transparent), transparent 64%),
+    color-mix(in srgb, var(--surface-control) 28%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.filterTags {
+  gap: 6px;
+}
+
+.filterTag {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 38%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-card) 82%, var(--bg-primary));
+  box-shadow: none;
+}
+
+.filterTagLabel {
+  gap: 4px;
+}
+
+.filterTagText {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.filterTagCount {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 840;
+}
+
+.filterTagActive {
+  border-color: color-mix(in srgb, var(--auth-command-accent) 22%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent) 6%, var(--surface-card));
+}
+
+.filterTagActive .filterTagCount {
+  color: color-mix(in srgb, var(--auth-command-accent) 78%, var(--text-primary));
+}
+
+.filterControlsPanel {
+  padding: 10px;
+  border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 94%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.uploadDropPool {
+  border-color: color-mix(in srgb, var(--border-color) 50%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--auth-command-accent-2) 4%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface-control) 22%, transparent);
+  box-shadow: none;
+}
+
+.uploadDropPoolTitle {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.uploadDropPoolHint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.advancedControls {
+  border: 1px solid color-mix(in srgb, var(--border-color) 56%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--auth-command-accent) 2%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-card) 94%, var(--bg-primary));
+  box-shadow: none;
+}
+
+.advancedControlsSummary {
+  padding: 10px 12px;
+  gap: 8px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--surface-control) 20%, transparent), transparent 60%);
+}
+
+.advancedControlsTitle {
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.advancedControlsMeta {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.advancedControlsSignals {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.advancedControlsSignal {
+  max-width: 124px;
+  min-height: 20px;
+  padding: 0;
+  font-size: 10px;
+}
+
+.advancedControlsConnection {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-control) 26%, transparent);
+}
+
+.advancedControlsToggle {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+.advancedControlsBody {
+  gap: 8px;
+  padding: 10px;
+}
+
+.priorityRotationBar,
+.priorityRotationBackgroundPanel {
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 36%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control) 16%, transparent);
+  box-shadow: none;
+}
+
+.priorityRotationBar {
+  display: flex;
+  flex-direction: column;
+}
+
+.priorityRotationMain {
+  gap: 10px;
+}
+
+.priorityRotationIcon,
+.priorityRotationBackgroundIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--auth-command-accent-2) 9%, var(--surface-control));
+  color: color-mix(in srgb, var(--auth-command-accent-2) 74%, var(--text-primary));
+}
+
+.priorityRotationCopy,
+.priorityRotationBackgroundCopy {
+  gap: 4px;
+}
+
+.priorityRotationTitle,
+.priorityRotationBackgroundTitle {
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.priorityRotationMeta {
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.priorityRotationTiers {
+  gap: 6px;
+}
+
+.priorityRotationTier {
+  border-color: color-mix(in srgb, var(--border-color) 42%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 84%, var(--bg-primary));
+}
+
+.priorityRotationStatusGroup {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.priorityRotationStatus {
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+
+.priorityRotationActions {
+  gap: 8px;
+}
+
+.priorityRotationBackgroundHeader {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.priorityRotationBackgroundMetaLine {
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.priorityRotationBackgroundMetaItem {
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.priorityRotationBackgroundControls {
+  gap: 8px;
+}
+
+.priorityRotationBackgroundHint {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--info-color) 10%, var(--border-color));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-card) 90%, var(--bg-primary));
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.priorityRotationBackgroundRules {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.priorityRotationSetting {
+  gap: 6px;
+  border: 0;
+  background: transparent;
+}
+
+.priorityRotationSettingHeader {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.priorityRotationThresholdValue,
+.priorityRotationStepperValue {
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-card) 88%, var(--bg-primary));
+}
+
+.priorityRotationStepperButton {
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 7px;
+}
+
+.priorityRotationBackgroundButtons {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.priorityRotationBackgroundButtons :global(.btn.btn-sm) {
+  min-height: 30px;
+}
+
+.priorityRotationBackgroundError {
+  border-color: color-mix(in srgb, var(--error-color) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--error-color) 7%, var(--surface-card));
+  color: color-mix(in srgb, var(--error-color) 72%, var(--text-primary));
+}
+
+.fileCard {
+  padding: 11px;
+  border-color: color-mix(in srgb, var(--border-color) 52%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 97%, var(--bg-primary));
+  box-shadow:
+    0 1px 1px color-mix(in srgb, #000 3%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background-color 140ms ease;
+}
+
+.fileCard:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--auth-command-accent-2) 18%, var(--border-color));
+  box-shadow:
+    0 16px 28px -30px color-mix(in srgb, var(--auth-command-accent-2) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+}
+
+.fileCardSelected {
+  background: color-mix(in srgb, var(--auth-command-accent-2) 4%, var(--surface-card));
+  box-shadow:
+    inset 2px 0 0 color-mix(in srgb, var(--auth-command-accent-2) 60%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--auth-command-accent-2) 10%, transparent);
+}
+
+.fileCardDisabled {
+  background: color-mix(in srgb, var(--surface-card) 90%, var(--bg-primary));
+}
+
+.fileCardLayout {
+  gap: 10px;
+}
+
+.fileCardMain {
+  gap: 8px;
+}
+
+.cardHeader {
+  gap: 8px;
+}
+
+.providerAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+}
+
+.cardHeaderContent {
+  gap: 4px;
+}
+
+.cardBadgeRow {
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.typeBadge,
+.stateBadge {
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  box-shadow: none;
+}
+
+.fileName {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 820;
+  line-height: 1.2;
+}
+
+.displayNameButton {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.displayNameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.displayNameInput {
+  min-height: 30px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.fileNameSource {
+  gap: 4px;
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control) 22%, transparent);
+}
+
+.noteLabel {
+  font-size: 9px;
+  font-weight: 620;
+}
+
+.noteValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.cardMeta {
+  gap: 6px 8px;
+  padding: 0;
+}
+
+.metaItem {
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.metaLabel {
+  font-size: 9px;
+  color: var(--text-tertiary);
+}
+
+.metaValue {
+  font-size: 11px;
+}
+
+.priorityBadgeEditor {
+  width: min(100%, 166px);
+  min-height: 32px;
+  border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 40%, transparent);
+}
+
+.priorityBadgeMain {
+  padding-inline: 6px;
+}
+
+.priorityBadgeStepButton {
+  min-width: 28px;
+  min-height: 32px;
+}
+
+.cardInsights {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.statusPanel,
+.quotaSection {
+  border-radius: 8px;
+  border-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 18%, transparent);
+  box-shadow: none;
+}
+
+.statusPanel {
+  gap: 5px;
+  padding: 7px 8px;
+}
+
+.statusPanelLabel {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-weight: 640;
+}
+
+.statusPanelStats {
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.statusPanelStats strong {
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.cardActions {
+  gap: 6px;
+  padding-top: 8px;
+  border-top-color: color-mix(in srgb, var(--border-color) 32%, transparent);
+}
+
+.cardActionsMain {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.primaryActionButton:global(.btn.btn-sm) {
+  min-height: 28px;
+  padding-inline: 7px;
+}
+
+.modelsActionButton:global(.btn.btn-sm) {
+  border-color: color-mix(in srgb, var(--auth-command-accent-2) 10%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent-2) 4%, var(--bg-secondary));
+}
+
+.modelsActionIconWrap {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.cardUtilityActionsWrap {
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cardUtilityActions {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.cardMoreButton:global(.btn.btn-sm) {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 7px;
+}
+
+.cardMoreIconOpen {
+  transform: rotate(180deg);
+}
+
+.iconButton:global(.btn.btn-sm) {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 7px;
+}
+
+.manualExpiryActionActive:global(.btn.btn-sm) {
+  color: color-mix(in srgb, var(--auth-command-accent-2) 78%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--auth-command-accent-2) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent-2) 7%, var(--bg-secondary));
+}
+
+.statusToggle {
+  min-height: 28px;
+  min-width: 62px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border-color: color-mix(in srgb, currentColor 14%, var(--border-color));
+  background: color-mix(in srgb, currentColor 4%, var(--surface-control));
+}
+
+.statusToggleStateDot {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.statusToggleLabel {
+  font-size: 10px;
+  font-weight: 680;
+}
+
+.oauthConfigSection {
+  border-color: color-mix(in srgb, var(--border-color) 54%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 95%, var(--bg-primary));
+  box-shadow: none;
+}
+
+.oauthConfigHeader {
+  padding-bottom: 8px;
+  border-bottom-color: color-mix(in srgb, var(--border-color) 40%, transparent);
+}
+
+.oauthConfigKicker {
+  color: color-mix(in srgb, var(--auth-command-accent) 72%, var(--text-tertiary));
+  font-size: 10px;
+}
+
+.oauthConfigTitle {
+  font-size: 18px;
+}
+
+.oauthConfigCopy {
+  max-width: 60ch;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.oauthConfigGrid {
+  gap: 8px;
+}
+
+@include mobile {
+  .container {
+    gap: 12px;
+  }
+
+  .pageTitle {
+    font-size: 22px;
+  }
+
+  .filterRail {
+    padding: 8px;
+  }
+
+  .filterTag {
+    min-height: 28px;
+  }
+
+  .advancedControlsSummary {
+    padding: 9px 10px;
+  }
+
+  .advancedControlsBody {
+    padding: 8px;
+  }
+
+  .priorityRotationBar,
+  .priorityRotationBackgroundPanel {
+    padding: 10px;
+  }
+
+  .priorityRotationBackgroundHeader {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .priorityRotationBackgroundMetaLine {
+    flex-wrap: wrap;
+  }
+
+  .fileCard {
+    padding: 10px;
+  }
+
+  .providerAvatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .fileName {
+    font-size: 15px;
+  }
+
+  .cardActionsMain {
+    width: 100%;
+  }
+}
+
+// Compact title-integrated summary and relay polish.
+.authFilesPanel {
+  :global(.card-header) {
+    align-items: flex-start;
+    gap: 10px;
+    padding-bottom: 9px;
+  }
+
+  :global(.title) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+.authFilesTitleBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.authFilesTitleMain {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.authFilesTitleText {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 820;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.countBadge {
+  height: 22px;
+  min-width: 22px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--auth-command-accent) 18%, var(--border-color));
+  background: color-mix(in srgb, var(--auth-command-accent) 7%, var(--surface-control));
+  color: color-mix(in srgb, var(--auth-command-accent) 82%, var(--text-primary));
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.authFilesTitleScope,
+.authFilesTitleMeta {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.authFilesTitleScope {
+  max-width: 132px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 28%, transparent);
+  color: var(--text-secondary);
+}
+
+.authFilesTitleStats {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1 1 360px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.authFilesTitleChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 24px;
+  min-width: 0;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 88%, var(--bg-primary));
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.authFilesTitleChipAttention {
+  border-color: color-mix(in srgb, #f59e0b 20%, var(--border-color));
+  background: color-mix(in srgb, #f59e0b 7%, var(--surface-card));
+}
+
+.authFilesTitleChipLabel {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.authFilesTitleChipValue {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 840;
+  font-variant-numeric: tabular-nums;
+}
+
+.headerActions {
+  gap: 6px;
+  padding-top: 0;
+
+  :global(.btn.btn-sm) {
+    min-height: 30px;
+    padding-inline: 10px;
+  }
+}
+
+.filterSection {
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.filterRail {
+  padding: 7px 8px;
+  background: color-mix(in srgb, var(--surface-control) 18%, transparent);
+}
+
+.filterTags {
+  gap: 5px;
+}
+
+.filterTag {
+  min-height: 28px;
+  padding: 0 8px;
+}
+
+.uploadDropPool {
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 50px;
+  padding: 8px 10px;
+  border-style: solid;
+}
+
+.uploadDropPoolIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+}
+
+.uploadDropPoolCopy {
+  gap: 2px;
+}
+
+.uploadDropPoolTitle {
+  font-size: 12px;
+}
+
+.uploadDropPoolHint {
+  font-size: 11px;
+}
+
+.uploadDropPoolStatus {
+  height: 24px;
+  min-width: 52px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.filterContent {
+  gap: 8px;
+}
+
+.advancedControlsSummary {
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto 26px;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.advancedControlsMeta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.advancedControlsSignal {
+  min-height: 20px;
+  padding: 0 7px;
+}
+
+.advancedControlsBody {
+  gap: 8px;
+  padding: 9px;
+}
+
+.priorityRotationBar,
+.priorityRotationBackgroundPanel {
+  padding: 10px;
+  border-color: color-mix(in srgb, var(--border-color) 34%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 3%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 14%, transparent);
+}
+
+.priorityRotationBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.priorityRotationMain {
+  min-width: 0;
+  padding: 0;
+}
+
+.priorityRotationCopy {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.54fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.priorityRotationTitle {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priorityRotationMeta {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priorityRotationTiers {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  min-width: 0;
+  gap: 5px;
+}
+
+.priorityRotationTier {
+  min-height: 28px;
+  padding: 4px 7px;
+}
+
+.priorityRotationActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  width: auto;
+  max-width: none;
+  min-width: max-content;
+  gap: 8px;
+
+  :global(.btn.btn-sm) {
+    min-height: 30px;
+    white-space: nowrap;
+  }
+}
+
+.priorityRotationStatusGroup {
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.priorityRotationBackgroundHeader {
+  grid-template-columns: 30px minmax(0, 1fr) minmax(148px, auto);
+  align-items: start;
+  gap: 9px;
+}
+
+.priorityRotationBackgroundCopy {
+  min-width: 0;
+}
+
+.priorityRotationBackgroundTitleRow {
+  min-height: 28px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.priorityRotationBackgroundMetaLine {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.priorityRotationBackgroundMetaItem {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-color) 30%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-card) 84%, var(--bg-primary));
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.priorityRotationRelayControl {
+  align-self: stretch;
+  justify-self: end;
+  min-width: 148px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 32%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-card) 82%, var(--bg-primary));
+}
+
+.priorityRotationBackgroundRules {
+  grid-template-columns: minmax(230px, 1fr) minmax(136px, 0.54fr) minmax(168px, 0.66fr);
+  gap: 7px;
+}
+
+.priorityRotationSetting {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 32%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-card) 82%, var(--bg-primary));
+}
+
+.priorityRotationSettingHeader {
+  min-height: 22px;
+}
+
+.priorityRotationThresholdControl {
+  min-width: 0;
+}
+
+.priorityRotationStepper {
+  grid-template-columns: 30px minmax(48px, 1fr) 30px;
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.priorityRotationIntervalStepper {
+  grid-template-columns: 30px minmax(78px, 1fr) 30px;
+}
+
+.priorityRotationStepperButton {
+  width: 30px;
+  height: 32px;
+  min-width: 30px;
+  min-height: 32px;
+  border-radius: 0;
+}
+
+.priorityRotationStepperValue {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 6px;
+  border-radius: 0;
+  border-inline: 1px solid color-mix(in srgb, var(--border-color) 24%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 82%, var(--bg-primary));
+
+  input {
+    width: 3ch;
+    text-align: center;
+  }
+}
+
+.priorityRotationIntervalStepper .priorityRotationStepperValue input {
+  width: 4ch;
+}
+
+.priorityRotationBackgroundButtons {
+  justify-content: flex-end;
+}
+
+@media (max-width: 1180px) {
+  .priorityRotationBar {
+    grid-template-columns: 1fr;
+  }
+
+  .priorityRotationActions {
+    justify-self: start;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .priorityRotationBackgroundHeader {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .priorityRotationRelayControl {
+    grid-column: 2;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  .authFilesTitleStats {
+    flex-basis: 100%;
+  }
+
+  .priorityRotationCopy {
+    grid-template-columns: 1fr;
+  }
+
+  .priorityRotationTiers {
+    grid-column: 1;
+    grid-row: auto;
+    padding-top: 4px;
+  }
+
+  .priorityRotationBackgroundMetaLine,
+  .priorityRotationBackgroundRules {
+    grid-template-columns: 1fr;
+  }
+}
+
+@include mobile {
+  .authFilesPanel {
+    :global(.card-header) {
+      gap: 8px;
+    }
+  }
+
+  .authFilesTitleBlock {
+    align-items: flex-start;
+    gap: 7px;
+  }
+
+  .authFilesTitleMain,
+  .authFilesTitleStats {
+    width: 100%;
+  }
+
+  .authFilesTitleMain {
+    flex-wrap: wrap;
+  }
+
+  .authFilesTitleChip {
+    flex: 1 1 calc(33.333% - 4px);
+    min-width: 88px;
+  }
+
+  .filterRail {
+    padding: 7px;
+  }
+
+  .uploadDropPool {
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .uploadDropPoolStatus {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .advancedControlsSummary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .advancedControlsMeta,
+  .advancedControlsSignals {
+    grid-column: 1 / -1;
+  }
+
+  .priorityRotationBar,
+  .priorityRotationBackgroundPanel {
+    padding: 9px;
+  }
+
+  .priorityRotationActions {
+    align-items: stretch;
+    width: 100%;
+
+    :global(.btn.btn-sm) {
+      flex: 1 1 100%;
+    }
+  }
+
+  .priorityRotationStatusGroup {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .priorityRotationBackgroundHeader {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .priorityRotationRelayControl {
+    grid-column: 1 / -1;
+  }
+}
+
+.filterRail .filterTags {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 0;
+  scrollbar-width: none;
+}
+
+.filterRail .filterTags::-webkit-scrollbar {
+  display: none;
+}
+
+.filterRail .filterTag {
+  flex: 0 0 auto;
+  width: auto;
 }

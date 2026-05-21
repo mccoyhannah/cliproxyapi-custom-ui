@@ -1853,13 +1853,6 @@ export function AuthFilesPage() {
     </div>
   );
 
-  const titleNode = (
-    <div className={styles.titleWrapper}>
-      <span>{t('auth_files.title_section')}</span>
-      {files.length > 0 && <span className={styles.countBadge}>{files.length}</span>}
-    </div>
-  );
-
   const deleteAllButtonLabel = (() => {
     if (disabledOnly || enabledOnly) {
       return t('auth_files.delete_filtered_result_button');
@@ -2232,7 +2225,7 @@ export function AuthFilesPage() {
           total: sorted.length,
           defaultValue: `本页 ${pageItems.length} / 筛选 ${sorted.length}`,
         });
-  const commandSummaryItems = [
+  const summaryChipItems = [
     {
       key: 'total',
       label: t('auth_files.summary_total', { defaultValue: '认证文件' }),
@@ -2270,6 +2263,38 @@ export function AuthFilesPage() {
           : t('auth_files.summary_runtime_none', { defaultValue: '无运行态占位' }),
     },
   ];
+  const titleSummaryItems = summaryChipItems.filter((item) => item.key !== 'total');
+  const titleNode = (
+    <div className={styles.authFilesTitleBlock}>
+      <div className={styles.authFilesTitleMain}>
+        <span className={styles.authFilesTitleText}>{t('auth_files.title_section')}</span>
+        {files.length > 0 && <span className={styles.countBadge}>{files.length}</span>}
+        <span className={styles.authFilesTitleScope}>{currentProviderLabel}</span>
+        <span className={styles.authFilesTitleMeta}>{visibleRangeLabel}</span>
+      </div>
+      <div
+        className={styles.authFilesTitleStats}
+        aria-label={t('auth_files.summary_chips_label', {
+          defaultValue: '认证文件摘要',
+        })}
+      >
+        {titleSummaryItems.map((item) => (
+          <span
+            className={`${styles.authFilesTitleChip} ${
+              item.key === 'problem' && Number(item.value) > 0
+                ? styles.authFilesTitleChipAttention
+                : ''
+            }`}
+            key={item.key}
+            title={`${item.label}: ${item.value} · ${item.meta}`}
+          >
+            <span className={styles.authFilesTitleChipLabel}>{item.label}</span>
+            <strong className={styles.authFilesTitleChipValue}>{item.value}</strong>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
   const listHeaderTitle = t('auth_files.list_header_title', {
     provider: currentProviderLabel,
     defaultValue: `${currentProviderLabel}认证文件`,
@@ -2281,13 +2306,12 @@ export function AuthFilesPage() {
     totalPages,
     defaultValue: `${pageItems.length}/${sorted.length} 项，第 ${currentPage}/${totalPages} 页`,
   });
-  const advancedControlSummary = [
-    priorityRotationStatusLabel,
-    priorityRotationSlotLabel,
-    priorityRotationSidecarLiveStatusLabel,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const advancedControlSummary = t('auth_files.advanced_control_summary', {
+    status: priorityRotationStatusLabel,
+    slots: priorityRotationSlotLabel,
+    sidecar: priorityRotationSidecarLiveStatusLabel,
+    defaultValue: `${priorityRotationStatusLabel} · ${priorityRotationSlotLabel} · ${priorityRotationSidecarLiveStatusLabel}`,
+  });
   const advancedControlConnectionLabel = priorityRotationSidecarOnline
     ? t('auth_files.advanced_control_connected', { defaultValue: '已连接' })
     : priorityRotationSidecarWaking
@@ -2376,35 +2400,6 @@ export function AuthFilesPage() {
         <h1 className={styles.pageTitle}>{t('auth_files.title')}</h1>
         <p className={styles.description}>{t('auth_files.description')}</p>
       </div>
-
-      <section className={styles.commandOverview} aria-label={t('auth_files.title_section')}>
-        <div className={styles.commandOverviewMain}>
-          <span className={styles.commandEyebrow}>
-            {t('auth_files.command_eyebrow', { defaultValue: 'AUTH OPS' })}
-          </span>
-          <div className={styles.commandOverviewTitleRow}>
-            <h2 className={styles.commandOverviewTitle}>
-              {t('auth_files.command_title', { defaultValue: '凭证运营台' })}
-            </h2>
-            <span className={styles.commandOverviewStatus}>{currentProviderLabel}</span>
-          </div>
-          <p className={styles.commandOverviewCopy}>
-            {t('auth_files.command_copy', {
-              defaultValue:
-                '日常筛选、启停、优先级和健康状态放在前面；接力配置收进高级区域，OAuth 配置独立成组。',
-            })}
-          </p>
-        </div>
-        <div className={styles.commandSummaryGrid}>
-          {commandSummaryItems.map((item) => (
-            <div className={styles.commandSummaryCard} key={item.key}>
-              <span className={styles.commandSummaryLabel}>{item.label}</span>
-              <strong className={styles.commandSummaryValue}>{item.value}</strong>
-              <span className={styles.commandSummaryMeta}>{item.meta}</span>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <Card
         className={styles.authFilesPanel}
@@ -2504,13 +2499,13 @@ export function AuthFilesPage() {
             <details className={styles.advancedControls}>
               <summary className={styles.advancedControlsSummary}>
                 <span className={styles.advancedControlsTitle}>
-                  {t('auth_files.advanced_control_title', { defaultValue: '高级接力控制' })}
+                  {t('auth_files.advanced_control_title', { defaultValue: '接力设置' })}
                 </span>
                 <span className={styles.advancedControlsMeta}>{advancedControlSummary}</span>
                 <span
                   className={styles.advancedControlsSignals}
                   aria-label={t('auth_files.advanced_control_signals', {
-                    defaultValue: '接力状态提示',
+                    defaultValue: '接力状态',
                   })}
                 >
                   {advancedControlSignals.map((signal) => (

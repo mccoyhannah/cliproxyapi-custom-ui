@@ -6,6 +6,7 @@ import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconCircleAlert,
+  IconChevronDown,
   IconDownload,
   IconMinus,
   IconModelCluster,
@@ -768,9 +769,15 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                       }))
                     }
                     aria-expanded={utilityActionsOpen}
+                    aria-label={t('auth_files.more_actions', { defaultValue: '更多操作' })}
                     title={t('auth_files.more_actions', { defaultValue: '更多操作' })}
                   >
-                    ...
+                    <IconChevronDown
+                      className={`${styles.actionIcon} ${
+                        utilityActionsOpen ? styles.cardMoreIconOpen : ''
+                      }`}
+                      size={16}
+                    />
                   </Button>
                   <div
                     className={`${styles.cardUtilityActions} ${
