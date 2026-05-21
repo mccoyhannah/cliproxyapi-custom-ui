@@ -10987,3 +10987,721 @@ button.codexSubscriptionValue {
   flex: 0 0 auto;
   width: auto;
 }
+
+// Auth files console polish: dense, calm, operations-first.
+.container {
+  gap: 16px;
+}
+
+.pageHeader {
+  gap: 4px;
+  padding-inline: 2px;
+}
+
+.pageTitle {
+  font-size: clamp(22px, 2vw, 28px);
+  letter-spacing: 0;
+}
+
+.description {
+  max-width: 980px;
+  line-height: 1.55;
+}
+
+.authFilesPanel {
+  --auth-card-accent: #0f766e;
+  --auth-card-accent-2: #2563eb;
+  --auth-card-muted-line: color-mix(in srgb, var(--border-color) 42%, transparent);
+  border-color: color-mix(in srgb, var(--border-color) 66%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--auth-card-accent) 4%, transparent), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 82%, transparent), transparent 210px),
+    var(--surface-card);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 3%, transparent),
+    0 18px 46px -42px color-mix(in srgb, var(--text-primary) 34%, transparent);
+
+  :global(.card-header) {
+    position: relative;
+    padding: 13px 14px 12px;
+    border-bottom-color: var(--auth-card-muted-line);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent),
+      color-mix(in srgb, var(--surface-control) 22%, transparent);
+  }
+
+  :global(.card-header)::before {
+    content: '';
+    position: absolute;
+    inset: 12px auto 12px 0;
+    width: 3px;
+    border-radius: 0 999px 999px 0;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--auth-card-accent) 86%, var(--primary-color)),
+      color-mix(in srgb, var(--auth-card-accent-2) 72%, var(--primary-color))
+    );
+  }
+}
+
+:global([data-theme='dark']) .authFilesPanel {
+  --auth-card-accent: #2dd4bf;
+  --auth-card-accent-2: #60a5fa;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--auth-card-accent) 6%, transparent), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-panel) 76%, transparent), transparent 220px),
+    var(--surface-card);
+}
+
+.authFilesTitleBlock {
+  gap: 7px 10px;
+}
+
+.authFilesTitleMain {
+  gap: 6px;
+}
+
+.authFilesTitleText {
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.authFilesTitleScope,
+.authFilesTitleMeta {
+  font-size: 11px;
+}
+
+.authFilesTitleStats {
+  gap: 6px;
+}
+
+.authFilesTitleChip {
+  min-height: 25px;
+  padding-inline: 9px;
+  border-color: color-mix(in srgb, var(--border-color) 48%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent),
+    color-mix(in srgb, var(--surface-card) 92%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
+}
+
+.authFilesTitleChipAttention {
+  border-color: color-mix(in srgb, var(--warning-color) 30%, var(--border-color));
+  background: color-mix(in srgb, var(--warning-bg) 42%, var(--surface-card));
+}
+
+.headerActions {
+  gap: 7px;
+
+  :global(.btn.btn-sm) {
+    min-height: 32px;
+    border-radius: 8px;
+    font-weight: 720;
+  }
+
+  :global(.btn-danger) {
+    border-color: color-mix(in srgb, var(--danger-color) 24%, var(--border-color));
+    background: color-mix(in srgb, var(--danger-color) 7%, var(--surface-control));
+    color: color-mix(in srgb, var(--danger-color) 84%, var(--text-primary));
+  }
+}
+
+.filterSection {
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.filterRail {
+  padding: 8px;
+  border-color: color-mix(in srgb, var(--border-color) 54%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-control) 66%, transparent), transparent),
+    color-mix(in srgb, var(--surface-panel) 58%, var(--bg-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
+    0 1px 2px color-mix(in srgb, #000 3%, transparent);
+}
+
+.filterTags {
+  gap: 6px;
+}
+
+.filterTag {
+  min-height: 31px;
+  padding: 3px 9px 3px 5px;
+  border-color: color-mix(in srgb, var(--border-color) 52%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent),
+    color-mix(in srgb, var(--surface-card) 88%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+
+  &:hover {
+    transform: none;
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--filter-color) 7%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+  }
+}
+
+.filterTagActive {
+  border-color: color-mix(in srgb, var(--filter-color) 38%, var(--border-color));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--filter-surface) 28%, transparent), transparent 72%),
+    color-mix(in srgb, var(--surface-card) 92%, var(--bg-primary));
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--filter-color) 62%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
+}
+
+.filterTagIconWrap {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.filterTagCount {
+  min-width: 22px;
+  height: 20px;
+  background: color-mix(in srgb, var(--surface-control) 82%, transparent);
+  color: color-mix(in srgb, var(--text-secondary) 88%, var(--text-primary));
+}
+
+.uploadDropPool {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--auth-card-accent) 24%, var(--border-color));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--auth-card-accent) 6%, transparent), transparent 62%),
+    color-mix(in srgb, var(--surface-card) 92%, var(--bg-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
+    0 12px 28px -30px color-mix(in srgb, var(--auth-card-accent) 42%, transparent);
+
+  &:hover,
+  &:focus-visible {
+    transform: none;
+    border-color: color-mix(in srgb, var(--auth-card-accent) 36%, var(--border-color));
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--auth-card-accent) 8%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+  }
+}
+
+.uploadDropPoolIcon {
+  width: 34px;
+  height: 34px;
+  color: color-mix(in srgb, var(--auth-card-accent) 84%, var(--text-primary));
+  background: color-mix(in srgb, var(--auth-card-accent) 9%, var(--surface-control));
+}
+
+.uploadDropPoolTitle {
+  font-size: 13px;
+}
+
+.uploadDropPoolHint {
+  color: var(--text-tertiary);
+}
+
+.uploadDropPoolStatus {
+  border-color: color-mix(in srgb, var(--border-color) 44%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 68%, transparent);
+}
+
+.filterControlsPanel {
+  padding: 10px;
+  border-color: color-mix(in srgb, var(--border-color) 52%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 4%, transparent), transparent),
+    color-mix(in srgb, var(--surface-panel) 58%, var(--bg-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.filterControls {
+  grid-template-columns:
+    minmax(260px, 1.35fr)
+    minmax(96px, 0.36fr)
+    minmax(178px, 0.68fr)
+    minmax(260px, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.filterItem {
+  gap: 5px;
+
+  label {
+    color: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-secondary));
+    font-size: 10px;
+    font-weight: 800;
+  }
+}
+
+.filterToggleGroup {
+  gap: 6px;
+}
+
+.filterToggleCard {
+  min-height: 38px;
+  border-color: color-mix(in srgb, var(--border-color) 46%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 78%, var(--bg-primary));
+}
+
+.fileListHeader {
+  align-items: center;
+  padding: 12px 2px 4px;
+  border-top-color: color-mix(in srgb, var(--border-color) 38%, transparent);
+}
+
+.fileListKicker {
+  color: color-mix(in srgb, var(--auth-card-accent) 82%, var(--text-secondary));
+}
+
+.fileListTitle {
+  font-size: 15px;
+}
+
+.fileListMeta {
+  border-color: color-mix(in srgb, var(--border-color) 42%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 52%, transparent);
+}
+
+.fileGrid,
+.fileGridQuotaManaged,
+.fileGridCompact {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 342px), 1fr));
+}
+
+.fileGridQuotaManaged {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 370px), 1fr));
+}
+
+.fileGridCompact {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 314px), 1fr));
+}
+
+.fileCard {
+  padding: 14px;
+  border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 7%, transparent), transparent 120px),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface-panel) 36%, transparent), transparent 64%),
+    var(--surface-card);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    0 1px 2px color-mix(in srgb, #000 4%, transparent);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary-color) 44%, transparent),
+      color-mix(in srgb, var(--auth-card-accent) 34%, transparent),
+      transparent 72%
+    );
+    opacity: 0.62;
+    pointer-events: none;
+  }
+
+  &:hover {
+    transform: none;
+    border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--primary-color) 3%, transparent), transparent 128px),
+      linear-gradient(135deg, color-mix(in srgb, var(--surface-panel) 42%, transparent), transparent 64%),
+      var(--surface-card-hover);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent),
+      0 18px 38px -34px color-mix(in srgb, var(--text-primary) 36%, transparent);
+  }
+}
+
+.fileCardSelected {
+  border-color: color-mix(in srgb, var(--primary-color) 54%, var(--border-color));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--primary-color) 20%, transparent),
+    0 18px 38px -34px color-mix(in srgb, var(--primary-color) 52%, transparent);
+}
+
+.fileCardDisabled {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 16%, transparent), transparent 120px),
+    color-mix(in srgb, var(--surface-card) 72%, var(--bg-secondary));
+}
+
+.fileCardCompact {
+  padding: 10px;
+}
+
+.cardHeader {
+  gap: 9px;
+}
+
+.providerAvatar {
+  width: 40px;
+  height: 40px;
+  border-color: color-mix(in srgb, currentColor 18%, var(--border-color));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
+    0 10px 20px -20px currentColor;
+}
+
+.providerAvatarImage {
+  width: 21px;
+  height: 21px;
+}
+
+.cardBadgeRow {
+  gap: 6px;
+}
+
+.typeBadge,
+.stateBadge {
+  min-height: 23px;
+  border-radius: 7px;
+}
+
+.refreshTokenWarningBadge {
+  color: color-mix(in srgb, var(--warning-text) 76%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--warning-border) 54%, var(--border-color));
+  background: color-mix(in srgb, var(--warning-bg) 44%, var(--surface-control));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+}
+
+.fileName {
+  color: color-mix(in srgb, var(--text-primary) 94%, var(--primary-color));
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 820;
+  line-height: 1.32;
+}
+
+.displayNameButton {
+  padding: 1px 0;
+
+  &:hover:not(:disabled) .displayNameText {
+    color: color-mix(in srgb, var(--primary-color) 68%, var(--text-primary));
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--primary-color) 24%, transparent);
+  }
+}
+
+.fileNameSource {
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+}
+
+.noteLabel {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface-control) 60%, transparent);
+  font-size: 10px;
+}
+
+.noteValue {
+  color: color-mix(in srgb, var(--text-secondary) 82%, var(--text-tertiary));
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardMeta {
+  gap: 6px;
+  padding: 0;
+}
+
+.metaItem {
+  min-height: 24px;
+  padding: 3px 7px;
+  border-color: color-mix(in srgb, var(--border-color) 36%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 34%, transparent);
+}
+
+.metaLabel {
+  font-weight: 720;
+}
+
+.metaValue {
+  font-weight: 650;
+}
+
+.priorityBadgeEditor {
+  grid-template-columns: minmax(32px, 0.35fr) minmax(0, 1fr) minmax(32px, 0.35fr);
+  min-width: 0;
+  max-width: 100%;
+  border-color: color-mix(in srgb, var(--priority-badge-color) 14%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--priority-badge-sheen) 9%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 82%, var(--bg-primary));
+}
+
+.priorityBadgeMain {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.priorityBadgeLabel,
+.priorityBadgeTier {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@include mobile {
+  .priorityBadgeEditor {
+    flex: 1 1 100%;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    width: 100%;
+  }
+
+  .priorityBadgeStepButton {
+    min-width: 44px;
+  }
+
+  .priorityBadgeMain {
+    grid-template-columns: auto auto minmax(0, auto);
+    overflow: visible;
+  }
+
+  .priorityBadgeTier {
+    max-width: none;
+    overflow: visible;
+  }
+}
+
+.cardInsights {
+  gap: 8px;
+  padding: 8px;
+  border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-control) 26%, transparent), transparent),
+    color-mix(in srgb, var(--surface-panel) 24%, transparent);
+}
+
+.statusPanel {
+  gap: 7px;
+  border-color: color-mix(in srgb, var(--border-color) 30%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 56%, transparent);
+}
+
+.statusPanelLabel {
+  color: color-mix(in srgb, var(--text-secondary) 86%, var(--text-primary));
+}
+
+.statusBar {
+  border-color: color-mix(in srgb, var(--border-color) 26%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 42%, transparent);
+}
+
+.statusBlock {
+  opacity: 0.82;
+  filter: saturate(0.82);
+}
+
+.statusPanelStats {
+  justify-content: space-between;
+}
+
+.statusPanelStats strong {
+  color: var(--text-primary);
+}
+
+.quotaSection {
+  border-color: color-mix(in srgb, var(--border-color) 28%, transparent);
+  background: color-mix(in srgb, var(--surface-card) 48%, transparent);
+}
+
+.quotaSectionError {
+  border-color: color-mix(in srgb, var(--danger-color) 20%, var(--border-color));
+  background: color-mix(in srgb, var(--failure-badge-bg) 38%, var(--surface-card));
+}
+
+.cardActions {
+  align-items: center;
+  gap: 8px;
+  padding-top: 9px;
+  border-top-color: color-mix(in srgb, var(--border-color) 32%, transparent);
+}
+
+.cardActionsMain {
+  gap: 6px;
+}
+
+.modelsActionButton:global(.btn.btn-sm) {
+  border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 7%, var(--surface-control));
+  color: color-mix(in srgb, var(--primary-color) 84%, var(--text-primary));
+}
+
+.modelsActionIconWrap {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
+
+.cardMoreButton:global(.btn.btn-sm),
+.iconButton:global(.btn.btn-sm) {
+  border-color: color-mix(in srgb, var(--border-color) 40%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 56%, transparent);
+}
+
+.cardUtilityActions {
+  gap: 4px;
+  padding: 2px;
+  border-color: color-mix(in srgb, var(--border-color) 26%, transparent);
+  background: color-mix(in srgb, var(--surface-control) 30%, transparent);
+}
+
+.statusToggle {
+  min-height: 32px;
+  min-width: 74px;
+  border-color: color-mix(in srgb, currentColor 18%, var(--border-color));
+  background: color-mix(in srgb, currentColor 5%, var(--surface-control));
+}
+
+.statusToggleDisabled {
+  color: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-secondary));
+  background: color-mix(in srgb, var(--surface-control) 38%, transparent);
+}
+
+.pagination {
+  padding-top: 2px;
+}
+
+.batchActionBar {
+  --auth-card-floating-accent: var(--auth-card-accent, var(--auth-command-accent, var(--primary-color)));
+  border-color: color-mix(in srgb, var(--auth-card-floating-accent) 26%, var(--border-color));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--auth-card-floating-accent) 7%, transparent), transparent 50%),
+    color-mix(in srgb, var(--floating-surface) 94%, transparent);
+}
+
+@media (max-width: 1180px) {
+  .filterControls {
+    grid-template-columns: minmax(240px, 1fr) minmax(94px, 0.38fr) minmax(176px, 0.72fr);
+  }
+
+  .filterToggleItem {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .fileGrid,
+  .fileGridQuotaManaged,
+  .fileGridCompact {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  }
+
+  .fileListHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fileListMeta {
+    max-width: 100%;
+  }
+}
+
+@include mobile {
+  .container {
+    gap: 12px;
+  }
+
+  .authFilesPanel {
+    :global(.card-header) {
+      padding: 12px 12px 10px;
+    }
+  }
+
+  .headerActions {
+    gap: 6px;
+
+    :global(.btn.btn-sm) {
+      flex: 1 1 calc(50% - 3px);
+      min-height: 36px;
+      padding-inline: 8px;
+    }
+  }
+
+  .authFilesTitleChip {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 110px;
+  }
+
+  .filterControls {
+    grid-template-columns: 1fr;
+  }
+
+  .filterToggleGroup {
+    grid-template-columns: 1fr;
+  }
+
+  .uploadDropPool {
+    grid-template-columns: 32px minmax(0, 1fr);
+    min-height: 64px;
+  }
+
+  .uploadDropPoolStatus {
+    grid-column: 2;
+  }
+
+  .fileGrid,
+  .fileGridQuotaManaged,
+  .fileGridCompact {
+    grid-template-columns: 1fr;
+  }
+
+  .fileCard {
+    padding: 12px;
+  }
+
+  .cardActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cardActionsMain,
+  .cardUtilityActionsWrap {
+    width: 100%;
+  }
+
+  .cardActionsMain {
+    justify-content: space-between;
+  }
+
+  .primaryActionButton:global(.btn.btn-sm) {
+    flex: 1 1 auto;
+    max-width: none;
+    min-height: 34px;
+  }
+
+  .cardUtilityActions {
+    margin-left: auto;
+  }
+
+  .statusToggle {
+    width: 100%;
+    justify-content: space-between;
+    min-height: 36px;
+    padding-inline: 10px;
+  }
+}
