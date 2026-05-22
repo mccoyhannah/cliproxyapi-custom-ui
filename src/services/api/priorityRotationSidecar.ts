@@ -4,6 +4,7 @@ export type PriorityRotationSidecarSettings = {
   thresholdPercent: number;
   activeSlotLimit: number;
   checkIntervalMinutes: number;
+  revision: number;
 };
 
 export type PriorityRotationSidecarChange = {

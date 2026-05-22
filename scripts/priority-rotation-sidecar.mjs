@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = {
   thresholdPercent: 50,
   activeSlotLimit: 5,
   checkIntervalMinutes: 5,
+  revision: 0,
 };
 const PRIORITY_ROTATION_ACTIVE_PRIORITY = 2;
 const PRIORITY_ROTATION_STANDBY_PRIORITY = 1;
@@ -203,6 +204,7 @@ function normalizeSettings(input) {
       1,
       180
     ),
+    revision: clampInteger(source.revision, DEFAULT_SETTINGS.revision, 0, Number.MAX_SAFE_INTEGER),
   };
 }
 
@@ -1473,7 +1475,11 @@ export async function runPriorityRotation(options = {}) {
 }
 
 async function persistSettings(updates) {
-  settings = normalizeSettings({ ...settings, ...updates });
+  const expectedRevision = Number(updates?.revision);
+  if (!Number.isInteger(expectedRevision) || expectedRevision !== settings.revision) {
+    throw new HttpError(409, 'Settings revision mismatch; refresh the page and try again');
+  }
+  settings = normalizeSettings({ ...settings, ...updates, revision: settings.revision + 1 });
   await writeJsonAtomic(settingsPath, settings);
   if (!state.nextRunAt || updates.checkIntervalMinutes !== undefined || updates.enabled !== undefined) {
     state.nextRunAt = settings.enabled ? new Date().toISOString() : null;

@@ -1484,6 +1484,7 @@ export function AuthFilesPage() {
           ? normalizePriorityRotationSidecarInterval(priorityRotationSidecarIntervalInput)
           : priorityRotationSettings.checkIntervalMinutes,
       ...updates,
+      revision: priorityRotationSidecarSettings?.revision ?? 0,
     }),
     [
       apiBase,
@@ -1491,6 +1492,7 @@ export function AuthFilesPage() {
       priorityRotationSettings.checkIntervalMinutes,
       priorityRotationSettings.enabled,
       priorityRotationSettings.thresholdPercent,
+      priorityRotationSidecarSettings?.revision,
       priorityRotationSidecarIntervalInput,
       priorityRotationSlotsInput,
       priorityRotationThresholdInput,
@@ -1765,6 +1767,8 @@ export function AuthFilesPage() {
     if (!managementKey) return;
     if (!priorityRotationSidecarStatus) return;
     if (priorityRotationSidecarError) return;
+    if (!isCurrentLayer) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
     if (
       priorityRotationSidecarSaving ||
       priorityRotationSidecarAutoSaving ||
@@ -1799,6 +1803,7 @@ export function AuthFilesPage() {
   }, [
     buildPriorityRotationSidecarSettings,
     managementKey,
+    isCurrentLayer,
     priorityRotationSidecarCommittedDraftDirty,
     priorityRotationSidecarError,
     priorityRotationSidecarAutoSaving,
