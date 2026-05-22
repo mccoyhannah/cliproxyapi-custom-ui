@@ -73,7 +73,8 @@ export type PriorityRotationAnalysis = {
 type PriorityRotationCandidate = {
   file: AuthFileItem;
   priority: number;
-  remainingPercent: number;
+  remainingPercent: number | null;
+  managed: boolean;
 };
 
 const clampThresholdPercent = (value: unknown): number => {
@@ -221,12 +222,29 @@ export const analyzeCodexPriorityRotation = (
 
     const quota = codexQuota[file.name];
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
-    if (planType !== null && !isManagedPlan(planType)) return;
-
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
+    if (planType !== null && !isManagedPlan(planType)) {
+      if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
+        candidates.push({
+          file,
+          priority,
+          remainingPercent: null,
+          managed: false,
+        });
+      }
+      return;
+    }
 
     if (planType === null || remainingPercent === null) {
       unknownCount++;
+      if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
+        candidates.push({
+          file,
+          priority,
+          remainingPercent: null,
+          managed: false,
+        });
+      }
       return;
     }
 
@@ -234,6 +252,7 @@ export const analyzeCodexPriorityRotation = (
       file,
       priority,
       remainingPercent,
+      managed: true,
     });
   });
 
@@ -257,16 +276,21 @@ export const analyzeCodexPriorityRotation = (
   );
   const effectiveThreshold = threshold;
   const thresholdAdjusted = false;
+  const managedCandidates = candidates.filter((candidate) => candidate.managed);
+  const getRemainingSortValue = (candidate: PriorityRotationCandidate): number =>
+    typeof candidate.remainingPercent === 'number' && Number.isFinite(candidate.remainingPercent)
+      ? candidate.remainingPercent
+      : -1;
   const healthyActiveCandidates = activeCandidates.filter(
-    (candidate) => candidate.remainingPercent >= effectiveThreshold
+    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= effectiveThreshold
   );
   const healthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.remainingPercent >= effectiveThreshold
+    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= effectiveThreshold
   );
 
   const demotionMap = new Map<string, PriorityRotationChangeReason>();
   activeCandidates.forEach((candidate) => {
-    if (candidate.remainingPercent < effectiveThreshold) {
+    if (candidate.managed && getRemainingSortValue(candidate) < effectiveThreshold) {
       demotionMap.set(candidate.file.name, 'low_remaining');
     }
   });
@@ -276,7 +300,7 @@ export const analyzeCodexPriorityRotation = (
     activeCandidates
       .filter((candidate) => !demotionMap.has(candidate.file.name))
       .sort((a, b) => {
-        const remainingCompare = a.remainingPercent - b.remainingPercent;
+        const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
         return remainingCompare !== 0
           ? remainingCompare
           : a.file.name.localeCompare(b.file.name);
@@ -292,7 +316,7 @@ export const analyzeCodexPriorityRotation = (
   const demotions = activeCandidates
     .filter((candidate) => demotionMap.has(candidate.file.name))
     .sort((a, b) => {
-      const remainingCompare = a.remainingPercent - b.remainingPercent;
+      const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
       return remainingCompare !== 0
         ? remainingCompare
         : a.file.name.localeCompare(b.file.name);
@@ -302,7 +326,7 @@ export const analyzeCodexPriorityRotation = (
       displayName: getDisplayName(candidate.file),
       fromPriority: activePriority,
       toPriority: standbyPriority,
-      remainingPercent: candidate.remainingPercent,
+      remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
       role: 'demote',
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
@@ -315,7 +339,7 @@ export const analyzeCodexPriorityRotation = (
   const promotionSlots = Math.max(replacementSlots, fillSlots);
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
-      const remainingCompare = b.remainingPercent - a.remainingPercent;
+      const remainingCompare = getRemainingSortValue(b) - getRemainingSortValue(a);
       return remainingCompare !== 0
         ? remainingCompare
         : a.file.name.localeCompare(b.file.name);
@@ -326,7 +350,7 @@ export const analyzeCodexPriorityRotation = (
       displayName: getDisplayName(candidate.file),
       fromPriority: standbyPriority,
       toPriority: activePriority,
-      remainingPercent: candidate.remainingPercent,
+      remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
       role: 'promote',
       reason: 'promote_standby',
     }));
@@ -336,13 +360,19 @@ export const analyzeCodexPriorityRotation = (
     const missingAdjacentStandby = activeDeficit > 0 && healthyStandbyCandidates.length === 0;
     const missingReplacementStandby =
       lowRemainingDemotionCount > 0 && healthyStandbyCandidates.length === 0;
+    const status: PriorityRotationStatus =
+      unknownCount > 0 && managedCandidates.length === 0
+        ? 'quota_unknown'
+        : missingAdjacentStandby || missingReplacementStandby
+          ? 'no_standby'
+          : 'no_changes';
     return {
       thresholdPercent: threshold,
       effectiveThresholdPercent: effectiveThreshold,
       thresholdAdjusted,
       activeSlotLimit: slotLimit,
-      status: missingAdjacentStandby || missingReplacementStandby ? 'no_standby' : 'no_changes',
-      managedCount: candidates.length,
+      status,
+      managedCount: managedCandidates.length,
       unknownCount,
       activePriority,
       standbyPriority,
@@ -362,7 +392,7 @@ export const analyzeCodexPriorityRotation = (
     thresholdAdjusted,
     activeSlotLimit: slotLimit,
     status: 'ready',
-    managedCount: candidates.length,
+    managedCount: managedCandidates.length,
     unknownCount,
     activePriority,
     standbyPriority,

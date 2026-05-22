@@ -8,6 +8,7 @@ import {
   IconCircleAlert,
   IconChevronDown,
   IconDownload,
+  IconFileText,
   IconMinus,
   IconModelCluster,
   IconPlus,
@@ -62,10 +63,12 @@ export type AuthFileCardProps = {
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   manualExpiryMs?: number | null;
   priorityTier?: AuthFilePriorityTier | null;
+  accountMemo?: string | null;
   onShowModels: (file: AuthFileItem) => void;
   onDownload: (name: string) => void;
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
   onManualExpiryEdit: (file: AuthFileItem) => void;
+  onAccountMemoOpen: (file: AuthFileItem) => void;
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
   onPriorityChange: (file: AuthFileItem, priority: number) => Promise<void>;
@@ -98,10 +101,12 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     codexSubscriptionSnapshot,
     manualExpiryMs,
     priorityTier,
+    accountMemo,
     onShowModels,
     onDownload,
     onOpenPrefixProxyEditor,
     onManualExpiryEdit,
+    onAccountMemoOpen,
     onDelete,
     onToggleStatus,
     onPriorityChange,
@@ -187,6 +192,11 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
   const displayName = noteValue || file.name;
   const displayNameTitle = noteValue ? `${noteValue} (${file.name})` : file.name;
+  const accountMemoText = typeof accountMemo === 'string' ? accountMemo.trim() : '';
+  const hasAccountMemo = accountMemoText.length > 0;
+  const accountMemoButtonLabel = hasAccountMemo
+    ? t('auth_files.account_memo_button_filled', { defaultValue: '查看/编辑账号备注' })
+    : t('auth_files.account_memo_button_empty', { defaultValue: '添加账号备注' });
   const displayNameInputId = `auth-display-name-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const [displayNameDraft, setDisplayNameDraft] = useState({
     fileName: file.name,
@@ -563,6 +573,19 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                       defaultValue: '临时凭证',
                     })}
                   </span>
+                )}
+                {!isRuntimeOnly && (
+                  <button
+                    type="button"
+                    className={`${styles.accountMemoButton} ${
+                      hasAccountMemo ? styles.accountMemoButtonActive : ''
+                    }`}
+                    onClick={() => onAccountMemoOpen(file)}
+                    aria-label={accountMemoButtonLabel}
+                    title={accountMemoButtonLabel}
+                  >
+                    <IconFileText size={14} />
+                  </button>
                 )}
               </div>
               {displayNameEditing ? (

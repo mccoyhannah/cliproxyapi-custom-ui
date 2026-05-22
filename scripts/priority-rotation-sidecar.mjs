@@ -900,6 +900,17 @@ export function analyzeCodexPriorityRotation(
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
     if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) {
+      if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
+        candidates.push({
+          order,
+          file,
+          priority,
+          planType,
+          remainingPercent: null,
+          managed: false,
+        });
+        return;
+      }
       addSkippedCandidate('skipped_plan', {
         planType,
         remainingPercent,
@@ -909,6 +920,17 @@ export function analyzeCodexPriorityRotation(
 
     if (planType === null || remainingPercent === null) {
       unknownCount += 1;
+      if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
+        candidates.push({
+          order,
+          file,
+          priority,
+          planType,
+          remainingPercent: null,
+          managed: false,
+        });
+        return;
+      }
       addSkippedCandidate('quota_unknown', {
         planType,
         remainingPercent,
@@ -917,7 +939,7 @@ export function analyzeCodexPriorityRotation(
       return;
     }
 
-    candidates.push({ order, file, priority, planType, remainingPercent });
+    candidates.push({ order, file, priority, planType, remainingPercent, managed: true });
   });
 
   if (candidates.length === 0) {
@@ -939,16 +961,24 @@ export function analyzeCodexPriorityRotation(
   );
   const effectiveThreshold = threshold;
   const thresholdAdjusted = false;
+  const managedCandidates = candidates.filter((candidate) => candidate.managed !== false);
+  const getRemainingSortValue = (candidate) =>
+    typeof candidate.remainingPercent === 'number' && Number.isFinite(candidate.remainingPercent)
+      ? candidate.remainingPercent
+      : -1;
   const healthyActiveCandidates = activeCandidates.filter(
-    (candidate) => candidate.remainingPercent >= effectiveThreshold
+    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
   );
   const healthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.remainingPercent >= effectiveThreshold
+    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
   );
 
   const demotionMap = new Map();
   activeCandidates.forEach((candidate) => {
-    if (candidate.remainingPercent < effectiveThreshold) {
+    if (
+      candidate.managed !== false &&
+      getRemainingSortValue(candidate) < effectiveThreshold
+    ) {
       demotionMap.set(candidate.file.name, 'low_remaining');
     }
   });
@@ -958,7 +988,7 @@ export function analyzeCodexPriorityRotation(
     activeCandidates
       .filter((candidate) => !demotionMap.has(candidate.file.name))
       .sort((a, b) => {
-        const remainingCompare = a.remainingPercent - b.remainingPercent;
+        const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
         return remainingCompare !== 0
           ? remainingCompare
           : a.file.name.localeCompare(b.file.name);
@@ -974,7 +1004,7 @@ export function analyzeCodexPriorityRotation(
   const demotions = activeCandidates
     .filter((candidate) => demotionMap.has(candidate.file.name))
     .sort((a, b) => {
-      const remainingCompare = a.remainingPercent - b.remainingPercent;
+      const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
       return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
     })
     .map((candidate) => ({
@@ -982,7 +1012,7 @@ export function analyzeCodexPriorityRotation(
       displayName: getDisplayName(candidate.file),
       fromPriority: activePriority,
       toPriority: standbyPriority,
-      remainingPercent: candidate.remainingPercent,
+      remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
       role: 'demote',
       reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
     }));
@@ -996,7 +1026,7 @@ export function analyzeCodexPriorityRotation(
   const promotionSlots = Math.max(replacementSlots, fillSlots);
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
-      const remainingCompare = b.remainingPercent - a.remainingPercent;
+      const remainingCompare = getRemainingSortValue(b) - getRemainingSortValue(a);
       return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
     })
     .slice(0, promotionSlots)
@@ -1005,7 +1035,7 @@ export function analyzeCodexPriorityRotation(
       displayName: getDisplayName(candidate.file),
       fromPriority: standbyPriority,
       toPriority: activePriority,
-      remainingPercent: candidate.remainingPercent,
+      remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
       role: 'promote',
       reason: 'promote_standby',
     }));
@@ -1040,7 +1070,10 @@ export function analyzeCodexPriorityRotation(
           planType: candidate.planType,
           remainingPercent: candidate.remainingPercent,
           tier,
-          belowThreshold: candidate.remainingPercent < threshold,
+          belowThreshold:
+            typeof candidate.remainingPercent === 'number'
+              ? candidate.remainingPercent < threshold
+              : null,
           decision,
         }),
       };
@@ -1053,13 +1086,19 @@ export function analyzeCodexPriorityRotation(
     const missingAdjacentStandby = activeDeficit > 0 && healthyStandbyCandidates.length === 0;
     const missingReplacementStandby =
       lowRemainingDemotionCount > 0 && healthyStandbyCandidates.length === 0;
+    const status =
+      unknownCount > 0 && managedCandidates.length === 0
+        ? 'quota_unknown'
+        : missingAdjacentStandby || missingReplacementStandby
+          ? 'no_standby'
+          : 'no_changes';
     return {
       thresholdPercent: threshold,
       effectiveThresholdPercent: effectiveThreshold,
       thresholdAdjusted,
       activeSlotLimit: slotLimit,
-      status: missingAdjacentStandby || missingReplacementStandby ? 'no_standby' : 'no_changes',
-      managedCount: candidates.length,
+      status,
+      managedCount: managedCandidates.length,
       unknownCount,
       activePriority,
       standbyPriority,
@@ -1080,7 +1119,7 @@ export function analyzeCodexPriorityRotation(
     thresholdAdjusted,
     activeSlotLimit: slotLimit,
     status: 'ready',
-    managedCount: candidates.length,
+    managedCount: managedCandidates.length,
     unknownCount,
     activePriority,
     standbyPriority,

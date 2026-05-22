@@ -472,6 +472,56 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
+  const files = [
+    codexFile('free-active.json', 2, 'free'),
+    codexFile('team-active-a.json', 2, 'team'),
+    codexFile('team-active-b.json', 2, 'team'),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'free-active.json': quota(20, 'free'),
+      'team-active-a.json': quota(20, 'team'),
+      'team-active-b.json': quota(25, 'team'),
+    },
+    50,
+    2
+  );
+  assert.equal(result.managedCount, 2);
+  assert.equal(result.activeCount, 3);
+  assert.equal(result.projectedActiveCount, 2);
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.reason, change.toPriority]),
+    [['free-active.json', 'demote', 'over_active_limit', 1]]
+  );
+}
+
+{
+  const files = [
+    codexFile('unknown-active.json', 2, 'team'),
+    codexFile('team-active-a.json', 2, 'team'),
+    codexFile('team-active-b.json', 2, 'team'),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'team-active-a.json': quota(20, 'team'),
+      'team-active-b.json': quota(25, 'team'),
+    },
+    50,
+    2
+  );
+  assert.equal(result.managedCount, 2);
+  assert.equal(result.unknownCount, 1);
+  assert.equal(result.activeCount, 3);
+  assert.equal(result.projectedActiveCount, 2);
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.reason, change.toPriority]),
+    [['unknown-active.json', 'demote', 'over_active_limit', 1]]
+  );
+}
+
+{
   const files = [codexFile('business-team.json', 2, 'self_serve_business_usage_based')];
   const result = analyzeCodexPriorityRotation(
     files,

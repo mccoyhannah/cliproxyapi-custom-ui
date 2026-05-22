@@ -83,6 +83,12 @@ import {
   type AuthFilesManualExpiryMap,
 } from '@/features/authFiles/manualExpiry';
 import {
+  getAuthFileAccountMemo,
+  readAuthFilesAccountMemos,
+  writeAuthFilesAccountMemos,
+  type AuthFilesAccountMemoMap,
+} from '@/features/authFiles/accountMemos';
+import {
   analyzeCodexPriorityRotation,
   normalizePriorityRotationActiveSlotLimit,
   normalizePriorityRotationThresholdPercent,
@@ -273,6 +279,11 @@ export function AuthFilesPage() {
   const [manualExpiryEditorFile, setManualExpiryEditorFile] = useState<AuthFileItem | null>(null);
   const [manualExpiryDateInput, setManualExpiryDateInput] = useState('');
   const [manualExpiryTimeInput, setManualExpiryTimeInput] = useState('');
+  const [accountMemosByFile, setAccountMemosByFile] = useState<AuthFilesAccountMemoMap>(() =>
+    readAuthFilesAccountMemos()
+  );
+  const [accountMemoEditorFile, setAccountMemoEditorFile] = useState<AuthFileItem | null>(null);
+  const [accountMemoDraft, setAccountMemoDraft] = useState('');
   const [priorityRotationSettings, setPriorityRotationSettings] =
     useState<PriorityRotationSidecarDraftSettings>(DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT);
   const [priorityRotationThresholdInput, setPriorityRotationThresholdInput] = useState(() =>
@@ -817,9 +828,10 @@ export function AuthFilesPage() {
 
     return filesMatchingStatusFilters.filter((item) => {
       const matchType = filter === 'all' || item.type === filter;
+      const accountMemoText = getAuthFileAccountMemo(accountMemosByFile, item.name)?.text ?? '';
       const matchSearch =
         !normalizedSearch ||
-        [item.name, item.type, item.provider, item.note].some((value) => {
+        [item.name, item.type, item.provider, item.note, accountMemoText].some((value) => {
           const content = (value || '').toString();
           return wildcardSearch
             ? wildcardSearch.test(content)
@@ -827,7 +839,7 @@ export function AuthFilesPage() {
         });
       return matchType && matchSearch;
     });
-  }, [filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
+  }, [accountMemosByFile, filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
 
   const isExpirySortMode = sortMode === 'expiry_soon' || sortMode === 'expiry_long';
   const baseSorted = useMemo(() => {
@@ -1157,6 +1169,68 @@ export function AuthFilesPage() {
     closeManualExpiryEditor();
   }, [closeManualExpiryEditor, manualExpiryEditorFile, showNotification, t]);
 
+  const openAccountMemoEditor = useCallback(
+    (file: AuthFileItem) => {
+      setAccountMemoEditorFile(file);
+      setAccountMemoDraft(getAuthFileAccountMemo(accountMemosByFile, file.name)?.text ?? '');
+    },
+    [accountMemosByFile]
+  );
+
+  const closeAccountMemoEditor = useCallback(() => {
+    setAccountMemoEditorFile(null);
+    setAccountMemoDraft('');
+  }, []);
+
+  const saveAccountMemo = useCallback(() => {
+    if (!accountMemoEditorFile) return;
+
+    const nextText = accountMemoDraft.trim();
+    const updatedAt = Date.now();
+    setAccountMemosByFile((current) => {
+      const next = { ...current };
+      if (nextText) {
+        next[accountMemoEditorFile.name] = { text: nextText, updatedAt };
+      } else {
+        delete next[accountMemoEditorFile.name];
+      }
+      writeAuthFilesAccountMemos(next);
+      return next;
+    });
+    showNotification(
+      nextText
+        ? t('auth_files.account_memo_saved', {
+            name: accountMemoEditorFile.name,
+            defaultValue: '已保存账号备注',
+          })
+        : t('auth_files.account_memo_cleared', {
+            name: accountMemoEditorFile.name,
+            defaultValue: '已清除账号备注',
+          }),
+      'success'
+    );
+    closeAccountMemoEditor();
+  }, [accountMemoDraft, accountMemoEditorFile, closeAccountMemoEditor, showNotification, t]);
+
+  const clearAccountMemo = useCallback(() => {
+    if (!accountMemoEditorFile) return;
+
+    setAccountMemosByFile((current) => {
+      const next = { ...current };
+      delete next[accountMemoEditorFile.name];
+      writeAuthFilesAccountMemos(next);
+      return next;
+    });
+    showNotification(
+      t('auth_files.account_memo_cleared', {
+        name: accountMemoEditorFile.name,
+        defaultValue: '已清除账号备注',
+      }),
+      'success'
+    );
+    closeAccountMemoEditor();
+  }, [accountMemoEditorFile, closeAccountMemoEditor, showNotification, t]);
+
   useEffect(() => {
     setPriorityRotationThresholdInput(String(priorityRotationSettings.thresholdPercent));
     setPriorityRotationSlotsInput(String(priorityRotationSettings.activeSlotLimit));
@@ -1201,6 +1275,51 @@ export function AuthFilesPage() {
       const checkIntervalMinutes = normalizePriorityRotationSidecarInterval(value);
       setPriorityRotationSidecarIntervalInput(String(checkIntervalMinutes));
       updatePriorityRotationSettings({ checkIntervalMinutes });
+    },
+    [updatePriorityRotationSettings]
+  );
+
+  const handlePriorityRotationThresholdInputChange = useCallback(
+    (value: string) => {
+      setPriorityRotationThresholdInput(value);
+      const trimmed = value.trim();
+      if (!trimmed || !Number.isFinite(Number(trimmed))) {
+        priorityRotationSidecarDraftTouchedRef.current = true;
+        return;
+      }
+      updatePriorityRotationSettings({
+        thresholdPercent: normalizePriorityRotationThresholdPercent(trimmed),
+      });
+    },
+    [updatePriorityRotationSettings]
+  );
+
+  const handlePriorityRotationSlotsInputChange = useCallback(
+    (value: string) => {
+      setPriorityRotationSlotsInput(value);
+      const trimmed = value.trim();
+      if (!trimmed || !Number.isFinite(Number(trimmed))) {
+        priorityRotationSidecarDraftTouchedRef.current = true;
+        return;
+      }
+      updatePriorityRotationSettings({
+        activeSlotLimit: normalizePriorityRotationActiveSlotLimit(trimmed),
+      });
+    },
+    [updatePriorityRotationSettings]
+  );
+
+  const handlePriorityRotationSidecarIntervalInputChange = useCallback(
+    (value: string) => {
+      setPriorityRotationSidecarIntervalInput(value);
+      const trimmed = value.trim();
+      if (!trimmed || !Number.isFinite(Number(trimmed))) {
+        priorityRotationSidecarDraftTouchedRef.current = true;
+        return;
+      }
+      updatePriorityRotationSettings({
+        checkIntervalMinutes: normalizePriorityRotationSidecarInterval(trimmed),
+      });
     },
     [updatePriorityRotationSettings]
   );
@@ -1874,6 +1993,13 @@ export function AuthFilesPage() {
   const manualExpiryEditorExistingMs = manualExpiryEditorFile
     ? getManualExpiryMs(manualExpiryByFile, manualExpiryEditorFile.name)
     : null;
+  const accountMemoEditorDisplayName = accountMemoEditorFile
+    ? getAuthFileDisplayName(accountMemoEditorFile)
+    : '';
+  const accountMemoEditorFileName = accountMemoEditorFile?.name ?? '';
+  const accountMemoEditorExistingText = accountMemoEditorFile
+    ? getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)?.text ?? ''
+    : '';
   const uploadDropPoolClass = [
     styles.uploadDropPool,
     uploadDropActive ? styles.uploadDropPoolActive : '',
@@ -2690,10 +2816,11 @@ export function AuthFilesPage() {
                               value={priorityRotationThresholdInput}
                               disabled={priorityRotationSidecarSaving}
                               aria-label={t('auth_files.priority_rotation_threshold_label')}
-                              onChange={(event) => {
-                                priorityRotationSidecarDraftTouchedRef.current = true;
-                                setPriorityRotationThresholdInput(event.currentTarget.value);
-                              }}
+                              onChange={(event) =>
+                                handlePriorityRotationThresholdInputChange(
+                                  event.currentTarget.value
+                                )
+                              }
                               onBlur={(event) =>
                                 commitPriorityRotationThresholdInput(event.currentTarget.value)
                               }
@@ -2761,10 +2888,9 @@ export function AuthFilesPage() {
                               value={priorityRotationSlotsInput}
                               disabled={priorityRotationSidecarSaving}
                               aria-label={t('auth_files.priority_rotation_slots_label')}
-                              onChange={(event) => {
-                                priorityRotationSidecarDraftTouchedRef.current = true;
-                                setPriorityRotationSlotsInput(event.currentTarget.value);
-                              }}
+                              onChange={(event) =>
+                                handlePriorityRotationSlotsInputChange(event.currentTarget.value)
+                              }
                               onBlur={(event) =>
                                 commitPriorityRotationSlotsInput(event.currentTarget.value)
                               }
@@ -2816,12 +2942,11 @@ export function AuthFilesPage() {
                               value={priorityRotationSidecarIntervalInput}
                               disabled={priorityRotationSidecarSaving}
                               aria-label={t('auth_files.priority_rotation_sidecar_interval')}
-                              onChange={(event) => {
-                                priorityRotationSidecarDraftTouchedRef.current = true;
-                                setPriorityRotationSidecarIntervalInput(
+                              onChange={(event) =>
+                                handlePriorityRotationSidecarIntervalInputChange(
                                   event.currentTarget.value
-                                );
-                              }}
+                                )
+                              }
                               onBlur={(event) =>
                                 commitPriorityRotationSidecarIntervalInput(
                                   event.currentTarget.value
@@ -3068,12 +3193,14 @@ export function AuthFilesPage() {
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}
                     priorityTier={priorityTierByFile.get(file.name) ?? null}
+                    accountMemo={getAuthFileAccountMemo(accountMemosByFile, file.name)?.text ?? ''}
                     priorityUpdating={priorityUpdating[file.name] === true}
                     noteUpdating={noteUpdating[file.name] === true}
                     onShowModels={showModels}
                     onDownload={handleDownload}
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
                     onManualExpiryEdit={openManualExpiryEditor}
+                    onAccountMemoOpen={openAccountMemoEditor}
                     onDelete={handleDelete}
                     onToggleStatus={handleStatusToggle}
                     onPriorityChange={handlePriorityChange}
@@ -3396,6 +3523,64 @@ export function AuthFilesPage() {
               ))}
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(accountMemoEditorFile)}
+        title={
+          <span className={styles.accountMemoModalTitle}>
+            {t('auth_files.account_memo_title', { defaultValue: '账号备注' })}
+          </span>
+        }
+        onClose={closeAccountMemoEditor}
+        width={520}
+        className={styles.accountMemoModal}
+        overlayClassName={styles.accountMemoOverlay}
+        footer={
+          <div className={styles.accountMemoFooter}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAccountMemo}
+              disabled={!accountMemoEditorExistingText}
+            >
+              {t('auth_files.account_memo_clear', { defaultValue: '清除' })}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={closeAccountMemoEditor}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" onClick={saveAccountMemo}>
+              {t('common.save')}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.accountMemoEditor}>
+          <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
+            <span className={styles.accountMemoTargetName}>{accountMemoEditorDisplayName}</span>
+            <span className={styles.accountMemoTargetFile}>
+              {t('auth_files.account_memo_file_label', { defaultValue: '文件' })}
+              <strong>{accountMemoEditorFileName}</strong>
+            </span>
+          </div>
+          <label className={styles.accountMemoField}>
+            <span>{t('auth_files.account_memo_label', { defaultValue: '备注' })}</span>
+            <textarea
+              value={accountMemoDraft}
+              onChange={(event) => setAccountMemoDraft(event.currentTarget.value)}
+              placeholder={t('auth_files.account_memo_placeholder', {
+                defaultValue: '写下这个账号是哪家的、从哪里来、用途、注意事项等。',
+              })}
+              rows={8}
+            />
+          </label>
+          <div className={styles.accountMemoHint}>
+            {t('auth_files.account_memo_hint', {
+              defaultValue:
+                '只保存在当前浏览器，不会写入认证文件。请不要保存密码、token 或完整密钥。',
+            })}
+          </div>
         </div>
       </Modal>
 
