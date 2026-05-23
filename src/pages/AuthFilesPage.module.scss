@@ -3346,6 +3346,12 @@ button.codexSubscriptionValue {
   border-color: color-mix(in srgb, var(--warning-border) 78%, transparent);
 }
 
+.stateBadgeQuotaError {
+  color: color-mix(in srgb, var(--danger-color) 86%, var(--text-primary));
+  background: color-mix(in srgb, var(--failure-badge-bg) 72%, var(--surface-control));
+  border-color: color-mix(in srgb, var(--danger-color) 38%, var(--border-color));
+}
+
 .refreshTokenWarningBadge {
   color: color-mix(in srgb, var(--warning-text) 90%, var(--text-primary));
   border: 1px solid color-mix(in srgb, var(--warning-border) 84%, transparent);
@@ -8873,6 +8879,14 @@ button.codexSubscriptionValue {
   }
 }
 
+.fileCardQuotaError {
+  border-color: color-mix(in srgb, var(--danger-color) 28%, var(--border-color));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--danger-color) 5%, transparent), transparent 36%),
+    linear-gradient(180deg, color-mix(in srgb, #fff 5%, transparent), transparent 120px),
+    color-mix(in srgb, var(--surface-card) 96%, var(--bg-primary));
+}
+
 .fileCardLayout {
   gap: 12px;
 }
@@ -10813,27 +10827,28 @@ button.codexSubscriptionValue {
 }
 
 .priorityRotationStepper {
-  grid-template-columns: 30px minmax(48px, 1fr) 30px;
+  grid-template-columns: 36px minmax(52px, 1fr) 36px;
   width: 100%;
-  height: 32px;
+  height: 36px;
   border-radius: 8px;
+  overflow: hidden;
 }
 
 .priorityRotationIntervalStepper {
-  grid-template-columns: 30px minmax(78px, 1fr) 30px;
+  grid-template-columns: 36px minmax(86px, 1fr) 36px;
 }
 
 .priorityRotationStepperButton {
-  width: 30px;
-  height: 32px;
-  min-width: 30px;
-  min-height: 32px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 0;
 }
 
 .priorityRotationStepperValue {
-  height: 32px;
-  min-height: 32px;
+  height: 36px;
+  min-height: 36px;
   padding: 0 6px;
   border-radius: 0;
   border-inline: 1px solid color-mix(in srgb, var(--border-color) 24%, transparent);
@@ -10851,6 +10866,49 @@ button.codexSubscriptionValue {
 
 .priorityRotationBackgroundButtons {
   justify-content: flex-end;
+}
+
+.advancedControls[open] .advancedControlsSummary {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #0f766e 5%, transparent), transparent 58%),
+    color-mix(in srgb, var(--surface-control) 18%, transparent);
+}
+
+.advancedControlsSignal {
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, currentColor 18%, var(--border-color));
+  background: color-mix(in srgb, currentColor 7%, var(--surface-card));
+}
+
+.advancedControlsConnection {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, var(--border-color));
+  background: color-mix(in srgb, currentColor 6%, var(--surface-card));
+}
+
+.priorityRotationBackgroundPanel {
+  border-left: 3px solid color-mix(in srgb, var(--primary-color) 32%, var(--border-color));
+}
+
+.priorityRotationBackgroundError {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--failure-badge-bg) 48%, var(--surface-card));
+  color: color-mix(in srgb, var(--danger-color) 84%, var(--text-primary));
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 @media (max-width: 1180px) {
@@ -11527,6 +11585,19 @@ button.codexSubscriptionValue {
 .quotaSectionError {
   border-color: color-mix(in srgb, var(--danger-color) 20%, var(--border-color));
   background: color-mix(in srgb, var(--failure-badge-bg) 38%, var(--surface-card));
+}
+
+.quotaCompactError {
+  min-width: 0;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 26%, var(--border-color));
+  background: color-mix(in srgb, var(--failure-badge-bg) 52%, var(--surface-card));
+  color: color-mix(in srgb, var(--danger-color) 82%, var(--text-primary));
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.35;
 }
 
 .cardActions {

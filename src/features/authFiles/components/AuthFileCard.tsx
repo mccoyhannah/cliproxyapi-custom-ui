@@ -35,6 +35,7 @@ import {
   getTypeLabel,
   isRuntimeOnlyAuthFile,
   parsePriorityValue,
+  resolveQuotaErrorMessage,
   type QuotaProviderType,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
@@ -45,7 +46,15 @@ import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
+const CREDENTIAL_QUOTA_ERROR_PATTERN =
+  /(401|403|auth|authentication|unauthorized|forbidden|credential|invalid|invalidated|expired|token|signing in)/i;
 type AuthFilePriorityTier = 'active' | 'standby' | 'buffer' | 'manualLocked';
+type CodexCardQuotaState = {
+  status?: string;
+  planType?: string | null;
+  error?: string;
+  errorStatus?: number;
+};
 
 export type AuthFileCardProps = {
   file: AuthFileItem;
@@ -123,6 +132,10 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const providerIcon = getAuthFileIcon(file.type || 'unknown', resolvedTheme);
 
   const resolvedQuotaType = resolveQuotaType(file);
+  const codexQuotaEntry = useQuotaStore((state) => {
+    if (resolvedQuotaType !== 'codex') return null;
+    return (state.codexQuota[file.name] as CodexCardQuotaState | undefined) ?? null;
+  });
   const selectedQuotaType =
     quotaFilterType && resolvedQuotaType === quotaFilterType ? quotaFilterType : null;
   const quotaType = selectedQuotaType ?? (resolvedQuotaType === 'codex' ? 'codex' : null);
@@ -131,13 +144,10 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     !isRuntimeOnly &&
     (quotaType === 'codex' || (!compact && selectedQuotaType !== null));
   const showQuotaSummaryOnly = quotaType === 'codex' && (compact || selectedQuotaType !== 'codex');
-  const codexQuotaPlanType = useQuotaStore((state) => {
-    if (resolvedQuotaType !== 'codex') return null;
-    const quota = state.codexQuota[file.name] as
-      | { status?: string; planType?: string | null }
-      | undefined;
-    return quota?.status === 'success' ? (quota.planType ?? null) : null;
-  });
+  const codexQuotaPlanType =
+    resolvedQuotaType === 'codex' && codexQuotaEntry?.status === 'success'
+      ? (codexQuotaEntry.planType ?? null)
+      : null;
   const currentCodexPlanType =
     resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
   const effectiveCodexPlanType =
@@ -176,6 +186,32 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const rawStatusMessage = getAuthFileStatusMessage(file);
   const hasStatusWarning =
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
+  const hasQuotaError =
+    !isRuntimeOnly &&
+    !file.disabled &&
+    resolvedQuotaType === 'codex' &&
+    codexQuotaEntry?.status === 'error';
+  const quotaErrorStatus =
+    typeof codexQuotaEntry?.errorStatus === 'number' ? codexQuotaEntry.errorStatus : undefined;
+  const quotaErrorMessage = hasQuotaError
+    ? resolveQuotaErrorMessage(
+        t,
+        quotaErrorStatus,
+        codexQuotaEntry?.error || t('common.unknown_error')
+      )
+    : '';
+  const quotaCredentialError =
+    hasQuotaError &&
+    (quotaErrorStatus === 401 ||
+      quotaErrorStatus === 403 ||
+      CREDENTIAL_QUOTA_ERROR_PATTERN.test(codexQuotaEntry?.error || quotaErrorMessage));
+  const quotaErrorBadgeLabel = quotaCredentialError
+    ? t('auth_files.quota_credential_error_badge', { defaultValue: '认证异常' })
+    : t('auth_files.quota_error_badge', { defaultValue: '额度异常' });
+  const activeWarningLabel = hasQuotaError
+    ? quotaErrorBadgeLabel
+    : t('auth_files.health_status_warning');
+  const activeWarningMessage = hasQuotaError ? quotaErrorMessage : rawStatusMessage;
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
@@ -491,6 +527,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     ? t('auth_files.type_virtual') || '虚拟认证文件'
     : file.disabled
       ? t('auth_files.health_status_disabled')
+      : hasQuotaError
+        ? t('auth_files.health_status_quota_error', { defaultValue: '额度异常' })
       : hasStatusWarning
         ? t('auth_files.health_status_warning')
         : rawStatusMessage
@@ -500,11 +538,17 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     ? styles.stateBadgeVirtual
     : file.disabled
       ? styles.stateBadgeDisabled
+      : hasQuotaError
+        ? styles.stateBadgeQuotaError
       : hasStatusWarning
         ? styles.stateBadgeWarning
         : styles.stateBadgeActive;
-  const statusWarningLabel = t('auth_files.health_status_warning');
-  const cardToneClass = isRuntimeOnly ? styles.fileCardVirtual : '';
+  const cardToneClass = [
+    isRuntimeOnly ? styles.fileCardVirtual : '',
+    hasQuotaError ? styles.fileCardQuotaError : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div
@@ -572,6 +616,14 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     {t('auth_files.missing_refresh_token_badge', {
                       defaultValue: '临时凭证',
                     })}
+                  </span>
+                )}
+                {hasQuotaError && (
+                  <span
+                    className={`${styles.stateBadge} ${styles.stateBadgeQuotaError}`}
+                    title={quotaErrorMessage}
+                  >
+                    {quotaErrorBadgeLabel}
                   </span>
                 )}
                 {!isRuntimeOnly && (
@@ -844,7 +896,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   className={`${styles.statusToggle} ${
                     file.disabled
                       ? styles.statusToggleDisabled
-                      : hasStatusWarning
+                      : hasQuotaError || hasStatusWarning
                         ? styles.statusToggleWarning
                         : styles.statusToggleActive
                   }`}
@@ -853,11 +905,11 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   <span className={styles.statusToggleLabel}>
                     {t('auth_files.status_toggle_label')}
                   </span>
-                  {hasStatusWarning && (
+                  {(hasQuotaError || hasStatusWarning) && (
                     <span
                       className={styles.stateWarningIconBadge}
-                      title={rawStatusMessage}
-                      aria-label={`${statusWarningLabel}: ${rawStatusMessage}`}
+                      title={activeWarningMessage}
+                      aria-label={`${activeWarningLabel}: ${activeWarningMessage}`}
                       role="img"
                       tabIndex={0}
                     >

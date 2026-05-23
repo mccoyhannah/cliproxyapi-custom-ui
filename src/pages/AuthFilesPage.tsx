@@ -2810,7 +2810,11 @@ export function AuthFilesPage() {
                       </div>
                     )}
                     <div className={styles.priorityRotationBackgroundRules}>
-                      <label className={styles.priorityRotationSetting}>
+                      <div
+                        className={styles.priorityRotationSetting}
+                        role="group"
+                        aria-label={t('auth_files.priority_rotation_threshold_label')}
+                      >
                         <span className={styles.priorityRotationSettingHeader}>
                           <span>{t('auth_files.priority_rotation_threshold_label')}</span>
                           <span className={styles.priorityRotationThresholdValue}>
@@ -2866,8 +2870,12 @@ export function AuthFilesPage() {
                             />
                           </span>
                         </span>
-                      </label>
-                      <label className={styles.priorityRotationSetting}>
+                      </div>
+                      <div
+                        className={styles.priorityRotationSetting}
+                        role="group"
+                        aria-label={t('auth_files.priority_rotation_slots_label')}
+                      >
                         <span className={styles.priorityRotationSettingHeader}>
                           <span>{t('auth_files.priority_rotation_slots_label')}</span>
                         </span>
@@ -2916,8 +2924,12 @@ export function AuthFilesPage() {
                             <IconPlus size={16} />
                           </button>
                         </span>
-                      </label>
-                      <label className={styles.priorityRotationSetting}>
+                      </div>
+                      <div
+                        className={styles.priorityRotationSetting}
+                        role="group"
+                        aria-label={t('auth_files.priority_rotation_sidecar_interval')}
+                      >
                         <span className={styles.priorityRotationSettingHeader}>
                           <span>{t('auth_files.priority_rotation_sidecar_interval')}</span>
                         </span>
@@ -2981,7 +2993,7 @@ export function AuthFilesPage() {
                             <IconPlus size={16} />
                           </button>
                         </span>
-                      </label>
+                      </div>
                     </div>
                     <div className={styles.priorityRotationBackgroundButtons}>
                       {!priorityRotationSidecarOnline && (

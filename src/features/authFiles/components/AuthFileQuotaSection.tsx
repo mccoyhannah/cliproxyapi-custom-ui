@@ -163,6 +163,21 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     !compactCodexExpiry;
 
   if ((compact || summaryOnly) && quotaType === 'codex') {
+    if (quotaStatus === 'error') {
+      return (
+        <div
+          className={`${styles.quotaSection} ${styles.quotaSectionCompact} ${quotaSectionToneClass}`}
+        >
+          <div className={styles.quotaCompactError} title={quotaErrorMessage}>
+            {t('auth_files.quota_compact_error', {
+              message: quotaErrorMessage,
+              defaultValue: '额度异常：{{message}}',
+            })}
+          </div>
+        </div>
+      );
+    }
+
     if (quotaStatus === 'success' && quota) {
       const content = config.renderQuotaItems(quota, t, {
         styles,
