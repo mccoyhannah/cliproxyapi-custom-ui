@@ -1606,6 +1606,16 @@
   }
 }
 
+.temporaryPriorityLockButtonActive {
+  &:global(.btn) {
+    border-color: color-mix(in srgb, var(--warning-color) 58%, var(--border-color));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--warning-color) 10%, transparent),
+      0 8px 18px color-mix(in srgb, var(--warning-color) 12%, transparent),
+      var(--ops-control-shadow);
+  }
+}
+
 .priorityRotationTierModal {
   :global(.modal-body) {
     padding-top: 0;

@@ -98,6 +98,12 @@ import {
   PRIORITY_ROTATION_STANDBY_PRIORITY,
 } from '@/features/authFiles/priorityRotation';
 import {
+  clearAuthFilesTemporaryPriorityLock,
+  readAuthFilesTemporaryPriorityLock,
+  writeAuthFilesTemporaryPriorityLock,
+  type AuthFilesTemporaryPriorityLockSnapshot,
+} from '@/features/authFiles/temporaryPriorityLock';
+import {
   launchPriorityRotationSidecar,
   priorityRotationSidecarApi,
   type PriorityRotationSidecarSettings,
@@ -296,6 +302,11 @@ export function AuthFilesPage() {
     useState<AuthFilePriorityTier | null>(null);
   const [priorityRotationPreviewOpen, setPriorityRotationPreviewOpen] = useState(false);
   const [priorityRotationPreviewApplying, setPriorityRotationPreviewApplying] = useState(false);
+  const [temporaryPriorityLockSnapshot, setTemporaryPriorityLockSnapshot] =
+    useState<AuthFilesTemporaryPriorityLockSnapshot | null>(() =>
+      readAuthFilesTemporaryPriorityLock()
+    );
+  const [temporaryPriorityLockApplying, setTemporaryPriorityLockApplying] = useState(false);
   const [priorityRotationSidecarStatus, setPriorityRotationSidecarStatus] =
     useState<PriorityRotationSidecarStatus | null>(null);
   const [priorityRotationSidecarLoading, setPriorityRotationSidecarLoading] = useState(false);
@@ -485,6 +496,14 @@ export function AuthFilesPage() {
     });
     return tiers;
   }, [files]);
+  const temporaryPriorityLockTargetFiles = useMemo(
+    () => files.filter((file) => !isRuntimeOnlyAuthFile(file) && file.disabled !== true),
+    [files]
+  );
+  const temporaryPriorityLockActive = temporaryPriorityLockSnapshot !== null;
+  const temporaryPriorityLockSnapshotCount = temporaryPriorityLockSnapshot
+    ? Object.keys(temporaryPriorityLockSnapshot.priorities).length
+    : 0;
 
   const stopUploadDropEvent = (event: ReactDragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -1720,6 +1739,128 @@ export function AuthFilesPage() {
     t,
   ]);
 
+  const clearTemporaryPriorityLockState = useCallback(() => {
+    clearAuthFilesTemporaryPriorityLock();
+    setTemporaryPriorityLockSnapshot(null);
+  }, []);
+
+  const saveTemporaryPriorityLockState = useCallback(
+    (snapshot: AuthFilesTemporaryPriorityLockSnapshot) => {
+      writeAuthFilesTemporaryPriorityLock(snapshot);
+      setTemporaryPriorityLockSnapshot(snapshot);
+    },
+    []
+  );
+
+  const handleTemporaryPriorityLockToggle = useCallback(async () => {
+    if (temporaryPriorityLockApplying || batchPriorityUpdating) return;
+
+    setTemporaryPriorityLockApplying(true);
+    try {
+      if (temporaryPriorityLockSnapshot) {
+        const restoreChanges = Object.entries(temporaryPriorityLockSnapshot.priorities).map(
+          ([name, priority]) => ({ name, priority })
+        );
+
+        if (restoreChanges.length === 0) {
+          clearTemporaryPriorityLockState();
+          return;
+        }
+
+        const result = await batchSetPriorities(restoreChanges, { notify: false });
+        if (result.successCount > 0) {
+          await loadFiles({ preserveExisting: true, silent: true });
+        }
+
+        if (result.failCount === 0) {
+          clearTemporaryPriorityLockState();
+          showNotification(
+            t('auth_files.priority_rotation_temp_p3_restore_success', {
+              count: restoreChanges.length,
+            }),
+            'success'
+          );
+        } else {
+          showNotification(
+            t('auth_files.priority_rotation_temp_p3_restore_partial', {
+              success: result.successCount,
+              failed: result.failCount,
+            }),
+            'warning'
+          );
+        }
+        return;
+      }
+
+      if (temporaryPriorityLockTargetFiles.length === 0) {
+        showNotification(t('auth_files.priority_rotation_temp_p3_none'), 'info');
+        return;
+      }
+
+      const snapshot: AuthFilesTemporaryPriorityLockSnapshot = {
+        version: 1,
+        createdAt: Date.now(),
+        targetPriority: PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY,
+        priorities: Object.fromEntries(
+          temporaryPriorityLockTargetFiles.map((file) => [
+            file.name,
+            parsePriorityValue(file.priority ?? file['priority']) ?? 0,
+          ])
+        ),
+      };
+      saveTemporaryPriorityLockState(snapshot);
+
+      const result = await batchSetPriorities(
+        temporaryPriorityLockTargetFiles.map((file) => ({
+          name: file.name,
+          priority: PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY,
+        })),
+        { notify: false }
+      );
+      if (result.successCount > 0) {
+        await loadFiles({ preserveExisting: true, silent: true });
+      }
+
+      if (result.failCount === 0) {
+        showNotification(
+          t('auth_files.priority_rotation_temp_p3_success', {
+            count: temporaryPriorityLockTargetFiles.length,
+          }),
+          'success'
+        );
+      } else if (result.successCount > 0) {
+        showNotification(
+          t('auth_files.priority_rotation_temp_p3_partial', {
+            success: result.successCount,
+            failed: result.failCount,
+          }),
+          'warning'
+        );
+      } else {
+        clearTemporaryPriorityLockState();
+        showNotification(
+          t('auth_files.priority_rotation_temp_p3_failed', {
+            failed: result.failCount,
+          }),
+          'warning'
+        );
+      }
+    } finally {
+      setTemporaryPriorityLockApplying(false);
+    }
+  }, [
+    batchPriorityUpdating,
+    batchSetPriorities,
+    clearTemporaryPriorityLockState,
+    loadFiles,
+    saveTemporaryPriorityLockState,
+    showNotification,
+    t,
+    temporaryPriorityLockApplying,
+    temporaryPriorityLockSnapshot,
+    temporaryPriorityLockTargetFiles,
+  ]);
+
   const togglePriorityRotationSidecarEnabled = useCallback(async () => {
     if (connectionStatus !== 'connected') {
       showNotification(
@@ -2078,7 +2219,15 @@ export function AuthFilesPage() {
     !priorityRotationHasPreviewChanges ||
     disableControls ||
     batchPriorityUpdating ||
+    temporaryPriorityLockApplying ||
     priorityRotationPreviewApplying;
+  const temporaryPriorityLockButtonDisabled =
+    disableControls ||
+    batchPriorityUpdating ||
+    temporaryPriorityLockApplying ||
+    (temporaryPriorityLockActive
+      ? temporaryPriorityLockSnapshotCount === 0
+      : temporaryPriorityLockTargetFiles.length === 0);
   const priorityRotationPreviewSummaryItems = [
     {
       key: 'threshold',
@@ -2206,6 +2355,12 @@ export function AuthFilesPage() {
     Boolean(priorityRotationSidecarStatus) && !priorityRotationSidecarError;
   const priorityRotationSidecarSavedEnabled =
     priorityRotationSidecarOnline && priorityRotationSidecarSettings?.enabled === true;
+  const temporaryPriorityLockStatusLabel = temporaryPriorityLockActive
+    ? t('auth_files.priority_rotation_temp_p3_active', {
+        count: temporaryPriorityLockSnapshotCount,
+        defaultValue: `临时 P3：${temporaryPriorityLockSnapshotCount} 个可恢复`,
+      })
+    : '';
   const priorityRotationSidecarDraftEnabled = priorityRotationSettings.enabled === true;
   const priorityRotationSidecarEnabled = priorityRotationSidecarDraftEnabled;
   const priorityRotationSidecarHasSecret = priorityRotationSidecarState?.hasSecret === true;
@@ -2715,17 +2870,55 @@ export function AuthFilesPage() {
                       >
                         {priorityRotationSlotLabel}
                       </span>
+                      {temporaryPriorityLockStatusLabel && (
+                        <span
+                          className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
+                        >
+                          {temporaryPriorityLockStatusLabel}
+                        </span>
+                      )}
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setPriorityRotationPreviewOpen(true)}
-                      disabled={priorityRotationPreviewDisabled}
-                      loading={priorityRotationPreviewApplying}
-                      aria-label={t('auth_files.priority_rotation_button_aria')}
-                    >
-                      {t('auth_files.priority_rotation_button')}
-                    </Button>
+                    <div className={styles.priorityRotationButtonGroup}>
+                      <Button
+                        variant={temporaryPriorityLockActive ? 'warning' : 'secondary'}
+                        size="sm"
+                        className={`${styles.priorityRotationButton} ${
+                          temporaryPriorityLockActive
+                            ? styles.temporaryPriorityLockButtonActive
+                            : ''
+                        }`}
+                        leftIcon={
+                          temporaryPriorityLockActive ? (
+                            <IconRefreshCw size={15} />
+                          ) : (
+                            <IconSlidersHorizontal size={15} />
+                          )
+                        }
+                        onClick={() => void handleTemporaryPriorityLockToggle()}
+                        disabled={temporaryPriorityLockButtonDisabled}
+                        loading={temporaryPriorityLockApplying}
+                        aria-label={
+                          temporaryPriorityLockActive
+                            ? t('auth_files.priority_rotation_temp_p3_restore_aria')
+                            : t('auth_files.priority_rotation_temp_p3_aria')
+                        }
+                      >
+                        {temporaryPriorityLockActive
+                          ? t('auth_files.priority_rotation_temp_p3_restore_button')
+                          : t('auth_files.priority_rotation_temp_p3_button')}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className={styles.priorityRotationButton}
+                        onClick={() => setPriorityRotationPreviewOpen(true)}
+                        disabled={priorityRotationPreviewDisabled}
+                        loading={priorityRotationPreviewApplying}
+                        aria-label={t('auth_files.priority_rotation_button_aria')}
+                      >
+                        {t('auth_files.priority_rotation_button')}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
