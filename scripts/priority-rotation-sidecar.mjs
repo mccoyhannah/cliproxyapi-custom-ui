@@ -136,7 +136,7 @@ export function shouldStopForIdle({
 
 export function parseModelRequestLogTimeMs(fileName) {
   const match =
-    /^v1-(?:responses|chat-completions|completions)-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-/i.exec(
+    /^v1-[a-z0-9][a-z0-9-]*-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-/i.exec(
       String(fileName ?? '')
     );
   if (!match) return null;

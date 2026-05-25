@@ -28,14 +28,18 @@ const quota = (usedPercent, planType = 'team') => ({
 
 {
   assert.equal(isModelRequestLogName('v1-responses-2026-05-20T051955-57644c1f.log'), true);
+  assert.equal(isModelRequestLogName('v1-chat-completions-2026-05-20T052001-11111111.log'), true);
+  assert.equal(isModelRequestLogName('v1-images-generations-2026-05-20T052101-22222222.log'), true);
   assert.equal(isModelRequestLogName('main.log'), false);
+  assert.equal(isModelRequestLogName('api-provider-openai-v1-responses-2026-05-20T052201.log'), false);
   assert.equal(
     getLatestModelRequestAtMs([
       'main.log',
       'v1-responses-2026-05-20T051955-57644c1f.log',
       'v1-chat-completions-2026-05-20T052001-11111111.log',
+      'v1-images-generations-2026-05-20T052101-22222222.log',
     ]),
-    parseModelRequestLogTimeMs('v1-chat-completions-2026-05-20T052001-11111111.log')
+    parseModelRequestLogTimeMs('v1-images-generations-2026-05-20T052101-22222222.log')
   );
 }
 
