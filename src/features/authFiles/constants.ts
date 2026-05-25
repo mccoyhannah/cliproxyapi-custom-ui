@@ -130,11 +130,126 @@ export const resolveQuotaErrorMessage = (
 
 export const normalizeProviderKey = (value: string) => value.trim().toLowerCase();
 
-export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
+export type AuthFileCredentialProblem = {
+  message: string;
+  rawMessage: string;
+  signals: string[];
+};
+
+const AUTH_FILE_CREDENTIAL_STATUS_PATTERN =
+  /\b(?:401|403|unauthorized|forbidden|auth_unavailable|authentication_error|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:token|credential|session|auth)|token\s+(?:is\s+)?(?:invalid|expired)|signing\s+in)\b/i;
+const AUTH_FILE_STATUS_PARSE_DEPTH = 5;
+const AUTH_FILE_STATUS_MESSAGE_KEYS = [
+  'detail',
+  'message',
+  'error',
+  'error_description',
+  'code',
+  'type',
+  'status',
+] as const;
+
+const getRawAuthFileStatusMessage = (file: AuthFileItem): string => {
   const raw = file['status_message'] ?? file.statusMessage;
   if (typeof raw === 'string') return raw.trim();
   if (raw == null) return '';
   return String(raw).trim();
+};
+
+const tryParseStatusJson = (text: string): unknown => {
+  const trimmed = text.trim();
+  if (!trimmed || !/^[{["]/.test(trimmed)) return undefined;
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return undefined;
+  }
+};
+
+const pushUniqueStatusPart = (parts: string[], value: unknown) => {
+  const text = String(value ?? '').trim();
+  if (!text || parts.includes(text)) return;
+  parts.push(text);
+};
+
+const collectAuthFileStatusParts = (
+  value: unknown,
+  parts: string[],
+  depth = 0
+) => {
+  if (depth > AUTH_FILE_STATUS_PARSE_DEPTH || value == null) return;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    const parsed = tryParseStatusJson(trimmed);
+    if (parsed !== undefined) {
+      collectAuthFileStatusParts(parsed, parts, depth + 1);
+      return;
+    }
+
+    pushUniqueStatusPart(parts, trimmed);
+    return;
+  }
+
+  if (typeof value !== 'object') {
+    pushUniqueStatusPart(parts, value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectAuthFileStatusParts(item, parts, depth + 1));
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  AUTH_FILE_STATUS_MESSAGE_KEYS.forEach((key) => {
+    if (key in record) {
+      collectAuthFileStatusParts(record[key], parts, depth + 1);
+    }
+  });
+
+  Object.entries(record).forEach(([key, item]) => {
+    if ((AUTH_FILE_STATUS_MESSAGE_KEYS as readonly string[]).includes(key)) return;
+    collectAuthFileStatusParts(item, parts, depth + 1);
+  });
+};
+
+export const getAuthFileStatusMessageParts = (file: AuthFileItem): string[] => {
+  const raw = getRawAuthFileStatusMessage(file);
+  const parts: string[] = [];
+  collectAuthFileStatusParts(raw, parts);
+  return parts;
+};
+
+export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
+  const parts = getAuthFileStatusMessageParts(file);
+  return parts[0] ?? getRawAuthFileStatusMessage(file);
+};
+
+export const getAuthFileCredentialProblem = (
+  file: AuthFileItem
+): AuthFileCredentialProblem | null => {
+  const rawMessage = getRawAuthFileStatusMessage(file);
+  if (!rawMessage) return null;
+
+  const parts = getAuthFileStatusMessageParts(file);
+  const haystack = [rawMessage, ...parts].join(' ');
+  if (!AUTH_FILE_CREDENTIAL_STATUS_PATTERN.test(haystack)) return null;
+
+  const signals = parts.filter((part) => AUTH_FILE_CREDENTIAL_STATUS_PATTERN.test(part));
+  const message =
+    parts.find((part) => !/^(authentication_error|auth_unavailable|invalid_token)$/i.test(part)) ??
+    signals[0] ??
+    rawMessage;
+
+  return {
+    message,
+    rawMessage,
+    signals,
+  };
 };
 
 export const hasAuthFileStatusMessage = (file: AuthFileItem): boolean =>

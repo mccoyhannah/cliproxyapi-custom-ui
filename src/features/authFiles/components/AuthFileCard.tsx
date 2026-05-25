@@ -29,6 +29,7 @@ import {
 } from '@/utils/quota';
 import {
   QUOTA_PROVIDER_TYPES,
+  getAuthFileCredentialProblem,
   getAuthFileIcon,
   getAuthFileStatusMessage,
   getTypeColor,
@@ -47,7 +48,7 @@ import styles from '@/pages/AuthFilesPage.module.scss';
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
 const CREDENTIAL_QUOTA_ERROR_PATTERN =
-  /(401|403|auth|authentication|unauthorized|forbidden|credential|invalid|invalidated|expired|token|signing in)/i;
+  /(401|403|auth_unavailable|authentication_error|authentication|unauthorized|forbidden|credential|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:token|credential|auth|session)|token\s+(?:is\s+)?(?:invalid|expired)|signing in)/i;
 type AuthFilePriorityTier = 'active' | 'standby' | 'buffer' | 'manualLocked';
 type CodexCardQuotaState = {
   status?: string;
@@ -186,6 +187,12 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const rawStatusMessage = getAuthFileStatusMessage(file);
   const hasStatusWarning =
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
+  const credentialStatusProblem =
+    !isRuntimeOnly && !file.disabled ? getAuthFileCredentialProblem(file) : null;
+  const hasCredentialStatusError = credentialStatusProblem !== null;
+  const credentialInvalidBadgeLabel = t('auth_files.credential_invalid_badge', {
+    defaultValue: '认证失效',
+  });
   const hasQuotaError =
     !isRuntimeOnly &&
     !file.disabled &&
@@ -206,12 +213,16 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       quotaErrorStatus === 403 ||
       CREDENTIAL_QUOTA_ERROR_PATTERN.test(codexQuotaEntry?.error || quotaErrorMessage));
   const quotaErrorBadgeLabel = quotaCredentialError
-    ? t('auth_files.quota_credential_error_badge', { defaultValue: '认证异常' })
+    ? credentialInvalidBadgeLabel
     : t('auth_files.quota_error_badge', { defaultValue: '额度异常' });
   const activeWarningLabel = hasQuotaError
     ? quotaErrorBadgeLabel
+    : hasCredentialStatusError
+      ? credentialInvalidBadgeLabel
     : t('auth_files.health_status_warning');
-  const activeWarningMessage = hasQuotaError ? quotaErrorMessage : rawStatusMessage;
+  const activeWarningMessage = hasQuotaError
+    ? quotaErrorMessage
+    : credentialStatusProblem?.message || rawStatusMessage;
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
@@ -311,6 +322,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     subscriptionExpiryMs !== null &&
     subscriptionExpiryMs !== undefined &&
     subscriptionExpiryMs <= referenceTimeMs;
+  const accessTokenExpired = accessTokenOnly && subscriptionExpired;
   const subscriptionExpiringSoon =
     !subscriptionExpired &&
     subscriptionExpiryMs !== null &&
@@ -349,6 +361,27 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       : showManualExpirySetup
       ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
       : subscriptionExpiryLabel;
+  const accessTokenMetaLabel = accessTokenExpired
+    ? t('auth_files.access_token_expired_short_label', {
+        defaultValue: 'Access 已过期',
+      })
+    : t('auth_files.access_token_expiry_short_label', {
+        defaultValue: 'Access 到期',
+      });
+  const credentialStatusMessage =
+    credentialStatusProblem?.message || t('common.unknown_error');
+  const credentialInvalidTitle =
+    accessTokenOnly && !accessTokenExpired
+      ? t('auth_files.credential_invalid_access_active_title', {
+          expiry: subscriptionExpiryLabel || accessTokenExpiryUnknownLabel,
+          message: credentialStatusMessage,
+          defaultValue:
+            'Access 尚未到期（{{expiry}}），但上游已拒绝此认证：{{message}}。请重新登录获取新凭证。',
+        })
+      : t('auth_files.credential_invalid_badge_title', {
+          message: credentialStatusMessage,
+          defaultValue: '上游已拒绝此认证：{{message}}。请重新登录获取新凭证。',
+        });
   const showSubscriptionMeta =
     Boolean(accessTokenOnly || manualExpiry || visibleCodexSubscription || showManualExpirySetup) &&
     !showQuotaLayout;
@@ -529,6 +562,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       ? t('auth_files.health_status_disabled')
       : hasQuotaError
         ? t('auth_files.health_status_quota_error', { defaultValue: '额度异常' })
+      : hasCredentialStatusError
+        ? credentialInvalidBadgeLabel
       : hasStatusWarning
         ? t('auth_files.health_status_warning')
         : rawStatusMessage
@@ -606,7 +641,15 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     {stateLabel}
                   </span>
                 )}
-                {accessTokenOnly && (
+                {hasCredentialStatusError && (
+                  <span
+                    className={`${styles.stateBadge} ${styles.stateBadgeQuotaError}`}
+                    title={credentialInvalidTitle}
+                  >
+                    {credentialInvalidBadgeLabel}
+                  </span>
+                )}
+                {accessTokenOnly && !hasCredentialStatusError && (
                   <span
                     className={`${styles.stateBadge} ${styles.refreshTokenWarningBadge}`}
                     title={t('auth_files.missing_refresh_token_badge_title', {
@@ -770,9 +813,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
               <div className={`${styles.metaItem} ${styles.subscriptionExpiryMeta}`}>
                 <span className={styles.metaLabel}>
                   {accessTokenOnly
-                    ? t('auth_files.access_token_expiry_short_label', {
-                        defaultValue: 'Access 到期',
-                      })
+                    ? accessTokenMetaLabel
                     : compact
                     ? t('auth_files.subscription_expiry_short_label')
                     : t('codex_quota.subscription_expiry_label')}
