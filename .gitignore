@@ -21,6 +21,7 @@ dist
 dist-ssr
 *.local
 skills
+.codegraph/
 
 # Editor directories and files
 settings.local.json
