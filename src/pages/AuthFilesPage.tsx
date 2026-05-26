@@ -91,6 +91,7 @@ import {
 import {
   analyzeCodexPriorityRotation,
   normalizePriorityRotationActiveSlotLimit,
+  normalizePriorityRotationNoStandbyThresholdDropPercent,
   normalizePriorityRotationThresholdPercent,
   PRIORITY_ROTATION_ACTIVE_PRIORITY,
   PRIORITY_ROTATION_BUFFER_PRIORITY,
@@ -131,6 +132,7 @@ import styles from './AuthFilesPage.module.scss';
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
 const PRIORITY_ROTATION_THRESHOLD_STEP = 1;
+const PRIORITY_ROTATION_NO_STANDBY_THRESHOLD_DROP_STEP = 1;
 const PRIORITY_ROTATION_SLOT_STEP = 1;
 const PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP = 1;
 const PRIORITY_ROTATION_WAKE_ATTEMPTS = 18;
@@ -212,7 +214,11 @@ type PriorityRotationTierDetailItem = {
 };
 type PriorityRotationSidecarDraftSettings = Pick<
   PriorityRotationSidecarSettings,
-  'enabled' | 'thresholdPercent' | 'activeSlotLimit' | 'checkIntervalMinutes'
+  | 'enabled'
+  | 'thresholdPercent'
+  | 'noStandbyThresholdDropPercent'
+  | 'activeSlotLimit'
+  | 'checkIntervalMinutes'
 >;
 type PriorityRotationSidecarSaveOptions = {
   notifyError?: boolean;
@@ -225,6 +231,7 @@ type PriorityRotationSidecarSaveOptions = {
 const DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT: PriorityRotationSidecarDraftSettings = {
   enabled: false,
   thresholdPercent: 50,
+  noStandbyThresholdDropPercent: 0,
   activeSlotLimit: 5,
   checkIntervalMinutes: 5,
 };
@@ -234,6 +241,9 @@ const pickPriorityRotationSidecarDraft = (
 ): PriorityRotationSidecarDraftSettings => ({
   enabled: settings.enabled === true,
   thresholdPercent: normalizePriorityRotationThresholdPercent(settings.thresholdPercent),
+  noStandbyThresholdDropPercent: normalizePriorityRotationNoStandbyThresholdDropPercent(
+    settings.noStandbyThresholdDropPercent
+  ),
   activeSlotLimit: normalizePriorityRotationActiveSlotLimit(settings.activeSlotLimit),
   checkIntervalMinutes: normalizePriorityRotationSidecarInterval(settings.checkIntervalMinutes),
 });
@@ -246,6 +256,8 @@ const isPriorityRotationSidecarDraftDirty = (
   return (
     draft.enabled !== saved.enabled ||
     draft.thresholdPercent !== saved.thresholdPercent ||
+    draft.noStandbyThresholdDropPercent !==
+      normalizePriorityRotationNoStandbyThresholdDropPercent(saved.noStandbyThresholdDropPercent) ||
     draft.activeSlotLimit !== saved.activeSlotLimit ||
     draft.checkIntervalMinutes !== saved.checkIntervalMinutes
   );
@@ -295,6 +307,10 @@ export function AuthFilesPage() {
   const [priorityRotationThresholdInput, setPriorityRotationThresholdInput] = useState(() =>
     String(priorityRotationSettings.thresholdPercent)
   );
+  const [
+    priorityRotationNoStandbyThresholdDropInput,
+    setPriorityRotationNoStandbyThresholdDropInput,
+  ] = useState(() => String(priorityRotationSettings.noStandbyThresholdDropPercent));
   const [priorityRotationSlotsInput, setPriorityRotationSlotsInput] = useState(() =>
     String(priorityRotationSettings.activeSlotLimit)
   );
@@ -314,8 +330,7 @@ export function AuthFilesPage() {
   const [priorityRotationSidecarWaking, setPriorityRotationSidecarWaking] = useState(false);
   const [priorityRotationSidecarSecretSaving, setPriorityRotationSidecarSecretSaving] =
     useState(false);
-  const [priorityRotationSidecarRunSaving, setPriorityRotationSidecarRunSaving] =
-    useState(false);
+  const [priorityRotationSidecarRunSaving, setPriorityRotationSidecarRunSaving] = useState(false);
   const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
   const [priorityRotationSidecarIntervalInput, setPriorityRotationSidecarIntervalInput] =
     useState('5');
@@ -429,6 +444,12 @@ export function AuthFilesPage() {
   const priorityRotationEffectiveThresholdPercent = priorityRotationThresholdInput.trim()
     ? normalizePriorityRotationThresholdPercent(priorityRotationThresholdInput)
     : priorityRotationSettings.thresholdPercent;
+  const priorityRotationEffectiveNoStandbyThresholdDropPercent =
+    priorityRotationNoStandbyThresholdDropInput.trim()
+      ? normalizePriorityRotationNoStandbyThresholdDropPercent(
+          priorityRotationNoStandbyThresholdDropInput
+        )
+      : priorityRotationSettings.noStandbyThresholdDropPercent;
   const priorityRotationEffectiveActiveSlotLimit = priorityRotationSlotsInput.trim()
     ? normalizePriorityRotationActiveSlotLimit(priorityRotationSlotsInput)
     : priorityRotationSettings.activeSlotLimit;
@@ -438,19 +459,23 @@ export function AuthFilesPage() {
         files,
         codexQuota,
         priorityRotationEffectiveThresholdPercent,
-        priorityRotationEffectiveActiveSlotLimit
+        priorityRotationEffectiveActiveSlotLimit,
+        priorityRotationEffectiveNoStandbyThresholdDropPercent
       ),
     [
       codexQuota,
       files,
       priorityRotationEffectiveActiveSlotLimit,
+      priorityRotationEffectiveNoStandbyThresholdDropPercent,
       priorityRotationEffectiveThresholdPercent,
     ]
   );
   const priorityRotationSidecarSettings = priorityRotationSidecarStatus?.settings ?? null;
   const priorityRotationSidecarCommittedDraftDirty = useMemo(() => {
     if (!priorityRotationSidecarSettings) return false;
-    if (isPriorityRotationSidecarDraftDirty(priorityRotationSettings, priorityRotationSidecarSettings)) {
+    if (
+      isPriorityRotationSidecarDraftDirty(priorityRotationSettings, priorityRotationSidecarSettings)
+    ) {
       return true;
     }
     return normalizeApiBase(apiBase) !== normalizeApiBase(priorityRotationSidecarSettings.apiBase);
@@ -458,15 +483,16 @@ export function AuthFilesPage() {
   const priorityRotationSidecarInputDraftDirty = useMemo(() => {
     if (!priorityRotationSidecarSettings) return false;
     return (
-      priorityRotationThresholdInput.trim() !==
-        String(priorityRotationSettings.thresholdPercent) ||
-      priorityRotationSlotsInput.trim() !==
-        String(priorityRotationSettings.activeSlotLimit) ||
+      priorityRotationThresholdInput.trim() !== String(priorityRotationSettings.thresholdPercent) ||
+      priorityRotationNoStandbyThresholdDropInput.trim() !==
+        String(priorityRotationSettings.noStandbyThresholdDropPercent) ||
+      priorityRotationSlotsInput.trim() !== String(priorityRotationSettings.activeSlotLimit) ||
       priorityRotationSidecarIntervalInput.trim() !==
         String(priorityRotationSettings.checkIntervalMinutes)
     );
   }, [
     priorityRotationSettings,
+    priorityRotationNoStandbyThresholdDropInput,
     priorityRotationSidecarIntervalInput,
     priorityRotationSidecarSettings,
     priorityRotationSlotsInput,
@@ -1252,8 +1278,15 @@ export function AuthFilesPage() {
 
   useEffect(() => {
     setPriorityRotationThresholdInput(String(priorityRotationSettings.thresholdPercent));
+    setPriorityRotationNoStandbyThresholdDropInput(
+      String(priorityRotationSettings.noStandbyThresholdDropPercent)
+    );
     setPriorityRotationSlotsInput(String(priorityRotationSettings.activeSlotLimit));
-  }, [priorityRotationSettings.activeSlotLimit, priorityRotationSettings.thresholdPercent]);
+  }, [
+    priorityRotationSettings.activeSlotLimit,
+    priorityRotationSettings.noStandbyThresholdDropPercent,
+    priorityRotationSettings.thresholdPercent,
+  ]);
 
   const updatePriorityRotationSettings = useCallback(
     (updates: Partial<PriorityRotationSidecarDraftSettings>) => {
@@ -1276,6 +1309,16 @@ export function AuthFilesPage() {
       const thresholdPercent = normalizePriorityRotationThresholdPercent(value);
       setPriorityRotationThresholdInput(String(thresholdPercent));
       updatePriorityRotationSettings({ thresholdPercent });
+    },
+    [updatePriorityRotationSettings]
+  );
+
+  const commitPriorityRotationNoStandbyThresholdDropInput = useCallback(
+    (value: string) => {
+      const noStandbyThresholdDropPercent =
+        normalizePriorityRotationNoStandbyThresholdDropPercent(value);
+      setPriorityRotationNoStandbyThresholdDropInput(String(noStandbyThresholdDropPercent));
+      updatePriorityRotationSettings({ noStandbyThresholdDropPercent });
     },
     [updatePriorityRotationSettings]
   );
@@ -1313,6 +1356,22 @@ export function AuthFilesPage() {
     [updatePriorityRotationSettings]
   );
 
+  const handlePriorityRotationNoStandbyThresholdDropInputChange = useCallback(
+    (value: string) => {
+      setPriorityRotationNoStandbyThresholdDropInput(value);
+      const trimmed = value.trim();
+      if (!trimmed || !Number.isFinite(Number(trimmed))) {
+        priorityRotationSidecarDraftTouchedRef.current = true;
+        return;
+      }
+      updatePriorityRotationSettings({
+        noStandbyThresholdDropPercent:
+          normalizePriorityRotationNoStandbyThresholdDropPercent(trimmed),
+      });
+    },
+    [updatePriorityRotationSettings]
+  );
+
   const handlePriorityRotationSlotsInputChange = useCallback(
     (value: string) => {
       setPriorityRotationSlotsInput(value);
@@ -1341,6 +1400,25 @@ export function AuthFilesPage() {
       });
     },
     [updatePriorityRotationSettings]
+  );
+
+  const adjustPriorityRotationNoStandbyThresholdDrop = useCallback(
+    (delta: number) => {
+      const raw = priorityRotationNoStandbyThresholdDropInput.trim();
+      const base = raw
+        ? normalizePriorityRotationNoStandbyThresholdDropPercent(raw)
+        : priorityRotationSettings.noStandbyThresholdDropPercent;
+      const noStandbyThresholdDropPercent = normalizePriorityRotationNoStandbyThresholdDropPercent(
+        base + delta
+      );
+      setPriorityRotationNoStandbyThresholdDropInput(String(noStandbyThresholdDropPercent));
+      updatePriorityRotationSettings({ noStandbyThresholdDropPercent });
+    },
+    [
+      priorityRotationNoStandbyThresholdDropInput,
+      priorityRotationSettings.noStandbyThresholdDropPercent,
+      updatePriorityRotationSettings,
+    ]
   );
 
   const adjustPriorityRotationSlots = useCallback(
@@ -1383,6 +1461,9 @@ export function AuthFilesPage() {
       priorityRotationSidecarDraftTouchedRef.current = false;
       setPriorityRotationSettings(nextDraft);
       setPriorityRotationThresholdInput(String(nextDraft.thresholdPercent));
+      setPriorityRotationNoStandbyThresholdDropInput(
+        String(nextDraft.noStandbyThresholdDropPercent)
+      );
       setPriorityRotationSlotsInput(String(nextDraft.activeSlotLimit));
       setPriorityRotationSidecarIntervalInput(String(nextDraft.checkIntervalMinutes));
     },
@@ -1492,6 +1573,13 @@ export function AuthFilesPage() {
         : priorityRotationThresholdInput.trim()
           ? normalizePriorityRotationThresholdPercent(priorityRotationThresholdInput)
           : priorityRotationSettings.thresholdPercent,
+      noStandbyThresholdDropPercent: options.committedDraftOnly
+        ? priorityRotationSettings.noStandbyThresholdDropPercent
+        : priorityRotationNoStandbyThresholdDropInput.trim()
+          ? normalizePriorityRotationNoStandbyThresholdDropPercent(
+              priorityRotationNoStandbyThresholdDropInput
+            )
+          : priorityRotationSettings.noStandbyThresholdDropPercent,
       activeSlotLimit: options.committedDraftOnly
         ? priorityRotationSettings.activeSlotLimit
         : priorityRotationSlotsInput.trim()
@@ -1510,7 +1598,9 @@ export function AuthFilesPage() {
       priorityRotationSettings.activeSlotLimit,
       priorityRotationSettings.checkIntervalMinutes,
       priorityRotationSettings.enabled,
+      priorityRotationSettings.noStandbyThresholdDropPercent,
       priorityRotationSettings.thresholdPercent,
+      priorityRotationNoStandbyThresholdDropInput,
       priorityRotationSidecarSettings?.revision,
       priorityRotationSidecarIntervalInput,
       priorityRotationSlotsInput,
@@ -1569,7 +1659,11 @@ export function AuthFilesPage() {
           committedDraftOnly: options.committedDraftOnly,
         });
         const result = await priorityRotationSidecarApi.updateSettings(settings, managementKey);
-        mergePriorityRotationSidecarResult(result.settings, result.state, options.forceDraft ?? true);
+        mergePriorityRotationSidecarResult(
+          result.settings,
+          result.state,
+          options.forceDraft ?? true
+        );
         if (notify) {
           showNotification(t('auth_files.priority_rotation_sidecar_settings_saved'), 'success');
         }
@@ -1731,13 +1825,7 @@ export function AuthFilesPage() {
     } finally {
       setPriorityRotationPreviewApplying(false);
     }
-  }, [
-    batchSetPriorities,
-    loadFiles,
-    priorityRotationAnalysis.changes,
-    showNotification,
-    t,
-  ]);
+  }, [batchSetPriorities, loadFiles, priorityRotationAnalysis.changes, showNotification, t]);
 
   const clearTemporaryPriorityLockState = useCallback(() => {
     clearAuthFilesTemporaryPriorityLock();
@@ -1883,11 +1971,9 @@ export function AuthFilesPage() {
     priorityRotationSidecarAutoSaveFailedAtRef.current = 0;
     setPriorityRotationSettings((current) => ({ ...current, enabled: nextEnabled }));
 
-    const saved = await savePriorityRotationSidecarSettings(
-      { enabled: nextEnabled },
-      true,
-      { forceDraft: true }
-    );
+    const saved = await savePriorityRotationSidecarSettings({ enabled: nextEnabled }, true, {
+      forceDraft: true,
+    });
     if (!saved) {
       setPriorityRotationSettings((current) => ({ ...current, enabled: previousEnabled }));
     }
@@ -1968,8 +2054,7 @@ export function AuthFilesPage() {
 
   useEffect(() => {
     const mutationAt = priorityRotationSidecarStatus?.state.lastMutationAt ?? '';
-    const mutationCount =
-      priorityRotationSidecarStatus?.state.lastMutationAppliedChangeCount ?? 0;
+    const mutationCount = priorityRotationSidecarStatus?.state.lastMutationAppliedChangeCount ?? 0;
     if (!mutationAt || mutationCount <= 0) return;
     if (priorityRotationSidecarLastMutationRef.current === mutationAt) return;
 
@@ -2144,7 +2229,7 @@ export function AuthFilesPage() {
     : '';
   const accountMemoEditorFileName = accountMemoEditorFile?.name ?? '';
   const accountMemoEditorExistingText = accountMemoEditorFile
-    ? getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)?.text ?? ''
+    ? (getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)?.text ?? '')
     : '';
   const uploadDropPoolClass = [
     styles.uploadDropPool,
@@ -2209,6 +2294,33 @@ export function AuthFilesPage() {
         : `主力 ${priorityRotationVisibleActiveCount}/${priorityRotationAnalysis.activeSlotLimit}`,
     }
   );
+  const priorityRotationThresholdSummaryValue = priorityRotationAnalysis.thresholdAdjusted
+    ? t('auth_files.priority_rotation_summary_threshold_with_fallback_value', {
+        threshold: priorityRotationAnalysis.thresholdPercent,
+        effective: priorityRotationAnalysis.effectiveThresholdPercent,
+        defaultValue: `健康线 ${priorityRotationAnalysis.thresholdPercent}% / 无备用接力线 ${priorityRotationAnalysis.effectiveThresholdPercent}%`,
+      })
+    : t('auth_files.priority_rotation_summary_threshold_value', {
+        threshold: priorityRotationAnalysis.thresholdPercent,
+      });
+  const priorityRotationFallbackSettingLabel =
+    priorityRotationEffectiveNoStandbyThresholdDropPercent > 0
+      ? t('auth_files.priority_rotation_no_standby_drop_active_value', {
+          drop: priorityRotationEffectiveNoStandbyThresholdDropPercent,
+          effective: Math.max(
+            0,
+            priorityRotationEffectiveThresholdPercent -
+              priorityRotationEffectiveNoStandbyThresholdDropPercent
+          ),
+          defaultValue: `无健康备用时下调 ${priorityRotationEffectiveNoStandbyThresholdDropPercent}%，接力线 ${Math.max(
+            0,
+            priorityRotationEffectiveThresholdPercent -
+              priorityRotationEffectiveNoStandbyThresholdDropPercent
+          )}%`,
+        })
+      : t('auth_files.priority_rotation_no_standby_drop_inactive', {
+          defaultValue: '无健康备用时不下调',
+        });
   const priorityRotationStatusClass = priorityRotationHasPreviewChanges
     ? styles.priorityRotationStatusReady
     : priorityRotationAnalysis.status === 'quota_unknown' ||
@@ -2232,9 +2344,7 @@ export function AuthFilesPage() {
     {
       key: 'threshold',
       label: t('auth_files.priority_rotation_summary_threshold_label'),
-      value: t('auth_files.priority_rotation_summary_threshold_value', {
-        threshold: priorityRotationAnalysis.effectiveThresholdPercent,
-      }),
+      value: priorityRotationThresholdSummaryValue,
     },
     {
       key: 'slots',
@@ -2273,10 +2383,10 @@ export function AuthFilesPage() {
     priorityRotationSidecarSaving || priorityRotationSidecarAutoSaving
       ? priorityRotationSavingLabel
       : priorityRotationSidecarCommittedDraftDirty
-    ? priorityRotationPendingSaveLabel
-    : priorityRotationSidecarInputDraftDirty
-      ? priorityRotationInputPendingLabel
-      : '';
+        ? priorityRotationPendingSaveLabel
+        : priorityRotationSidecarInputDraftDirty
+          ? priorityRotationInputPendingLabel
+          : '';
   const priorityRotationLayerLabel = t('auth_files.priority_rotation_layers_short');
   const priorityRotationLayerTitle = t('auth_files.priority_rotation_layers_title');
   const priorityRotationTierLabels: Record<AuthFilePriorityTier, string> = {
@@ -2364,10 +2474,9 @@ export function AuthFilesPage() {
   const priorityRotationSidecarDraftEnabled = priorityRotationSettings.enabled === true;
   const priorityRotationSidecarEnabled = priorityRotationSidecarDraftEnabled;
   const priorityRotationSidecarHasSecret = priorityRotationSidecarState?.hasSecret === true;
-  const priorityRotationSidecarStatusTone =
-    priorityRotationSidecarWaking
-      ? styles.priorityRotationStatusReady
-      : priorityRotationSidecarError || !priorityRotationSidecarOnline
+  const priorityRotationSidecarStatusTone = priorityRotationSidecarWaking
+    ? styles.priorityRotationStatusReady
+    : priorityRotationSidecarError || !priorityRotationSidecarOnline
       ? styles.priorityRotationStatusWarning
       : priorityRotationSidecarState?.running
         ? styles.priorityRotationStatusReady
@@ -2376,11 +2485,11 @@ export function AuthFilesPage() {
     ? t('auth_files.priority_rotation_sidecar_loading')
     : priorityRotationSidecarWaking
       ? t('auth_files.priority_rotation_sidecar_waking')
-    : priorityRotationSidecarError || !priorityRotationSidecarOnline
-      ? t('auth_files.priority_rotation_sidecar_offline')
-      : priorityRotationSidecarState?.running
-        ? t('auth_files.priority_rotation_sidecar_running')
-        : t('auth_files.priority_rotation_sidecar_waiting');
+      : priorityRotationSidecarError || !priorityRotationSidecarOnline
+        ? t('auth_files.priority_rotation_sidecar_offline')
+        : priorityRotationSidecarState?.running
+          ? t('auth_files.priority_rotation_sidecar_running')
+          : t('auth_files.priority_rotation_sidecar_waiting');
   const priorityRotationSidecarSecretLabel = !priorityRotationSidecarOnline
     ? t('auth_files.priority_rotation_sidecar_secret_unknown')
     : priorityRotationSidecarHasSecret
@@ -2980,9 +3089,7 @@ export function AuthFilesPage() {
                       <button
                         type="button"
                         className={`${styles.priorityRotationRelaySwitch} ${
-                          priorityRotationSidecarEnabled
-                            ? styles.priorityRotationRelaySwitchOn
-                            : ''
+                          priorityRotationSidecarEnabled ? styles.priorityRotationRelaySwitchOn : ''
                         } ${priorityRotationSidecarWaking ? styles.priorityRotationRelaySwitchWaking : ''}`}
                         role="switch"
                         aria-checked={priorityRotationSidecarEnabled}
@@ -3063,6 +3170,72 @@ export function AuthFilesPage() {
                             />
                           </span>
                         </span>
+                        <span className={styles.priorityRotationFallbackControl}>
+                          <span className={styles.priorityRotationFallbackHeader}>
+                            <span>{t('auth_files.priority_rotation_no_standby_drop_label')}</span>
+                            <span>{priorityRotationFallbackSettingLabel}</span>
+                          </span>
+                          <span
+                            className={`${styles.priorityRotationStepper} ${styles.priorityRotationFallbackStepper}`}
+                          >
+                            <button
+                              type="button"
+                              className={styles.priorityRotationStepperButton}
+                              disabled={priorityRotationSidecarSaving}
+                              aria-label={t(
+                                'auth_files.priority_rotation_no_standby_drop_decrease'
+                              )}
+                              onClick={() =>
+                                adjustPriorityRotationNoStandbyThresholdDrop(
+                                  -PRIORITY_ROTATION_NO_STANDBY_THRESHOLD_DROP_STEP
+                                )
+                              }
+                            >
+                              <IconMinus size={16} />
+                            </button>
+                            <span className={styles.priorityRotationStepperValue}>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={priorityRotationNoStandbyThresholdDropInput}
+                                disabled={priorityRotationSidecarSaving}
+                                aria-label={t('auth_files.priority_rotation_no_standby_drop_label')}
+                                onChange={(event) =>
+                                  handlePriorityRotationNoStandbyThresholdDropInputChange(
+                                    event.currentTarget.value
+                                  )
+                                }
+                                onBlur={(event) =>
+                                  commitPriorityRotationNoStandbyThresholdDropInput(
+                                    event.currentTarget.value
+                                  )
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                              />
+                              <span>%</span>
+                            </span>
+                            <button
+                              type="button"
+                              className={styles.priorityRotationStepperButton}
+                              disabled={priorityRotationSidecarSaving}
+                              aria-label={t(
+                                'auth_files.priority_rotation_no_standby_drop_increase'
+                              )}
+                              onClick={() =>
+                                adjustPriorityRotationNoStandbyThresholdDrop(
+                                  PRIORITY_ROTATION_NO_STANDBY_THRESHOLD_DROP_STEP
+                                )
+                              }
+                            >
+                              <IconPlus size={16} />
+                            </button>
+                          </span>
+                        </span>
                       </div>
                       <div
                         className={styles.priorityRotationSetting}
@@ -3133,9 +3306,7 @@ export function AuthFilesPage() {
                             type="button"
                             className={styles.priorityRotationStepperButton}
                             disabled={priorityRotationSidecarSaving}
-                            aria-label={t(
-                              'auth_files.priority_rotation_sidecar_interval_decrease'
-                            )}
+                            aria-label={t('auth_files.priority_rotation_sidecar_interval_decrease')}
                             onClick={() =>
                               adjustPriorityRotationSidecarInterval(
                                 -PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP
@@ -3174,9 +3345,7 @@ export function AuthFilesPage() {
                             type="button"
                             className={styles.priorityRotationStepperButton}
                             disabled={priorityRotationSidecarSaving}
-                            aria-label={t(
-                              'auth_files.priority_rotation_sidecar_interval_increase'
-                            )}
+                            aria-label={t('auth_files.priority_rotation_sidecar_interval_increase')}
                             onClick={() =>
                               adjustPriorityRotationSidecarInterval(
                                 PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP
@@ -3592,10 +3761,7 @@ export function AuthFilesPage() {
               {priorityRotationAnalysis.changes.map((change) => (
                 <div className={styles.priorityRotationRow} key={change.name}>
                   <span className={styles.priorityRotationIdentity}>
-                    <span
-                      className={styles.priorityRotationDisplayName}
-                      title={change.displayName}
-                    >
+                    <span className={styles.priorityRotationDisplayName} title={change.displayName}>
                       {change.displayName}
                     </span>
                     <span className={styles.priorityRotationFileName} title={change.name}>

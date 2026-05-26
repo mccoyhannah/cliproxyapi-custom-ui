@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   enabled: false,
   apiBase: 'http://127.0.0.1:8317',
   thresholdPercent: 50,
+  noStandbyThresholdDropPercent: 0,
   activeSlotLimit: 5,
   checkIntervalMinutes: 5,
   revision: 0,
@@ -53,7 +54,8 @@ const idleShutdownMinutes = clampInteger(
 );
 const idleShutdownMs = idleShutdownMinutes * 60_000;
 const dataDir = args['data-dir'] ?? path.join(installDir, 'priority-rotation');
-const customUiDir = args['custom-ui-dir'] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const customUiDir =
+  args['custom-ui-dir'] ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const modelRequestLogsDir = args['model-request-logs-dir'] ?? path.join(installDir, 'logs');
 const settingsPath = path.join(dataDir, 'settings.json');
 const statePath = path.join(dataDir, 'state.json');
@@ -123,22 +125,16 @@ export function shouldStopForIdle({
   idleMinutes = DEFAULT_IDLE_SHUTDOWN_MINUTES,
   running = false,
 } = {}) {
-  const normalizedIdleMinutes = clampInteger(
-    idleMinutes,
-    DEFAULT_IDLE_SHUTDOWN_MINUTES,
-    1,
-    180
-  );
+  const normalizedIdleMinutes = clampInteger(idleMinutes, DEFAULT_IDLE_SHUTDOWN_MINUTES, 1, 180);
   const activityAt = Number(lastActivityAtMs);
   if (running || !Number.isFinite(activityAt)) return false;
   return nowMs - activityAt >= normalizedIdleMinutes * 60_000;
 }
 
 export function parseModelRequestLogTimeMs(fileName) {
-  const match =
-    /^v1-[a-z0-9][a-z0-9-]*-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-/i.exec(
-      String(fileName ?? '')
-    );
+  const match = /^v1-[a-z0-9][a-z0-9-]*-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-/i.exec(
+    String(fileName ?? '')
+  );
   if (!match) return null;
   const [, year, month, day, hour, minute, second] = match;
   const value = new Date(
@@ -192,12 +188,13 @@ function normalizeSettings(input) {
       0,
       100
     ),
-    activeSlotLimit: clampInteger(
-      source.activeSlotLimit,
-      DEFAULT_SETTINGS.activeSlotLimit,
-      1,
-      99
+    noStandbyThresholdDropPercent: clampInteger(
+      source.noStandbyThresholdDropPercent,
+      DEFAULT_SETTINGS.noStandbyThresholdDropPercent,
+      0,
+      100
     ),
+    activeSlotLimit: clampInteger(source.activeSlotLimit, DEFAULT_SETTINGS.activeSlotLimit, 1, 99),
     checkIntervalMinutes: clampInteger(
       source.checkIntervalMinutes,
       DEFAULT_SETTINGS.checkIntervalMinutes,
@@ -294,9 +291,7 @@ export function buildIdleShutdownStatePatch(currentSettings = settings, currentS
     lastStatus: 'skipped',
     lastSkippedReason: 'idle_timeout',
     lastError: null,
-    nextRunAt: normalizedSettings.enabled
-      ? currentState?.nextRunAt || nextRunIso()
-      : null,
+    nextRunAt: normalizedSettings.enabled ? currentState?.nextRunAt || nextRunIso() : null,
   };
 }
 
@@ -614,7 +609,9 @@ function normalizeAuthFilesResponse(payload) {
 }
 
 function resolveAuthProvider(file) {
-  return String(file.provider ?? file.type ?? '').trim().toLowerCase();
+  return String(file.provider ?? file.type ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function isCodexFile(file) {
@@ -708,7 +705,8 @@ function parseIdTokenPayload(value) {
 
 function resolveCodexChatgptAccountId(file) {
   const metadata = file.metadata && typeof file.metadata === 'object' ? file.metadata : null;
-  const attributes = file.attributes && typeof file.attributes === 'object' ? file.attributes : null;
+  const attributes =
+    file.attributes && typeof file.attributes === 'object' ? file.attributes : null;
   const candidates = [file.id_token, metadata?.id_token, attributes?.id_token];
   for (const candidate of candidates) {
     const payload = parseIdTokenPayload(candidate);
@@ -720,7 +718,8 @@ function resolveCodexChatgptAccountId(file) {
 
 function resolveCodexPlanType(file) {
   const metadata = file.metadata && typeof file.metadata === 'object' ? file.metadata : null;
-  const attributes = file.attributes && typeof file.attributes === 'object' ? file.attributes : null;
+  const attributes =
+    file.attributes && typeof file.attributes === 'object' ? file.attributes : null;
   const idToken = file.id_token && typeof file.id_token === 'object' ? file.id_token : null;
   const metadataIdToken =
     metadata?.id_token && typeof metadata.id_token === 'object' ? metadata.id_token : null;
@@ -834,10 +833,18 @@ export function analyzeCodexPriorityRotation(
   files,
   codexQuota,
   thresholdPercent,
-  activeSlotLimit
+  activeSlotLimit,
+  noStandbyThresholdDropPercent = DEFAULT_SETTINGS.noStandbyThresholdDropPercent
 ) {
   const threshold = clampInteger(thresholdPercent, DEFAULT_SETTINGS.thresholdPercent, 0, 100);
   const slotLimit = clampInteger(activeSlotLimit, DEFAULT_SETTINGS.activeSlotLimit, 1, 99);
+  const fallbackDrop = clampInteger(
+    noStandbyThresholdDropPercent,
+    DEFAULT_SETTINGS.noStandbyThresholdDropPercent,
+    0,
+    100
+  );
+  const fallbackThreshold = Math.max(0, threshold - fallbackDrop);
   const candidates = [];
   const skippedCandidates = [];
   let unknownCount = 0;
@@ -961,26 +968,21 @@ export function analyzeCodexPriorityRotation(
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
   );
-  const effectiveThreshold = threshold;
-  const thresholdAdjusted = false;
   const managedCandidates = candidates.filter((candidate) => candidate.managed !== false);
   const getRemainingSortValue = (candidate) =>
     typeof candidate.remainingPercent === 'number' && Number.isFinite(candidate.remainingPercent)
       ? candidate.remainingPercent
       : -1;
   const healthyActiveCandidates = activeCandidates.filter(
-    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
+    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= threshold
   );
-  const healthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
+  const normalHealthyStandbyCandidates = standbyCandidates.filter(
+    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= threshold
   );
 
   const demotionMap = new Map();
   activeCandidates.forEach((candidate) => {
-    if (
-      candidate.managed !== false &&
-      getRemainingSortValue(candidate) < effectiveThreshold
-    ) {
+    if (candidate.managed !== false && getRemainingSortValue(candidate) < threshold) {
       demotionMap.set(candidate.file.name, 'low_remaining');
     }
   });
@@ -991,9 +993,7 @@ export function analyzeCodexPriorityRotation(
       .filter((candidate) => !demotionMap.has(candidate.file.name))
       .sort((a, b) => {
         const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
-        return remainingCompare !== 0
-          ? remainingCompare
-          : a.file.name.localeCompare(b.file.name);
+        return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
       })
       .some((candidate) => {
         if (projectedActiveCount <= slotLimit) return true;
@@ -1023,6 +1023,18 @@ export function analyzeCodexPriorityRotation(
   const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
     (reason) => reason === 'low_remaining'
   ).length;
+  const needsStandby =
+    Math.max(0, slotLimit - projectedActiveCount) > 0 || lowRemainingDemotionCount > 0;
+  const useFallbackStandbyThreshold =
+    needsStandby && normalHealthyStandbyCandidates.length === 0 && fallbackThreshold < threshold;
+  const effectiveThreshold = useFallbackStandbyThreshold ? fallbackThreshold : threshold;
+  const thresholdAdjusted = effectiveThreshold !== threshold;
+  const healthyStandbyCandidates = thresholdAdjusted
+    ? standbyCandidates.filter(
+        (candidate) =>
+          candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
+      )
+    : normalHealthyStandbyCandidates;
   const replacementSlots = Math.min(lowRemainingDemotionCount, activeDeficit);
   const fillSlots = Math.min(activeDeficit, healthyStandbyCandidates.length);
   const promotionSlots = Math.max(replacementSlots, fillSlots);
@@ -1155,8 +1167,10 @@ function pickClassifiedWindows(limitInfo, options = {}) {
   }
 
   if (allowOrderFallback) {
-    if (!fiveHourWindow) fiveHourWindow = primaryWindow && primaryWindow !== weeklyWindow ? primaryWindow : null;
-    if (!weeklyWindow) weeklyWindow = secondaryWindow && secondaryWindow !== fiveHourWindow ? secondaryWindow : null;
+    if (!fiveHourWindow)
+      fiveHourWindow = primaryWindow && primaryWindow !== weeklyWindow ? primaryWindow : null;
+    if (!weeklyWindow)
+      weeklyWindow = secondaryWindow && secondaryWindow !== fiveHourWindow ? secondaryWindow : null;
   }
 
   return { fiveHourWindow, weeklyWindow };
@@ -1220,18 +1234,16 @@ async function fetchCodexQuotaState(file, key) {
 
   const body = result?.body;
   const payload =
-    typeof body === 'string'
-      ? JSON.parse(body)
-      : body && typeof body === 'object'
-        ? body
-        : null;
+    typeof body === 'string' ? JSON.parse(body) : body && typeof body === 'object' ? body : null;
   if (!payload) {
     return { status: 'error', windows: [], error: 'empty_quota_payload' };
   }
 
   return {
     status: 'success',
-    planType: normalizePlanType(payload.plan_type ?? payload.planType ?? resolveCodexPlanType(file)),
+    planType: normalizePlanType(
+      payload.plan_type ?? payload.planType ?? resolveCodexPlanType(file)
+    ),
     windows: buildCodexQuotaWindows(payload),
   };
 }
@@ -1362,7 +1374,8 @@ export async function runPriorityRotation(options = {}) {
         files,
         codexQuota,
         settings.thresholdPercent,
-        settings.activeSlotLimit
+        settings.activeSlotLimit,
+        settings.noStandbyThresholdDropPercent
       );
       let successCount = 0;
       let failCount = 0;
@@ -1399,7 +1412,8 @@ export async function runPriorityRotation(options = {}) {
             files,
             codexQuota,
             settings.thresholdPercent,
-            settings.activeSlotLimit
+            settings.activeSlotLimit,
+            settings.noStandbyThresholdDropPercent
           );
         }
       }
@@ -1481,7 +1495,11 @@ async function persistSettings(updates) {
   }
   settings = normalizeSettings({ ...settings, ...updates, revision: settings.revision + 1 });
   await writeJsonAtomic(settingsPath, settings);
-  if (!state.nextRunAt || updates.checkIntervalMinutes !== undefined || updates.enabled !== undefined) {
+  if (
+    !state.nextRunAt ||
+    updates.checkIntervalMinutes !== undefined ||
+    updates.enabled !== undefined
+  ) {
     state.nextRunAt = settings.enabled ? new Date().toISOString() : null;
   }
   await updateState({ enabled: settings.enabled, nextRunAt: state.nextRunAt });

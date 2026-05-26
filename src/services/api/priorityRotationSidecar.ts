@@ -2,6 +2,7 @@ export type PriorityRotationSidecarSettings = {
   enabled: boolean;
   apiBase: string;
   thresholdPercent: number;
+  noStandbyThresholdDropPercent: number;
   activeSlotLimit: number;
   checkIntervalMinutes: number;
   revision: number;
@@ -151,14 +152,14 @@ export const priorityRotationSidecarApi = {
   getStatus: () => requestSidecar<PriorityRotationSidecarStatus>('/status'),
 
   updateSettings: (settings: Partial<PriorityRotationSidecarSettings>, managementKey: string) =>
-    requestSidecar<{ settings: PriorityRotationSidecarSettings; state: PriorityRotationSidecarState }>(
-      '/settings',
-      {
-        method: 'PUT',
-        managementKey,
-        body: JSON.stringify({ settings }),
-      }
-    ),
+    requestSidecar<{
+      settings: PriorityRotationSidecarSettings;
+      state: PriorityRotationSidecarState;
+    }>('/settings', {
+      method: 'PUT',
+      managementKey,
+      body: JSON.stringify({ settings }),
+    }),
 
   saveSecret: (managementKey: string, apiBase: string) =>
     requestSidecar<{
@@ -172,12 +173,12 @@ export const priorityRotationSidecarApi = {
     }),
 
   runNow: (managementKey: string) =>
-    requestSidecar<{ settings: PriorityRotationSidecarSettings; state: PriorityRotationSidecarState }>(
-      '/run-now',
-      {
-        method: 'POST',
-        managementKey,
-        body: JSON.stringify({ dryRun: false }),
-      }
-    ),
+    requestSidecar<{
+      settings: PriorityRotationSidecarSettings;
+      state: PriorityRotationSidecarState;
+    }>('/run-now', {
+      method: 'POST',
+      managementKey,
+      body: JSON.stringify({ dryRun: false }),
+    }),
 };

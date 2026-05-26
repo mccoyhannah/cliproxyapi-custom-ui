@@ -31,7 +31,10 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.equal(isModelRequestLogName('v1-chat-completions-2026-05-20T052001-11111111.log'), true);
   assert.equal(isModelRequestLogName('v1-images-generations-2026-05-20T052101-22222222.log'), true);
   assert.equal(isModelRequestLogName('main.log'), false);
-  assert.equal(isModelRequestLogName('api-provider-openai-v1-responses-2026-05-20T052201.log'), false);
+  assert.equal(
+    isModelRequestLogName('api-provider-openai-v1-responses-2026-05-20T052201.log'),
+    false
+  );
   assert.equal(
     getLatestModelRequestAtMs([
       'main.log',
@@ -191,7 +194,10 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.equal(result.standbyCount, 17);
   assert.equal(result.projectedActiveCount, 3);
   assert.equal(result.changes.length, 16);
-  assert.equal(result.changes.every((change) => change.fromPriority === 2 && change.toPriority === 1), true);
+  assert.equal(
+    result.changes.every((change) => change.fromPriority === 2 && change.toPriority === 1),
+    true
+  );
 }
 
 {
@@ -210,7 +216,10 @@ const quota = (usedPercent, planType = 'team') => ({
   );
   assert.equal(result.status, 'ready');
   assert.equal(result.changes.length, 1);
-  assert.equal(result.changes.some((change) => change.name === 'manual-locked.json'), false);
+  assert.equal(
+    result.changes.some((change) => change.name === 'manual-locked.json'),
+    false
+  );
   assert.ok(
     result.candidates.some(
       (candidate) =>
@@ -274,6 +283,76 @@ const quota = (usedPercent, planType = 'team') => ({
 }
 
 {
+  const files = [
+    codexFile('active-a.json', 2),
+    codexFile('active-b.json', 2),
+    codexFile('standby-low.json', 1),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(15),
+      'active-b.json': quota(15),
+      'standby-low.json': quota(30),
+    },
+    80,
+    3,
+    20
+  );
+  assert.equal(result.status, 'ready');
+  assert.equal(result.thresholdAdjusted, true);
+  assert.equal(result.effectiveThresholdPercent, 60);
+  assert.deepEqual(
+    result.changes.map((change) => [
+      change.name,
+      change.role,
+      change.fromPriority,
+      change.toPriority,
+    ]),
+    [['standby-low.json', 'promote', 1, 2]]
+  );
+}
+
+{
+  const files = [codexFile('active-soft-low.json', 2)];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-soft-low.json': quota(60),
+    },
+    50,
+    1,
+    40
+  );
+  assert.equal(result.status, 'ready');
+  assert.equal(result.thresholdAdjusted, true);
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.reason, change.toPriority]),
+    [['active-soft-low.json', 'demote', 'low_remaining', 1]]
+  );
+}
+
+{
+  const files = [codexFile('active-a.json', 2), codexFile('standby-empty.json', 1)];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-a.json': quota(20),
+      'standby-empty.json': quota(100),
+    },
+    50,
+    2,
+    500
+  );
+  assert.equal(result.thresholdAdjusted, true);
+  assert.equal(result.effectiveThresholdPercent, 0);
+  assert.deepEqual(
+    result.changes.map((change) => [change.name, change.role, change.remainingPercent]),
+    [['standby-empty.json', 'promote', 0]]
+  );
+}
+
+{
   const files = [codexFile('active-a.json', 2), codexFile('standby-only.json', 1)];
   const result = analyzeCodexPriorityRotation(
     files,
@@ -286,7 +365,12 @@ const quota = (usedPercent, planType = 'team') => ({
   );
   assert.equal(result.status, 'ready');
   assert.deepEqual(
-    result.changes.map((change) => [change.name, change.role, change.fromPriority, change.toPriority]),
+    result.changes.map((change) => [
+      change.name,
+      change.role,
+      change.fromPriority,
+      change.toPriority,
+    ]),
     [['standby-only.json', 'promote', 1, 2]]
   );
 }
@@ -311,7 +395,12 @@ const quota = (usedPercent, planType = 'team') => ({
   );
   assert.equal(result.status, 'ready');
   assert.deepEqual(
-    result.changes.map((change) => [change.name, change.role, change.fromPriority, change.toPriority]),
+    result.changes.map((change) => [
+      change.name,
+      change.role,
+      change.fromPriority,
+      change.toPriority,
+    ]),
     [['standby-a.json', 'promote', 1, 2]]
   );
 }
@@ -336,7 +425,12 @@ const quota = (usedPercent, planType = 'team') => ({
   );
   assert.equal(result.status, 'ready');
   assert.deepEqual(
-    result.changes.map((change) => [change.name, change.role, change.fromPriority, change.toPriority]),
+    result.changes.map((change) => [
+      change.name,
+      change.role,
+      change.fromPriority,
+      change.toPriority,
+    ]),
     [
       ['standby-a.json', 'promote', 1, 2],
       ['standby-b.json', 'promote', 1, 2],

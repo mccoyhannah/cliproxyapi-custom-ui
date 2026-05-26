@@ -12,6 +12,7 @@ import { parsePriorityValue } from './constants';
 const STORAGE_KEY = 'authFilesPage.priorityRotation.v1';
 const DEFAULT_THRESHOLD_PERCENT = 50;
 const DEFAULT_ACTIVE_SLOT_LIMIT = 5;
+const DEFAULT_NO_STANDBY_THRESHOLD_DROP_PERCENT = 0;
 const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_based']);
 export const PRIORITY_ROTATION_ACTIVE_PRIORITY = 2;
 export const PRIORITY_ROTATION_STANDBY_PRIORITY = 1;
@@ -32,6 +33,7 @@ export type PriorityRotationStatus =
 
 export type AuthFilesPriorityRotationSettings = {
   thresholdPercent: number;
+  noStandbyThresholdDropPercent: number;
   activeSlotLimit: number;
   lastAppliedAt?: number;
   lastAppliedChangeCount?: number;
@@ -83,6 +85,12 @@ const clampThresholdPercent = (value: unknown): number => {
   return Math.max(0, Math.min(100, Math.round(numeric)));
 };
 
+const clampNoStandbyThresholdDropPercent = (value: unknown): number => {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_NO_STANDBY_THRESHOLD_DROP_PERCENT;
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+};
+
 const clampActiveSlotLimit = (value: unknown): number => {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return DEFAULT_ACTIVE_SLOT_LIMIT;
@@ -90,62 +98,67 @@ const clampActiveSlotLimit = (value: unknown): number => {
 };
 
 export const normalizePriorityRotationThresholdPercent = clampThresholdPercent;
+export const normalizePriorityRotationNoStandbyThresholdDropPercent =
+  clampNoStandbyThresholdDropPercent;
 export const normalizePriorityRotationActiveSlotLimit = clampActiveSlotLimit;
 
-export const readAuthFilesPriorityRotationSettings =
-  (): AuthFilesPriorityRotationSettings => {
-    if (typeof window === 'undefined') {
-      return {
-        thresholdPercent: DEFAULT_THRESHOLD_PERCENT,
-        activeSlotLimit: DEFAULT_ACTIVE_SLOT_LIMIT,
-      };
-    }
+export const readAuthFilesPriorityRotationSettings = (): AuthFilesPriorityRotationSettings => {
+  if (typeof window === 'undefined') {
+    return {
+      thresholdPercent: DEFAULT_THRESHOLD_PERCENT,
+      noStandbyThresholdDropPercent: DEFAULT_NO_STANDBY_THRESHOLD_DROP_PERCENT,
+      activeSlotLimit: DEFAULT_ACTIVE_SLOT_LIMIT,
+    };
+  }
 
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return {
-          thresholdPercent: DEFAULT_THRESHOLD_PERCENT,
-          activeSlotLimit: DEFAULT_ACTIVE_SLOT_LIMIT,
-        };
-      }
-      const parsed = JSON.parse(raw) as Partial<AuthFilesPriorityRotationSettings>;
-      return {
-        thresholdPercent: clampThresholdPercent(parsed.thresholdPercent),
-        activeSlotLimit: clampActiveSlotLimit(parsed.activeSlotLimit),
-        lastAppliedAt:
-          typeof parsed.lastAppliedAt === 'number' && Number.isFinite(parsed.lastAppliedAt)
-            ? parsed.lastAppliedAt
-            : undefined,
-        lastAppliedChangeCount:
-          typeof parsed.lastAppliedChangeCount === 'number' &&
-          Number.isFinite(parsed.lastAppliedChangeCount)
-            ? parsed.lastAppliedChangeCount
-            : undefined,
-        autoEnabled: parsed.autoEnabled === true,
-        lastAutoAppliedAt:
-          typeof parsed.lastAutoAppliedAt === 'number' &&
-          Number.isFinite(parsed.lastAutoAppliedAt)
-            ? parsed.lastAutoAppliedAt
-            : undefined,
-        lastAutoAppliedChangeCount:
-          typeof parsed.lastAutoAppliedChangeCount === 'number' &&
-          Number.isFinite(parsed.lastAutoAppliedChangeCount)
-            ? parsed.lastAutoAppliedChangeCount
-            : undefined,
-        lastAutoSkippedReason:
-          typeof parsed.lastAutoSkippedReason === 'string' &&
-          parsed.lastAutoSkippedReason.trim()
-            ? parsed.lastAutoSkippedReason.trim()
-            : undefined,
-      };
-    } catch {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
       return {
         thresholdPercent: DEFAULT_THRESHOLD_PERCENT,
+        noStandbyThresholdDropPercent: DEFAULT_NO_STANDBY_THRESHOLD_DROP_PERCENT,
         activeSlotLimit: DEFAULT_ACTIVE_SLOT_LIMIT,
       };
     }
-  };
+    const parsed = JSON.parse(raw) as Partial<AuthFilesPriorityRotationSettings>;
+    return {
+      thresholdPercent: clampThresholdPercent(parsed.thresholdPercent),
+      noStandbyThresholdDropPercent: clampNoStandbyThresholdDropPercent(
+        parsed.noStandbyThresholdDropPercent
+      ),
+      activeSlotLimit: clampActiveSlotLimit(parsed.activeSlotLimit),
+      lastAppliedAt:
+        typeof parsed.lastAppliedAt === 'number' && Number.isFinite(parsed.lastAppliedAt)
+          ? parsed.lastAppliedAt
+          : undefined,
+      lastAppliedChangeCount:
+        typeof parsed.lastAppliedChangeCount === 'number' &&
+        Number.isFinite(parsed.lastAppliedChangeCount)
+          ? parsed.lastAppliedChangeCount
+          : undefined,
+      autoEnabled: parsed.autoEnabled === true,
+      lastAutoAppliedAt:
+        typeof parsed.lastAutoAppliedAt === 'number' && Number.isFinite(parsed.lastAutoAppliedAt)
+          ? parsed.lastAutoAppliedAt
+          : undefined,
+      lastAutoAppliedChangeCount:
+        typeof parsed.lastAutoAppliedChangeCount === 'number' &&
+        Number.isFinite(parsed.lastAutoAppliedChangeCount)
+          ? parsed.lastAutoAppliedChangeCount
+          : undefined,
+      lastAutoSkippedReason:
+        typeof parsed.lastAutoSkippedReason === 'string' && parsed.lastAutoSkippedReason.trim()
+          ? parsed.lastAutoSkippedReason.trim()
+          : undefined,
+    };
+  } catch {
+    return {
+      thresholdPercent: DEFAULT_THRESHOLD_PERCENT,
+      noStandbyThresholdDropPercent: DEFAULT_NO_STANDBY_THRESHOLD_DROP_PERCENT,
+      activeSlotLimit: DEFAULT_ACTIVE_SLOT_LIMIT,
+    };
+  }
+};
 
 export const writeAuthFilesPriorityRotationSettings = (
   settings: AuthFilesPriorityRotationSettings
@@ -157,6 +170,9 @@ export const writeAuthFilesPriorityRotationSettings = (
       JSON.stringify({
         ...settings,
         thresholdPercent: clampThresholdPercent(settings.thresholdPercent),
+        noStandbyThresholdDropPercent: clampNoStandbyThresholdDropPercent(
+          settings.noStandbyThresholdDropPercent
+        ),
         activeSlotLimit: clampActiveSlotLimit(settings.activeSlotLimit),
         autoEnabled: settings.autoEnabled === true,
       })
@@ -202,10 +218,13 @@ export const analyzeCodexPriorityRotation = (
   files: AuthFileItem[],
   codexQuota: Record<string, CodexQuotaState>,
   thresholdPercent: number,
-  activeSlotLimit: number
+  activeSlotLimit: number,
+  noStandbyThresholdDropPercent = DEFAULT_NO_STANDBY_THRESHOLD_DROP_PERCENT
 ): PriorityRotationAnalysis => {
   const threshold = clampThresholdPercent(thresholdPercent);
   const slotLimit = clampActiveSlotLimit(activeSlotLimit);
+  const fallbackDrop = clampNoStandbyThresholdDropPercent(noStandbyThresholdDropPercent);
+  const fallbackThreshold = Math.max(0, threshold - fallbackDrop);
   const candidates: PriorityRotationCandidate[] = [];
   let unknownCount = 0;
 
@@ -268,29 +287,25 @@ export const analyzeCodexPriorityRotation = (
   const activePriority = PRIORITY_ROTATION_ACTIVE_PRIORITY;
   const standbyPriority = PRIORITY_ROTATION_STANDBY_PRIORITY;
   const reservePriority = PRIORITY_ROTATION_BUFFER_PRIORITY;
-  const activeCandidates = candidates.filter(
-    (candidate) => candidate.priority === activePriority
-  );
+  const activeCandidates = candidates.filter((candidate) => candidate.priority === activePriority);
   const standbyCandidates = candidates.filter(
     (candidate) => candidate.priority === standbyPriority
   );
-  const effectiveThreshold = threshold;
-  const thresholdAdjusted = false;
   const managedCandidates = candidates.filter((candidate) => candidate.managed);
   const getRemainingSortValue = (candidate: PriorityRotationCandidate): number =>
     typeof candidate.remainingPercent === 'number' && Number.isFinite(candidate.remainingPercent)
       ? candidate.remainingPercent
       : -1;
   const healthyActiveCandidates = activeCandidates.filter(
-    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= effectiveThreshold
+    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= threshold
   );
-  const healthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= effectiveThreshold
+  const normalHealthyStandbyCandidates = standbyCandidates.filter(
+    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= threshold
   );
 
   const demotionMap = new Map<string, PriorityRotationChangeReason>();
   activeCandidates.forEach((candidate) => {
-    if (candidate.managed && getRemainingSortValue(candidate) < effectiveThreshold) {
+    if (candidate.managed && getRemainingSortValue(candidate) < threshold) {
       demotionMap.set(candidate.file.name, 'low_remaining');
     }
   });
@@ -301,9 +316,7 @@ export const analyzeCodexPriorityRotation = (
       .filter((candidate) => !demotionMap.has(candidate.file.name))
       .sort((a, b) => {
         const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
-        return remainingCompare !== 0
-          ? remainingCompare
-          : a.file.name.localeCompare(b.file.name);
+        return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
       })
       .some((candidate) => {
         if (projectedActiveCount <= slotLimit) return true;
@@ -317,9 +330,7 @@ export const analyzeCodexPriorityRotation = (
     .filter((candidate) => demotionMap.has(candidate.file.name))
     .sort((a, b) => {
       const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
-      return remainingCompare !== 0
-        ? remainingCompare
-        : a.file.name.localeCompare(b.file.name);
+      return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
     })
     .map<PriorityRotationChange>((candidate) => ({
       name: candidate.file.name,
@@ -334,15 +345,24 @@ export const analyzeCodexPriorityRotation = (
   const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
     (reason) => reason === 'low_remaining'
   ).length;
+  const needsStandby =
+    Math.max(0, slotLimit - projectedActiveCount) > 0 || lowRemainingDemotionCount > 0;
+  const useFallbackStandbyThreshold =
+    needsStandby && normalHealthyStandbyCandidates.length === 0 && fallbackThreshold < threshold;
+  const effectiveThreshold = useFallbackStandbyThreshold ? fallbackThreshold : threshold;
+  const thresholdAdjusted = effectiveThreshold !== threshold;
+  const healthyStandbyCandidates = thresholdAdjusted
+    ? standbyCandidates.filter(
+        (candidate) => candidate.managed && getRemainingSortValue(candidate) >= effectiveThreshold
+      )
+    : normalHealthyStandbyCandidates;
   const replacementSlots = Math.min(lowRemainingDemotionCount, activeDeficit);
   const fillSlots = Math.min(activeDeficit, healthyStandbyCandidates.length);
   const promotionSlots = Math.max(replacementSlots, fillSlots);
   const promotions = healthyStandbyCandidates
     .sort((a, b) => {
       const remainingCompare = getRemainingSortValue(b) - getRemainingSortValue(a);
-      return remainingCompare !== 0
-        ? remainingCompare
-        : a.file.name.localeCompare(b.file.name);
+      return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
     })
     .slice(0, promotionSlots)
     .map<PriorityRotationChange>((candidate) => ({
