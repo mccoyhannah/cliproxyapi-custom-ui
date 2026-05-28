@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
@@ -22,11 +23,14 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
   IconChevronDown,
+  IconDownload,
+  IconEye,
   IconFilterAll,
   IconMinus,
   IconPlus,
   IconRefreshCw,
   IconSlidersHorizontal,
+  IconTrash2,
   IconUploadCloud,
 } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -83,9 +87,11 @@ import {
   type AuthFilesManualExpiryMap,
 } from '@/features/authFiles/manualExpiry';
 import {
+  AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
   getAuthFileAccountMemo,
   readAuthFilesAccountMemos,
   writeAuthFilesAccountMemos,
+  type AuthFileAccountMemoImage,
   type AuthFilesAccountMemoMap,
 } from '@/features/authFiles/accountMemos';
 import {
@@ -127,6 +133,7 @@ import {
   resolveCodexPlanType,
 } from '@/utils/quota';
 import { normalizeApiBase } from '@/utils/connection';
+import { downloadBlob } from '@/utils/download';
 import styles from './AuthFilesPage.module.scss';
 
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
@@ -137,8 +144,180 @@ const PRIORITY_ROTATION_SLOT_STEP = 1;
 const PRIORITY_ROTATION_SIDECAR_INTERVAL_STEP = 1;
 const PRIORITY_ROTATION_WAKE_ATTEMPTS = 18;
 const PRIORITY_ROTATION_WAKE_INTERVAL_MS = 900;
+const ACCOUNT_MEMO_IMAGE_MAX_EDGE = 1200;
+const ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS = 900 * 1024;
+const ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS = 4_000_000;
+const ACCOUNT_MEMO_IMAGE_QUALITIES = [0.86, 0.78, 0.68, 0.58, 0.48] as const;
 
 const wait = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
+
+const createAccountMemoImageId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const estimateDataUrlBytes = (dataUrl: string): number => {
+  const base64 = dataUrl.split(',')[1] ?? '';
+  return Math.ceil((base64.length * 3) / 4);
+};
+
+const sanitizeAccountMemoImageName = (name: string, fallbackIndex: number): string => {
+  const baseName = name.replace(/\.[^.]+$/, '').trim() || `account-memo-${fallbackIndex + 1}`;
+  const safeBaseName =
+    baseName
+      .replace(/[^a-zA-Z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || `account-memo-${fallbackIndex + 1}`;
+  return `${safeBaseName}.webp`;
+};
+
+const loadImageFromFile = (file: File): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const objectUrl = window.URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      window.URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      window.URL.revokeObjectURL(objectUrl);
+      reject(new Error('image-load-failed'));
+    };
+    image.src = objectUrl;
+  });
+
+const drawAccountMemoImage = (
+  source: HTMLImageElement,
+  maxEdge: number
+): { canvas: HTMLCanvasElement; width: number; height: number } => {
+  const sourceWidth = source.naturalWidth || source.width;
+  const sourceHeight = source.naturalHeight || source.height;
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
+    throw new Error('image-load-failed');
+  }
+
+  const scale = Math.min(1, maxEdge / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('image-load-failed');
+  }
+
+  context.drawImage(source, 0, 0, width, height);
+  return { canvas, width, height };
+};
+
+const compressAccountMemoImageFile = async (
+  file: File,
+  fallbackIndex: number
+): Promise<AuthFileAccountMemoImage> => {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('image-not-supported');
+  }
+
+  const source = await loadImageFromFile(file);
+  let maxEdge = ACCOUNT_MEMO_IMAGE_MAX_EDGE;
+  let best: { dataUrl: string; size: number; storageChars: number; width: number; height: number } | null =
+    null;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const { canvas, width, height } = drawAccountMemoImage(source, maxEdge);
+
+    for (const quality of ACCOUNT_MEMO_IMAGE_QUALITIES) {
+      const dataUrl = canvas.toDataURL('image/webp', quality);
+      const size = estimateDataUrlBytes(dataUrl);
+      const storageChars = dataUrl.length;
+      const candidate = { dataUrl, size, storageChars, width, height };
+
+      if (!best || candidate.storageChars < best.storageChars) {
+        best = candidate;
+      }
+      if (storageChars <= ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS) {
+        return {
+          id: createAccountMemoImageId(),
+          name: sanitizeAccountMemoImageName(file.name, fallbackIndex),
+          mimeType: 'image/webp',
+          dataUrl,
+          size,
+          width,
+          height,
+          createdAt: Date.now(),
+        };
+      }
+    }
+
+    maxEdge = Math.max(420, Math.round(maxEdge * 0.76));
+  }
+
+  if (!best || best.storageChars > ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS) {
+    throw new Error('image-too-large');
+  }
+
+  return {
+    id: createAccountMemoImageId(),
+    name: sanitizeAccountMemoImageName(file.name, fallbackIndex),
+    mimeType: 'image/webp',
+    dataUrl: best.dataUrl,
+    size: best.size,
+    width: best.width,
+    height: best.height,
+    createdAt: Date.now(),
+  };
+};
+
+const dataUrlToFile = (image: AuthFileAccountMemoImage): File => {
+  const [, mimeType = image.mimeType] =
+    /^data:([^;,]+)[;,]/.exec(image.dataUrl) ?? ([] as unknown as [string, string]);
+  const base64 = image.dataUrl.split(',')[1] ?? '';
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new File([bytes], image.name, {
+    type: mimeType,
+    lastModified: image.createdAt || Date.now(),
+  });
+};
+
+const escapeHtmlAttribute = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const setAccountMemoImageDragData = (
+  event: ReactDragEvent<HTMLElement>,
+  image: AuthFileAccountMemoImage
+) => {
+  event.dataTransfer.effectAllowed = 'copy';
+
+  try {
+    const file = dataUrlToFile(image);
+    event.dataTransfer.items.add(file);
+  } catch {
+    // Some drag targets only accept DownloadURL/text fallbacks.
+  }
+
+  event.dataTransfer.setData('DownloadURL', `${image.mimeType}:${image.name}:${image.dataUrl}`);
+  event.dataTransfer.setData('text/uri-list', image.dataUrl);
+  event.dataTransfer.setData('text/plain', image.dataUrl);
+  event.dataTransfer.setData(
+    'text/html',
+    `<img src="${escapeHtmlAttribute(image.dataUrl)}" alt="${escapeHtmlAttribute(image.name)}">`
+  );
+};
 
 const escapeWildcardSearchSegment = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -302,6 +481,14 @@ export function AuthFilesPage() {
   );
   const [accountMemoEditorFile, setAccountMemoEditorFile] = useState<AuthFileItem | null>(null);
   const [accountMemoDraft, setAccountMemoDraft] = useState('');
+  const [accountMemoImagesDraft, setAccountMemoImagesDraft] = useState<AuthFileAccountMemoImage[]>(
+    []
+  );
+  const [accountMemoImageProcessing, setAccountMemoImageProcessing] = useState(false);
+  const [accountMemoPreviewImage, setAccountMemoPreviewImage] =
+    useState<AuthFileAccountMemoImage | null>(null);
+  const accountMemoImageSessionRef = useRef(0);
+  const accountMemoImageProcessingRef = useRef(false);
   const [priorityRotationSettings, setPriorityRotationSettings] =
     useState<PriorityRotationSidecarDraftSettings>(DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT);
   const [priorityRotationThresholdInput, setPriorityRotationThresholdInput] = useState(() =>
@@ -1216,34 +1403,174 @@ export function AuthFilesPage() {
 
   const openAccountMemoEditor = useCallback(
     (file: AuthFileItem) => {
+      const memo = getAuthFileAccountMemo(accountMemosByFile, file.name);
+      accountMemoImageSessionRef.current += 1;
+      accountMemoImageProcessingRef.current = false;
       setAccountMemoEditorFile(file);
-      setAccountMemoDraft(getAuthFileAccountMemo(accountMemosByFile, file.name)?.text ?? '');
+      setAccountMemoDraft(memo?.text ?? '');
+      setAccountMemoImagesDraft(memo?.images ?? []);
+      setAccountMemoPreviewImage(null);
     },
     [accountMemosByFile]
   );
 
   const closeAccountMemoEditor = useCallback(() => {
+    accountMemoImageSessionRef.current += 1;
+    accountMemoImageProcessingRef.current = false;
     setAccountMemoEditorFile(null);
     setAccountMemoDraft('');
+    setAccountMemoImagesDraft([]);
+    setAccountMemoImageProcessing(false);
+    setAccountMemoPreviewImage(null);
   }, []);
+
+  const addAccountMemoImageFiles = useCallback(
+    async (files: File[]) => {
+      const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+      if (imageFiles.length === 0) return;
+
+      if (accountMemoImageProcessingRef.current) {
+        showNotification(
+          t('auth_files.account_memo_image_processing', { defaultValue: '正在处理图片' }),
+          'warning'
+        );
+        return;
+      }
+
+      const availableSlots = AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES - accountMemoImagesDraft.length;
+      if (availableSlots <= 0) {
+        showNotification(
+          t('auth_files.account_memo_image_limit', {
+            count: AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
+            defaultValue: `每个账号备注最多保存 ${AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES} 张图片`,
+          }),
+          'warning'
+        );
+        return;
+      }
+
+      const sessionId = accountMemoImageSessionRef.current;
+      accountMemoImageProcessingRef.current = true;
+      setAccountMemoImageProcessing(true);
+      const acceptedFiles = imageFiles.slice(0, availableSlots);
+      const nextImages: AuthFileAccountMemoImage[] = [];
+      let failed = false;
+
+      for (const [index, file] of acceptedFiles.entries()) {
+        try {
+          nextImages.push(
+            await compressAccountMemoImageFile(file, accountMemoImagesDraft.length + index)
+          );
+        } catch {
+          failed = true;
+        }
+
+        if (accountMemoImageSessionRef.current !== sessionId) {
+          return;
+        }
+      }
+
+      if (accountMemoImageSessionRef.current !== sessionId) {
+        return;
+      }
+      accountMemoImageProcessingRef.current = false;
+      setAccountMemoImageProcessing(false);
+
+      if (nextImages.length > 0) {
+        setAccountMemoImagesDraft((current) =>
+          [...current, ...nextImages].slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES)
+        );
+      }
+
+      if (imageFiles.length > availableSlots) {
+        showNotification(
+          t('auth_files.account_memo_image_limit', {
+            count: AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
+            defaultValue: `每个账号备注最多保存 ${AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES} 张图片`,
+          }),
+          'warning'
+        );
+      } else if (failed) {
+        showNotification(
+          t('auth_files.account_memo_image_add_failed', {
+            defaultValue: '有图片无法处理，请换一张较小的图片再试',
+          }),
+          'error'
+        );
+      }
+    },
+    [accountMemoImagesDraft.length, showNotification, t]
+  );
+
+  const handleAccountMemoPaste = useCallback(
+    (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+      const files = Array.from(event.clipboardData.items)
+        .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+
+      if (files.length === 0) return;
+
+      event.preventDefault();
+      void addAccountMemoImageFiles(files);
+    },
+    [addAccountMemoImageFiles]
+  );
+
+  const removeAccountMemoImage = useCallback((imageId: string) => {
+    setAccountMemoImagesDraft((current) => current.filter((image) => image.id !== imageId));
+    setAccountMemoPreviewImage((current) => (current?.id === imageId ? null : current));
+  }, []);
+
+  const downloadAccountMemoImage = useCallback((image: AuthFileAccountMemoImage) => {
+    try {
+      downloadBlob({ filename: image.name, blob: dataUrlToFile(image) });
+    } catch {
+      showNotification(
+        t('auth_files.account_memo_image_download_failed', {
+          defaultValue: '图片数据已损坏，无法下载',
+        }),
+        'error'
+      );
+    }
+  }, [showNotification, t]);
 
   const saveAccountMemo = useCallback(() => {
     if (!accountMemoEditorFile) return;
 
     const nextText = accountMemoDraft.trim();
+    const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
     const updatedAt = Date.now();
-    setAccountMemosByFile((current) => {
-      const next = { ...current };
-      if (nextText) {
-        next[accountMemoEditorFile.name] = { text: nextText, updatedAt };
-      } else {
-        delete next[accountMemoEditorFile.name];
-      }
-      writeAuthFilesAccountMemos(next);
-      return next;
-    });
+    const next = { ...accountMemosByFile };
+    if (nextText || nextImages.length > 0) {
+      next[accountMemoEditorFile.name] = { text: nextText, images: nextImages, updatedAt };
+    } else {
+      delete next[accountMemoEditorFile.name];
+    }
+
+    if (JSON.stringify(next).length > ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS) {
+      showNotification(
+        t('auth_files.account_memo_save_failed', {
+          defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+        }),
+        'error'
+      );
+      return;
+    }
+
+    if (!writeAuthFilesAccountMemos(next)) {
+      showNotification(
+        t('auth_files.account_memo_save_failed', {
+          defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+        }),
+        'error'
+      );
+      return;
+    }
+
+    setAccountMemosByFile(next);
     showNotification(
-      nextText
+      nextText || nextImages.length > 0
         ? t('auth_files.account_memo_saved', {
             name: accountMemoEditorFile.name,
             defaultValue: '已保存账号备注',
@@ -1255,17 +1582,32 @@ export function AuthFilesPage() {
       'success'
     );
     closeAccountMemoEditor();
-  }, [accountMemoDraft, accountMemoEditorFile, closeAccountMemoEditor, showNotification, t]);
+  }, [
+    accountMemoDraft,
+    accountMemoEditorFile,
+    accountMemoImagesDraft,
+    accountMemosByFile,
+    closeAccountMemoEditor,
+    showNotification,
+    t,
+  ]);
 
   const clearAccountMemo = useCallback(() => {
     if (!accountMemoEditorFile) return;
 
-    setAccountMemosByFile((current) => {
-      const next = { ...current };
-      delete next[accountMemoEditorFile.name];
-      writeAuthFilesAccountMemos(next);
-      return next;
-    });
+    const next = { ...accountMemosByFile };
+    delete next[accountMemoEditorFile.name];
+    if (!writeAuthFilesAccountMemos(next)) {
+      showNotification(
+        t('auth_files.account_memo_save_failed', {
+          defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+        }),
+        'error'
+      );
+      return;
+    }
+
+    setAccountMemosByFile(next);
     showNotification(
       t('auth_files.account_memo_cleared', {
         name: accountMemoEditorFile.name,
@@ -1274,7 +1616,7 @@ export function AuthFilesPage() {
       'success'
     );
     closeAccountMemoEditor();
-  }, [accountMemoEditorFile, closeAccountMemoEditor, showNotification, t]);
+  }, [accountMemoEditorFile, accountMemosByFile, closeAccountMemoEditor, showNotification, t]);
 
   useEffect(() => {
     setPriorityRotationThresholdInput(String(priorityRotationSettings.thresholdPercent));
@@ -2228,9 +2570,17 @@ export function AuthFilesPage() {
     ? getAuthFileDisplayName(accountMemoEditorFile)
     : '';
   const accountMemoEditorFileName = accountMemoEditorFile?.name ?? '';
-  const accountMemoEditorExistingText = accountMemoEditorFile
-    ? (getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)?.text ?? '')
-    : '';
+  const accountMemoEditorExistingMemo = accountMemoEditorFile
+    ? getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)
+    : null;
+  const accountMemoEditorExistingText = accountMemoEditorExistingMemo?.text ?? '';
+  const accountMemoEditorHasExisting =
+    Boolean(accountMemoEditorExistingText) ||
+    (accountMemoEditorExistingMemo?.images.length ?? 0) > 0;
+  const accountMemoHasDraftContent =
+    Boolean(accountMemoDraft.trim()) || accountMemoImagesDraft.length > 0;
+  const accountMemoImageSlotsRemaining =
+    AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES - accountMemoImagesDraft.length;
   const uploadDropPoolClass = [
     styles.uploadDropPool,
     uploadDropActive ? styles.uploadDropPoolActive : '',
@@ -3910,7 +4260,8 @@ export function AuthFilesPage() {
           </span>
         }
         onClose={closeAccountMemoEditor}
-        width={520}
+        closeDisabled={Boolean(accountMemoPreviewImage)}
+        width={720}
         className={styles.accountMemoModal}
         overlayClassName={styles.accountMemoOverlay}
         footer={
@@ -3919,14 +4270,14 @@ export function AuthFilesPage() {
               variant="ghost"
               size="sm"
               onClick={clearAccountMemo}
-              disabled={!accountMemoEditorExistingText}
+              disabled={!accountMemoEditorHasExisting && !accountMemoHasDraftContent}
             >
               {t('auth_files.account_memo_clear', { defaultValue: '清除' })}
             </Button>
             <Button variant="secondary" size="sm" onClick={closeAccountMemoEditor}>
               {t('common.cancel')}
             </Button>
-            <Button size="sm" onClick={saveAccountMemo}>
+            <Button size="sm" onClick={saveAccountMemo} disabled={accountMemoImageProcessing}>
               {t('common.save')}
             </Button>
           </div>
@@ -3945,19 +4296,156 @@ export function AuthFilesPage() {
             <textarea
               value={accountMemoDraft}
               onChange={(event) => setAccountMemoDraft(event.currentTarget.value)}
+              onPaste={handleAccountMemoPaste}
               placeholder={t('auth_files.account_memo_placeholder', {
                 defaultValue: '写下这个账号是哪家的、从哪里来、用途、注意事项等。',
               })}
               rows={8}
             />
           </label>
+          <div className={styles.accountMemoImagePanel}>
+            <div className={styles.accountMemoImageHeader}>
+              <span>{t('auth_files.account_memo_images_label', { defaultValue: '图片' })}</span>
+              <span>
+                {accountMemoImagesDraft.length}/{AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES}
+              </span>
+            </div>
+            {accountMemoImagesDraft.length > 0 ? (
+              <div className={styles.accountMemoImageGrid}>
+                {accountMemoImagesDraft.map((image) => (
+                  <div className={styles.accountMemoImageItem} key={image.id}>
+                    <button
+                      type="button"
+                      className={styles.accountMemoImageThumb}
+                      draggable
+                      onClick={() => setAccountMemoPreviewImage(image)}
+                      onDragStart={(event) => setAccountMemoImageDragData(event, image)}
+                      aria-label={t('auth_files.account_memo_image_preview', {
+                        name: image.name,
+                        defaultValue: '预览图片',
+                      })}
+                      title={image.name}
+                    >
+                      <img src={image.dataUrl} alt={image.name} />
+                    </button>
+                    <div className={styles.accountMemoImageActions}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        iconOnly
+                        onClick={() => setAccountMemoPreviewImage(image)}
+                        aria-label={t('auth_files.account_memo_image_preview', {
+                          name: image.name,
+                          defaultValue: '预览图片',
+                        })}
+                        title={t('auth_files.account_memo_image_preview', {
+                          name: image.name,
+                          defaultValue: '预览图片',
+                        })}
+                      >
+                        <IconEye size={14} />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="xs"
+                        iconOnly
+                        onClick={() => downloadAccountMemoImage(image)}
+                        aria-label={t('auth_files.account_memo_image_download', {
+                          name: image.name,
+                          defaultValue: '下载图片',
+                        })}
+                        title={t('auth_files.account_memo_image_download', {
+                          name: image.name,
+                          defaultValue: '下载图片',
+                        })}
+                      >
+                        <IconDownload size={14} />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="xs"
+                        iconOnly
+                        onClick={() => removeAccountMemoImage(image.id)}
+                        aria-label={t('auth_files.account_memo_image_remove', {
+                          name: image.name,
+                          defaultValue: '移除图片',
+                        })}
+                        title={t('auth_files.account_memo_image_remove', {
+                          name: image.name,
+                          defaultValue: '移除图片',
+                        })}
+                      >
+                        <IconTrash2 size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.accountMemoImageEmpty}>
+                {t('auth_files.account_memo_images_empty', { defaultValue: '暂无图片' })}
+              </div>
+            )}
+            {accountMemoImageProcessing && (
+              <div className={styles.accountMemoImageStatus}>
+                {t('auth_files.account_memo_image_processing', { defaultValue: '正在处理图片' })}
+              </div>
+            )}
+            {accountMemoImageSlotsRemaining <= 0 && (
+              <div className={styles.accountMemoImageStatus}>
+                {t('auth_files.account_memo_image_limit', {
+                  count: AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
+                  defaultValue: `每个账号备注最多保存 ${AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES} 张图片`,
+                })}
+              </div>
+            )}
+          </div>
           <div className={styles.accountMemoHint}>
             {t('auth_files.account_memo_hint', {
               defaultValue:
-                '只保存在当前浏览器，不会写入认证文件。请不要保存密码、token 或完整密钥。',
+                '只保存在当前浏览器，不会写入认证文件。请不要保存密码、token、完整密钥或敏感截图。',
             })}
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(accountMemoPreviewImage)}
+        title={accountMemoPreviewImage?.name ?? ''}
+        onClose={() => setAccountMemoPreviewImage(null)}
+        width={760}
+        className={styles.accountMemoImagePreviewModal}
+        footer={
+          accountMemoPreviewImage ? (
+            <div className={styles.accountMemoImagePreviewFooter}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                leftIcon={<IconDownload size={15} />}
+                onClick={() => downloadAccountMemoImage(accountMemoPreviewImage)}
+              >
+                {t('auth_files.account_memo_image_download', { defaultValue: '下载图片' })}
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        {accountMemoPreviewImage && (
+          <div className={styles.accountMemoImagePreviewBody}>
+            <img
+              src={accountMemoPreviewImage.dataUrl}
+              alt={accountMemoPreviewImage.name}
+              draggable
+              onDragStart={(event) =>
+                setAccountMemoImageDragData(event, accountMemoPreviewImage)
+              }
+            />
+          </div>
+        )}
       </Modal>
 
       <Modal

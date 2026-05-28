@@ -12752,6 +12752,119 @@ button.codexSubscriptionValue {
   }
 }
 
+.accountMemoImagePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 94%, var(--bg-primary));
+  box-shadow:
+    var(--shadow-control),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+}
+
+.accountMemoImageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 760;
+
+  span:last-child {
+    flex: 0 0 auto;
+    color: var(--text-tertiary);
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 11px;
+  }
+}
+
+.accountMemoImageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.accountMemoImageItem {
+  display: grid;
+  grid-template-rows: 112px auto;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 74%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control) 90%, var(--bg-primary));
+}
+
+.accountMemoImageThumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  height: 112px;
+  padding: 0;
+  overflow: hidden;
+  cursor: grab;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg-primary) 88%, #f8fafc);
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 58%, var(--border-color));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+.accountMemoImageActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.accountMemoImageEmpty,
+.accountMemoImageStatus {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px dashed color-mix(in srgb, var(--border-color) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control) 68%, transparent);
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.accountMemoImageStatus {
+  min-height: auto;
+  justify-content: flex-start;
+  border-style: solid;
+  color: color-mix(in srgb, var(--text-secondary) 84%, #047857);
+}
+
 .accountMemoHint {
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, #14b8a6 18%, var(--border-color));
@@ -12774,6 +12887,57 @@ button.codexSubscriptionValue {
   }
 }
 
+.accountMemoImagePreviewModal:global(.modal) {
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #14b8a6 16%, var(--border-color));
+  background: color-mix(in srgb, var(--surface-card) 98%, var(--bg-primary));
+
+  :global(.modal-body) {
+    padding-top: 0;
+  }
+}
+
+.accountMemoImagePreviewBody {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  max-height: min(70vh, 620px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 8px;
+  background:
+    linear-gradient(45deg, color-mix(in srgb, var(--surface-control) 72%, transparent) 25%, transparent 25%),
+    linear-gradient(-45deg, color-mix(in srgb, var(--surface-control) 72%, transparent) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, color-mix(in srgb, var(--surface-control) 72%, transparent) 75%),
+    linear-gradient(-45deg, transparent 75%, color-mix(in srgb, var(--surface-control) 72%, transparent) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+
+  img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(min(70vh, 620px) - 24px);
+    cursor: grab;
+    object-fit: contain;
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+}
+
+.accountMemoImagePreviewFooter {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
 @include mobile {
   .accountMemoTargetFile {
     align-items: flex-start;
@@ -12786,6 +12950,14 @@ button.codexSubscriptionValue {
     textarea {
       min-height: 140px;
     }
+  }
+
+  .accountMemoImagePanel {
+    padding: 10px;
+  }
+
+  .accountMemoImageGrid {
+    grid-template-columns: 1fr;
   }
 
   .accountMemoFooter {
