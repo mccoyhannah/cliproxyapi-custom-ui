@@ -406,6 +406,10 @@ type PriorityRotationSidecarSaveOptions = {
   autoSave?: boolean;
   quietSaving?: boolean;
 };
+type PriorityRotationSidecarWakeOptions = {
+  force?: boolean;
+  notify?: boolean;
+};
 
 const DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT: PriorityRotationSidecarDraftSettings = {
   enabled: false,
@@ -426,6 +430,20 @@ const pickPriorityRotationSidecarDraft = (
   activeSlotLimit: normalizePriorityRotationActiveSlotLimit(settings.activeSlotLimit),
   checkIntervalMinutes: normalizePriorityRotationSidecarInterval(settings.checkIntervalMinutes),
 });
+
+const isPriorityRotationSidecarOfflineError = (err: unknown): boolean => {
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('fetch failed') ||
+    normalized.includes('networkerror') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed') ||
+    normalized.includes('connection refused') ||
+    normalized.includes('err_connection_refused')
+  );
+};
 
 const isPriorityRotationSidecarDraftDirty = (
   draft: PriorityRotationSidecarDraftSettings,
@@ -1855,53 +1873,81 @@ export function AuthFilesPage() {
     [hydratePriorityRotationSidecarStatus]
   );
 
-  const wakePriorityRotationSidecar = useCallback(async () => {
-    if (priorityRotationSidecarStatus && !priorityRotationSidecarError) {
-      return priorityRotationSidecarStatus;
-    }
-
-    setPriorityRotationSidecarWaking(true);
-    setPriorityRotationSidecarError('');
-
-    try {
-      const launched = launchPriorityRotationSidecar();
-      if (!launched) {
-        const message = t('auth_files.priority_rotation_sidecar_wake_unavailable');
-        setPriorityRotationSidecarError(message);
-        showNotification(message, 'error');
-        return null;
+  const wakePriorityRotationSidecar = useCallback(
+    async (options: PriorityRotationSidecarWakeOptions = {}) => {
+      const notify = options.notify !== false;
+      if (!options.force && priorityRotationSidecarStatus && !priorityRotationSidecarError) {
+        return priorityRotationSidecarStatus;
       }
 
-      let lastError = '';
-      for (let attempt = 0; attempt < PRIORITY_ROTATION_WAKE_ATTEMPTS; attempt += 1) {
-        await wait(attempt === 0 ? 650 : PRIORITY_ROTATION_WAKE_INTERVAL_MS);
-        try {
-          const status = await priorityRotationSidecarApi.getStatus();
-          hydratePriorityRotationSidecarStatus(status);
-          showNotification(t('auth_files.priority_rotation_sidecar_wake_success'), 'success');
-          return status;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : String(err);
+      setPriorityRotationSidecarWaking(true);
+      setPriorityRotationSidecarError('');
+
+      try {
+        const launched = launchPriorityRotationSidecar();
+        if (!launched) {
+          const message = t('auth_files.priority_rotation_sidecar_wake_unavailable');
+          setPriorityRotationSidecarError(message);
+          if (notify) {
+            showNotification(message, 'error');
+          }
+          return null;
         }
-      }
 
-      const message = t('auth_files.priority_rotation_sidecar_wake_failed', {
-        message: lastError,
-      });
-      setPriorityRotationSidecarStatus(null);
-      setPriorityRotationSidecarError(message);
-      showNotification(message, 'error');
-      return null;
-    } finally {
-      setPriorityRotationSidecarWaking(false);
-    }
-  }, [
-    hydratePriorityRotationSidecarStatus,
-    priorityRotationSidecarError,
-    priorityRotationSidecarStatus,
-    showNotification,
-    t,
-  ]);
+        let lastError = '';
+        for (let attempt = 0; attempt < PRIORITY_ROTATION_WAKE_ATTEMPTS; attempt += 1) {
+          await wait(attempt === 0 ? 650 : PRIORITY_ROTATION_WAKE_INTERVAL_MS);
+          try {
+            const status = await priorityRotationSidecarApi.getStatus();
+            hydratePriorityRotationSidecarStatus(status);
+            if (notify) {
+              showNotification(t('auth_files.priority_rotation_sidecar_wake_success'), 'success');
+            }
+            return status;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+          }
+        }
+
+        const message = t('auth_files.priority_rotation_sidecar_wake_failed', {
+          message: lastError,
+        });
+        setPriorityRotationSidecarStatus(null);
+        setPriorityRotationSidecarError(message);
+        if (notify) {
+          showNotification(message, 'error');
+        }
+        return null;
+      } finally {
+        setPriorityRotationSidecarWaking(false);
+      }
+    },
+    [
+      hydratePriorityRotationSidecarStatus,
+      priorityRotationSidecarError,
+      priorityRotationSidecarStatus,
+      showNotification,
+      t,
+    ]
+  );
+
+  const requestPriorityRotationSidecarWithWakeRetry = useCallback(
+    async <T,>(request: () => Promise<T>): Promise<T> => {
+      try {
+        return await request();
+      } catch (err) {
+        if (!isPriorityRotationSidecarOfflineError(err)) {
+          throw err;
+        }
+        const status = await wakePriorityRotationSidecar({ force: true, notify: false });
+        if (!status) {
+          throw err;
+        }
+        return request();
+      }
+    },
+    [wakePriorityRotationSidecar]
+  );
 
   const buildPriorityRotationSidecarSettings = useCallback(
     (
@@ -2000,7 +2046,9 @@ export function AuthFilesPage() {
         const settings = buildPriorityRotationSidecarSettings(updates, {
           committedDraftOnly: options.committedDraftOnly,
         });
-        const result = await priorityRotationSidecarApi.updateSettings(settings, managementKey);
+        const result = await requestPriorityRotationSidecarWithWakeRetry(() =>
+          priorityRotationSidecarApi.updateSettings(settings, managementKey)
+        );
         mergePriorityRotationSidecarResult(
           result.settings,
           result.state,
@@ -2030,6 +2078,7 @@ export function AuthFilesPage() {
       mergePriorityRotationSidecarResult,
       priorityRotationSidecarError,
       priorityRotationSidecarStatus,
+      requestPriorityRotationSidecarWithWakeRetry,
       showNotification,
       t,
       wakePriorityRotationSidecar,
@@ -2047,9 +2096,8 @@ export function AuthFilesPage() {
         const status = await wakePriorityRotationSidecar();
         if (!status) return;
       }
-      const result = await priorityRotationSidecarApi.saveSecret(
-        managementKey,
-        normalizeApiBase(apiBase)
+      const result = await requestPriorityRotationSidecarWithWakeRetry(() =>
+        priorityRotationSidecarApi.saveSecret(managementKey, normalizeApiBase(apiBase))
       );
       mergePriorityRotationSidecarResult(result.settings, result.state);
       showNotification(t('auth_files.priority_rotation_sidecar_secret_saved'), 'success');
@@ -2069,6 +2117,7 @@ export function AuthFilesPage() {
     mergePriorityRotationSidecarResult,
     priorityRotationSidecarError,
     priorityRotationSidecarStatus,
+    requestPriorityRotationSidecarWithWakeRetry,
     showNotification,
     t,
     wakePriorityRotationSidecar,
@@ -2109,7 +2158,9 @@ export function AuthFilesPage() {
         return;
       }
 
-      const result = await priorityRotationSidecarApi.runNow(managementKey);
+      const result = await requestPriorityRotationSidecarWithWakeRetry(() =>
+        priorityRotationSidecarApi.runNow(managementKey)
+      );
       mergePriorityRotationSidecarResult(result.settings, result.state, true);
       if ((result.state.lastAppliedChangeCount ?? 0) > 0) {
         await loadFiles({ preserveExisting: true, silent: true });
@@ -2136,6 +2187,7 @@ export function AuthFilesPage() {
     priorityRotationSidecarDraftDirty,
     priorityRotationSidecarError,
     priorityRotationSidecarStatus,
+    requestPriorityRotationSidecarWithWakeRetry,
     savePriorityRotationSidecarSettings,
     showNotification,
     t,
@@ -4334,6 +4386,7 @@ export function AuthFilesPage() {
                         variant="secondary"
                         size="xs"
                         iconOnly
+                        leftIcon={<IconEye size={14} />}
                         onClick={() => setAccountMemoPreviewImage(image)}
                         aria-label={t('auth_files.account_memo_image_preview', {
                           name: image.name,
@@ -4343,14 +4396,13 @@ export function AuthFilesPage() {
                           name: image.name,
                           defaultValue: '预览图片',
                         })}
-                      >
-                        <IconEye size={14} />
-                      </Button>
+                      />
                       <Button
                         type="button"
                         variant="secondary"
                         size="xs"
                         iconOnly
+                        leftIcon={<IconDownload size={14} />}
                         onClick={() => downloadAccountMemoImage(image)}
                         aria-label={t('auth_files.account_memo_image_download', {
                           name: image.name,
@@ -4360,14 +4412,13 @@ export function AuthFilesPage() {
                           name: image.name,
                           defaultValue: '下载图片',
                         })}
-                      >
-                        <IconDownload size={14} />
-                      </Button>
+                      />
                       <Button
                         type="button"
                         variant="danger"
                         size="xs"
                         iconOnly
+                        leftIcon={<IconTrash2 size={14} />}
                         onClick={() => removeAccountMemoImage(image.id)}
                         aria-label={t('auth_files.account_memo_image_remove', {
                           name: image.name,
@@ -4377,9 +4428,7 @@ export function AuthFilesPage() {
                           name: image.name,
                           defaultValue: '移除图片',
                         })}
-                      >
-                        <IconTrash2 size={14} />
-                      </Button>
+                      />
                     </div>
                   </div>
                 ))}
