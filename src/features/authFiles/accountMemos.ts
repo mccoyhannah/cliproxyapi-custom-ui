@@ -30,7 +30,7 @@ const normalizeMemoImage = (value: unknown): AuthFileAccountMemoImage | null => 
 
   const id = typeof record.id === 'string' && record.id.trim() ? record.id.trim() : `${Date.now()}`;
   const name =
-    typeof record.name === 'string' && record.name.trim() ? record.name.trim() : 'account-memo.webp';
+    typeof record.name === 'string' && record.name.trim() ? record.name.trim() : 'account-memo.png';
   const size =
     typeof record.size === 'number' && Number.isFinite(record.size) && record.size > 0
       ? Math.round(record.size)

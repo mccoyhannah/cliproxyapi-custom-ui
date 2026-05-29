@@ -151,6 +151,16 @@ const ACCOUNT_MEMO_IMAGE_QUALITIES = [0.86, 0.78, 0.68, 0.58, 0.48] as const;
 
 const wait = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 
+type AccountMemoImageMimeType = 'image/png' | 'image/jpeg';
+type AccountMemoImageCandidate = {
+  dataUrl: string;
+  mimeType: AccountMemoImageMimeType;
+  size: number;
+  storageChars: number;
+  width: number;
+  height: number;
+};
+
 const createAccountMemoImageId = (): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -163,14 +173,32 @@ const estimateDataUrlBytes = (dataUrl: string): number => {
   return Math.ceil((base64.length * 3) / 4);
 };
 
-const sanitizeAccountMemoImageName = (name: string, fallbackIndex: number): string => {
+const getAccountMemoImageExtension = (mimeType: string): 'png' | 'jpg' =>
+  mimeType === 'image/jpeg' || mimeType === 'image/jpg' ? 'jpg' : 'png';
+
+const getAccountMemoImageMimeType = (image: AuthFileAccountMemoImage): string => {
+  const [, dataUrlMimeType = ''] =
+    /^data:([^;,]+)[;,]/.exec(image.dataUrl) ?? ([] as unknown as [string, string]);
+  return dataUrlMimeType || image.mimeType;
+};
+
+const isAccountMemoCompatibleImage = (image: AuthFileAccountMemoImage): boolean => {
+  const mimeType = getAccountMemoImageMimeType(image);
+  return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/jpg';
+};
+
+const sanitizeAccountMemoImageName = (
+  name: string,
+  fallbackIndex: number,
+  mimeType: string
+): string => {
   const baseName = name.replace(/\.[^.]+$/, '').trim() || `account-memo-${fallbackIndex + 1}`;
   const safeBaseName =
     baseName
       .replace(/[^a-zA-Z0-9._-]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 80) || `account-memo-${fallbackIndex + 1}`;
-  return `${safeBaseName}.webp`;
+  return `${safeBaseName}.${getAccountMemoImageExtension(mimeType)}`;
 };
 
 const loadImageFromFile = (file: File): Promise<HTMLImageElement> =>
@@ -187,6 +215,14 @@ const loadImageFromFile = (file: File): Promise<HTMLImageElement> =>
       reject(new Error('image-load-failed'));
     };
     image.src = objectUrl;
+  });
+
+const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('image-load-failed'));
+    image.src = dataUrl;
   });
 
 const drawAccountMemoImage = (
@@ -215,42 +251,85 @@ const drawAccountMemoImage = (
   return { canvas, width, height };
 };
 
-const compressAccountMemoImageFile = async (
-  file: File,
-  fallbackIndex: number
-): Promise<AuthFileAccountMemoImage> => {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('image-not-supported');
+const createAccountMemoJpegCanvas = (source: HTMLCanvasElement): HTMLCanvasElement => {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('image-load-failed');
   }
 
-  const source = await loadImageFromFile(file);
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(source, 0, 0);
+  return canvas;
+};
+
+const buildAccountMemoImageCandidate = (
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  mimeType: AccountMemoImageMimeType,
+  quality?: number
+): AccountMemoImageCandidate => {
+  const dataUrl = canvas.toDataURL(mimeType, quality);
+  const size = estimateDataUrlBytes(dataUrl);
+  return {
+    dataUrl,
+    mimeType,
+    size,
+    storageChars: dataUrl.length,
+    width,
+    height,
+  };
+};
+
+const toAccountMemoImage = (
+  candidate: AccountMemoImageCandidate,
+  name: string,
+  fallbackIndex: number,
+  options: Partial<Pick<AuthFileAccountMemoImage, 'id' | 'createdAt'>> = {}
+): AuthFileAccountMemoImage => ({
+  id: options.id || createAccountMemoImageId(),
+  name: sanitizeAccountMemoImageName(name, fallbackIndex, candidate.mimeType),
+  mimeType: candidate.mimeType,
+  dataUrl: candidate.dataUrl,
+  size: candidate.size,
+  width: candidate.width,
+  height: candidate.height,
+  createdAt: options.createdAt || Date.now(),
+});
+
+const encodeAccountMemoImageSource = (source: HTMLImageElement): AccountMemoImageCandidate => {
   let maxEdge = ACCOUNT_MEMO_IMAGE_MAX_EDGE;
-  let best: { dataUrl: string; size: number; storageChars: number; width: number; height: number } | null =
-    null;
+  let best: AccountMemoImageCandidate | null = null;
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const { canvas, width, height } = drawAccountMemoImage(source, maxEdge);
+    const pngCandidate = buildAccountMemoImageCandidate(canvas, width, height, 'image/png');
+    if (!best || pngCandidate.storageChars < best.storageChars) {
+      best = pngCandidate;
+    }
+    if (pngCandidate.storageChars <= ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS) {
+      return pngCandidate;
+    }
 
+    const jpegCanvas = createAccountMemoJpegCanvas(canvas);
     for (const quality of ACCOUNT_MEMO_IMAGE_QUALITIES) {
-      const dataUrl = canvas.toDataURL('image/webp', quality);
-      const size = estimateDataUrlBytes(dataUrl);
-      const storageChars = dataUrl.length;
-      const candidate = { dataUrl, size, storageChars, width, height };
+      const jpegCandidate = buildAccountMemoImageCandidate(
+        jpegCanvas,
+        width,
+        height,
+        'image/jpeg',
+        quality
+      );
 
-      if (!best || candidate.storageChars < best.storageChars) {
-        best = candidate;
+      if (!best || jpegCandidate.storageChars < best.storageChars) {
+        best = jpegCandidate;
       }
-      if (storageChars <= ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS) {
-        return {
-          id: createAccountMemoImageId(),
-          name: sanitizeAccountMemoImageName(file.name, fallbackIndex),
-          mimeType: 'image/webp',
-          dataUrl,
-          size,
-          width,
-          height,
-          createdAt: Date.now(),
-        };
+      if (jpegCandidate.storageChars <= ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS) {
+        return jpegCandidate;
       }
     }
 
@@ -261,16 +340,39 @@ const compressAccountMemoImageFile = async (
     throw new Error('image-too-large');
   }
 
-  return {
-    id: createAccountMemoImageId(),
-    name: sanitizeAccountMemoImageName(file.name, fallbackIndex),
-    mimeType: 'image/webp',
-    dataUrl: best.dataUrl,
-    size: best.size,
-    width: best.width,
-    height: best.height,
-    createdAt: Date.now(),
-  };
+  return best;
+};
+
+const compressAccountMemoImageFile = async (
+  file: File,
+  fallbackIndex: number
+): Promise<AuthFileAccountMemoImage> => {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('image-not-supported');
+  }
+
+  const source = await loadImageFromFile(file);
+  return toAccountMemoImage(encodeAccountMemoImageSource(source), file.name, fallbackIndex);
+};
+
+const normalizeAccountMemoImageForDraft = async (
+  image: AuthFileAccountMemoImage,
+  fallbackIndex: number
+): Promise<AuthFileAccountMemoImage> => {
+  const mimeType = getAccountMemoImageMimeType(image);
+  if (isAccountMemoCompatibleImage(image)) {
+    return {
+      ...image,
+      mimeType: mimeType === 'image/jpg' ? 'image/jpeg' : mimeType,
+      name: sanitizeAccountMemoImageName(image.name, fallbackIndex, mimeType),
+    };
+  }
+
+  const source = await loadImageFromDataUrl(image.dataUrl);
+  return toAccountMemoImage(encodeAccountMemoImageSource(source), image.name, fallbackIndex, {
+    id: image.id,
+    createdAt: image.createdAt || Date.now(),
+  });
 };
 
 const dataUrlToFile = (image: AuthFileAccountMemoImage): File => {
@@ -302,20 +404,23 @@ const setAccountMemoImageDragData = (
   image: AuthFileAccountMemoImage
 ) => {
   event.dataTransfer.effectAllowed = 'copy';
+  let file: File | null = null;
 
   try {
-    const file = dataUrlToFile(image);
+    file = dataUrlToFile(image);
     event.dataTransfer.items.add(file);
   } catch {
     // Some drag targets only accept DownloadURL/text fallbacks.
   }
 
-  event.dataTransfer.setData('DownloadURL', `${image.mimeType}:${image.name}:${image.dataUrl}`);
+  const mimeType = file?.type || getAccountMemoImageMimeType(image) || image.mimeType;
+  const name = file?.name || image.name;
+  event.dataTransfer.setData('DownloadURL', `${mimeType}:${name}:${image.dataUrl}`);
   event.dataTransfer.setData('text/uri-list', image.dataUrl);
   event.dataTransfer.setData('text/plain', image.dataUrl);
   event.dataTransfer.setData(
     'text/html',
-    `<img src="${escapeHtmlAttribute(image.dataUrl)}" alt="${escapeHtmlAttribute(image.name)}">`
+    `<img src="${escapeHtmlAttribute(image.dataUrl)}" alt="${escapeHtmlAttribute(name)}">`
   );
 };
 
@@ -1422,12 +1527,34 @@ export function AuthFilesPage() {
   const openAccountMemoEditor = useCallback(
     (file: AuthFileItem) => {
       const memo = getAuthFileAccountMemo(accountMemosByFile, file.name);
+      const images = memo?.images ?? [];
       accountMemoImageSessionRef.current += 1;
+      const sessionId = accountMemoImageSessionRef.current;
       accountMemoImageProcessingRef.current = false;
+      setAccountMemoImageProcessing(false);
       setAccountMemoEditorFile(file);
       setAccountMemoDraft(memo?.text ?? '');
-      setAccountMemoImagesDraft(memo?.images ?? []);
+      setAccountMemoImagesDraft(images);
       setAccountMemoPreviewImage(null);
+
+      if (images.some((image) => !isAccountMemoCompatibleImage(image))) {
+        accountMemoImageProcessingRef.current = true;
+        setAccountMemoImageProcessing(true);
+        void Promise.all(
+          images.map(async (image, index) => {
+            try {
+              return await normalizeAccountMemoImageForDraft(image, index);
+            } catch {
+              return image;
+            }
+          })
+        ).then((nextImages) => {
+          if (accountMemoImageSessionRef.current !== sessionId) return;
+          accountMemoImageProcessingRef.current = false;
+          setAccountMemoImageProcessing(false);
+          setAccountMemoImagesDraft(nextImages);
+        });
+      }
     },
     [accountMemosByFile]
   );
