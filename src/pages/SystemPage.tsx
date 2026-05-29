@@ -4,7 +4,14 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { IconGithub, IconBookOpen, IconExternalLink, IconCode } from '@/components/ui/icons';
+import {
+  IconGithub,
+  IconBookOpen,
+  IconExternalLink,
+  IconCode,
+  IconRefreshCw,
+} from '@/components/ui/icons';
+import { useCliProxyBackendRestart } from '@/hooks/useCliProxyBackendRestart';
 import {
   useAuthStore,
   useConfigStore,
@@ -51,6 +58,15 @@ export function SystemPage() {
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
   const updateConfigValue = useConfigStore((state) => state.updateConfigValue);
+  const {
+    status: backendControlStatus,
+    error: backendControlError,
+    loading: backendControlLoading,
+    waking: backendControlWaking,
+    restarting: backendRestarting,
+    loadStatus: loadBackendControlStatus,
+    restartBackend,
+  } = useCliProxyBackendRestart();
 
   const models = useModelsStore((state) => state.models);
   const modelsLoading = useModelsStore((state) => state.loading);
@@ -84,6 +100,20 @@ export function SystemPage() {
   const buildTime = auth.serverBuildDate
     ? new Date(auth.serverBuildDate).toLocaleString(i18n.language)
     : t('system_info.version_unknown');
+  const backendControlOnline = Boolean(backendControlStatus);
+  const backendRunning = backendControlStatus?.backendRunning === true;
+  const backendControlStatusText = backendRestarting
+    ? t('backend_control.status_restarting')
+    : backendControlWaking
+      ? t('backend_control.status_waking')
+      : backendControlOnline
+        ? t('backend_control.status_online')
+        : t('backend_control.status_offline');
+  const backendStatusText = backendRestarting
+    ? t('backend_control.status_restarting')
+    : backendRunning
+      ? t('backend_control.backend_running')
+      : t('backend_control.backend_offline');
 
   const getIconForCategory = (categoryId: string): string | null => {
     const iconEntry = MODEL_CATEGORY_ICONS[categoryId];
@@ -194,6 +224,19 @@ export function SystemPage() {
       },
     });
   };
+
+  const handleBackendRestart = useCallback(() => {
+    showConfirmation({
+      title: t('backend_control.restart_title'),
+      message: t('backend_control.restart_confirm'),
+      variant: 'secondary',
+      confirmText: t('backend_control.restart_button'),
+      cancelText: t('common.cancel'),
+      onConfirm: async () => {
+        await restartBackend();
+      },
+    });
+  }, [restartBackend, showConfirmation, t]);
 
   const openRequestLogModal = useCallback(() => {
     setRequestLogTouched(false);
@@ -317,6 +360,98 @@ export function SystemPage() {
               <div className={styles.tileLabel}>{t('connection.status')}</div>
               <div className={styles.tileValue}>{t(`common.${auth.connectionStatus}_status`)}</div>
               <div className={styles.tileSub}>{auth.apiBase || '-'}</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card
+          title={t('backend_control.card_title')}
+          extra={
+            <div className={styles.maintenanceActions}>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<IconRefreshCw size={15} />}
+                onClick={() => void loadBackendControlStatus()}
+                loading={backendControlLoading}
+                disabled={backendControlLoading || backendRestarting || backendControlWaking}
+              >
+                {t('common.refresh')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<IconRefreshCw size={15} />}
+                onClick={handleBackendRestart}
+                loading={backendRestarting || backendControlWaking}
+                disabled={
+                  auth.connectionStatus !== 'connected' ||
+                  backendRestarting ||
+                  backendControlWaking
+                }
+              >
+                {t('backend_control.restart_button')}
+              </Button>
+            </div>
+          }
+        >
+          <p className={styles.sectionDescription}>{t('backend_control.card_desc')}</p>
+          {backendControlError && <div className="error-box">{backendControlError}</div>}
+          <div className={styles.maintenanceGrid}>
+            <div className={styles.maintenanceTile}>
+              <span className={styles.maintenanceLabel}>
+                {t('backend_control.helper_status')}
+              </span>
+              <strong
+                className={`${styles.maintenanceValue} ${
+                  backendControlOnline ? styles.statusGood : styles.statusMuted
+                }`}
+              >
+                {backendControlStatusText}
+              </strong>
+              <span className={styles.maintenanceMeta}>
+                {backendControlStatus
+                  ? `127.0.0.1:${backendControlStatus.port}`
+                  : t('backend_control.wake_on_restart')}
+              </span>
+            </div>
+            <div className={styles.maintenanceTile}>
+              <span className={styles.maintenanceLabel}>
+                {t('backend_control.backend_status')}
+              </span>
+              <strong
+                className={`${styles.maintenanceValue} ${
+                  backendRunning ? styles.statusGood : styles.statusMuted
+                }`}
+              >
+                {backendStatusText}
+              </strong>
+              <span className={styles.maintenanceMeta}>127.0.0.1:8317</span>
+            </div>
+            <div className={styles.maintenanceTile}>
+              <span className={styles.maintenanceLabel}>{t('backend_control.backend_pid')}</span>
+              <strong className={styles.maintenanceValue}>
+                {backendControlStatus?.backendPid ?? '-'}
+              </strong>
+              <span className={styles.maintenanceMeta}>
+                {backendControlStatus?.backendStartedAt
+                  ? new Date(backendControlStatus.backendStartedAt).toLocaleString(i18n.language)
+                  : t('system_info.version_unknown')}
+              </span>
+            </div>
+            <div className={styles.maintenanceTile}>
+              <span className={styles.maintenanceLabel}>{t('backend_control.backend_path')}</span>
+              <strong
+                className={`${styles.maintenanceValue} ${styles.maintenancePath}`}
+                title={backendControlStatus?.backendPath ?? ''}
+              >
+                {backendControlStatus?.backendPath ?? '-'}
+              </strong>
+              <span className={styles.maintenanceMeta}>
+                {backendControlStatus?.backendPathMatches
+                  ? t('backend_control.path_verified')
+                  : t('backend_control.path_unverified')}
+              </span>
             </div>
           </div>
         </Card>

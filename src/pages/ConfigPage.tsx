@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/icons';
 import { VisualConfigEditor } from '@/components/config/VisualConfigEditor';
 import { DiffModal } from '@/components/config/DiffModal';
+import { useCliProxyBackendRestart } from '@/hooks/useCliProxyBackendRestart';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
 import { useNotificationStore, useAuthStore, useThemeStore, useConfigStore } from '@/stores';
@@ -78,6 +79,11 @@ export function ConfigPage() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const {
+    restarting: backendRestarting,
+    waking: backendControlWaking,
+    restartBackend,
+  } = useCliProxyBackendRestart({ autoLoadStatus: false });
 
   const {
     visualValues,
@@ -208,6 +214,8 @@ export function ConfigPage() {
       showNotification(t('config_management.save_success'), 'success');
       if (commercialModeChanged) {
         showNotification(t('notification.commercial_mode_restart_required'), 'warning');
+      } else {
+        showNotification(t('backend_control.config_saved_restart_hint'), 'info');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
@@ -553,6 +561,19 @@ export function ConfigPage() {
     });
   }, [isDirty, loadConfig, showConfirmation, t]);
 
+  const handleBackendRestart = useCallback(() => {
+    showConfirmation({
+      title: t('backend_control.restart_title'),
+      message: t('backend_control.restart_confirm'),
+      confirmText: t('backend_control.restart_button'),
+      cancelText: t('common.cancel'),
+      variant: 'secondary',
+      onConfirm: async () => {
+        await restartBackend();
+      },
+    });
+  }, [restartBackend, showConfirmation, t]);
+
   const floatingActions = (
     <div className={styles.floatingActionContainer} ref={floatingActionsRef}>
       <div className={styles.floatingActionList}>
@@ -639,6 +660,20 @@ export function ConfigPage() {
             >
               {t('config_management.tabs.source', { defaultValue: '源代码编辑' })}
             </button>
+          </div>
+          <div className={styles.pageActions}>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<IconRefreshCw size={15} />}
+              onClick={handleBackendRestart}
+              disabled={disableControls || saving || backendRestarting || backendControlWaking}
+              loading={backendRestarting || backendControlWaking}
+              title={t('backend_control.restart_button')}
+              aria-label={t('backend_control.restart_button')}
+            >
+              {t('backend_control.restart_button')}
+            </Button>
           </div>
         </div>
       </div>

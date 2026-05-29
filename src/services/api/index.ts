@@ -11,5 +11,6 @@ export * from './oauth';
 export * from './logs';
 export * from './models';
 export * from './priorityRotationSidecar';
+export * from './cliProxyBackendControl';
 export * from './transformers';
 export * from './vertex';
