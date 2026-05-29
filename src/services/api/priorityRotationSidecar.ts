@@ -82,6 +82,12 @@ export type PriorityRotationSidecarStatus = {
   state: PriorityRotationSidecarState;
 };
 
+export type PriorityRotationSidecarRequestError = Error & {
+  status?: number;
+  data?: unknown;
+  body?: string;
+};
+
 const SIDECAR_BASE_URL = 'http://127.0.0.1:8318';
 const SIDECAR_WAKE_URL = 'cpamc-priority-rotation://start';
 
@@ -143,7 +149,11 @@ const requestSidecar = async <T>(
         : rawMessage
           ? `Sidecar request failed: ${response.status} ${rawMessage}`
           : `Sidecar request failed: ${response.status}`;
-    throw new Error(message);
+    const error = new Error(message) as PriorityRotationSidecarRequestError;
+    error.status = response.status;
+    error.data = data;
+    error.body = trimmedText;
+    throw error;
   }
   return data as T;
 };

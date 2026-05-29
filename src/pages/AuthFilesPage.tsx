@@ -113,6 +113,7 @@ import {
 import {
   launchPriorityRotationSidecar,
   priorityRotationSidecarApi,
+  type PriorityRotationSidecarRequestError,
   type PriorityRotationSidecarSettings,
   type PriorityRotationSidecarStatus,
 } from '@/services/api/priorityRotationSidecar';
@@ -547,6 +548,19 @@ const isPriorityRotationSidecarOfflineError = (err: unknown): boolean => {
     normalized.includes('load failed') ||
     normalized.includes('connection refused') ||
     normalized.includes('err_connection_refused')
+  );
+};
+
+const getPriorityRotationSidecarErrorStatus = (err: unknown): number | undefined =>
+  err && typeof err === 'object'
+    ? (err as Partial<PriorityRotationSidecarRequestError>).status
+    : undefined;
+
+const isPriorityRotationSidecarRevisionMismatchError = (err: unknown): boolean => {
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    getPriorityRotationSidecarErrorStatus(err) === 409 &&
+    message.toLowerCase().includes('revision mismatch')
   );
 };
 
@@ -2079,7 +2093,9 @@ export function AuthFilesPage() {
   const buildPriorityRotationSidecarSettings = useCallback(
     (
       updates: Partial<PriorityRotationSidecarSettings> = {},
-      options: Pick<PriorityRotationSidecarSaveOptions, 'committedDraftOnly'> = {}
+      options: Pick<PriorityRotationSidecarSaveOptions, 'committedDraftOnly'> & {
+        revision?: number;
+      } = {}
     ): Partial<PriorityRotationSidecarSettings> => ({
       enabled: priorityRotationSettings.enabled,
       apiBase: normalizeApiBase(apiBase),
@@ -2106,7 +2122,7 @@ export function AuthFilesPage() {
           ? normalizePriorityRotationSidecarInterval(priorityRotationSidecarIntervalInput)
           : priorityRotationSettings.checkIntervalMinutes,
       ...updates,
-      revision: priorityRotationSidecarSettings?.revision ?? 0,
+      revision: options.revision ?? priorityRotationSidecarSettings?.revision ?? 0,
     }),
     [
       apiBase,
@@ -2173,9 +2189,35 @@ export function AuthFilesPage() {
         const settings = buildPriorityRotationSidecarSettings(updates, {
           committedDraftOnly: options.committedDraftOnly,
         });
-        const result = await requestPriorityRotationSidecarWithWakeRetry(() =>
-          priorityRotationSidecarApi.updateSettings(settings, managementKey)
-        );
+        const saveWithRevision = (revision?: number) =>
+          priorityRotationSidecarApi.updateSettings(
+            {
+              ...settings,
+              revision: revision ?? settings.revision,
+            },
+            managementKey
+          );
+        let result: Awaited<ReturnType<typeof saveWithRevision>>;
+        try {
+          result = await saveWithRevision();
+        } catch (err) {
+          let freshStatus: PriorityRotationSidecarStatus | null = null;
+          if (isPriorityRotationSidecarOfflineError(err)) {
+            freshStatus = await wakePriorityRotationSidecar({ force: true, notify: false });
+          } else if (isPriorityRotationSidecarRevisionMismatchError(err)) {
+            try {
+              freshStatus = await priorityRotationSidecarApi.getStatus();
+              hydratePriorityRotationSidecarStatus(freshStatus);
+            } catch {
+              freshStatus = null;
+            }
+          }
+
+          if (!freshStatus) {
+            throw err;
+          }
+          result = await saveWithRevision(freshStatus.settings.revision);
+        }
         mergePriorityRotationSidecarResult(
           result.settings,
           result.state,
@@ -2201,11 +2243,11 @@ export function AuthFilesPage() {
     },
     [
       buildPriorityRotationSidecarSettings,
+      hydratePriorityRotationSidecarStatus,
       managementKey,
       mergePriorityRotationSidecarResult,
       priorityRotationSidecarError,
       priorityRotationSidecarStatus,
-      requestPriorityRotationSidecarWithWakeRetry,
       showNotification,
       t,
       wakePriorityRotationSidecar,
@@ -3510,7 +3552,7 @@ export function AuthFilesPage() {
                       </span>
                       {temporaryPriorityLockStatusLabel && (
                         <span
-                          className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusWarning}`}
+                          className={`${styles.priorityRotationStatus} ${styles.priorityRotationStatusManualLock}`}
                         >
                           {temporaryPriorityLockStatusLabel}
                         </span>
@@ -3518,7 +3560,7 @@ export function AuthFilesPage() {
                     </div>
                     <div className={styles.priorityRotationButtonGroup}>
                       <Button
-                        variant={temporaryPriorityLockActive ? 'warning' : 'secondary'}
+                        variant="secondary"
                         size="sm"
                         className={`${styles.priorityRotationButton} ${
                           temporaryPriorityLockActive

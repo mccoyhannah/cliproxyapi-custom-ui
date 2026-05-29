@@ -606,7 +606,7 @@
   --priority-rotation-active: #2563eb;
   --priority-rotation-standby: #0891b2;
   --priority-rotation-buffer: #64748b;
-  --priority-rotation-manual-locked: #be123c;
+  --priority-rotation-manual-locked: #5b5f8f;
   --priority-rotation-sheen: #fff;
   display: grid;
   grid-template-columns:
@@ -1069,7 +1069,7 @@
 }
 
 .priorityRotationTierManualLocked {
-  --tier-color: var(--priority-rotation-manual-locked, #be123c);
+  --tier-color: var(--priority-rotation-manual-locked, #5b5f8f);
 }
 
 .priorityRotationTierLabel {
@@ -1558,6 +1558,12 @@
   }
 }
 
+.priorityRotationStatusManualLock {
+  color: color-mix(in srgb, var(--priority-rotation-manual-locked) 78%, var(--text-primary));
+  border: 1px solid color-mix(in srgb, var(--priority-rotation-manual-locked) 18%, transparent);
+  background: color-mix(in srgb, var(--priority-rotation-manual-locked) 7%, transparent);
+}
+
 .priorityRotationButtonGroup {
   grid-column: 1 / -1;
   display: flex;
@@ -1604,10 +1610,20 @@
 
 .temporaryPriorityLockButtonActive {
   &:global(.btn) {
-    border-color: color-mix(in srgb, var(--warning-color) 58%, var(--border-color));
+    color: color-mix(in srgb, var(--priority-rotation-manual-locked) 78%, var(--text-primary));
+    border-color: color-mix(
+      in srgb,
+      var(--priority-rotation-manual-locked) 48%,
+      var(--border-color)
+    );
+    background: color-mix(
+      in srgb,
+      var(--priority-rotation-manual-locked) 8%,
+      var(--surface-control)
+    );
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--warning-color) 10%, transparent),
-      0 8px 18px color-mix(in srgb, var(--warning-color) 12%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--priority-rotation-manual-locked) 9%, transparent),
+      0 8px 18px color-mix(in srgb, var(--priority-rotation-manual-locked) 10%, transparent),
       var(--ops-control-shadow);
   }
 }
@@ -2760,7 +2776,7 @@ button.codexSubscriptionValue {
   --priority-rotation-active: #60a5fa;
   --priority-rotation-standby: #22d3ee;
   --priority-rotation-buffer: #cbd5e1;
-  --priority-rotation-manual-locked: #fb7185;
+  --priority-rotation-manual-locked: #a5b4fc;
   --priority-rotation-sheen: #020617;
 }
 
@@ -2787,12 +2803,12 @@ button.codexSubscriptionValue {
 }
 
 :global([data-theme='dark']) .priorityBadgeEditorManualLocked {
-  --priority-dot-color: #fb7185;
-  --priority-value-surface: color-mix(in srgb, #fb7185 12%, var(--surface-control));
-  --priority-value-border: color-mix(in srgb, #fb7185 26%, transparent);
-  --priority-value-color: color-mix(in srgb, #fecdd3 84%, var(--text-primary));
+  --priority-dot-color: #a5b4fc;
+  --priority-value-surface: color-mix(in srgb, #a5b4fc 11%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #a5b4fc 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #c7d2fe 84%, var(--text-primary));
 
-  border-color: color-mix(in srgb, #fb7185 28%, var(--border-color));
+  border-color: color-mix(in srgb, #a5b4fc 26%, var(--border-color));
 }
 
 :global([data-theme='dark']) .priorityBadgeEditorBuffer,
@@ -3605,18 +3621,18 @@ button.codexSubscriptionValue {
 }
 
 .priorityBadgeEditorManualLocked {
-  --priority-badge-color: #be123c;
-  --priority-dot-color: #be123c;
-  --priority-value-surface: color-mix(in srgb, #be123c 8%, var(--surface-control));
+  --priority-badge-color: #5b5f8f;
+  --priority-dot-color: #5b5f8f;
+  --priority-value-surface: color-mix(in srgb, #5b5f8f 7%, var(--surface-control));
   --priority-value-shadow: inset 0 1px 0
     color-mix(in srgb, var(--priority-badge-sheen) 18%, transparent);
-  --priority-value-border: color-mix(in srgb, #be123c 20%, transparent);
-  --priority-value-color: color-mix(in srgb, #9f1239 82%, var(--text-primary));
+  --priority-value-border: color-mix(in srgb, #5b5f8f 18%, transparent);
+  --priority-value-color: color-mix(in srgb, #4f527f 82%, var(--text-primary));
   --priority-prefix-size: 13px;
   --priority-input-size: 18px;
   --priority-input-weight: 860;
 
-  border-color: color-mix(in srgb, #be123c 20%, var(--border-color));
+  border-color: color-mix(in srgb, #5b5f8f 18%, var(--border-color));
 }
 
 .priorityBadgeEditorFree {
@@ -9663,11 +9679,11 @@ button.codexSubscriptionValue {
 }
 
 .priorityBadgeEditorManualLocked {
-  --priority-badge-color: #be123c;
-  --priority-dot-color: #be123c;
-  --priority-value-surface: color-mix(in srgb, #be123c 9%, var(--surface-control));
-  --priority-value-border: color-mix(in srgb, #be123c 24%, transparent);
-  --priority-value-color: color-mix(in srgb, #9f1239 84%, var(--text-primary));
+  --priority-badge-color: #5b5f8f;
+  --priority-dot-color: #5b5f8f;
+  --priority-value-surface: color-mix(in srgb, #5b5f8f 8%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #5b5f8f 22%, transparent);
+  --priority-value-color: color-mix(in srgb, #4f527f 84%, var(--text-primary));
 }
 
 .priorityBadgeEditorBuffer,
