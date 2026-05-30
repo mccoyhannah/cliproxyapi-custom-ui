@@ -1487,3 +1487,422 @@
     margin-left: 0;
   }
 }
+
+// Keep the live log stream readable even when structured filters are expanded.
+.logCard {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:global(.main-body) :global(.content.content-logs) {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+:global(.main-content.main-content-logs) {
+  overflow: visible;
+}
+
+:global(.main-content.main-content-logs) :global(.page-transition),
+:global(.main-content.main-content-logs) :global(.page-transition__layer) {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
+.filterPanelHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 auto;
+}
+
+.filterClearButton {
+  white-space: nowrap;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto;
+  align-items: start;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.searchWrapper {
+  grid-column: 1;
+  max-width: none;
+}
+
+.filterSwitches {
+  display: flex;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filterSwitches > :global(label) {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 76%, transparent);
+}
+
+.structuredFilters {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(330px, 1.25fr) minmax(190px, 0.72fr);
+  align-items: start;
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.structuredFilters > :global(.btn) {
+  display: none;
+}
+
+.filterChipGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 70%, transparent);
+}
+
+.filterChipLabel {
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.filterChipList {
+  flex-wrap: wrap;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.pathFilterGroup {
+  grid-column: 1 / -1;
+  min-height: 112px;
+}
+
+.pathFilterGroup .filterChipList {
+  align-items: center;
+  flex-wrap: wrap;
+  max-height: none;
+  overflow: visible;
+  scrollbar-width: none;
+  padding-right: 2px;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.filterChip {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+
+  &:disabled {
+    opacity: 1;
+    cursor: not-allowed;
+    color: color-mix(in srgb, var(--text-secondary) 72%, var(--text-tertiary));
+    border-color: color-mix(in srgb, var(--border-color) 88%, var(--text-tertiary));
+    background: color-mix(in srgb, var(--surface-panel) 82%, var(--bg-primary));
+  }
+}
+
+.levelFilterChip {
+  font-weight: 850;
+
+  &[data-level='info'] {
+    color: #0369a1;
+    border-color: rgba(2, 132, 199, 0.36);
+    background: rgba(14, 165, 233, 0.11);
+  }
+
+  &[data-level='warn'] {
+    color: #92400e;
+    border-color: rgba(217, 119, 6, 0.38);
+    background: rgba(245, 158, 11, 0.12);
+  }
+
+  &[data-level='error'],
+  &[data-level='fatal'] {
+    color: #be123c;
+    border-color: rgba(225, 29, 72, 0.38);
+    background: rgba(244, 63, 94, 0.12);
+  }
+
+  &[data-level='debug'],
+  &[data-level='trace'] {
+    color: #5b21b6;
+    border-color: rgba(124, 58, 237, 0.34);
+    background: rgba(124, 58, 237, 0.1);
+  }
+
+  &:disabled {
+    filter: saturate(0.9);
+  }
+
+  &[data-level='info']:disabled {
+    color: #075985;
+    border-color: rgba(2, 132, 199, 0.28);
+    background: rgba(14, 165, 233, 0.07);
+  }
+
+  &[data-level='warn']:disabled {
+    color: #78350f;
+    border-color: rgba(217, 119, 6, 0.28);
+    background: rgba(245, 158, 11, 0.08);
+  }
+
+  &[data-level='error']:disabled,
+  &[data-level='fatal']:disabled {
+    color: #9f1239;
+    border-color: rgba(225, 29, 72, 0.28);
+    background: rgba(244, 63, 94, 0.08);
+  }
+
+  &[data-level='debug']:disabled,
+  &[data-level='trace']:disabled {
+    color: #4c1d95;
+    border-color: rgba(124, 58, 237, 0.26);
+    background: rgba(124, 58, 237, 0.07);
+  }
+}
+
+.logViewerShell {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-height: auto;
+}
+
+.terminalToolbar {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.terminalActions {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  justify-content: flex-end;
+  padding: 0;
+
+  label {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 30px;
+    padding: 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-panel) 70%, transparent);
+    color: var(--text-secondary);
+  }
+
+  label:has(input:disabled) {
+    color: var(--text-tertiary);
+  }
+
+  label span {
+    color: inherit;
+  }
+
+  .switchLabel {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+.logPanel {
+  flex: 0 0 auto;
+  height: 640px;
+  min-height: 640px;
+  max-height: none;
+}
+
+.terminalChrome {
+  flex-wrap: nowrap;
+  min-height: 46px;
+}
+
+.terminalIdentity {
+  flex: 0 1 auto;
+}
+
+.terminalStatusList {
+  flex: 1 1 auto;
+}
+
+.loadMoreBanner {
+  top: 46px;
+}
+
+:global([data-theme='dark']) .filterChip:disabled {
+  color: rgba(203, 213, 225, 0.74);
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.46);
+}
+
+:global([data-theme='dark']) .levelFilterChip {
+  &[data-level='info'] {
+    color: #bae6fd;
+    border-color: rgba(56, 189, 248, 0.34);
+    background: rgba(14, 165, 233, 0.12);
+  }
+
+  &[data-level='warn'] {
+    color: #fde68a;
+    border-color: rgba(245, 158, 11, 0.36);
+    background: rgba(180, 83, 9, 0.16);
+  }
+
+  &[data-level='error'],
+  &[data-level='fatal'] {
+    color: #fecdd3;
+    border-color: rgba(251, 113, 133, 0.38);
+    background: rgba(190, 18, 60, 0.16);
+  }
+
+  &[data-level='debug'],
+  &[data-level='trace'] {
+    color: #ddd6fe;
+    border-color: rgba(167, 139, 250, 0.28);
+    background: rgba(109, 40, 217, 0.12);
+  }
+}
+
+@media (max-height: 820px) {
+  @media (min-width: 769px) {
+    .filters {
+      max-height: none;
+    }
+
+    .structuredFilters {
+      grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1.2fr) minmax(170px, 0.72fr);
+      max-height: none;
+    }
+
+    .pathFilterGroup .filterChipList {
+      max-height: none;
+    }
+
+    .logPanel {
+      height: 620px;
+      min-height: 620px;
+      max-height: none;
+    }
+  }
+}
+
+@media (max-height: 600px) {
+  @media (min-width: 769px) {
+    .filters {
+      max-height: none;
+    }
+
+    .structuredFilters {
+      max-height: none;
+    }
+
+    .pathFilterGroup .filterChipList {
+      max-height: none;
+    }
+
+    .logPanel {
+      height: 560px;
+      min-height: 560px;
+      max-height: none;
+    }
+  }
+}
+
+@include mobile {
+  .logCard {
+    overflow: visible;
+  }
+
+  .filterPanelHeader {
+    flex: 1 1 100%;
+  }
+
+  .filters {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filterSwitches {
+    display: flex;
+    grid-column: auto;
+    grid-row: auto;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .filterSwitches > :global(label) {
+    width: 100%;
+  }
+
+  .structuredFilters {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .pathFilterGroup .filterChipList {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .terminalChrome {
+    flex-wrap: wrap;
+  }
+
+  .terminalActions label {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .logPanel {
+    height: 420px;
+    min-height: 360px;
+    max-height: 480px;
+  }
+
+  .loadMoreBanner {
+    top: 86px;
+  }
+}

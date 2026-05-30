@@ -554,6 +554,15 @@ export function LogsPage() {
                     )}
                   </span>
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={styles.filterClearButton}
+                  onClick={filters.clearStructuredFilters}
+                  disabled={!filters.hasStructuredFilters}
+                >
+                  {t('logs.clear_filters')}
+                </Button>
               </div>
 
               {structuredFiltersExpanded && (
@@ -625,7 +634,7 @@ export function LogsPage() {
                     </div>
                   </div>
 
-                  <div className={styles.filterChipGroup}>
+                  <div className={`${styles.filterChipGroup} ${styles.pathFilterGroup}`}>
                     <span className={styles.filterChipLabel}>{t('logs.filter_path')}</span>
                     <div className={styles.filterChipList}>
                       {filters.pathOptions.length === 0 ? (
@@ -649,44 +658,37 @@ export function LogsPage() {
                       )}
                     </div>
                   </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={filters.clearStructuredFilters}
-                    disabled={!filters.hasStructuredFilters}
-                  >
-                    {t('logs.clear_filters')}
-                  </Button>
                 </div>
               )}
 
-              <ToggleSwitch
-                checked={hideManagementLogs}
-                onChange={setHideManagementLogs}
-                label={
-                  <span className={styles.switchLabel}>
-                    <IconEyeOff size={16} />
-                    {t('logs.hide_management_logs', { prefix: MANAGEMENT_API_PREFIX })}
-                  </span>
-                }
-              />
+              <div className={styles.filterSwitches}>
+                <ToggleSwitch
+                  checked={hideManagementLogs}
+                  onChange={setHideManagementLogs}
+                  label={
+                    <span className={styles.switchLabel}>
+                      <IconEyeOff size={16} />
+                      {t('logs.hide_management_logs', { prefix: MANAGEMENT_API_PREFIX })}
+                    </span>
+                  }
+                />
 
-              <ToggleSwitch
-                checked={showRawLogs}
-                onChange={setShowRawLogs}
-                label={
-                  <span
-                    className={styles.switchLabel}
-                    title={t('logs.show_raw_logs_hint', {
-                      defaultValue: 'Show original log text for easier multi-line copy',
-                    })}
-                  >
-                    <IconCode size={16} />
-                    {t('logs.show_raw_logs', { defaultValue: 'Show raw logs' })}
-                  </span>
-                }
-              />
+                <ToggleSwitch
+                  checked={showRawLogs}
+                  onChange={setShowRawLogs}
+                  label={
+                    <span
+                      className={styles.switchLabel}
+                      title={t('logs.show_raw_logs_hint', {
+                        defaultValue: 'Show original log text for easier multi-line copy',
+                      })}
+                    >
+                      <IconCode size={16} />
+                      {t('logs.show_raw_logs', { defaultValue: 'Show raw logs' })}
+                    </span>
+                  }
+                />
+              </div>
 
             </div>
 

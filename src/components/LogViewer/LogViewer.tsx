@@ -107,57 +107,67 @@ export function LogViewer({
           {t('logs.loaded_lines', { count: renderedCount })}
         </span>
       </div>
-      {toolbarSlot && <div className={styles.terminalToolbar}>{toolbarSlot}</div>}
+    </div>
+  );
+  const terminalToolbar = toolbarSlot ? (
+    <div className={styles.terminalToolbar}>{toolbarSlot}</div>
+  ) : null;
+
+  const renderPanel = (className: string, content: ReactNode, scrollable = false) => (
+    <div className={styles.logViewerShell}>
+      {terminalToolbar}
+      <div
+        ref={logViewerRef}
+        className={className}
+        onScroll={scrollable ? onScroll : undefined}
+      >
+        {chrome}
+        {content}
+      </div>
     </div>
   );
 
   if (loading) {
-    return (
-      <div ref={logViewerRef} className={`${styles.logPanel} ${styles.logPanelEmpty}`}>
-        {chrome}
-        <EmptyState
-          variant="loading"
-          compact
-          className={styles.logEmptyState}
-          title={t('logs.loading')}
-          description={t('logs.loading_desc', { defaultValue: 'Fetching the latest server logs.' })}
-        />
-      </div>
+    return renderPanel(
+      `${styles.logPanel} ${styles.logPanelEmpty}`,
+      <EmptyState
+        variant="loading"
+        compact
+        className={styles.logEmptyState}
+        title={t('logs.loading')}
+        description={t('logs.loading_desc', { defaultValue: 'Fetching the latest server logs.' })}
+      />
     );
   }
 
   if (logState.buffer.length > 0 && filteredLineCount === 0) {
-    return (
-      <div ref={logViewerRef} className={`${styles.logPanel} ${styles.logPanelEmpty}`}>
-        {chrome}
-        <EmptyState
-          className={styles.logEmptyState}
-          icon={emptyPrompt}
-          title={t('logs.search_empty_title')}
-          description={t('logs.search_empty_desc')}
-          variant="info"
-        />
-      </div>
+    return renderPanel(
+      `${styles.logPanel} ${styles.logPanelEmpty}`,
+      <EmptyState
+        className={styles.logEmptyState}
+        icon={emptyPrompt}
+        title={t('logs.search_empty_title')}
+        description={t('logs.search_empty_desc')}
+        variant="info"
+      />
     );
   }
 
   if (logState.buffer.length === 0) {
-    return (
-      <div ref={logViewerRef} className={`${styles.logPanel} ${styles.logPanelEmpty}`}>
-        {chrome}
-        <EmptyState
-          className={styles.logEmptyState}
-          icon={emptyPrompt}
-          title={t('logs.empty_title')}
-          description={t('logs.empty_desc')}
-        />
-      </div>
+    return renderPanel(
+      `${styles.logPanel} ${styles.logPanelEmpty}`,
+      <EmptyState
+        className={styles.logEmptyState}
+        icon={emptyPrompt}
+        title={t('logs.empty_title')}
+        description={t('logs.empty_desc')}
+      />
     );
   }
 
-  return (
-    <div ref={logViewerRef} className={styles.logPanel} onScroll={onScroll}>
-      {chrome}
+  return renderPanel(
+    styles.logPanel,
+    <>
       {canLoadMore && (
         <div className={styles.loadMoreBanner}>
           <span>{t('logs.load_more_hint')}</span>
@@ -309,6 +319,7 @@ export function LogViewer({
           })}
         </div>
       )}
-    </div>
+    </>,
+    true
   );
 }
