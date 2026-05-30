@@ -17,6 +17,13 @@ import {
   isRuntimeOnlyAuthFile,
   parsePriorityValue,
 } from '@/features/authFiles/constants';
+import {
+  buildAuthFileDisplayNameLookup,
+  getRememberedAuthFileDisplayName,
+  rememberAuthFileDisplayName,
+  rememberAuthFileDisplayNames,
+  type AuthFileDisplayNameLookup,
+} from '@/features/authFiles/displayNameMemory';
 
 type DeleteAllOptions = {
   filter: string;
@@ -43,8 +50,11 @@ type UploadValidationResult =
       valid: true;
       missingRefreshToken: boolean;
       accessTokenExpiryKnown: boolean;
+      displayNameLookup: AuthFileDisplayNameLookup;
     }
   | { file: File; valid: false; reason: UploadValidationRejectReason };
+
+type ValidUploadValidationResult = Extract<UploadValidationResult, { valid: true }>;
 
 type AuthFileDeleteFailure = { name: string; error: string };
 export type AuthFilePriorityBatchChange = { name: string; priority: number };
@@ -280,6 +290,7 @@ const validateAuthFileUpload = async (file: File): Promise<UploadValidationResul
       valid: true,
       missingRefreshToken,
       accessTokenExpiryKnown,
+      displayNameLookup: buildAuthFileDisplayNameLookup(normalizedAuthJson, file.name),
     };
   }
 
@@ -289,12 +300,53 @@ const validateAuthFileUpload = async (file: File): Promise<UploadValidationResul
     valid: true,
     missingRefreshToken,
     accessTokenExpiryKnown,
+    displayNameLookup: buildAuthFileDisplayNameLookup(parsed, file.name),
   };
 };
 
 const summarizeFileNames = (names: string[]): string => {
   const visibleNames = names.slice(0, 3).join(', ');
   return names.length > 3 ? `${visibleNames} +${names.length - 3}` : visibleNames;
+};
+
+const readAuthFileNote = (file: AuthFileItem, noteOverride?: string): string =>
+  (noteOverride ?? (typeof file.note === 'string' ? file.note : '')).trim();
+
+const rememberAuthFileDisplayNameWithIdentity = async (
+  file: AuthFileItem,
+  noteOverride?: string
+): Promise<boolean> => {
+  const note = readAuthFileNote(file, noteOverride);
+
+  try {
+    const authJson = await authFilesApi.downloadJsonObject(file.name);
+    return rememberAuthFileDisplayName(
+      file,
+      note,
+      buildAuthFileDisplayNameLookup(authJson, file.name)
+    );
+  } catch {
+    return rememberAuthFileDisplayName(file, note);
+  }
+};
+
+const rememberExistingDisplayNamesForUpload = async (
+  currentFiles: AuthFileItem[],
+  acceptedFiles: ValidUploadValidationResult[]
+): Promise<void> => {
+  if (currentFiles.length === 0 || acceptedFiles.length === 0) return;
+
+  const currentFilesByName = new Map(currentFiles.map((file) => [file.name, file]));
+  await Promise.all(
+    acceptedFiles.map(async (upload) => {
+      const currentFile = currentFilesByName.get(upload.originalName);
+      if (!currentFile) return;
+
+      const note = readAuthFileNote(currentFile);
+      if (!note) return;
+      await rememberAuthFileDisplayNameWithIdentity(currentFile, note);
+    })
+  );
 };
 
 export function useAuthFilesData(): UseAuthFilesDataResult {
@@ -460,6 +512,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       const data = await authFilesApi.list();
       if (requestSeq !== loadFilesRequestSeqRef.current) return;
       const nextFiles = data?.files || [];
+      rememberAuthFileDisplayNames(nextFiles);
       setFiles((prev) => {
         if (options.preserveExisting && prev.length > 0 && nextFiles.length === 0) {
           return prev;
@@ -496,15 +549,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       try {
         const validationResults = await Promise.all(filesToUpload.map(validateAuthFileUpload));
         const acceptedFiles = validationResults.filter(
-          (
-            result
-          ): result is {
-            file: File;
-            originalName: string;
-            valid: true;
-            missingRefreshToken: boolean;
-            accessTokenExpiryKnown: boolean;
-          } => result.valid
+          (result): result is ValidUploadValidationResult => result.valid
         );
         const validFiles = acceptedFiles.map((result) => result.file);
         const rejectedByReason = validationResults.reduce<Record<UploadValidationRejectReason, string[]>>(
@@ -578,6 +623,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         }
 
         const rejectedCount = validationResults.length - validFiles.length;
+        await rememberExistingDisplayNamesForUpload(files, acceptedFiles);
         const result = await authFilesApi.uploadFiles(validFiles);
         const successCount = result.uploaded;
         setUploadProgress({
@@ -594,6 +640,16 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
           const refreshedFiles = refreshed?.files || [];
           const refreshedNames = new Set(refreshedFiles.map((file) => file.name));
           const uploadedNames = result.files.length > 0 ? result.files : validFiles.map((file) => file.name);
+          const uploadDisplayNameLookupByName = new Map<string, AuthFileDisplayNameLookup>();
+          acceptedFiles.forEach((item) => {
+            uploadDisplayNameLookupByName.set(item.originalName, item.displayNameLookup);
+          });
+          uploadedNames.forEach((name, index) => {
+            const lookup = acceptedFiles[index]?.displayNameLookup;
+            if (lookup) {
+              uploadDisplayNameLookupByName.set(name, lookup);
+            }
+          });
           const unlistedNames = uploadedNames.filter((name) => !refreshedNames.has(name));
           const uploadedNameSet = new Set(uploadedNames);
           const missingRefreshWithExpiry = acceptedFiles
@@ -613,11 +669,82 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             )
             .map((item) => item.originalName);
 
-          setFiles(refreshedFiles);
+          let nextRefreshedFiles = refreshedFiles;
+          let restoredDisplayNameCount = 0;
+          let restoreDisplayNameFailedCount = 0;
+          let skippedExistingDisplayNameCount = 0;
+
+          for (const file of refreshedFiles) {
+            if (!uploadedNameSet.has(file.name)) continue;
+
+            const existingNote = typeof file.note === 'string' ? file.note.trim() : '';
+            if (existingNote) {
+              skippedExistingDisplayNameCount++;
+              rememberAuthFileDisplayName(
+                file,
+                existingNote,
+                uploadDisplayNameLookupByName.get(file.name)
+              );
+              continue;
+            }
+
+            const rememberedNote = getRememberedAuthFileDisplayName(
+              file,
+              uploadDisplayNameLookupByName.get(file.name)
+            );
+            if (!rememberedNote) continue;
+
+            try {
+              await authFilesApi.patchFields(file.name, { note: rememberedNote });
+              restoredDisplayNameCount++;
+              nextRefreshedFiles = nextRefreshedFiles.map((item) =>
+                item.name === file.name ? { ...item, note: rememberedNote } : item
+              );
+              rememberAuthFileDisplayName(
+                { ...file, note: rememberedNote },
+                rememberedNote,
+                uploadDisplayNameLookupByName.get(file.name)
+              );
+            } catch {
+              restoreDisplayNameFailedCount++;
+            }
+          }
+
+          rememberAuthFileDisplayNames(nextRefreshedFiles);
+          setFiles(nextRefreshedFiles);
           showNotification(
             `${t(rejectedCount > 0 ? 'auth_files.upload_partial_format' : 'auth_files.upload_success')}${suffix}`,
             result.failed.length || rejectedCount > 0 ? 'warning' : 'success'
           );
+
+          if (restoredDisplayNameCount > 0 && restoreDisplayNameFailedCount === 0) {
+            showNotification(
+              t('auth_files.display_name_restore_success', {
+                count: restoredDisplayNameCount,
+              }),
+              'success'
+            );
+          } else if (restoredDisplayNameCount > 0 || restoreDisplayNameFailedCount > 0) {
+            showNotification(
+              t(
+                restoredDisplayNameCount > 0
+                  ? 'auth_files.display_name_restore_partial'
+                  : 'auth_files.display_name_restore_failed',
+                {
+                  success: restoredDisplayNameCount,
+                  failed: restoreDisplayNameFailedCount,
+                }
+              ),
+              restoreDisplayNameFailedCount > 0 ? 'warning' : 'success'
+            );
+          } else if (skippedExistingDisplayNameCount > 0) {
+            showNotification(
+              t('auth_files.display_name_restore_skipped_existing', {
+                count: skippedExistingDisplayNameCount,
+              }),
+              'info'
+            );
+          }
 
           if (unlistedNames.length > 0) {
             showNotification(
@@ -659,7 +786,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         setUploadProgress(IDLE_UPLOAD_PROGRESS);
       }
     },
-    [showNotification, t]
+    [files, showNotification, t]
   );
 
   const handleFileChange = useCallback(
@@ -974,6 +1101,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
 
       try {
         await authFilesApi.patchFields(name, { note: nextNote });
+        await rememberAuthFileDisplayNameWithIdentity({ ...item, note: nextNote }, nextNote);
         showNotification(
           nextNote
             ? t('auth_files.display_name_save_success', { name })
