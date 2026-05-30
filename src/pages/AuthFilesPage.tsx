@@ -646,6 +646,7 @@ export function AuthFilesPage() {
     useState<AuthFilesTemporaryPriorityLockSnapshot | null>(() =>
       readAuthFilesTemporaryPriorityLock()
     );
+  const [allPriorityP2Applying, setAllPriorityP2Applying] = useState(false);
   const [temporaryPriorityLockApplying, setTemporaryPriorityLockApplying] = useState(false);
   const [priorityRotationSidecarStatus, setPriorityRotationSidecarStatus] =
     useState<PriorityRotationSidecarStatus | null>(null);
@@ -2403,6 +2404,65 @@ export function AuthFilesPage() {
     []
   );
 
+  const handleSetAllPriorityP2 = useCallback(async () => {
+    if (allPriorityP2Applying || batchPriorityUpdating) return;
+
+    if (temporaryPriorityLockTargetFiles.length === 0) {
+      showNotification(t('auth_files.priority_rotation_all_p2_none'), 'info');
+      return;
+    }
+
+    setAllPriorityP2Applying(true);
+    try {
+      const result = await batchSetPriorities(
+        temporaryPriorityLockTargetFiles.map((file) => ({
+          name: file.name,
+          priority: PRIORITY_ROTATION_ACTIVE_PRIORITY,
+        })),
+        { notify: false }
+      );
+      if (result.successCount > 0) {
+        await loadFiles({ preserveExisting: true, silent: true });
+      }
+
+      if (result.successCount > 0 && result.failCount === 0) {
+        showNotification(
+          t('auth_files.priority_rotation_all_p2_success', {
+            count: result.successCount,
+          }),
+          'success'
+        );
+      } else if (result.successCount > 0) {
+        showNotification(
+          t('auth_files.priority_rotation_all_p2_partial', {
+            success: result.successCount,
+            failed: result.failCount,
+          }),
+          'warning'
+        );
+      } else if (result.failCount > 0) {
+        showNotification(
+          t('auth_files.priority_rotation_all_p2_failed', {
+            failed: result.failCount,
+          }),
+          'warning'
+        );
+      } else {
+        showNotification(t('auth_files.priority_rotation_all_p2_already'), 'info');
+      }
+    } finally {
+      setAllPriorityP2Applying(false);
+    }
+  }, [
+    allPriorityP2Applying,
+    batchPriorityUpdating,
+    batchSetPriorities,
+    loadFiles,
+    showNotification,
+    t,
+    temporaryPriorityLockTargetFiles,
+  ]);
+
   const handleTemporaryPriorityLockToggle = useCallback(async () => {
     if (temporaryPriorityLockApplying || batchPriorityUpdating) return;
 
@@ -2902,15 +2962,23 @@ export function AuthFilesPage() {
     !priorityRotationHasPreviewChanges ||
     disableControls ||
     batchPriorityUpdating ||
+    allPriorityP2Applying ||
     temporaryPriorityLockApplying ||
     priorityRotationPreviewApplying;
   const temporaryPriorityLockButtonDisabled =
     disableControls ||
     batchPriorityUpdating ||
+    allPriorityP2Applying ||
     temporaryPriorityLockApplying ||
     (temporaryPriorityLockActive
       ? temporaryPriorityLockSnapshotCount === 0
       : temporaryPriorityLockTargetFiles.length === 0);
+  const allPriorityP2ButtonDisabled =
+    disableControls ||
+    batchPriorityUpdating ||
+    temporaryPriorityLockApplying ||
+    priorityRotationPreviewApplying ||
+    allPriorityP2Applying;
   const priorityRotationPreviewSummaryItems = [
     {
       key: 'threshold',
@@ -3586,6 +3654,18 @@ export function AuthFilesPage() {
                         {temporaryPriorityLockActive
                           ? t('auth_files.priority_rotation_temp_p3_restore_button')
                           : t('auth_files.priority_rotation_temp_p3_button')}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className={styles.priorityRotationButton}
+                        leftIcon={<IconSlidersHorizontal size={15} />}
+                        onClick={() => void handleSetAllPriorityP2()}
+                        disabled={allPriorityP2ButtonDisabled}
+                        loading={allPriorityP2Applying}
+                        aria-label={t('auth_files.priority_rotation_all_p2_aria')}
+                      >
+                        {t('auth_files.priority_rotation_all_p2_button')}
                       </Button>
                       <Button
                         variant="secondary"

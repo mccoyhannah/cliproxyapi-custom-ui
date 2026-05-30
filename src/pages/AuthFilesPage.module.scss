@@ -606,7 +606,7 @@
   --priority-rotation-active: #2563eb;
   --priority-rotation-standby: #0891b2;
   --priority-rotation-buffer: #64748b;
-  --priority-rotation-manual-locked: #5b5f8f;
+  --priority-rotation-manual-locked: #7c3aed;
   --priority-rotation-sheen: #fff;
   display: grid;
   grid-template-columns:
@@ -1069,7 +1069,7 @@
 }
 
 .priorityRotationTierManualLocked {
-  --tier-color: var(--priority-rotation-manual-locked, #5b5f8f);
+  --tier-color: var(--priority-rotation-manual-locked, #7c3aed);
 }
 
 .priorityRotationTierLabel {
@@ -2776,7 +2776,7 @@ button.codexSubscriptionValue {
   --priority-rotation-active: #60a5fa;
   --priority-rotation-standby: #22d3ee;
   --priority-rotation-buffer: #cbd5e1;
-  --priority-rotation-manual-locked: #a5b4fc;
+  --priority-rotation-manual-locked: #c084fc;
   --priority-rotation-sheen: #020617;
 }
 
@@ -2803,12 +2803,12 @@ button.codexSubscriptionValue {
 }
 
 :global([data-theme='dark']) .priorityBadgeEditorManualLocked {
-  --priority-dot-color: #a5b4fc;
-  --priority-value-surface: color-mix(in srgb, #a5b4fc 11%, var(--surface-control));
-  --priority-value-border: color-mix(in srgb, #a5b4fc 24%, transparent);
-  --priority-value-color: color-mix(in srgb, #c7d2fe 84%, var(--text-primary));
+  --priority-dot-color: #c084fc;
+  --priority-value-surface: color-mix(in srgb, #c084fc 11%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #c084fc 24%, transparent);
+  --priority-value-color: color-mix(in srgb, #e9d5ff 86%, var(--text-primary));
 
-  border-color: color-mix(in srgb, #a5b4fc 26%, var(--border-color));
+  border-color: color-mix(in srgb, #c084fc 26%, var(--border-color));
 }
 
 :global([data-theme='dark']) .priorityBadgeEditorBuffer,
@@ -3621,18 +3621,18 @@ button.codexSubscriptionValue {
 }
 
 .priorityBadgeEditorManualLocked {
-  --priority-badge-color: #5b5f8f;
-  --priority-dot-color: #5b5f8f;
-  --priority-value-surface: color-mix(in srgb, #5b5f8f 7%, var(--surface-control));
+  --priority-badge-color: #7c3aed;
+  --priority-dot-color: #7c3aed;
+  --priority-value-surface: color-mix(in srgb, #7c3aed 7%, var(--surface-control));
   --priority-value-shadow: inset 0 1px 0
     color-mix(in srgb, var(--priority-badge-sheen) 18%, transparent);
-  --priority-value-border: color-mix(in srgb, #5b5f8f 18%, transparent);
-  --priority-value-color: color-mix(in srgb, #4f527f 82%, var(--text-primary));
+  --priority-value-border: color-mix(in srgb, #7c3aed 18%, transparent);
+  --priority-value-color: color-mix(in srgb, #6d28d9 82%, var(--text-primary));
   --priority-prefix-size: 13px;
   --priority-input-size: 18px;
   --priority-input-weight: 860;
 
-  border-color: color-mix(in srgb, #5b5f8f 18%, var(--border-color));
+  border-color: color-mix(in srgb, #7c3aed 18%, var(--border-color));
 }
 
 .priorityBadgeEditorFree {
@@ -9679,11 +9679,11 @@ button.codexSubscriptionValue {
 }
 
 .priorityBadgeEditorManualLocked {
-  --priority-badge-color: #5b5f8f;
-  --priority-dot-color: #5b5f8f;
-  --priority-value-surface: color-mix(in srgb, #5b5f8f 8%, var(--surface-control));
-  --priority-value-border: color-mix(in srgb, #5b5f8f 22%, transparent);
-  --priority-value-color: color-mix(in srgb, #4f527f 84%, var(--text-primary));
+  --priority-badge-color: #7c3aed;
+  --priority-dot-color: #7c3aed;
+  --priority-value-surface: color-mix(in srgb, #7c3aed 8%, var(--surface-control));
+  --priority-value-border: color-mix(in srgb, #7c3aed 22%, transparent);
+  --priority-value-color: color-mix(in srgb, #6d28d9 84%, var(--text-primary));
 }
 
 .priorityBadgeEditorBuffer,
