@@ -1521,6 +1521,8 @@
   },
     "backend_control": {
       "restart_button": "Перезапустить backend",
+      "wake_button": "Запустить помощник",
+      "wake_button_aria": "Запустить локальный помощник управления",
       "restart_title": "Перезапуск backend CPA",
       "restart_confirm": "Локальный backend CLIProxyAPI будет перезапущен. Порт 8317 кратко отключится, затем страница обновит статус. Продолжить?",
       "restart_success": "Backend перезапущен: {{oldPid}} -> {{newPid}}",
@@ -1543,7 +1545,9 @@
       "status_restarting": "Перезапуск",
       "backend_running": "Работает",
       "backend_offline": "Не слушает порт",
-      "wake_on_restart": "Запускается автоматически при перезапуске",
+      "wake_hint_offline": "Нажмите запуск помощника, чтобы разбудить его",
+      "offline_fetch_error": "Помощник управления не запущен. Нажмите запуск помощника, чтобы разбудить его.",
+      "wake_on_restart": "Нажмите запуск помощника, чтобы разбудить его",
       "path_verified": "Путь проверен",
       "path_unverified": "Путь не проверен"
     },

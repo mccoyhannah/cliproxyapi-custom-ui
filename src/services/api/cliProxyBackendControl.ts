@@ -44,15 +44,12 @@ export type CliProxyBackendControlRequestError = Error & {
 const CONTROL_BASE_URL = 'http://127.0.0.1:8319';
 const CONTROL_WAKE_URL = 'cpamc-cliproxyapi-control://start';
 
-export const launchCliProxyBackendControlSidecar = (): boolean => {
-  if (typeof document === 'undefined') return false;
+export const CLI_PROXY_BACKEND_CONTROL_WAKE_URL = CONTROL_WAKE_URL;
 
-  const frame = document.createElement('iframe');
-  frame.style.display = 'none';
-  frame.setAttribute('aria-hidden', 'true');
-  frame.src = CONTROL_WAKE_URL;
-  document.body.appendChild(frame);
-  window.setTimeout(() => frame.remove(), 5_000);
+export const launchCliProxyBackendControlSidecar = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  window.location.assign(CONTROL_WAKE_URL);
   return true;
 };
 

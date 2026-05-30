@@ -1590,6 +1590,8 @@
   },
   "backend_control": {
     "restart_button": "重啟後端",
+    "wake_button": "啟動控制助手",
+    "wake_button_aria": "啟動本機控制助手",
     "restart_title": "重啟 CPA 後端",
     "restart_confirm": "將重啟本機 CLIProxyAPI 後端，8317 會短暫斷線，完成後頁面會自動重新整理狀態。確定繼續嗎？",
     "restart_success": "後端已重啟：{{oldPid}} -> {{newPid}}",
@@ -1612,7 +1614,9 @@
     "status_restarting": "重啟中",
     "backend_running": "正在執行",
     "backend_offline": "未監聽",
-    "wake_on_restart": "點選重啟時會自動喚醒",
+    "wake_hint_offline": "可點選啟動控制助手喚醒",
+    "offline_fetch_error": "控制助手未啟動，可點選啟動控制助手喚醒",
+    "wake_on_restart": "可點選啟動控制助手喚醒",
     "path_verified": "路徑已校驗",
     "path_unverified": "路徑未校驗"
   },

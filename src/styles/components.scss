@@ -156,10 +156,12 @@
     box-shadow: var(--shadow-control), var(--focus-ring);
   }
 
-  &:disabled {
+  &:disabled,
+  &[aria-disabled='true'] {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+    pointer-events: none;
   }
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +10,7 @@ import {
   IconExternalLink,
   IconCode,
   IconRefreshCw,
+  IconBot,
 } from '@/components/ui/icons';
 import { useCliProxyBackendRestart } from '@/hooks/useCliProxyBackendRestart';
 import {
@@ -21,6 +22,7 @@ import {
 } from '@/stores';
 import { configApi } from '@/services/api';
 import { apiKeysApi } from '@/services/api/apiKeys';
+import { CLI_PROXY_BACKEND_CONTROL_WAKE_URL } from '@/services/api/cliProxyBackendControl';
 import { classifyModels } from '@/utils/models';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
@@ -49,6 +51,19 @@ const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: strin
   minimax: iconMinimax,
 };
 
+const isBackendControlOfflineMessage = (message: string): boolean => {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('fetch failed') ||
+    normalized.includes('networkerror') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed') ||
+    normalized.includes('connection refused') ||
+    normalized.includes('err_connection_refused')
+  );
+};
+
 export function SystemPage() {
   const { t, i18n } = useTranslation();
   const { showNotification, showConfirmation } = useNotificationStore();
@@ -65,6 +80,7 @@ export function SystemPage() {
     waking: backendControlWaking,
     restarting: backendRestarting,
     loadStatus: loadBackendControlStatus,
+    wake: wakeBackendControl,
     restartBackend,
   } = useCliProxyBackendRestart();
 
@@ -102,6 +118,13 @@ export function SystemPage() {
     : t('system_info.version_unknown');
   const backendControlOnline = Boolean(backendControlStatus);
   const backendRunning = backendControlStatus?.backendRunning === true;
+  const showWakeBackendControlButton = !backendControlOnline;
+  const backendControlBusy = backendControlLoading || backendControlWaking || backendRestarting;
+  const backendControlErrorText = backendControlError
+    ? isBackendControlOfflineMessage(backendControlError)
+      ? t('backend_control.offline_fetch_error')
+      : backendControlError
+    : '';
   const backendControlStatusText = backendRestarting
     ? t('backend_control.status_restarting')
     : backendControlWaking
@@ -237,6 +260,17 @@ export function SystemPage() {
       },
     });
   }, [restartBackend, showConfirmation, t]);
+
+  const handleBackendControlWake = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (backendControlBusy) {
+        event.preventDefault();
+        return;
+      }
+      void wakeBackendControl({ force: true, notify: true, launch: false });
+    },
+    [backendControlBusy, wakeBackendControl]
+  );
 
   const openRequestLogModal = useCallback(() => {
     setRequestLogTouched(false);
@@ -374,10 +408,33 @@ export function SystemPage() {
                 leftIcon={<IconRefreshCw size={15} />}
                 onClick={() => void loadBackendControlStatus()}
                 loading={backendControlLoading}
-                disabled={backendControlLoading || backendRestarting || backendControlWaking}
+                disabled={backendControlBusy}
               >
                 {t('common.refresh')}
               </Button>
+              {showWakeBackendControlButton && (
+                <a
+                  className="btn btn-secondary btn-sm"
+                  href={CLI_PROXY_BACKEND_CONTROL_WAKE_URL}
+                  onClick={handleBackendControlWake}
+                  aria-label={t('backend_control.wake_button_aria')}
+                  aria-busy={backendControlWaking || undefined}
+                  aria-disabled={backendControlBusy || undefined}
+                >
+                  {backendControlWaking ? (
+                    <span className="loading-spinner" aria-hidden="true" />
+                  ) : (
+                    <span className="btn-icon">
+                      <IconBot size={15} />
+                    </span>
+                  )}
+                  <span className="btn-label">
+                    {backendControlWaking
+                      ? t('backend_control.status_waking')
+                      : t('backend_control.wake_button')}
+                  </span>
+                </a>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
@@ -396,7 +453,7 @@ export function SystemPage() {
           }
         >
           <p className={styles.sectionDescription}>{t('backend_control.card_desc')}</p>
-          {backendControlError && <div className="error-box">{backendControlError}</div>}
+          {backendControlErrorText && <div className="error-box">{backendControlErrorText}</div>}
           <div className={styles.maintenanceGrid}>
             <div className={styles.maintenanceTile}>
               <span className={styles.maintenanceLabel}>
@@ -412,7 +469,7 @@ export function SystemPage() {
               <span className={styles.maintenanceMeta}>
                 {backendControlStatus
                   ? `127.0.0.1:${backendControlStatus.port}`
-                  : t('backend_control.wake_on_restart')}
+                  : t('backend_control.wake_hint_offline')}
               </span>
             </div>
             <div className={styles.maintenanceTile}>

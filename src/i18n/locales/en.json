@@ -1581,6 +1581,8 @@
   },
   "backend_control": {
     "restart_button": "Restart backend",
+    "wake_button": "Start control helper",
+    "wake_button_aria": "Start the local control helper",
     "restart_title": "Restart CPA backend",
     "restart_confirm": "This will restart the local CLIProxyAPI backend. Port 8317 will disconnect briefly, then the page will refresh status automatically. Continue?",
     "restart_success": "Backend restarted: {{oldPid}} -> {{newPid}}",
@@ -1603,7 +1605,9 @@
     "status_restarting": "Restarting",
     "backend_running": "Running",
     "backend_offline": "Not listening",
-    "wake_on_restart": "Wakes automatically when restarting",
+    "wake_hint_offline": "Use Start control helper to wake it",
+    "offline_fetch_error": "Control helper is not running. Use Start control helper to wake it.",
+    "wake_on_restart": "Use Start control helper to wake it",
     "path_verified": "Path verified",
     "path_unverified": "Path not verified"
   },

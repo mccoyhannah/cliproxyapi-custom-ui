@@ -74,7 +74,11 @@ export function useCliProxyBackendRestart(options: UseCliProxyBackendRestartOpti
   );
 
   const wake = useCallback(
-    async ({ force = false, notify = false }: { force?: boolean; notify?: boolean } = {}) => {
+    async ({
+      force = false,
+      notify = false,
+      launch = true,
+    }: { force?: boolean; notify?: boolean; launch?: boolean } = {}) => {
       if (!force && status && !error) {
         return status;
       }
@@ -82,14 +86,16 @@ export function useCliProxyBackendRestart(options: UseCliProxyBackendRestartOpti
       setWaking(true);
       setError('');
       try {
-        const launched = launchCliProxyBackendControlSidecar();
-        if (!launched) {
-          const message = t('backend_control.wake_unavailable');
-          setError(message);
-          if (notify) {
-            showNotification(message, 'error');
+        if (launch) {
+          const launched = launchCliProxyBackendControlSidecar();
+          if (!launched) {
+            const message = t('backend_control.wake_unavailable');
+            setError(message);
+            if (notify) {
+              showNotification(message, 'error');
+            }
+            return null;
           }
-          return null;
         }
 
         let lastError = '';
