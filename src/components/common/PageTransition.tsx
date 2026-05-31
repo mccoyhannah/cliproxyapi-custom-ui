@@ -18,6 +18,7 @@ interface PageTransitionProps {
 
 const VERTICAL_TRANSITION_DURATION = 0.4;
 const VERTICAL_TRAVEL_DISTANCE = 40;
+const REDUCED_MOTION_DURATION = 0.15;
 const IOS_TRANSITION_DURATION = 0.45;
 const IOS_ENTER_FROM_X_PERCENT = 100;
 const IOS_EXIT_TO_X_PERCENT_FORWARD = -30;
@@ -30,6 +31,9 @@ const easePower2Out = (progress: number) => 1 - (1 - progress) ** 3;
 
 // Use a smoother cubic bezier for modern transitions
 const easeCircOut: [number, number, number, number] = [0.25, 1, 0.5, 1]; // standard spring-like deceleration
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const buildVerticalTransform = (y: number, scale: number = 1) =>
   `translate3d(0px, ${y}px, 0px) scale(${scale})`;
@@ -247,6 +251,7 @@ export function PageTransition({
     const enterFromY = isForward ? VERTICAL_TRAVEL_DISTANCE : -VERTICAL_TRAVEL_DISTANCE;
     const exitToY = isForward ? -VERTICAL_TRAVEL_DISTANCE : VERTICAL_TRAVEL_DISTANCE;
     const exitBaseY = enterScrollOffset - exitScrollOffset;
+    const reduceMotion = prefersReducedMotion();
     const activeAnimations: AnimationPlaybackControlsWithThen[] = [];
     let cancelled = false;
     let completed = false;
@@ -263,7 +268,32 @@ export function PageTransition({
       clearLayerStyles(exitingLayerEl);
     };
 
-    if (transitionVariant === 'ios') {
+    if (reduceMotion) {
+      if (exitingLayerEl) {
+        exitingLayerEl.style.transform =
+          transitionVariant === 'ios'
+            ? buildIosTransform(0, exitBaseY)
+            : buildVerticalTransform(exitBaseY, 1);
+        activeAnimations.push(
+          animate(
+            exitingLayerEl,
+            { opacity: [1, 0] },
+            { duration: REDUCED_MOTION_DURATION, ease: easePower2Out }
+          )
+        );
+      }
+
+      currentLayerEl.style.opacity = '0';
+      currentLayerEl.style.transform =
+        transitionVariant === 'ios' ? buildIosTransform(0, 0) : buildVerticalTransform(0, 1);
+      activeAnimations.push(
+        animate(
+          currentLayerEl,
+          { opacity: [0, 1] },
+          { duration: REDUCED_MOTION_DURATION, ease: easePower2Out }
+        )
+      );
+    } else if (transitionVariant === 'ios') {
       const exitToXPercent = isForward
         ? IOS_EXIT_TO_X_PERCENT_FORWARD
         : IOS_EXIT_TO_X_PERCENT_BACKWARD;
