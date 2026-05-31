@@ -29,14 +29,16 @@ import {
 } from '@/utils/quota';
 import {
   QUOTA_PROVIDER_TYPES,
-  getAuthFileCredentialProblem,
   getAuthFileIcon,
+  getAuthFileStatusProblem,
+  getAuthFileStatusProblemFromText,
   getAuthFileStatusMessage,
   getTypeColor,
   getTypeLabel,
   isRuntimeOnlyAuthFile,
   parsePriorityValue,
   resolveQuotaErrorMessage,
+  type AuthFileStatusCategory,
   type QuotaProviderType,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
@@ -47,14 +49,35 @@ import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
-const CREDENTIAL_QUOTA_ERROR_PATTERN =
-  /(401|403|auth_unavailable|authentication_error|authentication|unauthorized|forbidden|credential|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:token|credential|auth|session)|token\s+(?:is\s+)?(?:invalid|expired)|signing in)/i;
 type AuthFilePriorityTier = 'active' | 'standby' | 'buffer' | 'manualLocked';
 type CodexCardQuotaState = {
   status?: string;
   planType?: string | null;
   error?: string;
   errorStatus?: number;
+  errorKind?: AuthFileStatusCategory;
+  retryable?: boolean;
+};
+
+const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
+  credential_invalid: 'auth_files.credential_invalid_badge',
+  network_transient: 'auth_files.status_network_transient_badge',
+  input_too_large: 'auth_files.status_input_too_large_badge',
+  content_policy: 'auth_files.status_content_policy_badge',
+};
+
+const AUTH_STATUS_LABEL_FALLBACK: Record<AuthFileStatusCategory, string> = {
+  credential_invalid: '认证失效',
+  network_transient: '网络瞬断',
+  input_too_large: '输入过长',
+  content_policy: '内容拦截',
+};
+
+const AUTH_STATUS_TITLE_KEY: Record<AuthFileStatusCategory, string> = {
+  credential_invalid: 'auth_files.credential_invalid_badge_title',
+  network_transient: 'auth_files.status_network_transient_title',
+  input_too_large: 'auth_files.status_input_too_large_title',
+  content_policy: 'auth_files.status_content_policy_title',
 };
 
 export type AuthFileCardProps = {
@@ -187,12 +210,20 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const rawStatusMessage = getAuthFileStatusMessage(file);
   const hasStatusWarning =
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
+  const authFileStatusProblem =
+    !isRuntimeOnly && !file.disabled ? getAuthFileStatusProblem(file) : null;
   const credentialStatusProblem =
-    !isRuntimeOnly && !file.disabled ? getAuthFileCredentialProblem(file) : null;
+    authFileStatusProblem?.category === 'credential_invalid' ? authFileStatusProblem : null;
+  const hasAuthFileStatusProblem = authFileStatusProblem !== null;
   const hasCredentialStatusError = credentialStatusProblem !== null;
-  const credentialInvalidBadgeLabel = t('auth_files.credential_invalid_badge', {
-    defaultValue: '认证失效',
-  });
+  const getStatusBadgeLabel = (category: AuthFileStatusCategory) =>
+    t(AUTH_STATUS_LABEL_KEY[category], {
+      defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
+    });
+  const credentialInvalidBadgeLabel = getStatusBadgeLabel('credential_invalid');
+  const authFileStatusBadgeLabel = authFileStatusProblem
+    ? getStatusBadgeLabel(authFileStatusProblem.category)
+    : '';
   const hasQuotaError =
     !isRuntimeOnly &&
     !file.disabled &&
@@ -207,26 +238,37 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
         codexQuotaEntry?.error || t('common.unknown_error')
       )
     : '';
+  const quotaStatusProblem = hasQuotaError
+    ? getAuthFileStatusProblemFromText(
+        [
+          quotaErrorStatus,
+          codexQuotaEntry?.errorKind,
+          codexQuotaEntry?.error,
+          quotaErrorMessage,
+        ]
+          .filter((part) => part !== undefined && part !== null && String(part).trim())
+          .join(' ')
+      )
+    : null;
   const quotaCredentialError =
+    hasQuotaError && quotaStatusProblem?.category === 'credential_invalid';
+  const quotaErrorBadgeLabel = quotaStatusProblem
+    ? getStatusBadgeLabel(quotaStatusProblem.category)
+    : quotaCredentialError
+      ? credentialInvalidBadgeLabel
+      : t('auth_files.quota_error_badge', { defaultValue: '额度异常' });
+  const hideDuplicateQuotaStatusBadge =
+    hasAuthFileStatusProblem &&
     hasQuotaError &&
-    (quotaErrorStatus === 401 ||
-      quotaErrorStatus === 403 ||
-      CREDENTIAL_QUOTA_ERROR_PATTERN.test(codexQuotaEntry?.error || quotaErrorMessage));
-  const quotaErrorBadgeLabel = quotaCredentialError
-    ? credentialInvalidBadgeLabel
-    : t('auth_files.quota_error_badge', { defaultValue: '额度异常' });
-  const hideDuplicateQuotaCredentialBadge =
-    hasCredentialStatusError &&
-    quotaCredentialError &&
-    quotaErrorBadgeLabel === credentialInvalidBadgeLabel;
+    quotaStatusProblem?.category === authFileStatusProblem?.category;
   const activeWarningLabel = hasQuotaError
     ? quotaErrorBadgeLabel
-    : hasCredentialStatusError
-      ? credentialInvalidBadgeLabel
+    : authFileStatusProblem
+      ? authFileStatusBadgeLabel
     : t('auth_files.health_status_warning');
   const activeWarningMessage = hasQuotaError
-    ? quotaErrorMessage
-    : credentialStatusProblem?.message || rawStatusMessage;
+    ? quotaStatusProblem?.message || quotaErrorMessage
+    : authFileStatusProblem?.message || rawStatusMessage;
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
@@ -386,6 +428,18 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           message: credentialStatusMessage,
           defaultValue: '上游已拒绝此认证：{{message}}。请重新登录获取新凭证。',
         });
+  const authFileStatusTitle = authFileStatusProblem
+    ? authFileStatusProblem.category === 'credential_invalid'
+      ? credentialInvalidTitle
+      : t(AUTH_STATUS_TITLE_KEY[authFileStatusProblem.category], {
+          message: authFileStatusProblem.message,
+          defaultValue: `${authFileStatusBadgeLabel}: ${authFileStatusProblem.message}`,
+        })
+    : '';
+  const authFileStatusBadgeClass =
+    authFileStatusProblem?.category === 'credential_invalid'
+      ? styles.stateBadgeQuotaError
+      : styles.stateBadgeWarning;
   const showSubscriptionMeta =
     Boolean(accessTokenOnly || manualExpiry || visibleCodexSubscription || showManualExpirySetup) &&
     !showQuotaLayout;
@@ -566,8 +620,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       ? t('auth_files.health_status_disabled')
       : hasQuotaError
         ? t('auth_files.health_status_quota_error', { defaultValue: '额度异常' })
-      : hasCredentialStatusError
-        ? credentialInvalidBadgeLabel
+      : hasAuthFileStatusProblem
+        ? authFileStatusBadgeLabel
       : hasStatusWarning
         ? t('auth_files.health_status_warning')
         : rawStatusMessage
@@ -645,12 +699,12 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     {stateLabel}
                   </span>
                 )}
-                {hasCredentialStatusError && (
+                {hasAuthFileStatusProblem && (
                   <span
-                    className={`${styles.stateBadge} ${styles.stateBadgeQuotaError}`}
-                    title={credentialInvalidTitle}
+                    className={`${styles.stateBadge} ${authFileStatusBadgeClass}`}
+                    title={authFileStatusTitle}
                   >
-                    {credentialInvalidBadgeLabel}
+                    {authFileStatusBadgeLabel}
                   </span>
                 )}
                 {accessTokenOnly && !hasCredentialStatusError && (
@@ -665,10 +719,14 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     })}
                   </span>
                 )}
-                {hasQuotaError && !hideDuplicateQuotaCredentialBadge && (
+                {hasQuotaError && !hideDuplicateQuotaStatusBadge && (
                   <span
-                    className={`${styles.stateBadge} ${styles.stateBadgeQuotaError}`}
-                    title={quotaErrorMessage}
+                    className={`${styles.stateBadge} ${
+                      quotaStatusProblem && quotaStatusProblem.category !== 'credential_invalid'
+                        ? styles.stateBadgeWarning
+                        : styles.stateBadgeQuotaError
+                    }`}
+                    title={quotaStatusProblem?.message || quotaErrorMessage}
                   >
                     {quotaErrorBadgeLabel}
                   </span>

@@ -35,6 +35,32 @@ const ALLOWED_ORIGINS = new Set([
 const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_based']);
 const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
 const MAX_ROTATION_PASSES = 8;
+const RETRYABLE_QUOTA_ERROR_KINDS = new Set([
+  'network_transient',
+  'input_too_large',
+  'content_policy',
+]);
+const UPSTREAM_STATUS_PATTERNS = [
+  {
+    kind: 'input_too_large',
+    pattern:
+      /\b(?:context_too_large|context\s+window|input\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i,
+  },
+  {
+    kind: 'content_policy',
+    pattern: /\b(?:content[_\s-]?conceal(?:ed)?|content_filter|content_policy|safety)\b/i,
+  },
+  {
+    kind: 'network_transient',
+    pattern:
+      /\b(?:network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed)\b/i,
+  },
+  {
+    kind: 'credential_invalid',
+    pattern:
+      /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i,
+  },
+];
 
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
@@ -117,6 +143,24 @@ function clampInteger(value, fallback, min, max) {
   const numeric = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(min, Math.min(max, Math.round(numeric)));
+}
+
+export function classifyUpstreamStatusText(text = '', statusCode = undefined) {
+  const numericStatus = Number(statusCode);
+  if (Number.isFinite(numericStatus) && numericStatus >= 500 && numericStatus <= 599) {
+    return 'network_transient';
+  }
+
+  const haystack = String(text ?? '');
+  const matched = UPSTREAM_STATUS_PATTERNS.find(({ pattern }) => pattern.test(haystack));
+  if (matched) return matched.kind;
+
+  if (numericStatus === 401 || numericStatus === 403) return 'credential_invalid';
+  return null;
+}
+
+function isRetryableQuotaErrorKind(kind) {
+  return RETRYABLE_QUOTA_ERROR_KINDS.has(kind);
 }
 
 export function shouldStopForIdle({
@@ -560,6 +604,41 @@ function extractErrorMessage(value) {
   return '';
 }
 
+function stringifyForClassification(value) {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function buildQuotaErrorState({
+  error,
+  errorStatus,
+  planType,
+  classificationText = '',
+}) {
+  const statusCode = Number(errorStatus);
+  const errorKind = classifyUpstreamStatusText(
+    [classificationText, error].filter(Boolean).join(' '),
+    Number.isFinite(statusCode) ? statusCode : undefined
+  );
+  const state = {
+    status: 'error',
+    windows: [],
+    error,
+  };
+  if (planType !== undefined) state.planType = planType;
+  if (Number.isFinite(statusCode) && statusCode > 0) state.errorStatus = statusCode;
+  if (errorKind) {
+    state.errorKind = errorKind;
+    state.retryable = isRetryableQuotaErrorKind(errorKind);
+  }
+  return state;
+}
+
 async function managementJson(endpoint, key, options = {}) {
   const targetApiBase = options.apiBase ?? settings.apiBase;
   const headers = {
@@ -767,6 +846,8 @@ function buildCandidateDetail({
   tier = 'other',
   belowThreshold = null,
   decision = 'keep',
+  quotaErrorKind = null,
+  quotaRetryable = false,
 }) {
   return {
     name: String(file?.name ?? ''),
@@ -781,6 +862,8 @@ function buildCandidateDetail({
     isManualLocked: tier === 'manual_locked',
     belowThreshold,
     decision,
+    quotaErrorKind,
+    quotaRetryable,
   };
 }
 
@@ -848,6 +931,7 @@ export function analyzeCodexPriorityRotation(
   const candidates = [];
   const skippedCandidates = [];
   let unknownCount = 0;
+  let retryableUnknownCount = 0;
 
   files.forEach((file, order) => {
     if (!isCodexFile(file)) return;
@@ -908,6 +992,12 @@ export function analyzeCodexPriorityRotation(
     const quota = codexQuota[file.name];
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
+    const quotaErrorKind =
+      typeof quota?.errorKind === 'string'
+        ? quota.errorKind
+        : classifyUpstreamStatusText(quota?.error ?? '', quota?.errorStatus);
+    const quotaRetryable =
+      quota?.retryable === true || isRetryableQuotaErrorKind(quotaErrorKind);
     if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) {
       if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
         candidates.push({
@@ -917,6 +1007,8 @@ export function analyzeCodexPriorityRotation(
           planType,
           remainingPercent: null,
           managed: false,
+          quotaErrorKind,
+          quotaRetryable,
         });
         return;
       }
@@ -929,6 +1021,7 @@ export function analyzeCodexPriorityRotation(
 
     if (planType === null || remainingPercent === null) {
       unknownCount += 1;
+      if (quotaRetryable) retryableUnknownCount += 1;
       if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
         candidates.push({
           order,
@@ -937,6 +1030,8 @@ export function analyzeCodexPriorityRotation(
           planType,
           remainingPercent: null,
           managed: false,
+          quotaErrorKind,
+          quotaRetryable,
         });
         return;
       }
@@ -944,18 +1039,29 @@ export function analyzeCodexPriorityRotation(
         planType,
         remainingPercent,
         belowThreshold: remainingPercent === null ? null : remainingPercent < threshold,
+        quotaErrorKind,
+        quotaRetryable,
       });
       return;
     }
 
-    candidates.push({ order, file, priority, planType, remainingPercent, managed: true });
+    candidates.push({
+      order,
+      file,
+      priority,
+      planType,
+      remainingPercent,
+      managed: true,
+      quotaErrorKind,
+      quotaRetryable,
+    });
   });
 
   if (candidates.length === 0) {
     return buildEmptyAnalysis(
       threshold,
       slotLimit,
-      unknownCount > 0 ? 'quota_unknown' : 'no_changes',
+      unknownCount > 0 || retryableUnknownCount > 0 ? 'quota_unknown' : 'no_changes',
       unknownCount,
       skippedCandidates.sort((a, b) => a.order - b.order).map(stripCandidateOrder)
     );
@@ -990,7 +1096,7 @@ export function analyzeCodexPriorityRotation(
   let projectedActiveCount = activeCandidates.length - demotionMap.size;
   if (projectedActiveCount > slotLimit) {
     activeCandidates
-      .filter((candidate) => !demotionMap.has(candidate.file.name))
+      .filter((candidate) => !demotionMap.has(candidate.file.name) && candidate.quotaRetryable !== true)
       .sort((a, b) => {
         const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
         return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
@@ -1075,6 +1181,10 @@ export function analyzeCodexPriorityRotation(
             ? 'demote_over_active_limit'
             : promotionNames.has(candidate.file.name)
               ? 'promote_standby'
+              : candidate.quotaRetryable
+                ? 'quota_unknown_retryable'
+                : candidate.remainingPercent === null
+                  ? 'quota_unknown'
               : 'keep';
       return {
         order: candidate.order,
@@ -1089,6 +1199,8 @@ export function analyzeCodexPriorityRotation(
               ? candidate.remainingPercent < threshold
               : null,
           decision,
+          quotaErrorKind: candidate.quotaErrorKind,
+          quotaRetryable: candidate.quotaRetryable,
         }),
       };
     }),
@@ -1101,7 +1213,9 @@ export function analyzeCodexPriorityRotation(
     const missingReplacementStandby =
       lowRemainingDemotionCount > 0 && healthyStandbyCandidates.length === 0;
     const status =
-      unknownCount > 0 && managedCandidates.length === 0
+      retryableUnknownCount > 0
+        ? 'quota_unknown'
+        : unknownCount > 0 && managedCandidates.length === 0
         ? 'quota_unknown'
         : missingAdjacentStandby || missingReplacementStandby
           ? 'no_standby'
@@ -1196,7 +1310,7 @@ function buildCodexQuotaWindows(payload) {
 async function fetchCodexQuotaState(file, key) {
   const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
   if (!authIndex) {
-    return { status: 'error', windows: [], error: 'missing_auth_index' };
+    return buildQuotaErrorState({ error: 'missing_auth_index' });
   }
 
   const requestHeader = {
@@ -1224,19 +1338,18 @@ async function fetchCodexQuotaState(file, key) {
 
   const statusCode = Number(result?.status_code ?? result?.statusCode ?? 0);
   if (statusCode < 200 || statusCode >= 300) {
-    return {
-      status: 'error',
-      windows: [],
+    return buildQuotaErrorState({
       error: `quota_http_${statusCode || 'unknown'}`,
       errorStatus: statusCode,
-    };
+      classificationText: stringifyForClassification(result?.body),
+    });
   }
 
   const body = result?.body;
   const payload =
     typeof body === 'string' ? JSON.parse(body) : body && typeof body === 'object' ? body : null;
   if (!payload) {
-    return { status: 'error', windows: [], error: 'empty_quota_payload' };
+    return buildQuotaErrorState({ error: 'empty_quota_payload' });
   }
 
   return {
@@ -1257,12 +1370,13 @@ async function buildCodexQuotaMap(files, key) {
     try {
       quota[file.name] = await fetchCodexQuotaState(file, key);
     } catch (error) {
-      quota[file.name] = {
-        status: 'error',
-        windows: [],
+      const message = error instanceof Error ? error.message : String(error);
+      quota[file.name] = buildQuotaErrorState({
         planType: planTypeFromFile,
-        error: error instanceof Error ? error.message : String(error),
-      };
+        error: message,
+        errorStatus: error?.statusCode ?? error?.status,
+        classificationText: message,
+      });
     }
   }
   return quota;
@@ -1294,6 +1408,8 @@ function summarizeAnalysis(analysis) {
       isStandby: candidate.isStandby,
       belowThreshold: candidate.belowThreshold,
       decision: candidate.decision,
+      quotaErrorKind: candidate.quotaErrorKind,
+      quotaRetryable: candidate.quotaRetryable,
     })),
     changes: analysis.changes.map((change) => ({
       name: change.name,

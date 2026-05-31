@@ -29,6 +29,12 @@ interface LogViewerProps {
   onLongPressMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
 
+const formatPayloadSize = (bytes: number): string => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${bytes} B`;
+};
+
 export function LogViewer({
   styles,
   loading,
@@ -284,6 +290,24 @@ export function LogViewer({
                   )}
 
                   {line.latency && <span className={styles.pill}>{line.latency}</span>}
+                  {line.payloadSizeBytes !== undefined && (
+                    <span
+                      className={[
+                        styles.badge,
+                        line.payloadSizeLevel === 'huge' ? styles.statusError : styles.statusWarn,
+                      ].join(' ')}
+                      title={t('logs.payload_size_title', {
+                        size: formatPayloadSize(line.payloadSizeBytes),
+                        defaultValue:
+                          'Request body is {{size}}. Consider shortening context before retrying.',
+                      })}
+                    >
+                      {t('logs.payload_size_badge', {
+                        size: formatPayloadSize(line.payloadSizeBytes),
+                        defaultValue: 'Body {{size}}',
+                      })}
+                    </span>
+                  )}
                   {line.ip && <span className={styles.pill}>{line.ip}</span>}
 
                   {line.method && (

@@ -13,6 +13,13 @@ const LOG_REQUEST_ID_REGEX = /^([a-f0-9]{8}|--------)$/i;
 const LOG_TIME_OF_DAY_REGEX = /^\d{1,2}:\d{2}:\d{2}(?:\.\d{1,3})?$/;
 const GIN_TIMESTAMP_SEGMENT_REGEX =
   /^\[GIN\]\s+(\d{4})\/(\d{2})\/(\d{2})\s*-\s*(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s*$/;
+const CONTENT_LENGTH_PATTERNS: RegExp[] = [
+  /\bcontent-length\b(?:["'\s:=]|\[|\])+([0-9][\d,]*)/i,
+  /\bcontent_length\b(?:["'\s:=]|\[|\])+([0-9][\d,]*)/i,
+  /\brequest(?:[_\s-]?body)?[_\s-]?(?:bytes|length|size)\b(?:["'\s:=]|\[|\])+([0-9][\d,]*)/i,
+];
+const LARGE_PAYLOAD_BYTES = 1024 * 1024;
+const HUGE_PAYLOAD_BYTES = 3 * 1024 * 1024;
 
 const HTTP_STATUS_PATTERNS: RegExp[] = [
   /\|\s*([1-5]\d{2})\s*\|/,
@@ -62,6 +69,16 @@ const extractLatency = (text: string): string | undefined => {
   const match = text.match(LOG_LATENCY_REGEX);
   if (!match) return undefined;
   return match[0].replace(/\s+/g, '');
+};
+
+const extractPayloadSizeBytes = (text: string): number | undefined => {
+  for (const pattern of CONTENT_LENGTH_PATTERNS) {
+    const match = text.match(pattern);
+    if (!match) continue;
+    const parsed = Number.parseInt(match[1].replace(/,/g, ''), 10);
+    if (Number.isFinite(parsed) && parsed >= LARGE_PAYLOAD_BYTES) return parsed;
+  }
+  return undefined;
 };
 
 const extractLogLevel = (value: string): LogLevel | undefined => {
@@ -137,6 +154,13 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
   let ip: string | undefined;
   let method: HttpMethod | undefined;
   let path: string | undefined;
+  const payloadSizeBytes = extractPayloadSizeBytes(raw);
+  const payloadSizeLevel =
+    payloadSizeBytes === undefined
+      ? undefined
+      : payloadSizeBytes >= HUGE_PAYLOAD_BYTES
+        ? 'huge'
+        : 'large';
   let message = remaining;
 
   if (remaining.includes('|')) {
@@ -269,6 +293,8 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
     ip,
     method,
     path,
+    payloadSizeBytes,
+    payloadSizeLevel,
     message,
   };
 };

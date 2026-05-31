@@ -23,6 +23,8 @@ export type ParsedLogLine = {
   ip?: string;
   method?: HttpMethod;
   path?: string;
+  payloadSizeBytes?: number;
+  payloadSizeLevel?: 'large' | 'huge';
   message: string;
 };
 

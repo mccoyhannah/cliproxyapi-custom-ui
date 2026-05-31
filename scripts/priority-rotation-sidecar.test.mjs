@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   analyzeCodexPriorityRotation,
   buildIdleShutdownStatePatch,
+  classifyUpstreamStatusText,
   getLatestModelRequestAtMs,
   isModelRequestLogName,
   parseModelRequestLogTimeMs,
@@ -25,6 +26,31 @@ const quota = (usedPercent, planType = 'team') => ({
   planType,
   windows: [{ id: 'five-hour', usedPercent }],
 });
+
+const retryableQuotaError = (errorKind, error = errorKind) => ({
+  status: 'error',
+  planType: 'team',
+  windows: [],
+  error,
+  errorKind,
+  retryable: true,
+});
+
+{
+  assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'network_transient');
+  assert.equal(
+    classifyUpstreamStatusText('invalid_request_error context_too_large'),
+    'input_too_large'
+  );
+  assert.equal(
+    classifyUpstreamStatusText('content concealed by upstream safety policy'),
+    'content_policy'
+  );
+  assert.equal(
+    classifyUpstreamStatusText('invalidated oauth token for this account'),
+    'credential_invalid'
+  );
+}
 
 {
   assert.equal(isModelRequestLogName('v1-responses-2026-05-20T051955-57644c1f.log'), true);
@@ -179,6 +205,25 @@ const quota = (usedPercent, planType = 'team') => ({
   assert.equal(
     result.candidates.filter((candidate) => candidate.decision === 'observe_buffer').length,
     13
+  );
+}
+
+{
+  const files = [codexFile('active-eof-a.json', 2), codexFile('active-eof-b.json', 2)];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-eof-a.json': retryableQuotaError('network_transient', 'EOF'),
+      'active-eof-b.json': retryableQuotaError('input_too_large', 'context_too_large'),
+    },
+    50,
+    1
+  );
+  assert.equal(result.status, 'quota_unknown');
+  assert.deepEqual(result.changes, []);
+  assert.equal(
+    result.candidates.every((candidate) => candidate.decision === 'quota_unknown_retryable'),
+    true
   );
 }
 

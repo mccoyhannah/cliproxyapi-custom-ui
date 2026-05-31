@@ -136,8 +136,24 @@ export type AuthFileCredentialProblem = {
   signals: string[];
 };
 
+export type AuthFileStatusCategory =
+  | 'credential_invalid'
+  | 'network_transient'
+  | 'input_too_large'
+  | 'content_policy';
+
+export type AuthFileStatusProblem = AuthFileCredentialProblem & {
+  category: AuthFileStatusCategory;
+};
+
 const AUTH_FILE_CREDENTIAL_STATUS_PATTERN =
-  /\b(?:401|403|unauthorized|forbidden|auth_unavailable|authentication_error|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:token|credential|session|auth)|token\s+(?:is\s+)?(?:invalid|expired)|signing\s+in)\b/i;
+  /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i;
+const AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN =
+  /\b(?:network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed)\b/i;
+const AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN =
+  /\b(?:context_too_large|context\s+window|input\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i;
+const AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN =
+  /\b(?:content[_\s-]?conceal(?:ed)?|content_filter|content_policy|safety)\b/i;
 const AUTH_FILE_STATUS_PARSE_DEPTH = 5;
 const AUTH_FILE_STATUS_MESSAGE_KEYS = [
   'detail',
@@ -229,26 +245,73 @@ export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
   return parts[0] ?? getRawAuthFileStatusMessage(file);
 };
 
-export const getAuthFileCredentialProblem = (
-  file: AuthFileItem
-): AuthFileCredentialProblem | null => {
+const AUTH_FILE_STATUS_PATTERNS: Array<{
+  category: AuthFileStatusCategory;
+  pattern: RegExp;
+  signalOnlyPattern: RegExp;
+}> = [
+  {
+    category: 'input_too_large',
+    pattern: AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN,
+  },
+  {
+    category: 'content_policy',
+    pattern: AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN,
+  },
+  {
+    category: 'network_transient',
+    pattern: AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN,
+  },
+  {
+    category: 'credential_invalid',
+    pattern: AUTH_FILE_CREDENTIAL_STATUS_PATTERN,
+    signalOnlyPattern: /^(401|403|invalid_grant|invalid_token|authentication_error|auth_unavailable)$/i,
+  },
+];
+
+export const getAuthFileStatusProblemFromText = (
+  text: string,
+  parts: string[] = []
+): AuthFileStatusProblem | null => {
+  const rawMessage = text.trim();
+  if (!rawMessage && parts.length === 0) return null;
+
+  const haystack = [rawMessage, ...parts].join(' ');
+  const matched = AUTH_FILE_STATUS_PATTERNS.find(({ pattern }) => pattern.test(haystack));
+  if (!matched) return null;
+
+  const signals = parts.filter((part) => matched.pattern.test(part));
+  const message =
+    parts.find((part) => !matched.signalOnlyPattern.test(part)) ?? signals[0] ?? rawMessage;
+
+  return {
+    category: matched.category,
+    message,
+    rawMessage,
+    signals,
+  };
+};
+
+export const getAuthFileStatusProblem = (file: AuthFileItem): AuthFileStatusProblem | null => {
   const rawMessage = getRawAuthFileStatusMessage(file);
   if (!rawMessage) return null;
 
   const parts = getAuthFileStatusMessageParts(file);
-  const haystack = [rawMessage, ...parts].join(' ');
-  if (!AUTH_FILE_CREDENTIAL_STATUS_PATTERN.test(haystack)) return null;
+  return getAuthFileStatusProblemFromText(rawMessage, parts);
+};
 
-  const signals = parts.filter((part) => AUTH_FILE_CREDENTIAL_STATUS_PATTERN.test(part));
-  const message =
-    parts.find((part) => !/^(authentication_error|auth_unavailable|invalid_token)$/i.test(part)) ??
-    signals[0] ??
-    rawMessage;
-
+export const getAuthFileCredentialProblem = (
+  file: AuthFileItem
+): AuthFileCredentialProblem | null => {
+  const problem = getAuthFileStatusProblem(file);
+  if (problem?.category !== 'credential_invalid') return null;
   return {
-    message,
-    rawMessage,
-    signals,
+    message: problem.message,
+    rawMessage: problem.rawMessage,
+    signals: problem.signals,
   };
 };
 

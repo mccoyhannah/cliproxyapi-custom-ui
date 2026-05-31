@@ -253,6 +253,8 @@ export interface CodexQuotaState {
   subscriptionStatusMessage?: string | null;
   error?: string;
   errorStatus?: number;
+  errorKind?: 'credential_invalid' | 'network_transient' | 'input_too_large' | 'content_policy';
+  retryable?: boolean;
 }
 
 // Kimi API payload types
