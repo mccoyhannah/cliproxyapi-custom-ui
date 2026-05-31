@@ -215,6 +215,10 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const quotaErrorBadgeLabel = quotaCredentialError
     ? credentialInvalidBadgeLabel
     : t('auth_files.quota_error_badge', { defaultValue: '额度异常' });
+  const hideDuplicateQuotaCredentialBadge =
+    hasCredentialStatusError &&
+    quotaCredentialError &&
+    quotaErrorBadgeLabel === credentialInvalidBadgeLabel;
   const activeWarningLabel = hasQuotaError
     ? quotaErrorBadgeLabel
     : hasCredentialStatusError
@@ -661,7 +665,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     })}
                   </span>
                 )}
-                {hasQuotaError && (
+                {hasQuotaError && !hideDuplicateQuotaCredentialBadge && (
                   <span
                     className={`${styles.stateBadge} ${styles.stateBadgeQuotaError}`}
                     title={quotaErrorMessage}
