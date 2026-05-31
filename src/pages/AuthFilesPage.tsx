@@ -3668,9 +3668,9 @@ export function AuthFilesPage() {
                         {t('auth_files.priority_rotation_all_p2_button')}
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant="primary"
                         size="sm"
-                        className={styles.priorityRotationButton}
+                        className={`${styles.priorityRotationButton} ${styles.priorityRotationPreviewButton}`}
                         onClick={() => setPriorityRotationPreviewOpen(true)}
                         disabled={priorityRotationPreviewDisabled}
                         loading={priorityRotationPreviewApplying}
