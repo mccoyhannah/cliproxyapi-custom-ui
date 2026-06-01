@@ -153,8 +153,11 @@ const ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS = 900 * 1024;
 const ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS = 4_000_000;
 const ACCOUNT_MEMO_IMAGE_QUALITIES = [0.86, 0.78, 0.68, 0.58, 0.48] as const;
 const ACCOUNT_MEMO_LINK_LIMIT = 8;
-const CARD_FOCUS_BOTTOM_GAP = 32;
-const CARD_FOCUS_HEADER_GAP = 8;
+const CARD_FOCUS_BOTTOM_GAP = 8;
+const CARD_FOCUS_HEADER_COMFORT_GAP = 28;
+const CARD_FOCUS_HEADER_TUCK_LIMIT = 24;
+const CARD_FOCUS_PREVIOUS_LINE_CLEARANCE = 2;
+const CARD_FOCUS_HEADER_LINE_CLEARANCE = 2;
 const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
 const ACCOUNT_MEMO_URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
 const ACCOUNT_MEMO_TRAILING_URL_PUNCTUATION = /[),.;:!?，。！？、；：）】》]+$/u;
@@ -2955,9 +2958,18 @@ export function AuthFilesPage() {
     const containerRect = container.getBoundingClientRect();
     const headerRect = header.getBoundingClientRect();
     const gridRect = (grid ?? header).getBoundingClientRect();
+    const previousSectionBottom = (() => {
+      let section = header.previousElementSibling;
+      let bottom = Number.NEGATIVE_INFINITY;
+      while (section) {
+        bottom = Math.max(bottom, section.getBoundingClientRect().bottom);
+        section = section.previousElementSibling;
+      }
+      return Number.isFinite(bottom) ? bottom : null;
+    })();
     const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const headerTopScroll =
-      container.scrollTop + headerRect.top - containerRect.top - CARD_FOCUS_HEADER_GAP;
+    const headerComfortScroll =
+      container.scrollTop + headerRect.top - containerRect.top - CARD_FOCUS_HEADER_COMFORT_GAP;
     const gridBottomScroll =
       container.scrollTop +
       gridRect.bottom -
@@ -2965,19 +2977,61 @@ export function AuthFilesPage() {
       container.clientHeight +
       CARD_FOCUS_BOTTOM_GAP;
     const verticalSpan = gridRect.bottom - headerRect.top;
-    const needsBottomFirstPosition =
+    const canPreserveBottomGap =
       Boolean(grid) &&
-      verticalSpan + CARD_FOCUS_HEADER_GAP + CARD_FOCUS_BOTTOM_GAP > container.clientHeight;
-    const preferredScrollTop = needsBottomFirstPosition
-      ? gridBottomScroll
-      : Math.max(headerTopScroll, gridBottomScroll);
+      verticalSpan + CARD_FOCUS_HEADER_COMFORT_GAP + CARD_FOCUS_BOTTOM_GAP <=
+        container.clientHeight;
+    const preferredScrollTop = canPreserveBottomGap
+      ? Math.max(headerComfortScroll, gridBottomScroll)
+      : grid
+        ? Math.min(gridBottomScroll, headerComfortScroll + CARD_FOCUS_HEADER_TUCK_LIMIT)
+        : headerComfortScroll;
+    const previousLineHiddenScroll =
+      previousSectionBottom === null
+        ? 0
+        : container.scrollTop +
+          previousSectionBottom -
+          containerRect.top +
+          CARD_FOCUS_PREVIOUS_LINE_CLEARANCE;
+    const headerLineHiddenScroll =
+      container.scrollTop + headerRect.top - containerRect.top + CARD_FOCUS_HEADER_LINE_CLEARANCE;
     const targetScrollTop = Math.max(
       0,
-      Math.min(maxScrollTop, preferredScrollTop)
+      Math.min(
+        maxScrollTop,
+        Math.max(preferredScrollTop, previousLineHiddenScroll, headerLineHiddenScroll)
+      )
     );
 
     container.scrollTo({ top: targetScrollTop, behavior });
   }, []);
+
+  const scheduleFileCardsScroll = useCallback(
+    (behavior: ScrollBehavior = 'auto') => {
+      if (typeof window === 'undefined') return () => undefined;
+
+      const frames: number[] = [];
+      const timers: number[] = [];
+      const runScroll = () => scrollToFileCards(behavior);
+
+      runScroll();
+      frames.push(window.requestAnimationFrame(runScroll));
+      frames.push(
+        window.requestAnimationFrame(() => {
+          frames.push(window.requestAnimationFrame(runScroll));
+        })
+      );
+      timers.push(window.setTimeout(runScroll, 120));
+      timers.push(window.setTimeout(runScroll, 360));
+      timers.push(window.setTimeout(runScroll, 700));
+
+      return () => {
+        frames.forEach((frame) => window.cancelAnimationFrame(frame));
+        timers.forEach((timer) => window.clearTimeout(timer));
+      };
+    },
+    [scrollToFileCards]
+  );
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2995,32 +3049,18 @@ export function AuthFilesPage() {
     if (!target || (needsRenderedGrid && !fileGridRef.current)) return;
 
     focusedFileListOnOpenRef.current = focusSignature;
-    const frames: number[] = [];
-    const timers: number[] = [];
-    const runScroll = () => scrollToFileCards('auto');
-
-    runScroll();
-    frames.push(window.requestAnimationFrame(runScroll));
-    frames.push(
-      window.requestAnimationFrame(() => {
-        frames.push(window.requestAnimationFrame(runScroll));
-      })
-    );
-    timers.push(window.setTimeout(runScroll, 250));
-
-    return () => {
-      frames.forEach((frame) => window.cancelAnimationFrame(frame));
-      timers.forEach((timer) => window.clearTimeout(timer));
-    };
-  }, [loading, location.search, pageItems.length, scrollToFileCards]);
+    return scheduleFileCardsScroll('auto');
+  }, [loading, location.search, pageItems.length, scheduleFileCardsScroll]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleFocusCards = () => scrollToFileCards('auto');
+    const handleFocusCards = () => {
+      scheduleFileCardsScroll('auto');
+    };
     window.addEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
     return () => window.removeEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
-  }, [scrollToFileCards]);
+  }, [scheduleFileCardsScroll]);
 
   useEffect(() => {
     setBatchActionBarVisible(selectionCount > 0);
