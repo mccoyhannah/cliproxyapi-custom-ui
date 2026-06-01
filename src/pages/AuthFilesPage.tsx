@@ -3511,26 +3511,6 @@ export function AuthFilesPage() {
               {t('common.refresh')}
             </Button>
             <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<IconRefreshCw size={15} />}
-              onClick={() => void handleRefreshCodexQuota()}
-              disabled={
-                disableControls ||
-                codexQuotaRefreshing ||
-                loading ||
-                codexQuotaRefreshTargets.length === 0
-              }
-              loading={codexQuotaRefreshing}
-              loadingLabel={t('codex_quota.loading')}
-              title={t('auth_files.quota_refresh_all_title', {
-                count: codexQuotaRefreshTargets.length,
-                defaultValue: '刷新 {{count}} 个 Codex 账号额度',
-              })}
-            >
-              {t('codex_quota.refresh_button')}
-            </Button>
-            <Button
               size="sm"
               onClick={handleUploadClick}
               disabled={disableControls || uploading}
@@ -4269,7 +4249,33 @@ export function AuthFilesPage() {
                 <span className={styles.fileListKicker}>
                   {t('auth_files.list_kicker', { defaultValue: '日常管理' })}
                 </span>
-                <h3 className={styles.fileListTitle}>{listHeaderTitle}</h3>
+                <div className={styles.fileListTitleRow}>
+                  <h3 className={styles.fileListTitle}>{listHeaderTitle}</h3>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={styles.fileListQuotaRefreshButton}
+                    leftIcon={<IconRefreshCw size={15} />}
+                    onClick={() => void handleRefreshCodexQuota()}
+                    disabled={
+                      disableControls ||
+                      codexQuotaRefreshing ||
+                      loading ||
+                      codexQuotaRefreshTargets.length === 0
+                    }
+                    loading={codexQuotaRefreshing}
+                    loadingLabel={t('codex_quota.loading')}
+                    title={t('auth_files.quota_refresh_all_title', {
+                      count: codexQuotaRefreshTargets.length,
+                      defaultValue: '刷新 {{count}} 个 Codex 账号额度',
+                    })}
+                  >
+                    <span>{t('codex_quota.refresh_button')}</span>
+                    <span className={styles.fileListQuotaRefreshCount}>
+                      {codexQuotaRefreshTargets.length}
+                    </span>
+                  </Button>
+                </div>
               </div>
               <div className={styles.fileListMeta}>{listHeaderMeta}</div>
             </div>
