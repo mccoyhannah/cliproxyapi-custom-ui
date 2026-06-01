@@ -13203,7 +13203,6 @@ button.codexSubscriptionValue {
   min-width: 0;
 }
 
-.accountMemoImageEmpty,
 .accountMemoImageStatus {
   min-height: 42px;
   display: flex;
@@ -13224,16 +13223,6 @@ button.codexSubscriptionValue {
   justify-content: flex-start;
   border-style: solid;
   color: color-mix(in srgb, var(--text-secondary) 84%, #047857);
-}
-
-.accountMemoHint {
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, #14b8a6 18%, var(--border-color));
-  border-radius: 8px;
-  background: color-mix(in srgb, #ecfdf5 44%, var(--surface-panel));
-  color: color-mix(in srgb, var(--text-secondary) 84%, #047857);
-  font-size: 12px;
-  line-height: 1.55;
 }
 
 .accountMemoFooter {

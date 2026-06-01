@@ -3214,6 +3214,8 @@ export function AuthFilesPage() {
   );
   const accountMemoImageSlotsRemaining =
     AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES - accountMemoImagesDraft.length;
+  const accountMemoShouldShowImagePanel =
+    accountMemoImagesDraft.length > 0 || accountMemoImageProcessing;
   const uploadDropPoolClass = [
     styles.uploadDropPool,
     uploadDropActive ? styles.uploadDropPoolActive : '',
@@ -5032,109 +5034,101 @@ export function AuthFilesPage() {
               </div>
             </div>
           )}
-          <div className={styles.accountMemoImagePanel}>
-            <div className={styles.accountMemoImageHeader}>
-              <span>{t('auth_files.account_memo_images_label', { defaultValue: '图片' })}</span>
-              <span>
-                {accountMemoImagesDraft.length}/{AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES}
-              </span>
-            </div>
-            {accountMemoImagesDraft.length > 0 ? (
-              <div className={styles.accountMemoImageGrid}>
-                {accountMemoImagesDraft.map((image) => (
-                  <div className={styles.accountMemoImageItem} key={image.id}>
-                    <button
-                      type="button"
-                      className={styles.accountMemoImageThumb}
-                      draggable
-                      onClick={() => setAccountMemoPreviewImage(image)}
-                      onDragStart={(event) => setAccountMemoImageDragData(event, image)}
-                      aria-label={t('auth_files.account_memo_image_preview', {
-                        name: image.name,
-                        defaultValue: '预览图片',
-                      })}
-                      title={image.name}
-                    >
-                      <img src={image.dataUrl} alt={image.name} />
-                    </button>
-                    <div className={styles.accountMemoImageActions}>
-                      <Button
+          {accountMemoShouldShowImagePanel && (
+            <div className={styles.accountMemoImagePanel}>
+              <div className={styles.accountMemoImageHeader}>
+                <span>{t('auth_files.account_memo_images_label', { defaultValue: '图片' })}</span>
+                <span>
+                  {accountMemoImagesDraft.length}/{AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES}
+                </span>
+              </div>
+              {accountMemoImagesDraft.length > 0 && (
+                <div className={styles.accountMemoImageGrid}>
+                  {accountMemoImagesDraft.map((image) => (
+                    <div className={styles.accountMemoImageItem} key={image.id}>
+                      <button
                         type="button"
-                        variant="secondary"
-                        size="xs"
-                        iconOnly
-                        leftIcon={<IconEye size={14} />}
+                        className={styles.accountMemoImageThumb}
+                        draggable
                         onClick={() => setAccountMemoPreviewImage(image)}
+                        onDragStart={(event) => setAccountMemoImageDragData(event, image)}
                         aria-label={t('auth_files.account_memo_image_preview', {
                           name: image.name,
                           defaultValue: '预览图片',
                         })}
-                        title={t('auth_files.account_memo_image_preview', {
-                          name: image.name,
-                          defaultValue: '预览图片',
-                        })}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="xs"
-                        iconOnly
-                        leftIcon={<IconDownload size={14} />}
-                        onClick={() => downloadAccountMemoImage(image)}
-                        aria-label={t('auth_files.account_memo_image_download', {
-                          name: image.name,
-                          defaultValue: '下载图片',
-                        })}
-                        title={t('auth_files.account_memo_image_download', {
-                          name: image.name,
-                          defaultValue: '下载图片',
-                        })}
-                      />
-                      <Button
-                        type="button"
-                        variant="danger"
-                        size="xs"
-                        iconOnly
-                        leftIcon={<IconTrash2 size={14} />}
-                        onClick={() => removeAccountMemoImage(image.id)}
-                        aria-label={t('auth_files.account_memo_image_remove', {
-                          name: image.name,
-                          defaultValue: '移除图片',
-                        })}
-                        title={t('auth_files.account_memo_image_remove', {
-                          name: image.name,
-                          defaultValue: '移除图片',
-                        })}
-                      />
+                        title={image.name}
+                      >
+                        <img src={image.dataUrl} alt={image.name} />
+                      </button>
+                      <div className={styles.accountMemoImageActions}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="xs"
+                          iconOnly
+                          leftIcon={<IconEye size={14} />}
+                          onClick={() => setAccountMemoPreviewImage(image)}
+                          aria-label={t('auth_files.account_memo_image_preview', {
+                            name: image.name,
+                            defaultValue: '预览图片',
+                          })}
+                          title={t('auth_files.account_memo_image_preview', {
+                            name: image.name,
+                            defaultValue: '预览图片',
+                          })}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="xs"
+                          iconOnly
+                          leftIcon={<IconDownload size={14} />}
+                          onClick={() => downloadAccountMemoImage(image)}
+                          aria-label={t('auth_files.account_memo_image_download', {
+                            name: image.name,
+                            defaultValue: '下载图片',
+                          })}
+                          title={t('auth_files.account_memo_image_download', {
+                            name: image.name,
+                            defaultValue: '下载图片',
+                          })}
+                        />
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="xs"
+                          iconOnly
+                          leftIcon={<IconTrash2 size={14} />}
+                          onClick={() => removeAccountMemoImage(image.id)}
+                          aria-label={t('auth_files.account_memo_image_remove', {
+                            name: image.name,
+                            defaultValue: '移除图片',
+                          })}
+                          title={t('auth_files.account_memo_image_remove', {
+                            name: image.name,
+                            defaultValue: '移除图片',
+                          })}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.accountMemoImageEmpty}>
-                {t('auth_files.account_memo_images_empty', { defaultValue: '暂无图片' })}
-              </div>
-            )}
-            {accountMemoImageProcessing && (
-              <div className={styles.accountMemoImageStatus}>
-                {t('auth_files.account_memo_image_processing', { defaultValue: '正在处理图片' })}
-              </div>
-            )}
-            {accountMemoImageSlotsRemaining <= 0 && (
-              <div className={styles.accountMemoImageStatus}>
-                {t('auth_files.account_memo_image_limit', {
-                  count: AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
-                  defaultValue: `每个账号备注最多保存 ${AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES} 张图片`,
-                })}
-              </div>
-            )}
-          </div>
-          <div className={styles.accountMemoHint}>
-            {t('auth_files.account_memo_hint', {
-              defaultValue:
-                '只保存在当前浏览器，不会写入认证文件。请不要保存密码、token、完整密钥或敏感截图。',
-            })}
-          </div>
+                  ))}
+                </div>
+              )}
+              {accountMemoImageProcessing && (
+                <div className={styles.accountMemoImageStatus}>
+                  {t('auth_files.account_memo_image_processing', { defaultValue: '正在处理图片' })}
+                </div>
+              )}
+              {accountMemoImageSlotsRemaining <= 0 && (
+                <div className={styles.accountMemoImageStatus}>
+                  {t('auth_files.account_memo_image_limit', {
+                    count: AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
+                    defaultValue: `每个账号备注最多保存 ${AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES} 张图片`,
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
 
