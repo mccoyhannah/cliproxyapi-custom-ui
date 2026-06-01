@@ -159,6 +159,14 @@ const CARD_FOCUS_HEADER_TUCK_LIMIT = 24;
 const CARD_FOCUS_PREVIOUS_LINE_CLEARANCE = 2;
 const CARD_FOCUS_HEADER_LINE_CLEARANCE = 2;
 const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
+const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
+
+const formatCodexOAuthShortcutRemaining = (remainingMs: number) => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
 const ACCOUNT_MEMO_URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
 const ACCOUNT_MEMO_TRAILING_URL_PUNCTUATION = /[),.;:!?，。！？、；：）】》]+$/u;
 
@@ -705,6 +713,10 @@ export function AuthFilesPage() {
   const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
   const [codexQuotaRefreshing, setCodexQuotaRefreshing] = useState(false);
   const [codexOAuthOpening, setCodexOAuthOpening] = useState(false);
+  const [codexOAuthAttemptExpiresAt, setCodexOAuthAttemptExpiresAt] = useState<number | null>(
+    null
+  );
+  const [codexOAuthNowMs, setCodexOAuthNowMs] = useState(() => Date.now());
   const [priorityRotationSidecarIntervalInput, setPriorityRotationSidecarIntervalInput] =
     useState('5');
   const [priorityRotationSidecarError, setPriorityRotationSidecarError] = useState('');
@@ -767,6 +779,21 @@ export function AuthFilesPage() {
     filesLengthRef.current = files.length;
   }, [files.length]);
 
+  useEffect(() => {
+    if (codexOAuthAttemptExpiresAt === null) return;
+
+    const tick = () => setCodexOAuthNowMs(Date.now());
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [codexOAuthAttemptExpiresAt]);
+
+  useEffect(() => {
+    if (codexOAuthAttemptExpiresAt !== null && codexOAuthAttemptExpiresAt <= codexOAuthNowMs) {
+      setCodexOAuthAttemptExpiresAt(null);
+    }
+  }, [codexOAuthAttemptExpiresAt, codexOAuthNowMs]);
+
   const {
     excluded,
     excludedError,
@@ -809,6 +836,26 @@ export function AuthFilesPage() {
   });
 
   const disableControls = connectionStatus !== 'connected';
+  const codexOAuthRemainingMs = codexOAuthAttemptExpiresAt
+    ? Math.max(0, codexOAuthAttemptExpiresAt - codexOAuthNowMs)
+    : 0;
+  const codexOAuthCountdownActive =
+    codexOAuthAttemptExpiresAt !== null && codexOAuthRemainingMs > 0;
+  const codexOAuthCountdownText = formatCodexOAuthShortcutRemaining(codexOAuthRemainingMs);
+  const codexOAuthButtonLabel = codexOAuthCountdownActive
+    ? t('auth_files.codex_oauth_reauth_countdown', {
+        time: codexOAuthCountdownText,
+        defaultValue: `重新认证 ${codexOAuthCountdownText}`,
+      })
+    : t('auth_files.codex_oauth_shortcut_compact', { defaultValue: '登录' });
+  const codexOAuthButtonTitle = codexOAuthCountdownActive
+    ? t('auth_files.codex_oauth_reauth_title', {
+        time: codexOAuthCountdownText,
+        defaultValue: `认证倒计时 ${codexOAuthCountdownText}，点击可重新认证`,
+      })
+    : t('auth_files.codex_oauth_shortcut_title', {
+        defaultValue: '生成 Codex OAuth 授权链接并打开登录页',
+      });
   const codexQuotaRefreshTargets = useMemo(
     () => files.filter((file) => CODEX_CONFIG.filterFn(file) && !isRuntimeOnlyAuthFile(file)),
     [files]
@@ -892,8 +939,10 @@ export function AuthFilesPage() {
         throw new Error(t('auth_files.codex_oauth_missing_url', { defaultValue: '未返回授权链接' }));
       }
 
+      let openedAuthPage = false;
       if (authWindow && !authWindow.closed) {
         authWindow.location.href = response.url;
+        openedAuthPage = true;
       } else {
         const opened = window.open(response.url, '_blank', 'noopener,noreferrer');
         if (!opened) {
@@ -908,6 +957,13 @@ export function AuthFilesPage() {
           );
           return;
         }
+        openedAuthPage = true;
+      }
+
+      if (openedAuthPage) {
+        const now = Date.now();
+        setCodexOAuthNowMs(now);
+        setCodexOAuthAttemptExpiresAt(now + CODEX_OAUTH_SHORTCUT_WAIT_MS);
       }
 
       showNotification(
@@ -4551,11 +4607,9 @@ export function AuthFilesPage() {
                   loadingLabel={t('auth_files.codex_oauth_opening', {
                     defaultValue: '打开中',
                   })}
-                  title={t('auth_files.codex_oauth_shortcut_title', {
-                    defaultValue: '生成 Codex OAuth 授权链接并打开登录页',
-                  })}
+                  title={codexOAuthButtonTitle}
                 >
-                  {t('auth_files.codex_oauth_shortcut_compact', { defaultValue: '登录' })}
+                  {codexOAuthButtonLabel}
                 </Button>
               </div>
             </div>

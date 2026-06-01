@@ -605,6 +605,8 @@
     "codex_oauth_shortcut": "Codex Login",
     "codex_oauth_shortcut_compact": "Login",
     "codex_oauth_shortcut_title": "Generate a Codex OAuth authorization link and open the login page",
+    "codex_oauth_reauth_countdown": "Re-auth {{time}}",
+    "codex_oauth_reauth_title": "Authentication countdown {{time}}. Click to re-authenticate",
     "codex_oauth_opening": "Opening",
     "codex_oauth_opened": "Codex login page opened.",
     "codex_oauth_popup_blocked": "The browser blocked the new tab. The Codex login link was copied if possible.",

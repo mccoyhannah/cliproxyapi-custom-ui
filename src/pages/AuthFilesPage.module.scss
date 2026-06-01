@@ -8967,6 +8967,10 @@ button.codexSubscriptionValue {
   :global(.btn-icon) {
     color: currentColor;
   }
+
+  :global(.btn-label) {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 .fileListTitle {

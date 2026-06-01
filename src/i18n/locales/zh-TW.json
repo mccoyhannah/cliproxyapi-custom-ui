@@ -604,6 +604,8 @@
     "codex_oauth_shortcut": "Codex 登入",
     "codex_oauth_shortcut_compact": "登入",
     "codex_oauth_shortcut_title": "產生 Codex OAuth 授權連結並開啟登入頁",
+    "codex_oauth_reauth_countdown": "重新認證 {{time}}",
+    "codex_oauth_reauth_title": "認證倒數 {{time}}，點擊可重新認證",
     "codex_oauth_opening": "開啟中",
     "codex_oauth_opened": "已開啟 Codex 登入頁。",
     "codex_oauth_popup_blocked": "瀏覽器阻擋了新分頁；若可用，已複製 Codex 登入連結。",

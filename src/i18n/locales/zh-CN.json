@@ -627,6 +627,8 @@
     "codex_oauth_shortcut": "Codex 登录",
     "codex_oauth_shortcut_compact": "登录",
     "codex_oauth_shortcut_title": "生成 Codex OAuth 授权链接并打开登录页",
+    "codex_oauth_reauth_countdown": "重新认证 {{time}}",
+    "codex_oauth_reauth_title": "认证倒计时 {{time}}，点击可重新认证",
     "codex_oauth_opening": "打开中",
     "codex_oauth_opened": "已打开 Codex 登录页。",
     "codex_oauth_popup_blocked": "浏览器拦截了新标签页；如剪贴板可用，已复制 Codex 登录链接。",

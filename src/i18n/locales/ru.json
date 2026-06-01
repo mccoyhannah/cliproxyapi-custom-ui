@@ -574,6 +574,8 @@
     "codex_oauth_shortcut": "Codex вход",
     "codex_oauth_shortcut_compact": "Вход",
     "codex_oauth_shortcut_title": "Создать ссылку авторизации Codex OAuth и открыть страницу входа",
+    "codex_oauth_reauth_countdown": "Повторный вход {{time}}",
+    "codex_oauth_reauth_title": "Обратный отсчет авторизации {{time}}. Нажмите, чтобы войти снова",
     "codex_oauth_opening": "Открытие",
     "codex_oauth_opened": "Страница входа Codex открыта.",
     "codex_oauth_popup_blocked": "Браузер заблокировал новую вкладку. Ссылка входа Codex скопирована, если возможно.",
