@@ -105,7 +105,8 @@
   "header": {
     "check_connection": "Проверить подключение",
     "refresh_all": "Обновить всё",
-    "logout": "Выйти"
+    "logout": "Выйти",
+    "auth_files_quick_jump": "К карточкам"
   },
   "connection": {
     "title": "Информация о подключении",
@@ -568,6 +569,16 @@
     "display_name_restore_partial": "Восстановление имён завершено частично: успешно {{success}}, ошибок {{failed}}",
     "display_name_restore_failed": "Не удалось восстановить имена для {{failed}} файлов; загрузка сохранена",
     "display_name_restore_skipped_existing": "Восстановление имён пропущено для {{count}} файлов: на сервере уже есть имя",
+    "account_memo_links_preview": "Предпросмотр ссылок заметки",
+    "account_memo_links_label": "Кликабельные ссылки",
+    "codex_oauth_shortcut": "Codex вход",
+    "codex_oauth_shortcut_compact": "Вход",
+    "codex_oauth_shortcut_title": "Создать ссылку авторизации Codex OAuth и открыть страницу входа",
+    "codex_oauth_opening": "Открытие",
+    "codex_oauth_opened": "Страница входа Codex открыта.",
+    "codex_oauth_popup_blocked": "Браузер заблокировал новую вкладку. Ссылка входа Codex скопирована, если возможно.",
+    "codex_oauth_open_failed": "Не удалось открыть вход Codex: {{message}}",
+    "codex_oauth_missing_url": "Ссылка авторизации не возвращена",
     "priority_invalid": "Приоритет должен быть целым числом",
     "priority_decrease": "Понизить приоритет",
     "priority_increase": "Повысить приоритет",

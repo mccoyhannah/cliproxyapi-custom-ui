@@ -8935,6 +8935,40 @@ button.codexSubscriptionValue {
   font-variant-numeric: tabular-nums;
 }
 
+.fileListCodexLoginButton {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 10px 5px 9px;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--primary-color) 10%, var(--surface-card)),
+      color-mix(in srgb, var(--primary-color) 5%, var(--surface-control))
+    );
+  color: color-mix(in srgb, var(--primary-color) 72%, var(--text-primary));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent),
+    0 1px 2px color-mix(in srgb, var(--primary-color) 12%, transparent);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--primary-color) 42%, var(--border-color));
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent),
+      0 4px 10px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    transform: translateY(-1px);
+  }
+
+  :global(.btn-icon) {
+    color: currentColor;
+  }
+}
+
 .fileListTitle {
   flex: 0 1 auto;
   margin: 0;
@@ -9002,10 +9036,15 @@ button.codexSubscriptionValue {
   font-variant-numeric: tabular-nums;
 }
 
-.fileListHeaderBalance {
-  justify-self: stretch;
+.fileListHeaderActions {
+  justify-self: start;
+  align-self: end;
   min-width: 0;
   min-height: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 8px;
 }
 
 .filterContent {
@@ -9326,8 +9365,10 @@ button.codexSubscriptionValue {
     justify-content: center;
   }
 
-  .fileListHeaderBalance {
-    display: none;
+  .fileListHeaderActions {
+    justify-self: start;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .fileListMeta {
@@ -11922,6 +11963,86 @@ button.codexSubscriptionValue {
   background: color-mix(in srgb, var(--surface-control) 38%, transparent);
 }
 
+.fileGridCompact {
+  gap: 10px;
+}
+
+.fileGridCompact .fileCardCompact {
+  padding: 8px;
+}
+
+.fileCardCompact .fileCardMain {
+  gap: 6px;
+}
+
+.fileCardCompact .cardHeader {
+  gap: 7px;
+}
+
+.fileCardCompact .providerAvatar {
+  width: 36px;
+  height: 36px;
+}
+
+.fileCardCompact .providerAvatarImage {
+  width: 20px;
+  height: 20px;
+}
+
+.fileCardCompact .cardHeaderContent {
+  gap: 3px;
+}
+
+.fileCardCompact .fileNameSource {
+  padding: 4px 6px;
+}
+
+.fileCardCompact .cardMeta {
+  gap: 4px 7px;
+}
+
+.fileCardCompact .priorityBadgeEditor {
+  min-height: 30px;
+  width: min(100%, 160px);
+}
+
+.fileCardCompact .priorityBadgeStepButton {
+  min-height: 30px;
+}
+
+.fileCardCompact .priorityBadgeValueShell {
+  padding: 3px 6px 4px;
+}
+
+.fileCardCompact .cardInsights {
+  gap: 5px;
+  padding: 6px;
+}
+
+.fileCardCompact .statusPanelCompact {
+  gap: 4px;
+  padding: 6px 7px;
+}
+
+.fileCardCompact .statusPanelCompact .statusBar {
+  gap: 6px;
+  row-gap: 4px;
+}
+
+.fileCardCompact .quotaSectionCompact {
+  gap: 3px;
+  padding: 0;
+  margin-top: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fileCardCompact .cardActions {
+  gap: 5px;
+  padding-top: 6px;
+}
+
 .pagination {
   padding-top: 2px;
 }
@@ -11975,8 +12096,10 @@ button.codexSubscriptionValue {
     justify-content: center;
   }
 
-  .fileListHeaderBalance {
-    display: none;
+  .fileListHeaderActions {
+    justify-self: start;
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .fileListMeta {
@@ -12916,6 +13039,73 @@ button.codexSubscriptionValue {
       border-color: color-mix(in srgb, var(--primary-color) 58%, var(--border-color));
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
     }
+  }
+}
+
+.accountMemoLinksPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary-color) 5%, var(--surface-panel));
+}
+
+.accountMemoLinksLabel {
+  color: color-mix(in srgb, var(--primary-color) 70%, var(--text-secondary));
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.accountMemoLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.accountMemoLink {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 9%, var(--surface-control));
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+
+  span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--primary-color) 46%, var(--border-color));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-color) 13%, transparent);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 62%, var(--border-color));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 18%, transparent);
   }
 }
 

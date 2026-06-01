@@ -25,6 +25,7 @@ import {
   IconChevronDown,
   IconDownload,
   IconEye,
+  IconExternalLink,
   IconFilterAll,
   IconMinus,
   IconPlus,
@@ -117,6 +118,7 @@ import {
   type PriorityRotationSidecarSettings,
   type PriorityRotationSidecarStatus,
 } from '@/services/api/priorityRotationSidecar';
+import { oauthApi } from '@/services/api/oauth';
 import { CODEX_CONFIG, useQuotaLoader } from '@/components/quota';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
@@ -150,6 +152,12 @@ const ACCOUNT_MEMO_IMAGE_MAX_EDGE = 1200;
 const ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS = 900 * 1024;
 const ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS = 4_000_000;
 const ACCOUNT_MEMO_IMAGE_QUALITIES = [0.86, 0.78, 0.68, 0.58, 0.48] as const;
+const ACCOUNT_MEMO_LINK_LIMIT = 8;
+const CARD_FOCUS_BOTTOM_GAP = 32;
+const CARD_FOCUS_HEADER_GAP = 8;
+const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
+const ACCOUNT_MEMO_URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
+const ACCOUNT_MEMO_TRAILING_URL_PUNCTUATION = /[),.;:!?，。！？、；：）】》]+$/u;
 
 const wait = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 
@@ -161,6 +169,38 @@ type AccountMemoImageCandidate = {
   storageChars: number;
   width: number;
   height: number;
+};
+type AccountMemoLink = {
+  label: string;
+  href: string;
+};
+
+const normalizeAccountMemoUrlCandidate = (value: string): AccountMemoLink | null => {
+  let label = value.trim();
+  while (ACCOUNT_MEMO_TRAILING_URL_PUNCTUATION.test(label)) {
+    label = label.slice(0, -1);
+  }
+  if (!label) return null;
+
+  const href = /^https?:\/\//i.test(label) ? label : `https://${label}`;
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return { label, href: parsed.href };
+  } catch {
+    return null;
+  }
+};
+
+const extractAccountMemoLinks = (text: string): AccountMemoLink[] => {
+  const links: AccountMemoLink[] = [];
+  for (const match of text.matchAll(ACCOUNT_MEMO_URL_PATTERN)) {
+    const link = normalizeAccountMemoUrlCandidate(match[1] ?? match[0]);
+    if (!link) continue;
+    links.push(link);
+    if (links.length >= ACCOUNT_MEMO_LINK_LIMIT) break;
+  }
+  return links;
 };
 
 const createAccountMemoImageId = (): string => {
@@ -661,6 +701,7 @@ export function AuthFilesPage() {
   const [priorityRotationSidecarRunSaving, setPriorityRotationSidecarRunSaving] = useState(false);
   const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
   const [codexQuotaRefreshing, setCodexQuotaRefreshing] = useState(false);
+  const [codexOAuthOpening, setCodexOAuthOpening] = useState(false);
   const [priorityRotationSidecarIntervalInput, setPriorityRotationSidecarIntervalInput] =
     useState('5');
   const [priorityRotationSidecarError, setPriorityRotationSidecarError] = useState('');
@@ -668,7 +709,8 @@ export function AuthFilesPage() {
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const fileListHeaderRef = useRef<HTMLDivElement>(null);
-  const focusedFileListOnOpenRef = useRef(false);
+  const fileGridRef = useRef<HTMLDivElement>(null);
+  const focusedFileListOnOpenRef = useRef('');
   const pageDragDepthRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
@@ -828,6 +870,63 @@ export function AuthFilesPage() {
     showNotification,
     t,
   ]);
+
+  const handleOpenCodexOAuth = useCallback(async () => {
+    if (disableControls || codexOAuthOpening) return;
+
+    let authWindow: Window | null = null;
+    if (typeof window !== 'undefined') {
+      authWindow = window.open('about:blank', '_blank');
+      if (authWindow) {
+        authWindow.opener = null;
+      }
+    }
+
+    setCodexOAuthOpening(true);
+    try {
+      const response = await oauthApi.startAuth('codex');
+      if (!response.url) {
+        throw new Error(t('auth_files.codex_oauth_missing_url', { defaultValue: '未返回授权链接' }));
+      }
+
+      if (authWindow && !authWindow.closed) {
+        authWindow.location.href = response.url;
+      } else {
+        const opened = window.open(response.url, '_blank', 'noopener,noreferrer');
+        if (!opened) {
+          const copied = await copyToClipboard(response.url);
+          showNotification(
+            t('auth_files.codex_oauth_popup_blocked', {
+              defaultValue: copied
+                ? '浏览器拦截了新标签页，已复制 Codex 登录链接。'
+                : '浏览器拦截了新标签页，请到 OAuth 登录页手动打开链接。',
+            }),
+            'warning'
+          );
+          return;
+        }
+      }
+
+      showNotification(
+        t('auth_files.codex_oauth_opened', { defaultValue: '已打开 Codex 登录页。' }),
+        'success'
+      );
+    } catch (err) {
+      if (authWindow && !authWindow.closed) {
+        authWindow.close();
+      }
+      const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+      showNotification(
+        t('auth_files.codex_oauth_open_failed', {
+          message,
+          defaultValue: message ? `打开 Codex 登录失败：${message}` : '打开 Codex 登录失败。',
+        }),
+        'error'
+      );
+    } finally {
+      setCodexOAuthOpening(false);
+    }
+  }, [codexOAuthOpening, disableControls, showNotification, t]);
   const uploadDropDisabled = disableControls || uploading;
   const normalizedFilter = normalizeProviderKey(String(filter));
   const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
@@ -2840,26 +2939,88 @@ export function AuthFilesPage() {
     };
   }, [batchActionBarVisible, selectionCount]);
 
-  useEffect(() => {
+  const scrollToFileCards = useCallback((behavior: ScrollBehavior = 'auto') => {
+    if (typeof window === 'undefined') return;
+
+    const header = fileListHeaderRef.current;
+    const grid = fileGridRef.current;
+    if (!header) return;
+
+    const container = header.closest('.content') as HTMLElement | null;
+    if (!container) {
+      header.scrollIntoView({ block: 'start', inline: 'nearest', behavior });
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const headerRect = header.getBoundingClientRect();
+    const gridRect = (grid ?? header).getBoundingClientRect();
+    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    const headerTopScroll =
+      container.scrollTop + headerRect.top - containerRect.top - CARD_FOCUS_HEADER_GAP;
+    const gridBottomScroll =
+      container.scrollTop +
+      gridRect.bottom -
+      containerRect.top -
+      container.clientHeight +
+      CARD_FOCUS_BOTTOM_GAP;
+    const verticalSpan = gridRect.bottom - headerRect.top;
+    const needsBottomFirstPosition =
+      Boolean(grid) &&
+      verticalSpan + CARD_FOCUS_HEADER_GAP + CARD_FOCUS_BOTTOM_GAP > container.clientHeight;
+    const preferredScrollTop = needsBottomFirstPosition
+      ? gridBottomScroll
+      : Math.max(headerTopScroll, gridBottomScroll);
+    const targetScrollTop = Math.max(
+      0,
+      Math.min(maxScrollTop, preferredScrollTop)
+    );
+
+    container.scrollTo({ top: targetScrollTop, behavior });
+  }, []);
+
+  useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
 
     const shouldFocusCards = new URLSearchParams(location.search).get('focus') === 'cards';
     if (!shouldFocusCards) {
-      focusedFileListOnOpenRef.current = false;
+      focusedFileListOnOpenRef.current = '';
       return;
     }
-    if (focusedFileListOnOpenRef.current || loading) return;
+    const focusSignature = location.search;
+    if (focusedFileListOnOpenRef.current === focusSignature || loading) return;
 
     const target = fileListHeaderRef.current;
-    if (!target) return;
+    const needsRenderedGrid = pageItems.length > 0;
+    if (!target || (needsRenderedGrid && !fileGridRef.current)) return;
 
-    focusedFileListOnOpenRef.current = true;
-    const frame = window.requestAnimationFrame(() => {
-      target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
-    });
+    focusedFileListOnOpenRef.current = focusSignature;
+    const frames: number[] = [];
+    const timers: number[] = [];
+    const runScroll = () => scrollToFileCards('auto');
 
-    return () => window.cancelAnimationFrame(frame);
-  }, [loading, location.search]);
+    runScroll();
+    frames.push(window.requestAnimationFrame(runScroll));
+    frames.push(
+      window.requestAnimationFrame(() => {
+        frames.push(window.requestAnimationFrame(runScroll));
+      })
+    );
+    timers.push(window.setTimeout(runScroll, 250));
+
+    return () => {
+      frames.forEach((frame) => window.cancelAnimationFrame(frame));
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [loading, location.search, pageItems.length, scrollToFileCards]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleFocusCards = () => scrollToFileCards('auto');
+    window.addEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
+    return () => window.removeEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
+  }, [scrollToFileCards]);
 
   useEffect(() => {
     setBatchActionBarVisible(selectionCount > 0);
@@ -2951,6 +3112,10 @@ export function AuthFilesPage() {
     (accountMemoEditorExistingMemo?.images.length ?? 0) > 0;
   const accountMemoHasDraftContent =
     Boolean(accountMemoDraft.trim()) || accountMemoImagesDraft.length > 0;
+  const accountMemoLinks = useMemo(
+    () => extractAccountMemoLinks(accountMemoDraft),
+    [accountMemoDraft]
+  );
   const accountMemoImageSlotsRemaining =
     AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES - accountMemoImagesDraft.length;
   const uploadDropPoolClass = [
@@ -4334,7 +4499,25 @@ export function AuthFilesPage() {
                   </Button>
                 )}
               </div>
-              <div className={styles.fileListHeaderBalance} aria-hidden="true" />
+              <div className={styles.fileListHeaderActions}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={styles.fileListCodexLoginButton}
+                  leftIcon={<IconExternalLink size={15} />}
+                  onClick={() => void handleOpenCodexOAuth()}
+                  disabled={disableControls || codexOAuthOpening}
+                  loading={codexOAuthOpening}
+                  loadingLabel={t('auth_files.codex_oauth_opening', {
+                    defaultValue: '打开中',
+                  })}
+                  title={t('auth_files.codex_oauth_shortcut_title', {
+                    defaultValue: '生成 Codex OAuth 授权链接并打开登录页',
+                  })}
+                >
+                  {t('auth_files.codex_oauth_shortcut_compact', { defaultValue: '登录' })}
+                </Button>
+              </div>
             </div>
 
             {loading && files.length === 0 ? (
@@ -4355,6 +4538,7 @@ export function AuthFilesPage() {
               />
             ) : (
               <div
+                ref={fileGridRef}
                 className={`${styles.fileGrid} ${quotaFilterType ? styles.fileGridQuotaManaged : ''} ${compactMode ? styles.fileGridCompact : ''}`}
               >
                 {pageItems.map((file) => (
@@ -4727,6 +4911,33 @@ export function AuthFilesPage() {
               rows={8}
             />
           </label>
+          {accountMemoLinks.length > 0 && (
+            <div
+              className={styles.accountMemoLinksPreview}
+              aria-label={t('auth_files.account_memo_links_preview', {
+                defaultValue: '备注链接预览',
+              })}
+            >
+              <span className={styles.accountMemoLinksLabel}>
+                {t('auth_files.account_memo_links_label', { defaultValue: '可跳转链接' })}
+              </span>
+              <div className={styles.accountMemoLinks}>
+                {accountMemoLinks.map((link, index) => (
+                  <a
+                    key={`${link.href}-${index}`}
+                    className={styles.accountMemoLink}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={link.href}
+                  >
+                    <IconExternalLink size={13} />
+                    <span>{link.label}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           <div className={styles.accountMemoImagePanel}>
             <div className={styles.accountMemoImageHeader}>
               <span>{t('auth_files.account_memo_images_label', { defaultValue: '图片' })}</span>

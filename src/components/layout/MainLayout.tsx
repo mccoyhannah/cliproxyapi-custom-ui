@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PageTransition } from '@/components/common/PageTransition';
 import { CodexQuotaBackgroundRefresher } from '@/components/quota';
@@ -17,11 +17,13 @@ import { HeaderActions } from './HeaderActions';
 import { SidebarNav } from './SidebarNav';
 
 const SIDEBAR_ID = 'primary-sidebar';
+const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
 
 export function MainLayout() {
   const { t } = useTranslation();
   const { showNotification } = useNotificationStore();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const logout = useAuthStore((state) => state.logout);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
@@ -41,6 +43,8 @@ export function MainLayout() {
   const mobileToggleRestoreRef = useRef<HTMLElement | null>(null);
 
   const isLogsPage = location.pathname.startsWith('/logs');
+  const showAuthFilesQuickJump =
+    location.pathname === '/auth-files' || location.pathname.startsWith('/auth-files/');
 
   // 将顶部悬浮控制区高度写入 CSS 变量，供移动端粘性元素和浮层避让。
   useLayoutEffect(() => {
@@ -151,6 +155,14 @@ export function MainLayout() {
     showNotification(t('notification.data_refreshed'), 'success');
   };
 
+  const handleAuthFilesQuickJump = useCallback(() => {
+    if (location.pathname === '/auth-files') {
+      window.dispatchEvent(new Event(AUTH_FILES_FOCUS_CARDS_EVENT));
+      return;
+    }
+    navigate('/auth-files?focus=cards');
+  }, [location.pathname, navigate]);
+
   const resolveRouteOrder = useCallback(
     (pathname: string) => getRouteOrder(pathname, { loggingToFile: config?.loggingToFile }),
     [config?.loggingToFile]
@@ -173,6 +185,8 @@ export function MainLayout() {
           onToggleSidebarOpen={handleToggleSidebarOpen}
           onToggleSidebarCollapsed={() => setSidebarCollapsed((prev) => !prev)}
           onRefreshAll={handleRefreshAll}
+          onAuthFilesQuickJump={handleAuthFilesQuickJump}
+          showAuthFilesQuickJump={showAuthFilesQuickJump}
           onLanguageSelect={setLanguage}
           onThemeSelect={setTheme}
           onLogout={logout}

@@ -105,7 +105,8 @@
   "header": {
     "check_connection": "检查连接",
     "refresh_all": "刷新全部",
-    "logout": "登出"
+    "logout": "登出",
+    "auth_files_quick_jump": "回到卡片区"
   },
   "connection": {
     "title": "连接信息",
@@ -621,6 +622,16 @@
     "account_memo_image_add_failed": "有图片无法处理，请换一张较小的图片再试",
     "account_memo_image_download_failed": "图片数据已损坏，无法下载",
     "account_memo_save_failed": "账号备注保存失败，可能是浏览器本地存储空间不足",
+    "account_memo_links_preview": "备注链接预览",
+    "account_memo_links_label": "可跳转链接",
+    "codex_oauth_shortcut": "Codex 登录",
+    "codex_oauth_shortcut_compact": "登录",
+    "codex_oauth_shortcut_title": "生成 Codex OAuth 授权链接并打开登录页",
+    "codex_oauth_opening": "打开中",
+    "codex_oauth_opened": "已打开 Codex 登录页。",
+    "codex_oauth_popup_blocked": "浏览器拦截了新标签页；如剪贴板可用，已复制 Codex 登录链接。",
+    "codex_oauth_open_failed": "打开 Codex 登录失败：{{message}}",
+    "codex_oauth_missing_url": "未返回授权链接",
     "priority_invalid": "优先级必须是整数",
     "priority_decrease": "降低优先级",
     "priority_increase": "提高优先级",

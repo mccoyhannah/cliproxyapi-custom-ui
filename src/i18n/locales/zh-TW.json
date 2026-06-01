@@ -105,7 +105,8 @@
   "header": {
     "check_connection": "檢查連線",
     "refresh_all": "全部重新整理",
-    "logout": "登出"
+    "logout": "登出",
+    "auth_files_quick_jump": "回到卡片區"
   },
   "connection": {
     "title": "連線資訊",
@@ -598,6 +599,16 @@
     "display_name_restore_partial": "顯示名稱自動恢復部分完成：成功 {{success}} 個，失敗 {{failed}} 個",
     "display_name_restore_failed": "顯示名稱自動恢復失敗：{{failed}} 個未恢復；上傳已保留",
     "display_name_restore_skipped_existing": "已跳過 {{count}} 個顯示名稱恢復：後端已有顯示名稱，未覆蓋",
+    "account_memo_links_preview": "備註連結預覽",
+    "account_memo_links_label": "可跳轉連結",
+    "codex_oauth_shortcut": "Codex 登入",
+    "codex_oauth_shortcut_compact": "登入",
+    "codex_oauth_shortcut_title": "產生 Codex OAuth 授權連結並開啟登入頁",
+    "codex_oauth_opening": "開啟中",
+    "codex_oauth_opened": "已開啟 Codex 登入頁。",
+    "codex_oauth_popup_blocked": "瀏覽器阻擋了新分頁；若可用，已複製 Codex 登入連結。",
+    "codex_oauth_open_failed": "開啟 Codex 登入失敗：{{message}}",
+    "codex_oauth_missing_url": "未返回授權連結",
     "priority_invalid": "優先順序必須是整數",
     "priority_decrease": "降低優先順序",
     "priority_increase": "提高優先順序",

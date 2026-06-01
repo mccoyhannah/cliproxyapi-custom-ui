@@ -19,6 +19,8 @@ interface HeaderActionsProps {
   onToggleSidebarOpen: () => void;
   onToggleSidebarCollapsed: () => void;
   onRefreshAll: () => void | Promise<void>;
+  onAuthFilesQuickJump?: () => void;
+  showAuthFilesQuickJump?: boolean;
   onLanguageSelect: (language: string) => void;
   onThemeSelect: (theme: Theme) => void;
   onLogout: () => void;
@@ -44,6 +46,14 @@ const headerIcons = {
     <svg {...headerIconProps}>
       <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
       <path d="M21 3v5h-5" />
+    </svg>
+  ),
+  cards: (
+    <svg {...headerIconProps}>
+      <rect x="3" y="4" width="7" height="7" rx="1.5" />
+      <rect x="14" y="4" width="7" height="7" rx="1.5" />
+      <rect x="3" y="15" width="7" height="5" rx="1.5" />
+      <rect x="14" y="15" width="7" height="5" rx="1.5" />
     </svg>
   ),
   menu: (
@@ -147,6 +157,8 @@ export function HeaderActions({
   onToggleSidebarOpen,
   onToggleSidebarCollapsed,
   onRefreshAll,
+  onAuthFilesQuickJump,
+  showAuthFilesQuickJump = false,
   onLanguageSelect,
   onThemeSelect,
   onLogout,
@@ -273,6 +285,18 @@ export function HeaderActions({
             {versionLabel}
           </Badge>
         </div>
+        {showAuthFilesQuickJump && onAuthFilesQuickJump && (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            onClick={onAuthFilesQuickJump}
+            title={t('header.auth_files_quick_jump', { defaultValue: '回到卡片区' })}
+            aria-label={t('header.auth_files_quick_jump', { defaultValue: '回到卡片区' })}
+          >
+            {headerIcons.cards}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

@@ -105,7 +105,8 @@
   "header": {
     "check_connection": "Check Connection",
     "refresh_all": "Refresh All",
-    "logout": "Logout"
+    "logout": "Logout",
+    "auth_files_quick_jump": "Back to cards"
   },
   "connection": {
     "title": "Connection Information",
@@ -599,6 +600,16 @@
     "display_name_restore_partial": "Display-name restore partially completed: {{success}} restored, {{failed}} failed",
     "display_name_restore_failed": "Display-name restore failed for {{failed}} files; upload was kept",
     "display_name_restore_skipped_existing": "Skipped display-name restore for {{count}} files because the backend already has a display name",
+    "account_memo_links_preview": "Memo link preview",
+    "account_memo_links_label": "Clickable links",
+    "codex_oauth_shortcut": "Codex Login",
+    "codex_oauth_shortcut_compact": "Login",
+    "codex_oauth_shortcut_title": "Generate a Codex OAuth authorization link and open the login page",
+    "codex_oauth_opening": "Opening",
+    "codex_oauth_opened": "Codex login page opened.",
+    "codex_oauth_popup_blocked": "The browser blocked the new tab. The Codex login link was copied if possible.",
+    "codex_oauth_open_failed": "Failed to open Codex login: {{message}}",
+    "codex_oauth_missing_url": "No authorization link returned",
     "priority_invalid": "Priority must be an integer",
     "priority_decrease": "Decrease priority",
     "priority_increase": "Increase priority",
