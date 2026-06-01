@@ -8973,6 +8973,15 @@ button.codexSubscriptionValue {
   }
 }
 
+.fileListCodexCancelButton {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--text-secondary) 86%, var(--text-primary));
+  font-variant-numeric: tabular-nums;
+}
+
 .fileListTitle {
   flex: 0 1 auto;
   margin: 0;
@@ -9048,6 +9057,7 @@ button.codexSubscriptionValue {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: 8px;
   padding-left: 8px;
 }
 

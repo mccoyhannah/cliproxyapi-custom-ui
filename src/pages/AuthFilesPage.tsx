@@ -160,12 +160,63 @@ const CARD_FOCUS_PREVIOUS_LINE_CLEARANCE = 2;
 const CARD_FOCUS_HEADER_LINE_CLEARANCE = 2;
 const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
+const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
 
 const formatCodexOAuthShortcutRemaining = (remainingMs: number) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const writeCodexOAuthWaitingPage = (target: Window | null, title: string, description: string) => {
+  if (!target || target.closed) return;
+
+  try {
+    target.document.open();
+    target.document.write(`<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #f8fafc; color: #0f172a; }
+      main { width: min(420px, calc(100vw - 40px)); padding: 28px; border: 1px solid #dbeafe; border-radius: 18px; background: rgba(255,255,255,.9); box-shadow: 0 20px 55px rgba(15,23,42,.12); }
+      h1 { margin: 0 0 10px; font-size: 18px; line-height: 1.3; }
+      p { margin: 0; color: #475569; font-size: 14px; line-height: 1.7; }
+      .bar { height: 4px; margin-top: 18px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+      .bar::before { content: ""; display: block; width: 38%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0ea5e9, #14b8a6); animation: move 1.1s ease-in-out infinite alternate; }
+      @keyframes move { from { transform: translateX(0); } to { transform: translateX(165%); } }
+      @media (prefers-color-scheme: dark) {
+        body { background: #020617; color: #e2e8f0; }
+        main { border-color: #1e293b; background: rgba(15,23,42,.92); box-shadow: 0 20px 55px rgba(0,0,0,.28); }
+        p { color: #94a3b8; }
+        .bar { background: #1e293b; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>${escapeHtml(title)}</h1>
+      <p>${escapeHtml(description)}</p>
+      <div class="bar" aria-hidden="true"></div>
+    </main>
+  </body>
+</html>`);
+    target.document.close();
+  } catch {
+    // Best effort only: cross-browser popup documents may be inaccessible.
+  }
 };
 const ACCOUNT_MEMO_URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
 const ACCOUNT_MEMO_TRAILING_URL_PUNCTUATION = /[),.;:!?，。！？、；：）】》]+$/u;
@@ -734,6 +785,9 @@ export function AuthFilesPage() {
   const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
   const priorityRotationSidecarStatusRequestIdRef = useRef(0);
   const priorityRotationSidecarLastMutationRef = useRef('');
+  const codexOAuthPollTimerRef = useRef<number | null>(null);
+  const codexOAuthAttemptIdRef = useRef(0);
+  const codexOAuthOpenRequestIdRef = useRef(0);
 
   const {
     files,
@@ -775,6 +829,19 @@ export function AuthFilesPage() {
 
   const statusBarCache = useAuthFilesStatusBarCache(files);
 
+  const clearCodexOAuthPollTimer = useCallback(() => {
+    if (codexOAuthPollTimerRef.current !== null) {
+      window.clearInterval(codexOAuthPollTimerRef.current);
+      codexOAuthPollTimerRef.current = null;
+    }
+  }, []);
+
+  const finishCodexOAuthAttempt = useCallback(() => {
+    clearCodexOAuthPollTimer();
+    setCodexOAuthAttemptExpiresAt(null);
+    setCodexOAuthNowMs(Date.now());
+  }, [clearCodexOAuthPollTimer]);
+
   useEffect(() => {
     filesLengthRef.current = files.length;
   }, [files.length]);
@@ -790,9 +857,14 @@ export function AuthFilesPage() {
 
   useEffect(() => {
     if (codexOAuthAttemptExpiresAt !== null && codexOAuthAttemptExpiresAt <= codexOAuthNowMs) {
-      setCodexOAuthAttemptExpiresAt(null);
+      codexOAuthAttemptIdRef.current += 1;
+      finishCodexOAuthAttempt();
     }
-  }, [codexOAuthAttemptExpiresAt, codexOAuthNowMs]);
+  }, [codexOAuthAttemptExpiresAt, codexOAuthNowMs, finishCodexOAuthAttempt]);
+
+  useEffect(() => {
+    return () => clearCodexOAuthPollTimer();
+  }, [clearCodexOAuthPollTimer]);
 
   const {
     excluded,
@@ -864,6 +936,65 @@ export function AuthFilesPage() {
     setCodexQuotaRefreshing(isLoading);
   }, []);
 
+  const startCodexOAuthPolling = useCallback(
+    (state: string, attemptId: number) => {
+      clearCodexOAuthPollTimer();
+
+      const poll = async () => {
+        try {
+          const result = await oauthApi.getAuthStatus(state);
+          if (codexOAuthAttemptIdRef.current !== attemptId) return;
+
+          if (result.status === 'ok') {
+            finishCodexOAuthAttempt();
+            showNotification(
+              t('auth_files.codex_oauth_success', { defaultValue: 'Codex 认证成功。' }),
+              'success'
+            );
+            return;
+          }
+
+          if (result.status === 'error') {
+            finishCodexOAuthAttempt();
+            showNotification(
+              t('auth_files.codex_oauth_status_error', {
+                message: result.error || '',
+                defaultValue: result.error
+                  ? `Codex 认证失败：${result.error}`
+                  : 'Codex 认证失败。',
+              }),
+              'error'
+            );
+          }
+        } catch (err) {
+          if (codexOAuthAttemptIdRef.current !== attemptId) return;
+          const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+          finishCodexOAuthAttempt();
+          showNotification(
+            t('auth_files.codex_oauth_status_error', {
+              message,
+              defaultValue: message ? `Codex 认证失败：${message}` : 'Codex 认证失败。',
+            }),
+            'error'
+          );
+        }
+      };
+
+      codexOAuthPollTimerRef.current = window.setInterval(
+        () => void poll(),
+        CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS
+      );
+    },
+    [clearCodexOAuthPollTimer, finishCodexOAuthAttempt, showNotification, t]
+  );
+
+  const handleCancelCodexOAuth = useCallback(() => {
+    codexOAuthOpenRequestIdRef.current += 1;
+    codexOAuthAttemptIdRef.current += 1;
+    setCodexOAuthOpening(false);
+    finishCodexOAuthAttempt();
+  }, [finishCodexOAuthAttempt]);
+
   const handleRefreshCodexQuota = useCallback(async () => {
     if (disableControls || codexQuotaRefreshing) return;
 
@@ -924,24 +1055,45 @@ export function AuthFilesPage() {
   const handleOpenCodexOAuth = useCallback(async () => {
     if (disableControls || codexOAuthOpening) return;
 
+    const openRequestId = codexOAuthOpenRequestIdRef.current + 1;
+    codexOAuthOpenRequestIdRef.current = openRequestId;
     let authWindow: Window | null = null;
     if (typeof window !== 'undefined') {
       authWindow = window.open('about:blank', '_blank');
       if (authWindow) {
         authWindow.opener = null;
+        writeCodexOAuthWaitingPage(
+          authWindow,
+          t('auth_files.codex_oauth_waiting_page_title', {
+            defaultValue: '正在打开 Codex 登录...',
+          }),
+          t('auth_files.codex_oauth_waiting_page_desc', {
+            defaultValue: '授权链接生成后会自动跳转，请稍候。',
+          })
+        );
       }
     }
 
     setCodexOAuthOpening(true);
     try {
       const response = await oauthApi.startAuth('codex');
+      if (codexOAuthOpenRequestIdRef.current !== openRequestId) {
+        if (authWindow && !authWindow.closed) {
+          authWindow.close();
+        }
+        return;
+      }
       if (!response.url) {
         throw new Error(t('auth_files.codex_oauth_missing_url', { defaultValue: '未返回授权链接' }));
       }
 
       let openedAuthPage = false;
       if (authWindow && !authWindow.closed) {
-        authWindow.location.href = response.url;
+        try {
+          authWindow.location.replace(response.url);
+        } catch {
+          authWindow.location.href = response.url;
+        }
         openedAuthPage = true;
       } else {
         const opened = window.open(response.url, '_blank', 'noopener,noreferrer');
@@ -962,6 +1114,13 @@ export function AuthFilesPage() {
 
       if (openedAuthPage) {
         const now = Date.now();
+        const attemptId = codexOAuthAttemptIdRef.current + 1;
+        codexOAuthAttemptIdRef.current = attemptId;
+        if (response.state) {
+          startCodexOAuthPolling(response.state, attemptId);
+        } else {
+          clearCodexOAuthPollTimer();
+        }
         setCodexOAuthNowMs(now);
         setCodexOAuthAttemptExpiresAt(now + CODEX_OAUTH_SHORTCUT_WAIT_MS);
       }
@@ -971,6 +1130,7 @@ export function AuthFilesPage() {
         'success'
       );
     } catch (err) {
+      if (codexOAuthOpenRequestIdRef.current !== openRequestId) return;
       if (authWindow && !authWindow.closed) {
         authWindow.close();
       }
@@ -983,9 +1143,18 @@ export function AuthFilesPage() {
         'error'
       );
     } finally {
-      setCodexOAuthOpening(false);
+      if (codexOAuthOpenRequestIdRef.current === openRequestId) {
+        setCodexOAuthOpening(false);
+      }
     }
-  }, [codexOAuthOpening, disableControls, showNotification, t]);
+  }, [
+    clearCodexOAuthPollTimer,
+    codexOAuthOpening,
+    disableControls,
+    showNotification,
+    startCodexOAuthPolling,
+    t,
+  ]);
   const uploadDropDisabled = disableControls || uploading;
   const normalizedFilter = normalizeProviderKey(String(filter));
   const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
@@ -4613,6 +4782,20 @@ export function AuthFilesPage() {
                 >
                   {codexOAuthButtonLabel}
                 </Button>
+                {codexOAuthCountdownActive && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={styles.fileListCodexCancelButton}
+                    onClick={handleCancelCodexOAuth}
+                    disabled={disableControls}
+                    title={t('auth_files.codex_oauth_cancel_title', {
+                      defaultValue: '停止等待本次 Codex 登录',
+                    })}
+                  >
+                    {t('auth_files.codex_oauth_cancel', { defaultValue: '取消登录' })}
+                  </Button>
+                )}
               </div>
             </div>
 
