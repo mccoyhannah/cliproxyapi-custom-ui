@@ -117,6 +117,7 @@ import {
   type PriorityRotationSidecarSettings,
   type PriorityRotationSidecarStatus,
 } from '@/services/api/priorityRotationSidecar';
+import { CODEX_CONFIG, useQuotaLoader } from '@/components/quota';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
 import {
@@ -587,6 +588,7 @@ export function AuthFilesPage() {
   const managementKey = useAuthStore((state) => state.managementKey);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
+  const { loadQuota: loadCodexQuota } = useQuotaLoader(CODEX_CONFIG);
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
@@ -657,6 +659,7 @@ export function AuthFilesPage() {
     useState(false);
   const [priorityRotationSidecarRunSaving, setPriorityRotationSidecarRunSaving] = useState(false);
   const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
+  const [codexQuotaRefreshing, setCodexQuotaRefreshing] = useState(false);
   const [priorityRotationSidecarIntervalInput, setPriorityRotationSidecarIntervalInput] =
     useState('5');
   const [priorityRotationSidecarError, setPriorityRotationSidecarError] = useState('');
@@ -758,6 +761,70 @@ export function AuthFilesPage() {
   });
 
   const disableControls = connectionStatus !== 'connected';
+  const codexQuotaRefreshTargets = useMemo(
+    () => files.filter((file) => CODEX_CONFIG.filterFn(file) && !isRuntimeOnlyAuthFile(file)),
+    [files]
+  );
+  const setCodexQuotaRefreshLoading = useCallback((isLoading: boolean) => {
+    setCodexQuotaRefreshing(isLoading);
+  }, []);
+
+  const handleRefreshCodexQuota = useCallback(async () => {
+    if (disableControls || codexQuotaRefreshing) return;
+
+    if (codexQuotaRefreshTargets.length === 0) {
+      showNotification(
+        t('auth_files.quota_refresh_all_none', {
+          defaultValue: '没有可刷新额度的 Codex 认证文件。',
+        }),
+        'info'
+      );
+      return;
+    }
+
+    const started = await loadCodexQuota(
+      codexQuotaRefreshTargets,
+      'all',
+      setCodexQuotaRefreshLoading,
+      { preserveExisting: true }
+    );
+
+    if (!started) {
+      showNotification(
+        t('auth_files.quota_refresh_all_busy', {
+          defaultValue: '额度正在刷新，请稍等。',
+        }),
+        'info'
+      );
+      return;
+    }
+
+    const latestQuota = useQuotaStore.getState().codexQuota;
+    const failed = codexQuotaRefreshTargets.filter(
+      (file) => latestQuota[file.name]?.status === 'error'
+    ).length;
+    const success = codexQuotaRefreshTargets.length - failed;
+
+    showNotification(
+      t('auth_files.quota_refresh_all_done', {
+        success,
+        failed,
+        defaultValue:
+          failed > 0
+            ? '额度刷新完成：{{success}} 个成功，{{failed}} 个失败。'
+            : '已刷新 {{success}} 个 Codex 额度。',
+      }),
+      failed > 0 ? 'warning' : 'success'
+    );
+  }, [
+    codexQuotaRefreshTargets,
+    codexQuotaRefreshing,
+    disableControls,
+    loadCodexQuota,
+    setCodexQuotaRefreshLoading,
+    showNotification,
+    t,
+  ]);
   const uploadDropDisabled = disableControls || uploading;
   const normalizedFilter = normalizeProviderKey(String(filter));
   const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
@@ -3442,6 +3509,26 @@ export function AuthFilesPage() {
           <div className={styles.headerActions}>
             <Button variant="secondary" size="sm" onClick={handleHeaderRefresh} disabled={loading}>
               {t('common.refresh')}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<IconRefreshCw size={15} />}
+              onClick={() => void handleRefreshCodexQuota()}
+              disabled={
+                disableControls ||
+                codexQuotaRefreshing ||
+                loading ||
+                codexQuotaRefreshTargets.length === 0
+              }
+              loading={codexQuotaRefreshing}
+              loadingLabel={t('codex_quota.loading')}
+              title={t('auth_files.quota_refresh_all_title', {
+                count: codexQuotaRefreshTargets.length,
+                defaultValue: '刷新 {{count}} 个 Codex 账号额度',
+              })}
+            >
+              {t('codex_quota.refresh_button')}
             </Button>
             <Button
               size="sm"

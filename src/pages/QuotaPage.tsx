@@ -452,7 +452,6 @@ export function QuotaPage() {
         loading={loading}
         disabled={disableControls}
         defaultViewMode="all"
-        autoRefreshOnReady
         dashboardFilter={dashboardFilter}
         sortItems={sortCodexQuotaItems}
         getItemSignal={getCodexSignal}

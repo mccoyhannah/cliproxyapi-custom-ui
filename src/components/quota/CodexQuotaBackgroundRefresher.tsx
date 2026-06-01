@@ -5,20 +5,22 @@ import type { AuthFileItem } from '@/types';
 import { CODEX_CONFIG } from './quotaConfigs';
 import { useQuotaLoader } from './useQuotaLoader';
 
-const AUTO_REFRESH_INTERVAL_MS = 30_000;
-
 const buildSignature = (files: AuthFileItem[]) => files.map((file) => file.name).join('|');
 
 export function CodexQuotaBackgroundRefresher() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const setQuotaRefreshMeta = useQuotaStore((state) => state.setQuotaRefreshMeta);
   const { loadQuota } = useQuotaLoader(CODEX_CONFIG);
+  const initialRefreshAttemptedRef = useRef(false);
   const refreshInFlightRef = useRef(false);
 
   const refreshCodexQuota = useCallback(async () => {
     if (connectionStatus !== 'connected') return false;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
+    if (initialRefreshAttemptedRef.current) return false;
     if (refreshInFlightRef.current) return false;
 
+    initialRefreshAttemptedRef.current = true;
     refreshInFlightRef.current = true;
     try {
       const response = await authFilesApi.list();
@@ -35,23 +37,10 @@ export function CodexQuotaBackgroundRefresher() {
       }
 
       const quotaState = useQuotaStore.getState();
-      const meta = quotaState.quotaRefreshMeta.codex;
       const hasAnyExistingQuota = targets.some((file) => {
         const status = quotaState.codexQuota[file.name]?.status;
         return status === 'success' || status === 'error';
       });
-      const hasEveryExistingQuota = targets.every((file) => {
-        const status = quotaState.codexQuota[file.name]?.status;
-        return status === 'success' || status === 'error';
-      });
-      const lastCompletedAt = meta?.lastCompletedAt ?? null;
-      const alreadyFresh =
-        meta?.signature === signature &&
-        lastCompletedAt !== null &&
-        Date.now() - lastCompletedAt < AUTO_REFRESH_INTERVAL_MS &&
-        hasEveryExistingQuota;
-
-      if (alreadyFresh) return false;
 
       const setSilentLoading = () => {};
       return loadQuota(targets, 'all', setSilentLoading, {
@@ -85,18 +74,6 @@ export function CodexQuotaBackgroundRefresher() {
   useEffect(() => {
     if (connectionStatus !== 'connected') return;
     void refreshCodexQuota();
-  }, [connectionStatus, refreshCodexQuota]);
-
-  useEffect(() => {
-    if (connectionStatus !== 'connected') return;
-
-    const refreshIfVisible = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      void refreshCodexQuota();
-    };
-
-    const intervalId = window.setInterval(refreshIfVisible, AUTO_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(intervalId);
   }, [connectionStatus, refreshCodexQuota]);
 
   useEffect(() => {
