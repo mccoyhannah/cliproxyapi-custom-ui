@@ -3431,6 +3431,7 @@ export function AuthFilesPage() {
     totalPages,
     defaultValue: `${pageItems.length}/${sorted.length} 项，第 ${currentPage}/${totalPages} 页`,
   });
+  const showListPaginationControls = sorted.length > pageSize;
   const advancedControlSummary = t('auth_files.advanced_control_summary', {
     status: priorityRotationStatusLabel,
     slots: priorityRotationSlotLabel,
@@ -4301,7 +4302,39 @@ export function AuthFilesPage() {
                   </Button>
                 </div>
               </div>
-              <div className={styles.fileListMeta}>{listHeaderMeta}</div>
+              <div
+                className={`${styles.fileListPagination} ${
+                  showListPaginationControls ? '' : styles.fileListPaginationSingle
+                }`}
+                aria-label={t('auth_files.pagination_label', {
+                  defaultValue: '认证文件分页',
+                })}
+              >
+                {showListPaginationControls && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={styles.fileListPaginationButton}
+                    onClick={() => setPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    {t('auth_files.pagination_prev')}
+                  </Button>
+                )}
+                <div className={styles.fileListPaginationInfo}>{listHeaderMeta}</div>
+                {showListPaginationControls && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={styles.fileListPaginationButton}
+                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    {t('auth_files.pagination_next')}
+                  </Button>
+                )}
+              </div>
+              <div className={styles.fileListHeaderBalance} aria-hidden="true" />
             </div>
 
             {loading && files.length === 0 ? (
@@ -4359,33 +4392,6 @@ export function AuthFilesPage() {
               </div>
             )}
 
-            {sorted.length > pageSize && (
-              <div className={styles.pagination}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  {t('auth_files.pagination_prev')}
-                </Button>
-                <div className={styles.pageInfo}>
-                  {t('auth_files.pagination_info', {
-                    current: currentPage,
-                    total: totalPages,
-                    count: sorted.length,
-                  })}
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages}
-                >
-                  {t('auth_files.pagination_next')}
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       </Card>
