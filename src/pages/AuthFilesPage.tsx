@@ -13,7 +13,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useInterval } from '@/hooks/useInterval';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
@@ -592,6 +592,7 @@ export function AuthFilesPage() {
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [filter, setFilter] = useState<'all' | string>('all');
   const [problemOnly, setProblemOnly] = useState(false);
@@ -666,6 +667,8 @@ export function AuthFilesPage() {
   const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
+  const fileListHeaderRef = useRef<HTMLDivElement>(null);
+  const focusedFileListOnOpenRef = useRef(false);
   const pageDragDepthRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
@@ -2838,6 +2841,27 @@ export function AuthFilesPage() {
   }, [batchActionBarVisible, selectionCount]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const shouldFocusCards = new URLSearchParams(location.search).get('focus') === 'cards';
+    if (!shouldFocusCards) {
+      focusedFileListOnOpenRef.current = false;
+      return;
+    }
+    if (focusedFileListOnOpenRef.current || loading) return;
+
+    const target = fileListHeaderRef.current;
+    if (!target) return;
+
+    focusedFileListOnOpenRef.current = true;
+    const frame = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, location.search]);
+
+  useEffect(() => {
     setBatchActionBarVisible(selectionCount > 0);
   }, [selectionCount]);
 
@@ -4244,7 +4268,7 @@ export function AuthFilesPage() {
               </div>
             </div>
 
-            <div className={styles.fileListHeader}>
+            <div className={styles.fileListHeader} ref={fileListHeaderRef}>
               <div className={styles.fileListHeaderText}>
                 <span className={styles.fileListKicker}>
                   {t('auth_files.list_kicker', { defaultValue: '日常管理' })}

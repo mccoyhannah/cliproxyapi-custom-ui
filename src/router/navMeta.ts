@@ -30,7 +30,7 @@ interface NestedRouteOrder {
 }
 
 export const NAV_ITEMS: readonly NavItemMeta[] = [
-  { key: 'dashboard', path: '/', labelKey: 'nav.dashboard', icon: 'dashboard' },
+  { key: 'dashboard', path: '/dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
   { key: 'config', path: '/config', labelKey: 'nav.config_management', icon: 'config' },
   { key: 'aiProviders', path: '/ai-providers', labelKey: 'nav.ai_providers', icon: 'aiProviders' },
   { key: 'authFiles', path: '/auth-files', labelKey: 'nav.auth_files', icon: 'authFiles' },
@@ -67,7 +67,7 @@ export function getVisibleNavItems({ loggingToFile }: VisibleNavOptions = {}) {
 
 export function normalizeRoutePath(pathname: string) {
   const trimmedPath = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-  return trimmedPath === '/dashboard' ? '/' : trimmedPath;
+  return trimmedPath;
 }
 
 function getNestedRouteOrder(
