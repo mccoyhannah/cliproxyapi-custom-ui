@@ -13093,6 +13093,15 @@ button.codexSubscriptionValue {
   background: color-mix(in srgb, var(--primary-color) 5%, var(--surface-panel));
 }
 
+.accountMemoPreviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .accountMemoLinksLabel {
   color: color-mix(in srgb, var(--primary-color) 70%, var(--text-secondary));
   font-size: 12px;
@@ -13119,15 +13128,24 @@ button.codexSubscriptionValue {
 
 .accountMemoPreviewItemHeader {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
 
   .accountMemoLink {
-    flex: 1 1 auto;
     min-width: 0;
   }
+}
+
+.accountMemoPreviewNote {
+  max-width: 100%;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .accountMemoLink {
@@ -13177,7 +13195,9 @@ button.codexSubscriptionValue {
 }
 
 .accountMemoCopyButton {
-  flex: 0 0 auto;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
   border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
 }
 
@@ -13200,10 +13220,6 @@ button.codexSubscriptionValue {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .accountMemoImagePanel {
