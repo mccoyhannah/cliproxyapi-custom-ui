@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import {
   IconChevronDown,
+  IconCopy,
   IconDownload,
   IconEye,
   IconExternalLink,
@@ -238,6 +239,11 @@ type AccountMemoLink = {
   label: string;
   href: string;
 };
+type AccountMemoPreviewBlock = {
+  link: AccountMemoLink;
+  copyText: string;
+  startIndex: number;
+};
 
 const normalizeAccountMemoUrlCandidate = (value: string): AccountMemoLink | null => {
   let label = value.trim();
@@ -256,15 +262,30 @@ const normalizeAccountMemoUrlCandidate = (value: string): AccountMemoLink | null
   }
 };
 
-const extractAccountMemoLinks = (text: string): AccountMemoLink[] => {
-  const links: AccountMemoLink[] = [];
-  for (const match of text.matchAll(ACCOUNT_MEMO_URL_PATTERN)) {
-    const link = normalizeAccountMemoUrlCandidate(match[1] ?? match[0]);
+const parseAccountMemoPreviewBlocks = (text: string): AccountMemoPreviewBlock[] => {
+  const matches = Array.from(text.matchAll(ACCOUNT_MEMO_URL_PATTERN)).map((match) => ({
+    raw: match[1] ?? match[0],
+    index: match.index ?? 0,
+  }));
+  const blocks: AccountMemoPreviewBlock[] = [];
+
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index];
+    const link = normalizeAccountMemoUrlCandidate(match.raw);
     if (!link) continue;
-    links.push(link);
-    if (links.length >= ACCOUNT_MEMO_LINK_LIMIT) break;
+    const nextMatch = matches[index + 1];
+    const contentStart = match.index + match.raw.length;
+    const contentEnd = nextMatch?.index ?? text.length;
+    const copyText = text.slice(contentStart, contentEnd).trim();
+    blocks.push({
+      link,
+      copyText,
+      startIndex: match.index,
+    });
+    if (blocks.length >= ACCOUNT_MEMO_LINK_LIMIT) break;
   }
-  return links;
+
+  return blocks;
 };
 
 const createAccountMemoImageId = (): string => {
@@ -1194,6 +1215,25 @@ export function AuthFilesPage() {
           'warning'
         );
       }
+    },
+    [showNotification, t]
+  );
+  const handleCopyAccountMemoPreviewText = useCallback(
+    async (text: string) => {
+      const copyText = text.trim();
+      if (!copyText) return;
+
+      const copied = await copyToClipboard(copyText);
+      showNotification(
+        copied
+          ? t('auth_files.account_memo_copy_success', {
+              defaultValue: '已复制可粘贴内容',
+            })
+          : t('auth_files.account_memo_copy_failed', {
+              defaultValue: '复制失败',
+            }),
+        copied ? 'success' : 'error'
+      );
     },
     [showNotification, t]
   );
@@ -3419,8 +3459,8 @@ export function AuthFilesPage() {
     (accountMemoEditorExistingMemo?.images.length ?? 0) > 0;
   const accountMemoHasDraftContent =
     Boolean(accountMemoDraft.trim()) || accountMemoImagesDraft.length > 0;
-  const accountMemoLinks = useMemo(
-    () => extractAccountMemoLinks(accountMemoDraft),
+  const accountMemoPreviewBlocks = useMemo(
+    () => parseAccountMemoPreviewBlocks(accountMemoDraft),
     [accountMemoDraft]
   );
   const accountMemoImageSlotsRemaining =
@@ -5269,28 +5309,51 @@ export function AuthFilesPage() {
               rows={8}
             />
           </label>
-          {accountMemoLinks.length > 0 && (
+          {accountMemoPreviewBlocks.length > 0 && (
             <div
               className={styles.accountMemoLinksPreview}
               aria-label={t('auth_files.account_memo_links_preview', {
-                defaultValue: '备注链接预览',
+                defaultValue: '备注链接与复制预览',
               })}
             >
               <span className={styles.accountMemoLinksLabel}>
-                {t('auth_files.account_memo_links_label', { defaultValue: '可跳转链接' })}
+                {t('auth_files.account_memo_links_label', { defaultValue: '链接与复制内容' })}
               </span>
               <div className={styles.accountMemoLinks}>
-                {accountMemoLinks.map((link, index) => (
-                  <button
-                    type="button"
-                    key={`${link.href}-${index}`}
-                    className={styles.accountMemoLink}
-                    title={link.href}
-                    onClick={() => void handleOpenAccountMemoLink(link.href)}
+                {accountMemoPreviewBlocks.map((block, index) => (
+                  <div
+                    className={styles.accountMemoPreviewItem}
+                    key={`${block.link.href}-${block.startIndex}-${index}`}
                   >
-                    <IconExternalLink size={13} />
-                    <span>{link.label}</span>
-                  </button>
+                    <div className={styles.accountMemoPreviewItemHeader}>
+                      <button
+                        type="button"
+                        className={styles.accountMemoLink}
+                        title={block.link.href}
+                        onClick={() => void handleOpenAccountMemoLink(block.link.href)}
+                      >
+                        <IconExternalLink size={13} />
+                        <span>{block.link.label}</span>
+                      </button>
+                      {block.copyText && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="xs"
+                          className={styles.accountMemoCopyButton}
+                          leftIcon={<IconCopy size={13} />}
+                          onClick={() => void handleCopyAccountMemoPreviewText(block.copyText)}
+                        >
+                          {t('auth_files.account_memo_copy_button', {
+                            defaultValue: '复制内容',
+                          })}
+                        </Button>
+                      )}
+                    </div>
+                    {block.copyText && (
+                      <p className={styles.accountMemoCopyText}>{block.copyText}</p>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
