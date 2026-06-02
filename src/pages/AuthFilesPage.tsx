@@ -5335,7 +5335,9 @@ export function AuthFilesPage() {
                         <IconExternalLink size={13} />
                         <span>{block.link.label}</span>
                       </button>
-                      {block.copyText && (
+                    </div>
+                    {block.copyText && (
+                      <div className={styles.accountMemoCopyRow}>
                         <Button
                           type="button"
                           variant="secondary"
@@ -5348,10 +5350,8 @@ export function AuthFilesPage() {
                             defaultValue: '复制内容',
                           })}
                         </Button>
-                      )}
-                    </div>
-                    {block.copyText && (
-                      <p className={styles.accountMemoCopyText}>{block.copyText}</p>
+                        <p className={styles.accountMemoCopyText}>{block.copyText}</p>
+                      </div>
                     )}
                   </div>
                 ))}

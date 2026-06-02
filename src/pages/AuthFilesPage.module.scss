@@ -13181,7 +13181,15 @@ button.codexSubscriptionValue {
   border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
 }
 
+.accountMemoCopyRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
 .accountMemoCopyText {
+  flex: 1 1 auto;
   min-width: 0;
   margin: 0;
   padding: 7px 8px;
