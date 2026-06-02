@@ -13053,12 +13053,6 @@ button.codexSubscriptionValue {
     var(--shadow-control),
     inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
 
-  span {
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 760;
-  }
-
   textarea {
     width: 100%;
     min-width: 0;
@@ -13080,6 +13074,30 @@ button.codexSubscriptionValue {
       box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
     }
   }
+}
+
+.accountMemoFieldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.accountMemoFieldLabel {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.accountMemoFieldActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .accountMemoLinksPreview {

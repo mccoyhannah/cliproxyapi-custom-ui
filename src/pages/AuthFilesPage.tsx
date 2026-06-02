@@ -317,7 +317,7 @@ const formatAccountMemoCopyPreview = (text: string): string => {
   return [
     normalizedText.slice(0, ACCOUNT_MEMO_COPY_PREVIEW_HEAD_CHARS).trimEnd(),
     normalizedText.slice(-ACCOUNT_MEMO_COPY_PREVIEW_TAIL_CHARS).trimStart(),
-  ].join('...');
+  ].join('......');
 };
 
 const createAccountMemoImageId = (): string => {
@@ -2256,13 +2256,12 @@ export function AuthFilesPage() {
           }),
       'success'
     );
-    closeAccountMemoEditor();
+    setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
   }, [
     accountMemoDraft,
     accountMemoEditorFile,
     accountMemoImagesDraft,
     accountMemosByFile,
-    closeAccountMemoEditor,
     showNotification,
     t,
   ]);
@@ -2283,6 +2282,10 @@ export function AuthFilesPage() {
     }
 
     setAccountMemosByFile(next);
+    setAccountMemoDraft('');
+    setAccountMemoImagesDraft([]);
+    setAccountMemoPreviewImage(null);
+    setAccountMemoEditMode(true);
     showNotification(
       t('auth_files.account_memo_cleared', {
         name: accountMemoEditorFile.name,
@@ -2290,8 +2293,7 @@ export function AuthFilesPage() {
       }),
       'success'
     );
-    closeAccountMemoEditor();
-  }, [accountMemoEditorFile, accountMemosByFile, closeAccountMemoEditor, showNotification, t]);
+  }, [accountMemoEditorFile, accountMemosByFile, showNotification, t]);
 
   useEffect(() => {
     setPriorityRotationThresholdInput(String(priorityRotationSettings.thresholdPercent));
@@ -3977,11 +3979,10 @@ export function AuthFilesPage() {
     defaultValue: `${currentProviderLabel}认证文件`,
   });
   const listHeaderMeta = t('auth_files.list_header_meta', {
-    shown: pageItems.length,
-    total: sorted.length,
-    page: currentPage,
-    totalPages,
-    defaultValue: `${pageItems.length}/${sorted.length} 项，第 ${currentPage}/${totalPages} 页`,
+    current: currentPage,
+    total: totalPages,
+    count: sorted.length,
+    defaultValue: `第 ${currentPage}/${totalPages} 页 · 共 ${sorted.length} 个`,
   });
   const showListPaginationControls = sorted.length > pageSize;
   const advancedControlSummary = t('auth_files.advanced_control_summary', {
@@ -5275,24 +5276,6 @@ export function AuthFilesPage() {
         width={720}
         className={styles.accountMemoModal}
         overlayClassName={styles.accountMemoOverlay}
-        footer={
-          <div className={styles.accountMemoFooter}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearAccountMemo}
-              disabled={!accountMemoEditorHasExisting && !accountMemoHasDraftContent}
-            >
-              {t('auth_files.account_memo_clear', { defaultValue: '清除' })}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={closeAccountMemoEditor}>
-              {t('common.cancel')}
-            </Button>
-            <Button size="sm" onClick={saveAccountMemo} disabled={accountMemoImageProcessing}>
-              {t('common.save')}
-            </Button>
-          </div>
-        }
       >
         <div className={styles.accountMemoEditor}>
           <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
@@ -5336,9 +5319,34 @@ export function AuthFilesPage() {
             </span>
           </div>
           {accountMemoShouldShowEditor && (
-            <label className={styles.accountMemoField}>
-              <span>{t('auth_files.account_memo_label', { defaultValue: '备注' })}</span>
+            <div className={styles.accountMemoField}>
+              <div className={styles.accountMemoFieldHeader}>
+                <span className={styles.accountMemoFieldLabel}>
+                  {t('auth_files.account_memo_label', { defaultValue: '备注' })}
+                </span>
+                <span className={styles.accountMemoFieldActions}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    onClick={clearAccountMemo}
+                    disabled={!accountMemoEditorHasExisting && !accountMemoHasDraftContent}
+                  >
+                    {t('auth_files.account_memo_clear', { defaultValue: '清除' })}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="xs"
+                    onClick={saveAccountMemo}
+                    disabled={accountMemoImageProcessing}
+                  >
+                    {t('auth_files.account_memo_save_keep_open', { defaultValue: '保存备注' })}
+                  </Button>
+                </span>
+              </div>
               <textarea
+                aria-label={t('auth_files.account_memo_label', { defaultValue: '备注' })}
                 value={accountMemoDraft}
                 onChange={(event) => setAccountMemoDraft(event.currentTarget.value)}
                 onPaste={handleAccountMemoPaste}
@@ -5347,7 +5355,7 @@ export function AuthFilesPage() {
                 })}
                 rows={8}
               />
-            </label>
+            </div>
           )}
           {accountMemoPreviewBlocks.length > 0 && (
             <div
