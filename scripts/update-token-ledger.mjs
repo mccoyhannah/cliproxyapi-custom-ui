@@ -109,16 +109,18 @@ const embedLedgerInHtml = async (htmlPath, projection) => {
   const script = buildEmbeddedLedgerScript(projection);
   const existingPattern = new RegExp(
     `\\s*<script[^>]*id=["']${EMBEDDED_LEDGER_ID}["'][^>]*>[\\s\\S]*?<\\/script>`,
-    'i'
+    'gi'
   );
+  const htmlWithoutLedger = html.replace(existingPattern, '');
+  const closingBodyMatches = [...htmlWithoutLedger.matchAll(/<\/body>/gi)];
 
   let nextHtml;
-  if (existingPattern.test(html)) {
-    nextHtml = html.replace(existingPattern, `\n${script}`);
-  } else if (/<\/body>/i.test(html)) {
-    nextHtml = html.replace(/<\/body>/i, `\n${script}\n</body>`);
+  if (closingBodyMatches.length > 0) {
+    const lastClosingBody = closingBodyMatches[closingBodyMatches.length - 1];
+    const insertAt = lastClosingBody.index;
+    nextHtml = `${htmlWithoutLedger.slice(0, insertAt)}\n${script}\n${htmlWithoutLedger.slice(insertAt)}`;
   } else {
-    nextHtml = `${html}\n${script}\n`;
+    nextHtml = `${htmlWithoutLedger}\n${script}\n`;
   }
 
   if (nextHtml === html) return false;

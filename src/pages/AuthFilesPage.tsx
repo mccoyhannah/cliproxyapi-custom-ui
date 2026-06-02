@@ -177,6 +177,8 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const htmlClosingTag = (tagName: string) => `<${['/', tagName].join('')}>`;
+
 const writeCodexOAuthWaitingPage = (target: Window | null, title: string, description: string) => {
   if (!target || target.closed) return;
 
@@ -211,8 +213,8 @@ const writeCodexOAuthWaitingPage = (target: Window | null, title: string, descri
       <p>${escapeHtml(description)}</p>
       <div class="bar" aria-hidden="true"></div>
     </main>
-  </body>
-</html>`);
+  ${htmlClosingTag('body')}
+${htmlClosingTag('html')}`);
     target.document.close();
   } catch {
     // Best effort only: cross-browser popup documents may be inaccessible.
