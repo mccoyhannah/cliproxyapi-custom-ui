@@ -23,7 +23,8 @@ export type PriorityRotationChangeRole = 'demote' | 'promote';
 export type PriorityRotationChangeReason =
   | 'low_remaining'
   | 'over_active_limit'
-  | 'promote_standby';
+  | 'promote_standby'
+  | 'credential_invalid';
 export type PriorityRotationStatus =
   | 'ready'
   | 'no_changes'
@@ -77,6 +78,7 @@ type PriorityRotationCandidate = {
   priority: number;
   remainingPercent: number | null;
   managed: boolean;
+  quotaErrorKind?: CodexQuotaState['errorKind'] | null;
 };
 
 const clampThresholdPercent = (value: unknown): number => {
@@ -242,6 +244,18 @@ export const analyzeCodexPriorityRotation = (
     const quota = codexQuota[file.name];
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
+    const quotaErrorKind = quota?.errorKind ?? null;
+    if (quotaErrorKind === 'credential_invalid') {
+      candidates.push({
+        file,
+        priority,
+        remainingPercent,
+        managed: false,
+        quotaErrorKind,
+      });
+      return;
+    }
+
     if (planType !== null && !isManagedPlan(planType)) {
       if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
         candidates.push({
@@ -249,6 +263,7 @@ export const analyzeCodexPriorityRotation = (
           priority,
           remainingPercent: null,
           managed: false,
+          quotaErrorKind,
         });
       }
       return;
@@ -262,6 +277,7 @@ export const analyzeCodexPriorityRotation = (
           priority,
           remainingPercent: null,
           managed: false,
+          quotaErrorKind,
         });
       }
       return;
@@ -272,6 +288,7 @@ export const analyzeCodexPriorityRotation = (
       priority,
       remainingPercent,
       managed: true,
+      quotaErrorKind,
     });
   });
 
@@ -299,18 +316,42 @@ export const analyzeCodexPriorityRotation = (
   const healthyActiveCandidates = activeCandidates.filter(
     (candidate) => candidate.managed && getRemainingSortValue(candidate) >= threshold
   );
-  const normalHealthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.managed && getRemainingSortValue(candidate) >= threshold
-  );
-
-  const demotionMap = new Map<string, PriorityRotationChangeReason>();
-  activeCandidates.forEach((candidate) => {
-    if (candidate.managed && getRemainingSortValue(candidate) < threshold) {
-      demotionMap.set(candidate.file.name, 'low_remaining');
+  const demotionMap = new Map<
+    string,
+    { reason: PriorityRotationChangeReason; toPriority: number }
+  >();
+  candidates.forEach((candidate) => {
+    if (candidate.quotaErrorKind === 'credential_invalid') {
+      demotionMap.set(candidate.file.name, {
+        reason: 'credential_invalid',
+        toPriority: reservePriority,
+      });
     }
   });
 
-  let projectedActiveCount = activeCandidates.length - demotionMap.size;
+  const normalHealthyStandbyCandidates = standbyCandidates.filter(
+    (candidate) =>
+      !demotionMap.has(candidate.file.name) &&
+      candidate.managed &&
+      getRemainingSortValue(candidate) >= threshold
+  );
+
+  activeCandidates.forEach((candidate) => {
+    if (
+      !demotionMap.has(candidate.file.name) &&
+      candidate.managed &&
+      getRemainingSortValue(candidate) < threshold
+    ) {
+      demotionMap.set(candidate.file.name, {
+        reason: 'low_remaining',
+        toPriority: standbyPriority,
+      });
+    }
+  });
+
+  const getActiveDemotionCount = () =>
+    activeCandidates.filter((candidate) => demotionMap.has(candidate.file.name)).length;
+  let projectedActiveCount = activeCandidates.length - getActiveDemotionCount();
   if (projectedActiveCount > slotLimit) {
     activeCandidates
       .filter((candidate) => !demotionMap.has(candidate.file.name))
@@ -320,30 +361,36 @@ export const analyzeCodexPriorityRotation = (
       })
       .some((candidate) => {
         if (projectedActiveCount <= slotLimit) return true;
-        demotionMap.set(candidate.file.name, 'over_active_limit');
+        demotionMap.set(candidate.file.name, {
+          reason: 'over_active_limit',
+          toPriority: standbyPriority,
+        });
         projectedActiveCount--;
         return false;
       });
   }
 
-  const demotions = activeCandidates
+  const demotions = candidates
     .filter((candidate) => demotionMap.has(candidate.file.name))
     .sort((a, b) => {
       const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
       return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
     })
-    .map<PriorityRotationChange>((candidate) => ({
-      name: candidate.file.name,
-      displayName: getDisplayName(candidate.file),
-      fromPriority: activePriority,
-      toPriority: standbyPriority,
-      remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
-      role: 'demote',
-      reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
-    }));
+    .map<PriorityRotationChange>((candidate) => {
+      const demotion = demotionMap.get(candidate.file.name);
+      return {
+        name: candidate.file.name,
+        displayName: getDisplayName(candidate.file),
+        fromPriority: candidate.priority,
+        toPriority: demotion?.toPriority ?? standbyPriority,
+        remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
+        role: 'demote',
+        reason: demotion?.reason ?? 'low_remaining',
+      };
+    });
   const activeDeficit = Math.max(0, slotLimit - projectedActiveCount);
   const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
-    (reason) => reason === 'low_remaining'
+    (demotion) => demotion.reason === 'low_remaining'
   ).length;
   const needsStandby =
     Math.max(0, slotLimit - projectedActiveCount) > 0 || lowRemainingDemotionCount > 0;
@@ -353,7 +400,10 @@ export const analyzeCodexPriorityRotation = (
   const thresholdAdjusted = effectiveThreshold !== threshold;
   const healthyStandbyCandidates = thresholdAdjusted
     ? standbyCandidates.filter(
-        (candidate) => candidate.managed && getRemainingSortValue(candidate) >= effectiveThreshold
+        (candidate) =>
+          !demotionMap.has(candidate.file.name) &&
+          candidate.managed &&
+          getRemainingSortValue(candidate) >= effectiveThreshold
       )
     : normalHealthyStandbyCandidates;
   const replacementSlots = Math.min(lowRemainingDemotionCount, activeDeficit);

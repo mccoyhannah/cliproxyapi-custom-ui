@@ -15,7 +15,7 @@ export type PriorityRotationSidecarChange = {
   toPriority: number;
   remainingPercent: number;
   role: 'demote' | 'promote';
-  reason: 'low_remaining' | 'over_active_limit' | 'promote_standby';
+  reason: 'low_remaining' | 'over_active_limit' | 'promote_standby' | 'credential_invalid';
 };
 
 export type PriorityRotationSidecarCandidate = {

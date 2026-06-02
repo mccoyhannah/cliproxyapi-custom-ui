@@ -36,6 +36,15 @@ const retryableQuotaError = (errorKind, error = errorKind) => ({
   retryable: true,
 });
 
+const credentialQuotaError = (error = 'invalidated oauth token for this account') => ({
+  status: 'error',
+  planType: 'team',
+  windows: [],
+  error,
+  errorKind: 'credential_invalid',
+  retryable: false,
+});
+
 {
   assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'network_transient');
   assert.equal(
@@ -225,6 +234,64 @@ const retryableQuotaError = (errorKind, error = errorKind) => ({
     result.candidates.every((candidate) => candidate.decision === 'quota_unknown_retryable'),
     true
   );
+}
+
+{
+  const files = [
+    codexFile('active-invalid.json', 2),
+    codexFile('standby-invalid.json', 1),
+    codexFile('active-healthy.json', 2),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-invalid.json': credentialQuotaError(),
+      'standby-invalid.json': credentialQuotaError('403 upstream refused this credential'),
+      'active-healthy.json': quota(10),
+    },
+    50,
+    3
+  );
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(
+    result.changes
+      .filter((change) => change.reason === 'credential_invalid')
+      .map((change) => [change.name, change.fromPriority, change.toPriority, change.role])
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    [
+      ['active-invalid.json', 2, 0, 'demote'],
+      ['standby-invalid.json', 1, 0, 'demote'],
+    ]
+  );
+  assert.ok(
+    result.candidates.every((candidate) =>
+      candidate.name.endsWith('invalid.json')
+        ? candidate.decision === 'demote_credential_invalid'
+        : true
+    )
+  );
+}
+
+{
+  const files = [
+    codexFile('buffer-invalid.json', 0),
+    codexFile('manual-invalid.json', 3),
+    { ...codexFile('disabled-invalid.json', 2), disabled: true },
+    { ...codexFile('runtime-invalid.json', 2), runtime_only: true },
+    { name: 'openai-invalid.json', type: 'openai', priority: 2, plan_type: 'team' },
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    Object.fromEntries(files.map((file) => [file.name, credentialQuotaError()])),
+    50,
+    3
+  );
+  assert.equal(result.status, 'no_changes');
+  assert.deepEqual(result.changes, []);
+  assert.ok(result.candidates.some((candidate) => candidate.decision === 'observe_buffer'));
+  assert.ok(result.candidates.some((candidate) => candidate.decision === 'manual_locked'));
+  assert.ok(result.candidates.some((candidate) => candidate.decision === 'skipped_disabled'));
+  assert.ok(result.candidates.some((candidate) => candidate.decision === 'skipped_runtime_only'));
 }
 
 {

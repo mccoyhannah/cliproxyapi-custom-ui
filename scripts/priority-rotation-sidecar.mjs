@@ -998,6 +998,20 @@ export function analyzeCodexPriorityRotation(
         : classifyUpstreamStatusText(quota?.error ?? '', quota?.errorStatus);
     const quotaRetryable =
       quota?.retryable === true || isRetryableQuotaErrorKind(quotaErrorKind);
+    if (quotaErrorKind === 'credential_invalid') {
+      candidates.push({
+        order,
+        file,
+        priority,
+        planType,
+        remainingPercent,
+        managed: false,
+        quotaErrorKind,
+        quotaRetryable: false,
+      });
+      return;
+    }
+
     if (planType !== null && !MANAGED_CODEX_PLANS.has(planType)) {
       if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
         candidates.push({
@@ -1082,18 +1096,39 @@ export function analyzeCodexPriorityRotation(
   const healthyActiveCandidates = activeCandidates.filter(
     (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= threshold
   );
-  const normalHealthyStandbyCandidates = standbyCandidates.filter(
-    (candidate) => candidate.managed !== false && getRemainingSortValue(candidate) >= threshold
-  );
-
   const demotionMap = new Map();
-  activeCandidates.forEach((candidate) => {
-    if (candidate.managed !== false && getRemainingSortValue(candidate) < threshold) {
-      demotionMap.set(candidate.file.name, 'low_remaining');
+  candidates.forEach((candidate) => {
+    if (candidate.quotaErrorKind === 'credential_invalid') {
+      demotionMap.set(candidate.file.name, {
+        reason: 'credential_invalid',
+        toPriority: reservePriority,
+      });
     }
   });
 
-  let projectedActiveCount = activeCandidates.length - demotionMap.size;
+  const normalHealthyStandbyCandidates = standbyCandidates.filter(
+    (candidate) =>
+      !demotionMap.has(candidate.file.name) &&
+      candidate.managed !== false &&
+      getRemainingSortValue(candidate) >= threshold
+  );
+
+  activeCandidates.forEach((candidate) => {
+    if (
+      !demotionMap.has(candidate.file.name) &&
+      candidate.managed !== false &&
+      getRemainingSortValue(candidate) < threshold
+    ) {
+      demotionMap.set(candidate.file.name, {
+        reason: 'low_remaining',
+        toPriority: standbyPriority,
+      });
+    }
+  });
+
+  const getActiveDemotionCount = () =>
+    activeCandidates.filter((candidate) => demotionMap.has(candidate.file.name)).length;
+  let projectedActiveCount = activeCandidates.length - getActiveDemotionCount();
   if (projectedActiveCount > slotLimit) {
     activeCandidates
       .filter((candidate) => !demotionMap.has(candidate.file.name) && candidate.quotaRetryable !== true)
@@ -1103,31 +1138,37 @@ export function analyzeCodexPriorityRotation(
       })
       .some((candidate) => {
         if (projectedActiveCount <= slotLimit) return true;
-        demotionMap.set(candidate.file.name, 'over_active_limit');
+        demotionMap.set(candidate.file.name, {
+          reason: 'over_active_limit',
+          toPriority: standbyPriority,
+        });
         projectedActiveCount -= 1;
         return false;
       });
   }
 
-  const demotions = activeCandidates
+  const demotions = candidates
     .filter((candidate) => demotionMap.has(candidate.file.name))
     .sort((a, b) => {
       const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
       return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
     })
-    .map((candidate) => ({
-      name: candidate.file.name,
-      displayName: getDisplayName(candidate.file),
-      fromPriority: activePriority,
-      toPriority: standbyPriority,
-      remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
-      role: 'demote',
-      reason: demotionMap.get(candidate.file.name) ?? 'low_remaining',
-    }));
+    .map((candidate) => {
+      const demotion = demotionMap.get(candidate.file.name);
+      return {
+        name: candidate.file.name,
+        displayName: getDisplayName(candidate.file),
+        fromPriority: candidate.priority,
+        toPriority: demotion?.toPriority ?? standbyPriority,
+        remainingPercent: Math.max(0, getRemainingSortValue(candidate)),
+        role: 'demote',
+        reason: demotion?.reason ?? 'low_remaining',
+      };
+    });
 
   const activeDeficit = Math.max(0, slotLimit - projectedActiveCount);
   const lowRemainingDemotionCount = Array.from(demotionMap.values()).filter(
-    (reason) => reason === 'low_remaining'
+    (demotion) => demotion.reason === 'low_remaining'
   ).length;
   const needsStandby =
     Math.max(0, slotLimit - projectedActiveCount) > 0 || lowRemainingDemotionCount > 0;
@@ -1138,6 +1179,7 @@ export function analyzeCodexPriorityRotation(
   const healthyStandbyCandidates = thresholdAdjusted
     ? standbyCandidates.filter(
         (candidate) =>
+          !demotionMap.has(candidate.file.name) &&
           candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
       )
     : normalHealthyStandbyCandidates;
@@ -1173,9 +1215,11 @@ export function analyzeCodexPriorityRotation(
           : candidate.priority === reservePriority
             ? 'buffer'
             : 'other';
-      const demotionReason = demotionMap.get(candidate.file.name);
+      const demotionReason = demotionMap.get(candidate.file.name)?.reason;
       const decision =
-        demotionReason === 'low_remaining'
+        demotionReason === 'credential_invalid'
+          ? 'demote_credential_invalid'
+          : demotionReason === 'low_remaining'
           ? 'demote_low_remaining'
           : demotionReason === 'over_active_limit'
             ? 'demote_over_active_limit'

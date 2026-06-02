@@ -179,7 +179,7 @@ const escapeHtml = (value: string) =>
 
 const htmlClosingTag = (tagName: string) => `<${['/', tagName].join('')}>`;
 
-const writeCodexOAuthWaitingPage = (target: Window | null, title: string, description: string) => {
+const writeExternalWaitingPage = (target: Window | null, title: string, description: string) => {
   if (!target || target.closed) return;
 
   try {
@@ -1064,7 +1064,7 @@ export function AuthFilesPage() {
       authWindow = window.open('about:blank', '_blank');
       if (authWindow) {
         authWindow.opener = null;
-        writeCodexOAuthWaitingPage(
+        writeExternalWaitingPage(
           authWindow,
           t('auth_files.codex_oauth_waiting_page_title', {
             defaultValue: '正在打开 Codex 登录...',
@@ -1157,6 +1157,46 @@ export function AuthFilesPage() {
     startCodexOAuthPolling,
     t,
   ]);
+
+  const handleOpenAccountMemoLink = useCallback(
+    async (href: string) => {
+      if (typeof window === 'undefined') return;
+
+      const externalWindow = window.open('about:blank', '_blank');
+      if (externalWindow) {
+        externalWindow.opener = null;
+        writeExternalWaitingPage(
+          externalWindow,
+          t('auth_files.account_memo_external_waiting_page_title', {
+            defaultValue: '正在打开链接...',
+          }),
+          t('auth_files.account_memo_external_waiting_page_desc', {
+            defaultValue: '链接会自动跳转，请稍候。',
+          })
+        );
+        try {
+          externalWindow.location.replace(href);
+        } catch {
+          externalWindow.location.href = href;
+        }
+        return;
+      }
+
+      const opened = window.open(href, '_blank', 'noopener,noreferrer');
+      if (!opened) {
+        const copied = await copyToClipboard(href);
+        showNotification(
+          t('auth_files.account_memo_link_popup_blocked', {
+            defaultValue: copied
+              ? '浏览器拦截了新标签页，已复制链接。'
+              : '浏览器拦截了新标签页，请手动复制链接。',
+          }),
+          'warning'
+        );
+      }
+    },
+    [showNotification, t]
+  );
   const uploadDropDisabled = disableControls || uploading;
   const normalizedFilter = normalizeProviderKey(String(filter));
   const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
@@ -3949,6 +3989,10 @@ export function AuthFilesPage() {
         });
       case 'promote_standby':
         return t('auth_files.priority_rotation_reason_promote');
+      case 'credential_invalid':
+        return t('auth_files.priority_rotation_reason_credential_invalid', {
+          defaultValue: '认证失效，降至缓冲',
+        });
       default:
         return String(reason);
     }
@@ -5174,7 +5218,40 @@ export function AuthFilesPage() {
       >
         <div className={styles.accountMemoEditor}>
           <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
-            <span className={styles.accountMemoTargetName}>{accountMemoEditorDisplayName}</span>
+            <div className={styles.accountMemoTargetHeader}>
+              <span className={styles.accountMemoTargetName}>{accountMemoEditorDisplayName}</span>
+              <span className={styles.accountMemoCodexActions}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className={`${styles.fileListCodexLoginButton} ${styles.accountMemoCodexLoginButton}`}
+                  leftIcon={<IconExternalLink size={14} />}
+                  onClick={() => void handleOpenCodexOAuth()}
+                  disabled={disableControls || codexOAuthOpening}
+                  loading={codexOAuthOpening}
+                  loadingLabel={t('auth_files.codex_oauth_opening', {
+                    defaultValue: '打开中',
+                  })}
+                  title={codexOAuthButtonTitle}
+                >
+                  {codexOAuthButtonLabel}
+                </Button>
+                {codexOAuthCountdownActive && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={`${styles.fileListCodexCancelButton} ${styles.accountMemoCodexCancelButton}`}
+                    onClick={handleCancelCodexOAuth}
+                    disabled={disableControls}
+                    title={t('auth_files.codex_oauth_cancel_title', {
+                      defaultValue: '停止等待本次 Codex 登录',
+                    })}
+                  >
+                    {t('auth_files.codex_oauth_cancel', { defaultValue: '取消登录' })}
+                  </Button>
+                )}
+              </span>
+            </div>
             <span className={styles.accountMemoTargetFile}>
               {t('auth_files.account_memo_file_label', { defaultValue: '文件' })}
               <strong>{accountMemoEditorFileName}</strong>
@@ -5204,17 +5281,16 @@ export function AuthFilesPage() {
               </span>
               <div className={styles.accountMemoLinks}>
                 {accountMemoLinks.map((link, index) => (
-                  <a
+                  <button
+                    type="button"
                     key={`${link.href}-${index}`}
                     className={styles.accountMemoLink}
-                    href={link.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     title={link.href}
+                    onClick={() => void handleOpenAccountMemoLink(link.href)}
                   >
                     <IconExternalLink size={13} />
                     <span>{link.label}</span>
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>

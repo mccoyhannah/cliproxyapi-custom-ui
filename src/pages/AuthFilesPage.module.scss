@@ -12982,7 +12982,16 @@ button.codexSubscriptionValue {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 15%, transparent);
 }
 
+.accountMemoTargetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
 .accountMemoTargetName {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--text-primary);
@@ -12991,6 +13000,23 @@ button.codexSubscriptionValue {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.accountMemoCodexActions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.accountMemoCodexLoginButton,
+.accountMemoCodexCancelButton {
+  min-height: 28px;
+  padding-block: 4px;
+  font-size: 12px;
 }
 
 .accountMemoTargetFile {
@@ -13081,6 +13107,8 @@ button.codexSubscriptionValue {
 }
 
 .accountMemoLink {
+  appearance: none;
+  cursor: pointer;
   max-width: 100%;
   display: inline-flex;
   align-items: center;
@@ -13093,6 +13121,7 @@ button.codexSubscriptionValue {
     linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
     color-mix(in srgb, var(--primary-color) 9%, var(--surface-control));
   color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  font: inherit;
   font-size: 12px;
   font-weight: 760;
   line-height: 1.2;
@@ -13299,6 +13328,17 @@ button.codexSubscriptionValue {
 }
 
 @include mobile {
+  .accountMemoTargetHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .accountMemoCodexActions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
   .accountMemoTargetFile {
     align-items: flex-start;
     flex-direction: column;
