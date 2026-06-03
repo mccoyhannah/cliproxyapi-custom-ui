@@ -133,6 +133,7 @@ const AUTH_STATUS_BADGE_TTL_MS: Record<AuthFileStatusCategory, number | null> = 
   content_policy: 180_000,
   rate_limited: 180_000,
 };
+const RECENT_FAILURE_WINDOW_MAX_AGE_MS = 10 * 60 * 1000;
 
 const getStatusProblemKey = (
   problem: { category: AuthFileStatusCategory; message: string; rawMessage: string } | null,
@@ -284,9 +285,11 @@ const simplifyStatusMessage = (
 const getLatestFailureWindow = (
   statusData: AuthFileStatusBarData
 ): { index: number; label: string } | null => {
+  const now = Date.now();
   for (let index = statusData.blockDetails.length - 1; index >= 0; index -= 1) {
     const detail = statusData.blockDetails[index];
     if (detail.failure <= 0) continue;
+    if (now - detail.endTime > RECENT_FAILURE_WINDOW_MAX_AGE_MS) continue;
     return {
       index,
       label: `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`,
@@ -323,10 +326,13 @@ function StatusProblemTooltip({
     const measuredHeight = tooltipRef.current?.offsetHeight ?? 132;
     const centerX = rect.left + rect.width / 2;
     const left = clampNumber(centerX - width / 2, 12, Math.max(12, viewportWidth - width - 12));
-    const canPlaceBelow = rect.bottom + measuredHeight + 14 <= viewportHeight || rect.top < measuredHeight + 14;
-    const top = canPlaceBelow
-      ? rect.bottom + 10
-      : clampNumber(rect.top - measuredHeight - 10, 12, viewportHeight - measuredHeight - 12);
+    const canPlaceAbove = rect.top >= measuredHeight + 14;
+    const canPlaceBelow = rect.bottom + measuredHeight + 14 <= viewportHeight;
+    const placement = canPlaceAbove || !canPlaceBelow ? 'top' : 'bottom';
+    const top =
+      placement === 'top'
+        ? clampNumber(rect.top - measuredHeight - 10, 12, viewportHeight - measuredHeight - 12)
+        : rect.bottom + 10;
     const arrowLeft = clampNumber(centerX - left, 18, width - 18);
 
     setPosition({
@@ -334,7 +340,7 @@ function StatusProblemTooltip({
       top,
       width,
       arrowLeft,
-      placement: canPlaceBelow ? 'bottom' : 'top',
+      placement,
     });
   }, []);
 
@@ -543,17 +549,22 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     authFileStatusProblem,
     authStatusVisibilityKey
   );
+  const latestFailureRequestWindow = getLatestFailureWindow(statusData);
+  const shouldShowAuthFileStatusProblem =
+    visibleAuthFileStatusProblem !== null &&
+    (visibleAuthFileStatusProblem.category === 'credential_invalid' ||
+      latestFailureRequestWindow !== null);
   const credentialStatusProblem =
+    shouldShowAuthFileStatusProblem &&
     visibleAuthFileStatusProblem?.category === 'credential_invalid'
       ? visibleAuthFileStatusProblem
       : null;
-  const hasAuthFileStatusProblem = visibleAuthFileStatusProblem !== null;
+  const hasAuthFileStatusProblem = shouldShowAuthFileStatusProblem;
   const hasCredentialStatusError = credentialStatusProblem !== null;
   const getStatusBadgeLabel = (category: AuthFileStatusCategory) =>
     t(AUTH_STATUS_LABEL_KEY[category], {
       defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
     });
-  const latestFailureRequestWindow = getLatestFailureWindow(statusData);
   const buildStatusProblemInfo = (
     label: string,
     message: string,
@@ -637,7 +648,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     hasVisibleQuotaError &&
     visibleQuotaStatusProblem?.category === visibleAuthFileStatusProblem?.category;
   const hasVisibleStatusWarning =
-    hasVisibleQuotaError || hasAuthFileStatusProblem || (hasStatusWarning && !authFileStatusProblem);
+    hasVisibleQuotaError ||
+    hasAuthFileStatusProblem ||
+    (hasStatusWarning && !authFileStatusProblem && latestFailureRequestWindow !== null);
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
@@ -1025,7 +1038,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
         ? t('auth_files.health_status_quota_error', { defaultValue: '额度异常' })
       : hasAuthFileStatusProblem
         ? authFileStatusBadgeLabel
-      : hasStatusWarning && !authFileStatusProblem
+      : hasStatusWarning && !authFileStatusProblem && latestFailureRequestWindow !== null
         ? t('auth_files.health_status_warning')
         : rawStatusMessage
           ? t('auth_files.health_status_healthy')
@@ -1108,26 +1121,6 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     title={accountMemoButtonLabel}
                   >
                     <IconFileText size={14} />
-                  </button>
-                )}
-                {showCardQuotaRefreshButton && (
-                  <button
-                    type="button"
-                    className={`${styles.cardQuotaRefreshButton} ${
-                      quotaRefreshing ? styles.cardQuotaRefreshButtonLoading : ''
-                    }`}
-                    onClick={() => onRefreshQuota(file)}
-                    disabled={
-                      disableControls || file.disabled || quotaRefreshDisabled || quotaRefreshing
-                    }
-                    aria-label={cardQuotaRefreshLabel}
-                    title={cardQuotaRefreshLabel}
-                  >
-                    {quotaRefreshing ? (
-                      <LoadingSpinner size={12} />
-                    ) : (
-                      <IconRefreshCw size={13} />
-                    )}
                   </button>
                 )}
               </div>
@@ -1434,6 +1427,26 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                       />
                     </Button>
                   </div>
+                )}
+                {showCardQuotaRefreshButton && (
+                  <button
+                    type="button"
+                    className={`${styles.cardQuotaRefreshButton} ${
+                      quotaRefreshing ? styles.cardQuotaRefreshButtonLoading : ''
+                    }`}
+                    onClick={() => onRefreshQuota(file)}
+                    disabled={
+                      disableControls || file.disabled || quotaRefreshDisabled || quotaRefreshing
+                    }
+                    aria-label={cardQuotaRefreshLabel}
+                    title={cardQuotaRefreshLabel}
+                  >
+                    {quotaRefreshing ? (
+                      <LoadingSpinner size={12} />
+                    ) : (
+                      <IconRefreshCw size={13} />
+                    )}
+                  </button>
                 )}
               </div>
               {!isRuntimeOnly && (
