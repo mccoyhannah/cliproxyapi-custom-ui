@@ -13248,6 +13248,13 @@ button.codexSubscriptionValue {
   min-width: 0;
 }
 
+.accountMemoCredentialPart {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
 .accountMemoCredentialPreview {
   flex: 1 1 auto;
   min-width: 0;

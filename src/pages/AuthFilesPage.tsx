@@ -230,6 +230,7 @@ const ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN =
   /(?:账号|帳號|账户|帳戶|邮箱|郵箱|邮件|郵件|密码|密碼|pass(?:word)?|email|login|user(?:name)?|account)/i;
 const ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN = /[|｜]/;
 const ACCOUNT_MEMO_CREDENTIAL_PART_SEPARATOR_PATTERN = /\s*(?:-{4,}|－{4,}|—{4,})\s*/u;
+const ACCOUNT_MEMO_CREDENTIAL_NOTE_SEPARATOR_PATTERN = /[:：]/u;
 const ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH = 8;
 
 const wait = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
@@ -256,6 +257,7 @@ type AccountMemoLinkPreviewBlock = {
 };
 type AccountMemoCredentialPart = {
   text: string;
+  noteText: string;
   startIndex: number;
 };
 type AccountMemoCredentialPreviewBlock = {
@@ -301,32 +303,58 @@ const isLikelyAccountMemoCredentialPart = (value: string): boolean => {
   return /[A-Za-z]/.test(part) && (/\d/.test(part) || part.length >= 12);
 };
 
+const splitAccountMemoCredentialNote = (value: string) => {
+  const match = ACCOUNT_MEMO_CREDENTIAL_NOTE_SEPARATOR_PATTERN.exec(value);
+  if (!match || match.index <= 0) {
+    return { noteText: '', text: value.trim(), textOffset: value.search(/\S/) };
+  }
+
+  const rawNote = value.slice(0, match.index).trim();
+  const rawText = value.slice(match.index + match[0].length);
+  const textOffset = match.index + match[0].length + rawText.search(/\S/);
+  return {
+    noteText: rawNote ? `${rawNote}${match[0]}` : '',
+    text: rawText.trim(),
+    textOffset,
+  };
+};
+
 const splitAccountMemoCredentialParts = (
   blockText: string,
   startIndex: number
 ): AccountMemoCredentialPart[] => {
   const parts: AccountMemoCredentialPart[] = [];
   let lineStart = 0;
+  let pendingNoteText = '';
 
   for (const rawLine of blockText.split(/\r?\n/)) {
     const line = rawLine.trim();
     const leadingSpaces = rawLine.search(/\S/);
     const contentLineStart = startIndex + lineStart + (leadingSpaces > -1 ? leadingSpaces : 0);
     if (line) {
+      const parsedLine = splitAccountMemoCredentialNote(line);
+      if (parsedLine.noteText && !parsedLine.text) {
+        pendingNoteText = parsedLine.noteText;
+        lineStart += rawLine.length + 1;
+        continue;
+      }
+
       let segmentStart = 0;
       const segments = line.split(ACCOUNT_MEMO_CREDENTIAL_PART_SEPARATOR_PATTERN);
       for (const segment of segments) {
-        const part = segment.trim();
+        const parsedPart = splitAccountMemoCredentialNote(segment);
+        const part = parsedPart.text;
         if (part && isLikelyAccountMemoCredentialPart(part)) {
           const localIndex = line.indexOf(segment, segmentStart);
-          const leadingSegmentSpaces = segment.search(/\S/);
           parts.push({
             text: part,
+            noteText: parsedPart.noteText || pendingNoteText,
             startIndex:
               contentLineStart +
               (localIndex > -1 ? localIndex : segmentStart) +
-              (leadingSegmentSpaces > -1 ? leadingSegmentSpaces : 0),
+              (parsedPart.textOffset > -1 ? parsedPart.textOffset : 0),
           });
+          pendingNoteText = '';
         }
         segmentStart += segment.length;
       }
@@ -5552,27 +5580,37 @@ export function AuthFilesPage() {
                       <div className={styles.accountMemoCredentialGroup}>
                         {block.parts.map((part, partIndex) => (
                           <div
-                            className={styles.accountMemoCopyRow}
+                            className={styles.accountMemoCredentialPart}
                             key={`${part.startIndex}-${part.text}-${partIndex}`}
                           >
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="xs"
-                              iconOnly
-                              className={styles.accountMemoCopyButton}
-                              leftIcon={<IconCopy size={13} />}
-                              aria-label={t('auth_files.account_memo_copy_button', {
-                                defaultValue: '复制',
-                              })}
-                              title={t('auth_files.account_memo_copy_button', {
-                                defaultValue: '复制',
-                              })}
-                              onClick={() => void handleCopyAccountMemoPreviewText(part.text)}
-                            />
-                            <p className={styles.accountMemoCopyText} title={part.text}>
-                              {formatAccountMemoCopyPreview(part.text)}
-                            </p>
+                            {part.noteText && (
+                              <span
+                                className={styles.accountMemoPreviewNote}
+                                title={part.noteText}
+                              >
+                                {part.noteText}
+                              </span>
+                            )}
+                            <div className={styles.accountMemoCopyRow}>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="xs"
+                                iconOnly
+                                className={styles.accountMemoCopyButton}
+                                leftIcon={<IconCopy size={13} />}
+                                aria-label={t('auth_files.account_memo_copy_button', {
+                                  defaultValue: '复制',
+                                })}
+                                title={t('auth_files.account_memo_copy_button', {
+                                  defaultValue: '复制',
+                                })}
+                                onClick={() => void handleCopyAccountMemoPreviewText(part.text)}
+                              />
+                              <p className={styles.accountMemoCopyText} title={part.text}>
+                                {formatAccountMemoCopyPreview(part.text)}
+                              </p>
+                            </div>
                           </div>
                         ))}
                       </div>
