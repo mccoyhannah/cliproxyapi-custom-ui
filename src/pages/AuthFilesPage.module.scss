@@ -13233,8 +13233,9 @@ button.codexSubscriptionValue {
   padding: 7px 8px;
   border-radius: 7px;
   background: color-mix(in srgb, var(--bg-primary) 72%, var(--surface-panel));
-  color: var(--text-secondary);
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
   font-size: 12px;
+  font-weight: 650;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
