@@ -225,6 +225,11 @@ const ACCOUNT_MEMO_URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi;
 const ACCOUNT_MEMO_TRAILING_URL_PUNCTUATION = /[),.;:!?，。！？、；：）】》]+$/u;
 const ACCOUNT_MEMO_COPY_PREVIEW_HEAD_CHARS = 96;
 const ACCOUNT_MEMO_COPY_PREVIEW_TAIL_CHARS = 44;
+const ACCOUNT_MEMO_EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN =
+  /(?:账号|帳號|账户|帳戶|邮箱|郵箱|邮件|郵件|密码|密碼|pass(?:word)?|email|login|user(?:name)?|account)/i;
+const ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN = /[|｜]/;
+const ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH = 8;
 
 const wait = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
 
@@ -241,12 +246,21 @@ type AccountMemoLink = {
   label: string;
   href: string;
 };
-type AccountMemoPreviewBlock = {
+type AccountMemoLinkPreviewBlock = {
+  type: 'link';
   link: AccountMemoLink;
   noteText: string;
   copyText: string;
   startIndex: number;
 };
+type AccountMemoCredentialPreviewBlock = {
+  type: 'credential';
+  title: string;
+  copyText: string;
+  previewText: string;
+  startIndex: number;
+};
+type AccountMemoPreviewBlock = AccountMemoLinkPreviewBlock | AccountMemoCredentialPreviewBlock;
 
 const normalizeAccountMemoUrlCandidate = (value: string): AccountMemoLink | null => {
   let label = value.trim();
@@ -263,6 +277,59 @@ const normalizeAccountMemoUrlCandidate = (value: string): AccountMemoLink | null
   } catch {
     return null;
   }
+};
+
+const isLikelyAccountMemoCredentialBlock = (blockText: string): boolean => {
+  const normalizedLines = blockText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (normalizedLines.length === 0) return false;
+
+  if (ACCOUNT_MEMO_EMAIL_PATTERN.test(blockText)) return true;
+  if (ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN.test(blockText)) return true;
+  if (ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN.test(blockText)) return true;
+
+  const isCompactCredentialLine = (line: string) => {
+    if (line.length < 4 || line.length > 96) return false;
+    if (/\s/.test(line)) return false;
+    if (/^[\p{Script=Han}\p{P}\p{S}\s]+$/u.test(line)) return false;
+    if (!/[A-Za-z0-9]/.test(line)) return false;
+    return true;
+  };
+
+  if (normalizedLines.length === 1) {
+    const [line] = normalizedLines;
+    if (!line || !isCompactCredentialLine(line)) return false;
+    if (line.length < ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH) return false;
+    return /[A-Za-z]/.test(line) && (/\d/.test(line) || line.length >= 12);
+  }
+
+  const compactCredentialLines = normalizedLines.filter((line) => {
+    if (/\s{2,}/.test(line)) return false;
+    return isCompactCredentialLine(line);
+  });
+  return compactCredentialLines.length >= 2;
+};
+
+const getAccountMemoCredentialTitle = (blockText: string): string => {
+  const lines = blockText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length <= 1) return '';
+  const firstLine = lines[0];
+  if (!firstLine) return '';
+  return formatAccountMemoCopyPreview(firstLine);
+};
+
+const getAccountMemoCredentialPreviewText = (blockText: string): string => {
+  const lines = blockText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length <= 1) return blockText.trim();
+  return lines.slice(1).join('\n').trim() || blockText.trim();
 };
 
 const parseAccountMemoPreviewBlocks = (text: string): AccountMemoPreviewBlock[] => {
@@ -286,12 +353,23 @@ const parseAccountMemoPreviewBlocks = (text: string): AccountMemoPreviewBlock[] 
       const copyText = blockText.slice(contentStart).trim();
       ACCOUNT_MEMO_URL_PATTERN.lastIndex = 0;
       blocks.push({
+        type: 'link',
         link,
         noteText,
         copyText,
         startIndex: startIndex + matchIndex,
       });
-      break;
+      return;
+    }
+
+    if (isLikelyAccountMemoCredentialBlock(blockText)) {
+      blocks.push({
+        type: 'credential',
+        title: getAccountMemoCredentialTitle(blockText),
+        copyText: blockText.trim(),
+        previewText: getAccountMemoCredentialPreviewText(blockText),
+        startIndex,
+      });
     }
   };
 
@@ -5366,7 +5444,7 @@ export function AuthFilesPage() {
             >
               <div className={styles.accountMemoPreviewHeader}>
                 <span className={styles.accountMemoLinksLabel}>
-                  {t('auth_files.account_memo_links_label', { defaultValue: '链接与复制内容' })}
+                  {t('auth_files.account_memo_links_label', { defaultValue: '可操作内容' })}
                 </span>
                 {!accountMemoEditMode && (
                   <Button
@@ -5383,25 +5461,50 @@ export function AuthFilesPage() {
                 {accountMemoPreviewBlocks.map((block, index) => (
                   <div
                     className={styles.accountMemoPreviewItem}
-                    key={`${block.link.href}-${block.startIndex}-${index}`}
+                    key={`${block.type}-${block.startIndex}-${index}`}
                   >
-                    <div className={styles.accountMemoPreviewItemHeader}>
-                      {block.noteText && (
-                        <span className={styles.accountMemoPreviewNote} title={block.noteText}>
-                          {block.noteText}
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        className={styles.accountMemoLink}
-                        title={block.link.href}
-                        onClick={() => void handleOpenAccountMemoLink(block.link.href)}
-                      >
-                        <IconExternalLink size={13} />
-                        <span>{block.link.label}</span>
-                      </button>
-                    </div>
-                    {block.copyText && (
+                    {block.type === 'link' ? (
+                      <>
+                        <div className={styles.accountMemoPreviewItemHeader}>
+                          {block.noteText && (
+                            <span className={styles.accountMemoPreviewNote} title={block.noteText}>
+                              {block.noteText}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.accountMemoLink}
+                            title={block.link.href}
+                            onClick={() => void handleOpenAccountMemoLink(block.link.href)}
+                          >
+                            <IconExternalLink size={13} />
+                            <span>{block.link.label}</span>
+                          </button>
+                        </div>
+                        {block.copyText && (
+                          <div className={styles.accountMemoCopyRow}>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              iconOnly
+                              className={styles.accountMemoCopyButton}
+                              leftIcon={<IconCopy size={13} />}
+                              aria-label={t('auth_files.account_memo_copy_button', {
+                                defaultValue: '复制',
+                              })}
+                              title={t('auth_files.account_memo_copy_button', {
+                                defaultValue: '复制',
+                              })}
+                              onClick={() => void handleCopyAccountMemoPreviewText(block.copyText)}
+                            />
+                            <p className={styles.accountMemoCopyText} title={block.copyText}>
+                              {formatAccountMemoCopyPreview(block.copyText)}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
                       <div className={styles.accountMemoCopyRow}>
                         <Button
                           type="button"
@@ -5418,9 +5521,19 @@ export function AuthFilesPage() {
                           })}
                           onClick={() => void handleCopyAccountMemoPreviewText(block.copyText)}
                         />
-                        <p className={styles.accountMemoCopyText} title={block.copyText}>
-                          {formatAccountMemoCopyPreview(block.copyText)}
-                        </p>
+                        <div className={styles.accountMemoCredentialPreview}>
+                          {block.title && (
+                            <span
+                              className={styles.accountMemoCredentialTitle}
+                              title={block.title}
+                            >
+                              {block.title}
+                            </span>
+                          )}
+                          <p className={styles.accountMemoCopyText} title={block.copyText}>
+                            {formatAccountMemoCopyPreview(block.previewText)}
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>

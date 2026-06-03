@@ -13240,6 +13240,26 @@ button.codexSubscriptionValue {
   overflow-wrap: anywhere;
 }
 
+.accountMemoCredentialPreview {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.accountMemoCredentialTitle {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--primary-color) 72%, var(--text-secondary));
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .accountMemoImagePanel {
   display: flex;
   flex-direction: column;
