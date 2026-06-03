@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -65,6 +65,13 @@ type VisibleStatusProblem<T> = T & {
   visibleUntilMs: number | null;
   visibleRemainingMs: number | null;
   visibleTtlMs: number | null;
+};
+type StatusProblemTooltipInfo = {
+  label: string;
+  message: string;
+  requestWindow?: string;
+  observedAt?: string;
+  closeLabel?: string;
 };
 
 const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
@@ -229,10 +236,90 @@ const formatStatusDuration = (durationMs: number): string => {
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 };
 
-const getLatestFailureWindowLabel = (statusData: AuthFileStatusBarData): string => {
-  const detail = [...statusData.blockDetails].reverse().find((item) => item.failure > 0);
-  if (!detail) return '';
-  return `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`;
+const getLatestFailureWindow = (
+  statusData: AuthFileStatusBarData
+): { index: number; label: string } | null => {
+  for (let index = statusData.blockDetails.length - 1; index >= 0; index -= 1) {
+    const detail = statusData.blockDetails[index];
+    if (detail.failure <= 0) continue;
+    return {
+      index,
+      label: `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`,
+    };
+  }
+  return null;
+};
+
+function StatusProblemTooltip({
+  info,
+  children,
+  className,
+  onActiveChange,
+}: {
+  info: StatusProblemTooltipInfo;
+  children: ReactNode;
+  className?: string;
+  onActiveChange?: (active: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const show = () => {
+    setOpen(true);
+    onActiveChange?.(true);
+  };
+  const hide = () => {
+    setOpen(false);
+    onActiveChange?.(false);
+  };
+
+  return (
+    <span
+      className={`${styles.statusProblemTooltipWrap} ${className ?? ''}`}
+      onPointerEnter={show}
+      onPointerLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
+      {children}
+      {open && (
+        <span className={styles.statusProblemTooltip} role="tooltip">
+          <span className={styles.statusProblemTooltipHeader}>
+            <span className={styles.statusProblemTooltipDot} aria-hidden="true" />
+            <span>{info.label}</span>
+          </span>
+          <span className={styles.statusProblemTooltipMessage}>{info.message}</span>
+          {(info.requestWindow || info.observedAt || info.closeLabel) && (
+            <span className={styles.statusProblemTooltipMeta}>
+              {info.requestWindow && (
+                <span>
+                  <span className={styles.statusProblemTooltipMetaLabel}>
+                    {t('auth_files.status_problem_window_short', { defaultValue: '时段' })}
+                  </span>
+                  {info.requestWindow}
+                </span>
+              )}
+              {!info.requestWindow && info.observedAt && (
+                <span>
+                  <span className={styles.statusProblemTooltipMetaLabel}>
+                    {t('auth_files.status_problem_observed_short', { defaultValue: '记录' })}
+                  </span>
+                  {info.observedAt}
+                </span>
+              )}
+              {info.closeLabel && (
+                <span>
+                  <span className={styles.statusProblemTooltipMetaLabel}>
+                    {t('auth_files.status_problem_close_short', { defaultValue: '关闭' })}
+                  </span>
+                  {info.closeLabel}
+                </span>
+              )}
+            </span>
+          )}
+        </span>
+      )}
+    </span>
+  );
 };
 
 export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps) {
@@ -269,6 +356,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     onPriorityInvalid,
     onToggleSelect,
   } = props;
+  const [highlightedStatusBlockIndex, setHighlightedStatusBlockIndex] = useState<number | null>(
+    null
+  );
 
   const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
   const isAistudio = (file.type || '').toLowerCase() === 'aistudio';
@@ -354,59 +444,41 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     t(AUTH_STATUS_LABEL_KEY[category], {
       defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
     });
-  const latestFailureRequestWindow = getLatestFailureWindowLabel(statusData);
-  const buildStatusProblemTitle = (
-    baseTitle: string,
+  const latestFailureRequestWindow = getLatestFailureWindow(statusData);
+  const buildStatusProblemInfo = (
+    label: string,
+    message: string,
     problem: VisibleStatusProblem<{
       category: AuthFileStatusCategory;
       message: string;
       rawMessage: string;
     }> | null,
     options: { observedAtMs?: number; requestWindow?: string } = {}
-  ) => {
-    const lines = [baseTitle.trim()].filter(Boolean);
-    const requestWindow = options.requestWindow ?? latestFailureRequestWindow;
+  ): StatusProblemTooltipInfo => {
+    const requestWindow = options.requestWindow ?? latestFailureRequestWindow?.label;
+    const observedAt = options.observedAtMs
+      ? formatStatusClock(options.observedAtMs, true)
+      : undefined;
+    let closeLabel: string | undefined;
 
-    if (requestWindow) {
-      lines.push(
-        t('auth_files.status_problem_request_window', {
-          window: requestWindow,
-          defaultValue: '最近失败请求时段：{{window}}',
-        })
-      );
-    } else if (options.observedAtMs) {
-      lines.push(
-        t('auth_files.status_problem_observed_at', {
-          time: formatStatusClock(options.observedAtMs, true),
-          defaultValue: '错误记录时间：{{time}}',
-        })
-      );
+    if (problem?.visibleRemainingMs !== null && problem?.visibleRemainingMs !== undefined) {
+      closeLabel = t('auth_files.status_problem_close_in', {
+        time: formatStatusDuration(problem.visibleRemainingMs),
+        defaultValue: '{{time}} 后关闭',
+      });
+    } else if (problem) {
+      closeLabel = t('auth_files.status_problem_close_persistent', {
+        defaultValue: '认证恢复后关闭',
+      });
     }
 
-    if (problem) {
-      lines.push(
-        t('auth_files.status_problem_visible_since', {
-          time: formatStatusClock(problem.visibleSinceMs, true),
-          defaultValue: '提示开始显示：{{time}}',
-        })
-      );
-      if (problem.visibleRemainingMs !== null) {
-        lines.push(
-          t('auth_files.status_problem_visible_remaining', {
-            time: formatStatusDuration(problem.visibleRemainingMs),
-            defaultValue: '还会显示：{{time}}',
-          })
-        );
-      } else {
-        lines.push(
-          t('auth_files.status_problem_visible_persistent', {
-            defaultValue: '持续显示：直到认证恢复或状态清除',
-          })
-        );
-      }
-    }
-
-    return lines.join('\n');
+    return {
+      label,
+      message: message.trim(),
+      requestWindow,
+      observedAt,
+      closeLabel,
+    };
   };
   const credentialInvalidBadgeLabel = getStatusBadgeLabel('credential_invalid');
   const authFileStatusBadgeLabel = visibleAuthFileStatusProblem
@@ -636,24 +708,45 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           defaultValue: `${authFileStatusBadgeLabel}: ${visibleAuthFileStatusProblem.message}`,
         })
     : '';
-  const authFileStatusTitle = visibleAuthFileStatusProblem
-    ? buildStatusProblemTitle(authFileStatusBaseTitle, visibleAuthFileStatusProblem)
-    : '';
-  const quotaErrorTitle =
+  const authFileStatusInfo = visibleAuthFileStatusProblem
+    ? buildStatusProblemInfo(
+        authFileStatusBadgeLabel,
+        authFileStatusBaseTitle,
+        visibleAuthFileStatusProblem
+      )
+    : null;
+  const quotaErrorInfo =
     hasVisibleQuotaError && visibleQuotaStatusProblem
-      ? buildStatusProblemTitle(visibleQuotaStatusProblem.message || quotaErrorMessage, visibleQuotaStatusProblem, {
+      ? buildStatusProblemInfo(quotaErrorBadgeLabel, visibleQuotaStatusProblem.message || quotaErrorMessage, visibleQuotaStatusProblem, {
           observedAtMs:
             typeof codexQuotaEntry?.errorObservedAt === 'number'
               ? codexQuotaEntry.errorObservedAt
               : undefined,
           requestWindow: '',
         })
-      : quotaErrorMessage;
-  const activeWarningTitle = hasVisibleQuotaError
-    ? quotaErrorTitle
+      : hasVisibleQuotaError
+        ? {
+            label: quotaErrorBadgeLabel,
+            message: quotaErrorMessage,
+          }
+        : null;
+  const activeWarningInfo = hasVisibleQuotaError
+    ? quotaErrorInfo
     : visibleAuthFileStatusProblem
-      ? authFileStatusTitle
-      : activeWarningMessage;
+      ? authFileStatusInfo
+      : {
+          label: activeWarningLabel,
+          message: activeWarningMessage,
+          requestWindow: latestFailureRequestWindow?.label,
+        };
+  const setRequestWindowHighlight = (
+    active: boolean,
+    info: StatusProblemTooltipInfo | null
+  ) => {
+    setHighlightedStatusBlockIndex(
+      active && info?.requestWindow ? (latestFailureRequestWindow?.index ?? null) : null
+    );
+  };
   const authFileStatusBadgeClass =
     visibleAuthFileStatusProblem?.category === 'credential_invalid'
       ? styles.stateBadgeQuotaError
@@ -989,13 +1082,20 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 {isRuntimeOnly && (
                   <span className={`${styles.stateBadge} ${stateBadgeClass}`}>{stateLabel}</span>
                 )}
-                {hasAuthFileStatusProblem && (
-                  <span
-                    className={`${styles.stateBadge} ${authFileStatusBadgeClass}`}
-                    title={authFileStatusTitle}
+                {hasAuthFileStatusProblem && authFileStatusInfo && (
+                  <StatusProblemTooltip
+                    info={authFileStatusInfo}
+                    onActiveChange={(active) =>
+                      setRequestWindowHighlight(active, authFileStatusInfo)
+                    }
                   >
-                    {authFileStatusBadgeLabel}
-                  </span>
+                    <span
+                      className={`${styles.stateBadge} ${authFileStatusBadgeClass}`}
+                      tabIndex={0}
+                    >
+                      {authFileStatusBadgeLabel}
+                    </span>
+                  </StatusProblemTooltip>
                 )}
                 {accessTokenOnly && !hasCredentialStatusError && (
                   <span
@@ -1009,18 +1109,20 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     })}
                   </span>
                 )}
-                {hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge && (
-                  <span
-                    className={`${styles.stateBadge} ${
-                      visibleQuotaStatusProblem &&
-                      visibleQuotaStatusProblem.category !== 'credential_invalid'
-                        ? styles.stateBadgeWarning
-                        : styles.stateBadgeQuotaError
-                    }`}
-                    title={quotaErrorTitle}
-                  >
-                    {quotaErrorBadgeLabel}
-                  </span>
+                {hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge && quotaErrorInfo && (
+                  <StatusProblemTooltip info={quotaErrorInfo}>
+                    <span
+                      className={`${styles.stateBadge} ${
+                        visibleQuotaStatusProblem &&
+                        visibleQuotaStatusProblem.category !== 'credential_invalid'
+                          ? styles.stateBadgeWarning
+                          : styles.stateBadgeQuotaError
+                      }`}
+                      tabIndex={0}
+                    >
+                      {quotaErrorBadgeLabel}
+                    </span>
+                  </StatusProblemTooltip>
                 )}
               </div>
             )}
@@ -1158,7 +1260,11 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
               <div className={styles.statusPanelLabel}>
                 <span>{t('auth_files.health_status_label')}</span>
               </div>
-              <ProviderStatusBar statusData={statusData} styles={styles} />
+              <ProviderStatusBar
+                statusData={statusData}
+                styles={styles}
+                highlightedBlockIndex={highlightedStatusBlockIndex}
+              />
               <div
                 className={`${styles.statusPanelStats} ${compact ? styles.statusPanelStatsCompact : ''}`}
                 title={`${t('stats.recent_success')}: ${fileStats.success} · ${t('stats.recent_failure')}: ${fileStats.failure}`}
@@ -1252,16 +1358,22 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   <span className={styles.statusToggleLabel}>
                     {t('auth_files.status_toggle_label')}
                   </span>
-                  {hasVisibleStatusWarning && (
-                    <span
-                      className={styles.stateWarningIconBadge}
-                      title={activeWarningTitle}
-                      aria-label={`${activeWarningLabel}: ${activeWarningMessage}`}
-                      role="img"
-                      tabIndex={0}
+                  {hasVisibleStatusWarning && activeWarningInfo && (
+                    <StatusProblemTooltip
+                      info={activeWarningInfo}
+                      onActiveChange={(active) =>
+                        setRequestWindowHighlight(active, activeWarningInfo)
+                      }
                     >
-                      <IconCircleAlert size={14} aria-hidden="true" />
-                    </span>
+                      <span
+                        className={styles.stateWarningIconBadge}
+                        aria-label={`${activeWarningLabel}: ${activeWarningMessage}`}
+                        role="img"
+                        tabIndex={0}
+                      >
+                        <IconCircleAlert size={14} aria-hidden="true" />
+                      </span>
+                    </StatusProblemTooltip>
                   )}
                   <ToggleSwitch
                     ariaLabel={t('auth_files.status_toggle_label')}

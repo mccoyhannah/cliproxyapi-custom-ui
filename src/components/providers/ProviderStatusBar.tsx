@@ -42,9 +42,14 @@ type StylesModule = Record<string, string>;
 interface ProviderStatusBarProps {
   statusData: StatusBarData;
   styles?: StylesModule;
+  highlightedBlockIndex?: number | null;
 }
 
-export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderStatusBarProps) {
+export function ProviderStatusBar({
+  statusData,
+  styles: stylesProp,
+  highlightedBlockIndex = null,
+}: ProviderStatusBarProps) {
   const { t } = useTranslation();
   const s = (stylesProp || defaultStyles) as StylesModule;
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
@@ -135,24 +140,14 @@ export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderSt
           const isIdle = detail.rate === -1;
           const blockStyle = isIdle ? undefined : { backgroundColor: rateToColor(detail.rate) };
           const isActive = activeTooltip === idx;
-          const total = detail.success + detail.failure;
-          const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
-          const nativeTitle =
-            total > 0
-              ? `${t('status_bar.request_window', {
-                  window: timeRange,
-                  defaultValue: '请求时段 {{window}}',
-                })}\n${t('stats.recent_success')}: ${detail.success} · ${t('stats.recent_failure')}: ${detail.failure}`
-              : `${t('status_bar.request_window', {
-                  window: timeRange,
-                  defaultValue: '请求时段 {{window}}',
-                })}\n${t('status_bar.no_requests')}`;
+          const isHighlighted = highlightedBlockIndex === idx;
 
           return (
             <div
               key={idx}
-              className={`${s.statusBlockWrapper} ${isActive ? s.statusBlockActive : ''}`}
-              title={nativeTitle}
+              className={`${s.statusBlockWrapper} ${
+                isActive || isHighlighted ? s.statusBlockActive : ''
+              } ${isHighlighted ? s.statusBlockHighlighted : ''}`}
               onPointerEnter={(e) => handlePointerEnter(e, idx)}
               onPointerLeave={handlePointerLeave}
               onPointerDown={(e) => handlePointerDown(e, idx)}
