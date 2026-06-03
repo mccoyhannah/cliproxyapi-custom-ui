@@ -229,6 +229,7 @@ const ACCOUNT_MEMO_EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN =
   /(?:账号|帳號|账户|帳戶|邮箱|郵箱|邮件|郵件|密码|密碼|pass(?:word)?|email|login|user(?:name)?|account)/i;
 const ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN = /[|｜]/;
+const ACCOUNT_MEMO_CREDENTIAL_PART_SEPARATOR_PATTERN = /\s*(?:-{4,}|－{4,}|—{4,})\s*/u;
 const ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH = 8;
 
 const wait = (delayMs: number) => new Promise((resolve) => window.setTimeout(resolve, delayMs));
@@ -253,11 +254,13 @@ type AccountMemoLinkPreviewBlock = {
   copyText: string;
   startIndex: number;
 };
+type AccountMemoCredentialPart = {
+  text: string;
+  startIndex: number;
+};
 type AccountMemoCredentialPreviewBlock = {
   type: 'credential';
-  title: string;
-  copyText: string;
-  previewText: string;
+  parts: AccountMemoCredentialPart[];
   startIndex: number;
 };
 type AccountMemoPreviewBlock = AccountMemoLinkPreviewBlock | AccountMemoCredentialPreviewBlock;
@@ -279,6 +282,61 @@ const normalizeAccountMemoUrlCandidate = (value: string): AccountMemoLink | null
   }
 };
 
+const isCompactAccountMemoCredentialText = (value: string): boolean => {
+  if (value.length < 4 || value.length > 96) return false;
+  if (/\s/.test(value)) return false;
+  if (/^[\p{Script=Han}\p{P}\p{S}\s]+$/u.test(value)) return false;
+  if (!/[A-Za-z0-9]/.test(value)) return false;
+  return true;
+};
+
+const isLikelyAccountMemoCredentialPart = (value: string): boolean => {
+  const part = value.trim();
+  if (!part) return false;
+  if (ACCOUNT_MEMO_EMAIL_PATTERN.test(part)) return true;
+  if (ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN.test(part)) return true;
+  if (ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN.test(part)) return true;
+  if (!isCompactAccountMemoCredentialText(part)) return false;
+  if (part.length < ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH) return false;
+  return /[A-Za-z]/.test(part) && (/\d/.test(part) || part.length >= 12);
+};
+
+const splitAccountMemoCredentialParts = (
+  blockText: string,
+  startIndex: number
+): AccountMemoCredentialPart[] => {
+  const parts: AccountMemoCredentialPart[] = [];
+  let lineStart = 0;
+
+  for (const rawLine of blockText.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const leadingSpaces = rawLine.search(/\S/);
+    const contentLineStart = startIndex + lineStart + (leadingSpaces > -1 ? leadingSpaces : 0);
+    if (line) {
+      let segmentStart = 0;
+      const segments = line.split(ACCOUNT_MEMO_CREDENTIAL_PART_SEPARATOR_PATTERN);
+      for (const segment of segments) {
+        const part = segment.trim();
+        if (part && isLikelyAccountMemoCredentialPart(part)) {
+          const localIndex = line.indexOf(segment, segmentStart);
+          const leadingSegmentSpaces = segment.search(/\S/);
+          parts.push({
+            text: part,
+            startIndex:
+              contentLineStart +
+              (localIndex > -1 ? localIndex : segmentStart) +
+              (leadingSegmentSpaces > -1 ? leadingSegmentSpaces : 0),
+          });
+        }
+        segmentStart += segment.length;
+      }
+    }
+    lineStart += rawLine.length + 1;
+  }
+
+  return parts;
+};
+
 const isLikelyAccountMemoCredentialBlock = (blockText: string): boolean => {
   const normalizedLines = blockText
     .split(/\r?\n/)
@@ -290,52 +348,23 @@ const isLikelyAccountMemoCredentialBlock = (blockText: string): boolean => {
   if (ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN.test(blockText)) return true;
   if (ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN.test(blockText)) return true;
 
-  const isCompactCredentialLine = (line: string) => {
-    if (line.length < 4 || line.length > 96) return false;
-    if (/\s/.test(line)) return false;
-    if (/^[\p{Script=Han}\p{P}\p{S}\s]+$/u.test(line)) return false;
-    if (!/[A-Za-z0-9]/.test(line)) return false;
-    return true;
-  };
-
   if (normalizedLines.length === 1) {
     const [line] = normalizedLines;
-    if (!line || !isCompactCredentialLine(line)) return false;
-    if (line.length < ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH) return false;
-    return /[A-Za-z]/.test(line) && (/\d/.test(line) || line.length >= 12);
+    return Boolean(line && splitAccountMemoCredentialParts(line, 0).length > 0);
   }
 
   const compactCredentialLines = normalizedLines.filter((line) => {
     if (/\s{2,}/.test(line)) return false;
-    return isCompactCredentialLine(line);
+    return isCompactAccountMemoCredentialText(line);
   });
   return compactCredentialLines.length >= 2;
-};
-
-const getAccountMemoCredentialTitle = (blockText: string): string => {
-  const lines = blockText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length <= 1) return '';
-  const firstLine = lines[0];
-  if (!firstLine) return '';
-  return formatAccountMemoCopyPreview(firstLine);
-};
-
-const getAccountMemoCredentialPreviewText = (blockText: string): string => {
-  const lines = blockText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-  if (lines.length <= 1) return blockText.trim();
-  return lines.slice(1).join('\n').trim() || blockText.trim();
 };
 
 const parseAccountMemoPreviewBlocks = (text: string): AccountMemoPreviewBlock[] => {
   const blocks: AccountMemoPreviewBlock[] = [];
   const blockSeparatorPattern = /\r?\n[ \t]*\r?\n+/g;
   let blockStart = 0;
+  let canMergeCredentialBlock = false;
 
   const appendBlock = (blockText: string, startIndex: number) => {
     if (!blockText.trim()) return;
@@ -359,18 +388,33 @@ const parseAccountMemoPreviewBlocks = (text: string): AccountMemoPreviewBlock[] 
         copyText,
         startIndex: startIndex + matchIndex,
       });
+      canMergeCredentialBlock = false;
       return;
     }
 
     if (isLikelyAccountMemoCredentialBlock(blockText)) {
+      const parts = splitAccountMemoCredentialParts(blockText, startIndex);
+      if (parts.length === 0) {
+        canMergeCredentialBlock = false;
+        return;
+      }
+
+      const previousBlock = blocks[blocks.length - 1];
+      if (canMergeCredentialBlock && previousBlock?.type === 'credential') {
+        previousBlock.parts.push(...parts);
+        return;
+      }
+
       blocks.push({
         type: 'credential',
-        title: getAccountMemoCredentialTitle(blockText),
-        copyText: blockText.trim(),
-        previewText: getAccountMemoCredentialPreviewText(blockText),
+        parts,
         startIndex,
       });
+      canMergeCredentialBlock = true;
+      return;
     }
+
+    canMergeCredentialBlock = false;
   };
 
   let separatorMatch: RegExpExecArray | null;
@@ -5505,35 +5549,32 @@ export function AuthFilesPage() {
                         )}
                       </>
                     ) : (
-                      <div className={styles.accountMemoCopyRow}>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="xs"
-                          iconOnly
-                          className={styles.accountMemoCopyButton}
-                          leftIcon={<IconCopy size={13} />}
-                          aria-label={t('auth_files.account_memo_copy_button', {
-                            defaultValue: '复制',
-                          })}
-                          title={t('auth_files.account_memo_copy_button', {
-                            defaultValue: '复制',
-                          })}
-                          onClick={() => void handleCopyAccountMemoPreviewText(block.copyText)}
-                        />
-                        <div className={styles.accountMemoCredentialPreview}>
-                          {block.title && (
-                            <span
-                              className={styles.accountMemoCredentialTitle}
-                              title={block.title}
-                            >
-                              {block.title}
-                            </span>
-                          )}
-                          <p className={styles.accountMemoCopyText} title={block.copyText}>
-                            {formatAccountMemoCopyPreview(block.previewText)}
-                          </p>
-                        </div>
+                      <div className={styles.accountMemoCredentialGroup}>
+                        {block.parts.map((part, partIndex) => (
+                          <div
+                            className={styles.accountMemoCopyRow}
+                            key={`${part.startIndex}-${part.text}-${partIndex}`}
+                          >
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              iconOnly
+                              className={styles.accountMemoCopyButton}
+                              leftIcon={<IconCopy size={13} />}
+                              aria-label={t('auth_files.account_memo_copy_button', {
+                                defaultValue: '复制',
+                              })}
+                              title={t('auth_files.account_memo_copy_button', {
+                                defaultValue: '复制',
+                              })}
+                              onClick={() => void handleCopyAccountMemoPreviewText(part.text)}
+                            />
+                            <p className={styles.accountMemoCopyText} title={part.text}>
+                              {formatAccountMemoCopyPreview(part.text)}
+                            </p>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
