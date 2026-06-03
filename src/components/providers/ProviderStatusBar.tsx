@@ -25,6 +25,13 @@ function rateToColor(rate: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
 function formatSuccessRate(rate: number): string {
   const rounded = rate.toFixed(1);
   return `${rounded.endsWith('.0') ? rounded.slice(0, -2) : rounded}%`;
@@ -97,9 +104,11 @@ export function ProviderStatusBar({
   const renderTooltip = (detail: StatusBlockDetail, idx: number) => {
     const total = detail.success + detail.failure;
     const posClass = getTooltipPositionClass(idx, statusData.blockDetails.length);
+    const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
 
     return (
       <div className={`${s.statusTooltip} ${posClass}`}>
+        <span className={s.tooltipTime}>{timeRange}</span>
         {total > 0 ? (
           <span className={s.tooltipStats}>
             <span className={s.tooltipSuccess}>{t('status_bar.success_short')} {detail.success}</span>
