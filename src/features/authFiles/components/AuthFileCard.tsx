@@ -12,6 +12,7 @@ import {
   IconMinus,
   IconModelCluster,
   IconPlus,
+  IconRefreshCw,
   IconSettings,
   IconTimer,
   IconTrash2,
@@ -61,6 +62,7 @@ type CodexCardQuotaState = {
 
 const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
   credential_invalid: 'auth_files.credential_invalid_badge',
+  request_interrupted: 'auth_files.status_request_interrupted_badge',
   network_transient: 'auth_files.status_network_transient_badge',
   input_too_large: 'auth_files.status_input_too_large_badge',
   content_policy: 'auth_files.status_content_policy_badge',
@@ -68,6 +70,7 @@ const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
 
 const AUTH_STATUS_LABEL_FALLBACK: Record<AuthFileStatusCategory, string> = {
   credential_invalid: '认证失效',
+  request_interrupted: '请求中断',
   network_transient: '网络瞬断',
   input_too_large: '输入过长',
   content_policy: '内容拦截',
@@ -75,6 +78,7 @@ const AUTH_STATUS_LABEL_FALLBACK: Record<AuthFileStatusCategory, string> = {
 
 const AUTH_STATUS_TITLE_KEY: Record<AuthFileStatusCategory, string> = {
   credential_invalid: 'auth_files.credential_invalid_badge_title',
+  request_interrupted: 'auth_files.status_request_interrupted_title',
   network_transient: 'auth_files.status_network_transient_title',
   input_too_large: 'auth_files.status_input_too_large_title',
   content_policy: 'auth_files.status_content_policy_title',
@@ -90,6 +94,8 @@ export type AuthFileCardProps = {
   statusUpdating: boolean;
   priorityUpdating: boolean;
   noteUpdating: boolean;
+  quotaRefreshing: boolean;
+  quotaRefreshDisabled: boolean;
   quotaFilterType: QuotaProviderType | null;
   statusData: AuthFileStatusBarData;
   authTokenSnapshot?: CodexAuthTokenSnapshot | null;
@@ -101,6 +107,7 @@ export type AuthFileCardProps = {
   onDownload: (name: string) => void;
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
   onManualExpiryEdit: (file: AuthFileItem) => void;
+  onRefreshQuota: (file: AuthFileItem) => void;
   onAccountMemoOpen: (file: AuthFileItem) => void;
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
@@ -128,6 +135,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     statusUpdating,
     priorityUpdating,
     noteUpdating,
+    quotaRefreshing,
+    quotaRefreshDisabled,
     quotaFilterType,
     statusData,
     authTokenSnapshot,
@@ -139,6 +148,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     onDownload,
     onOpenPrefixProxyEditor,
     onManualExpiryEdit,
+    onRefreshQuota,
     onAccountMemoOpen,
     onDelete,
     onToggleStatus,
@@ -290,6 +300,10 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const accountMemoButtonLabel = hasAccountMemo
     ? t('auth_files.account_memo_button_filled', { defaultValue: '查看/编辑账号备注' })
     : t('auth_files.account_memo_button_empty', { defaultValue: '添加账号备注' });
+  const showCardQuotaRefreshButton = resolvedQuotaType === 'codex' && !isRuntimeOnly;
+  const cardQuotaRefreshLabel = t('auth_files.quota_refresh_single_button', {
+    defaultValue: '刷新这个认证文件的额度',
+  });
   const displayNameInputId = `auth-display-name-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const [displayNameDraft, setDisplayNameDraft] = useState({
     fileName: file.name,
@@ -742,6 +756,26 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     title={accountMemoButtonLabel}
                   >
                     <IconFileText size={14} />
+                  </button>
+                )}
+                {showCardQuotaRefreshButton && (
+                  <button
+                    type="button"
+                    className={`${styles.cardQuotaRefreshButton} ${
+                      quotaRefreshing ? styles.cardQuotaRefreshButtonLoading : ''
+                    }`}
+                    onClick={() => onRefreshQuota(file)}
+                    disabled={
+                      disableControls || file.disabled || quotaRefreshDisabled || quotaRefreshing
+                    }
+                    aria-label={cardQuotaRefreshLabel}
+                    title={cardQuotaRefreshLabel}
+                  >
+                    {quotaRefreshing ? (
+                      <LoadingSpinner size={12} />
+                    ) : (
+                      <IconRefreshCw size={13} />
+                    )}
                   </button>
                 )}
               </div>

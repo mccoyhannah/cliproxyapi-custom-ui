@@ -639,6 +639,8 @@
     "credential_invalid_badge": "Auth expired",
     "credential_invalid_badge_title": "Upstream rejected this credential: {{message}}. Sign in again to get a new credential.",
     "credential_invalid_access_active_title": "Access has not expired yet ({{expiry}}), but upstream rejected this credential: {{message}}. Sign in again to get a new credential.",
+    "status_request_interrupted_badge": "Request interrupted",
+    "status_request_interrupted_title": "The request or upstream response stream was interrupted: {{message}}. Retry later.",
     "status_network_transient_badge": "Network blip",
     "status_network_transient_title": "Network or upstream connection was interrupted: {{message}}. Retry later.",
     "status_input_too_large_badge": "Input too long",
@@ -924,7 +926,9 @@
     "prefix_proxy_html_challenge": "Downloaded content is an HTML challenge page, not an auth JSON object. Re-authenticate or replace this auth file before editing fields.",
     "prefix_proxy_saved_success": "Updated auth file \"{{name}}\" successfully",
     "quota_refresh_success": "Quota refreshed for \"{{name}}\"",
-    "quota_refresh_failed": "Failed to refresh quota for \"{{name}}\": {{message}}"
+    "quota_refresh_failed": "Failed to refresh quota for \"{{name}}\": {{message}}",
+    "quota_refresh_single_button": "Refresh quota for this auth file",
+    "quota_refresh_single_busy": "Quota is refreshing. Please wait."
   },
   "antigravity_quota": {
     "title": "Antigravity Quota",

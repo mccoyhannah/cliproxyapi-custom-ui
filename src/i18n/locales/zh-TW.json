@@ -638,6 +638,8 @@
     "credential_invalid_badge": "認證失效",
     "credential_invalid_badge_title": "上游已拒絕此認證：{{message}}。請重新登入取得新憑證。",
     "credential_invalid_access_active_title": "Access 尚未到期（{{expiry}}），但上游已拒絕此認證：{{message}}。請重新登入取得新憑證。",
+    "status_request_interrupted_badge": "請求中斷",
+    "status_request_interrupted_title": "本次請求或上游回應流已中斷：{{message}}。可稍後重試。",
     "status_network_transient_badge": "網路瞬斷",
     "status_network_transient_title": "網路或上游連線瞬斷：{{message}}。可稍後重試。",
     "status_input_too_large_badge": "輸入過長",
@@ -905,7 +907,9 @@
     "prefix_proxy_html_challenge": "下載到的是 HTML 驗證頁面，不是驗證 JSON 物件。請重新驗證或替換該驗證檔案後再編輯欄位。",
     "prefix_proxy_saved_success": "已更新驗證檔案「{{name}}」",
     "quota_refresh_success": "已重新整理「{{name}}」的配額",
-    "quota_refresh_failed": "重新整理「{{name}}」的配額失敗：{{message}}"
+    "quota_refresh_failed": "重新整理「{{name}}」的配額失敗：{{message}}",
+    "quota_refresh_single_button": "重新整理這個認證檔的配額",
+    "quota_refresh_single_busy": "配額正在重新整理，請稍候。"
   },
   "antigravity_quota": {
     "title": "Antigravity 配額",

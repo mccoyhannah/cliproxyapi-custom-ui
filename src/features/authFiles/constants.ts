@@ -138,6 +138,7 @@ export type AuthFileCredentialProblem = {
 
 export type AuthFileStatusCategory =
   | 'credential_invalid'
+  | 'request_interrupted'
   | 'network_transient'
   | 'input_too_large'
   | 'content_policy';
@@ -150,6 +151,8 @@ const AUTH_FILE_CREDENTIAL_STATUS_PATTERN =
   /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i;
 const AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN =
   /\b(?:network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed)\b/i;
+const AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN =
+  /\b(?:request_interrupted|context\s+cancell?ed|context\s+deadline\s+exceeded|stream\s+error:?[^\n]*(?:internal_error|received\s+from\s+peer)|internal_error;\s*received\s+from\s+peer)\b/i;
 const AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN =
   /\b(?:context_too_large|context\s+window|input\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i;
 const AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN =
@@ -259,6 +262,11 @@ const AUTH_FILE_STATUS_PATTERNS: Array<{
     category: 'content_policy',
     pattern: AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN,
     signalOnlyPattern: AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN,
+  },
+  {
+    category: 'request_interrupted',
+    pattern: AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN,
   },
   {
     category: 'network_transient',

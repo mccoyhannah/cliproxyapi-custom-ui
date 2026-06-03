@@ -47,6 +47,13 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
 
 {
   assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'network_transient');
+  assert.equal(classifyUpstreamStatusText('context canceled'), 'request_interrupted');
+  assert.equal(classifyUpstreamStatusText('context cancelled'), 'request_interrupted');
+  assert.equal(classifyUpstreamStatusText('context deadline exceeded'), 'request_interrupted');
+  assert.equal(
+    classifyUpstreamStatusText('stream error: stream ID 1; INTERNAL_ERROR; received from peer'),
+    'request_interrupted'
+  );
   assert.equal(
     classifyUpstreamStatusText('invalid_request_error context_too_large'),
     'input_too_large'
@@ -218,12 +225,20 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
 }
 
 {
-  const files = [codexFile('active-eof-a.json', 2), codexFile('active-eof-b.json', 2)];
+  const files = [
+    codexFile('active-eof-a.json', 2),
+    codexFile('active-eof-b.json', 2),
+    codexFile('active-interrupted.json', 2),
+  ];
   const result = analyzeCodexPriorityRotation(
     files,
     {
       'active-eof-a.json': retryableQuotaError('network_transient', 'EOF'),
       'active-eof-b.json': retryableQuotaError('input_too_large', 'context_too_large'),
+      'active-interrupted.json': retryableQuotaError(
+        'request_interrupted',
+        'stream error: stream ID 1; INTERNAL_ERROR; received from peer'
+      ),
     },
     50,
     1

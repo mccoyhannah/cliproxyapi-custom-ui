@@ -659,6 +659,8 @@
     "credential_invalid_badge": "认证失效",
     "credential_invalid_badge_title": "上游已拒绝此认证：{{message}}。请重新登录获取新凭证。",
     "credential_invalid_access_active_title": "Access 尚未到期（{{expiry}}），但上游已拒绝此认证：{{message}}。请重新登录获取新凭证。",
+    "status_request_interrupted_badge": "请求中断",
+    "status_request_interrupted_title": "本次请求或上游响应流已中断：{{message}}。可稍后重试。",
     "status_network_transient_badge": "网络瞬断",
     "status_network_transient_title": "网络或上游连接瞬断：{{message}}。可稍后重试。",
     "status_input_too_large_badge": "输入过长",
@@ -944,7 +946,9 @@
     "prefix_proxy_html_challenge": "下载到的是 HTML 验证页面，不是认证 JSON 对象。请重新认证或替换该认证文件后再编辑字段。",
     "prefix_proxy_saved_success": "已更新认证文件 \"{{name}}\"",
     "quota_refresh_success": "已刷新 \"{{name}}\" 的额度",
-    "quota_refresh_failed": "刷新 \"{{name}}\" 的额度失败：{{message}}"
+    "quota_refresh_failed": "刷新 \"{{name}}\" 的额度失败：{{message}}",
+    "quota_refresh_single_button": "刷新这个认证文件的额度",
+    "quota_refresh_single_busy": "额度正在刷新，请稍等。"
   },
   "antigravity_quota": {
     "title": "Antigravity 额度",

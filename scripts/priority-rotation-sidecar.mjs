@@ -36,6 +36,7 @@ const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_
 const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
 const MAX_ROTATION_PASSES = 8;
 const RETRYABLE_QUOTA_ERROR_KINDS = new Set([
+  'request_interrupted',
   'network_transient',
   'input_too_large',
   'content_policy',
@@ -49,6 +50,11 @@ const UPSTREAM_STATUS_PATTERNS = [
   {
     kind: 'content_policy',
     pattern: /\b(?:content[_\s-]?conceal(?:ed)?|content_filter|content_policy|safety)\b/i,
+  },
+  {
+    kind: 'request_interrupted',
+    pattern:
+      /\b(?:request_interrupted|context\s+cancell?ed|context\s+deadline\s+exceeded|stream\s+error:?[^\n]*(?:internal_error|received\s+from\s+peer)|internal_error;\s*received\s+from\s+peer)\b/i,
   },
   {
     kind: 'network_transient',

@@ -608,6 +608,14 @@
     "credential_invalid_badge": "Авторизация недействительна",
     "credential_invalid_badge_title": "Вышестоящий сервис отклонил эти учётные данные: {{message}}. Войдите снова, чтобы получить новые.",
     "credential_invalid_access_active_title": "Access ещё не истёк ({{expiry}}), но вышестоящий сервис отклонил эти учётные данные: {{message}}. Войдите снова, чтобы получить новые.",
+    "status_request_interrupted_badge": "Запрос прерван",
+    "status_request_interrupted_title": "Запрос или поток ответа вышестоящего сервиса был прерван: {{message}}. Повторите позже.",
+    "status_network_transient_badge": "Сетевой сбой",
+    "status_network_transient_title": "Сеть или соединение с вышестоящим сервисом прервалось: {{message}}. Повторите позже.",
+    "status_input_too_large_badge": "Слишком длинный ввод",
+    "status_input_too_large_title": "Вышестоящий сервис отклонил слишком большой ввод: {{message}}. Сократите контекст и повторите.",
+    "status_content_policy_badge": "Контент заблокирован",
+    "status_content_policy_title": "Политика контента вышестоящего сервиса заблокировала или скрыла ответ: {{message}}.",
     "codex_quota_five_hour_short": "5ч",
     "codex_quota_weekly_short": "Нед",
     "page_size_label": "На странице",
@@ -858,7 +866,9 @@
     "quota_refresh_single": "Обновить квоту",
     "quota_refresh_hint": "Обновить квоту только для этих учётных данных",
     "quota_refresh_success": "Квота для \"{{name}}\" обновлена",
-    "quota_refresh_failed": "Не удалось обновить квоту для \"{{name}}\": {{message}}"
+    "quota_refresh_failed": "Не удалось обновить квоту для \"{{name}}\": {{message}}",
+    "quota_refresh_single_button": "Обновить квоту этого файла",
+    "quota_refresh_single_busy": "Квота обновляется. Подождите."
   },
   "antigravity_quota": {
     "title": "Квота Antigravity",

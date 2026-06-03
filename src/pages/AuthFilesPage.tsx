@@ -51,6 +51,7 @@ import {
   isRuntimeOnlyAuthFile,
   normalizeProviderKey,
   parsePriorityValue,
+  resolveQuotaErrorMessage,
   type QuotaProviderType,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
@@ -969,6 +970,9 @@ export function AuthFilesPage() {
   const [priorityRotationSidecarRunSaving, setPriorityRotationSidecarRunSaving] = useState(false);
   const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
   const [codexQuotaRefreshing, setCodexQuotaRefreshing] = useState(false);
+  const [codexQuotaRefreshingByFile, setCodexQuotaRefreshingByFile] = useState<
+    Record<string, boolean>
+  >({});
   const [codexOAuthOpening, setCodexOAuthOpening] = useState(false);
   const [codexOAuthAttemptExpiresAt, setCodexOAuthAttemptExpiresAt] = useState<number | null>(
     null
@@ -1142,6 +1146,18 @@ export function AuthFilesPage() {
     setCodexQuotaRefreshing(isLoading);
   }, []);
 
+  const setSingleCodexQuotaRefreshLoading = useCallback((fileName: string, isLoading: boolean) => {
+    setCodexQuotaRefreshingByFile((prev) => {
+      if (isLoading) {
+        return { ...prev, [fileName]: true };
+      }
+      if (!prev[fileName]) return prev;
+      const next = { ...prev };
+      delete next[fileName];
+      return next;
+    });
+  }, []);
+
   const startCodexOAuthPolling = useCallback(
     (state: string, attemptId: number) => {
       clearCodexOAuthPollTimer();
@@ -1257,6 +1273,75 @@ export function AuthFilesPage() {
     showNotification,
     t,
   ]);
+
+  const handleRefreshSingleCodexQuota = useCallback(
+    async (file: AuthFileItem) => {
+      if (
+        disableControls ||
+        loading ||
+        codexQuotaRefreshing ||
+        codexQuotaRefreshingByFile[file.name] ||
+        !CODEX_CONFIG.filterFn(file) ||
+        isRuntimeOnlyAuthFile(file) ||
+        isDisabledAuthFile(file)
+      ) {
+        return;
+      }
+
+      const started = await loadCodexQuota(
+        [file],
+        'all',
+        (isLoading) => setSingleCodexQuotaRefreshLoading(file.name, isLoading),
+        { preserveExisting: true }
+      );
+
+      if (!started) {
+        showNotification(
+          t('auth_files.quota_refresh_single_busy', {
+            defaultValue: '额度正在刷新，请稍等。',
+          }),
+          'info'
+        );
+        return;
+      }
+
+      const latestQuota = useQuotaStore.getState().codexQuota[file.name];
+      if (latestQuota?.status === 'error') {
+        const message = resolveQuotaErrorMessage(
+          t,
+          latestQuota.errorStatus,
+          latestQuota.error || t('common.unknown_error')
+        );
+        showNotification(
+          t('auth_files.quota_refresh_failed', {
+            name: file.name,
+            message,
+            defaultValue: '刷新 "{{name}}" 的额度失败：{{message}}',
+          }),
+          'warning'
+        );
+        return;
+      }
+
+      showNotification(
+        t('auth_files.quota_refresh_success', {
+          name: file.name,
+          defaultValue: '已刷新 "{{name}}" 的额度',
+        }),
+        'success'
+      );
+    },
+    [
+      codexQuotaRefreshing,
+      codexQuotaRefreshingByFile,
+      disableControls,
+      loadCodexQuota,
+      loading,
+      setSingleCodexQuotaRefreshLoading,
+      showNotification,
+      t,
+    ]
+  );
 
   const handleOpenCodexOAuth = useCallback(async () => {
     if (disableControls || codexOAuthOpening) return;
@@ -5105,6 +5190,8 @@ export function AuthFilesPage() {
                     disableControls={disableControls}
                     deleting={deleting === file.name}
                     statusUpdating={statusUpdating[file.name] === true}
+                    quotaRefreshing={codexQuotaRefreshingByFile[file.name] === true}
+                    quotaRefreshDisabled={loading || codexQuotaRefreshing}
                     quotaFilterType={quotaFilterType}
                     statusData={statusDataByFileName.get(file.name)!}
                     authTokenSnapshot={authTokenSnapshots.get(file.name)}
@@ -5118,6 +5205,7 @@ export function AuthFilesPage() {
                     onDownload={handleDownload}
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
                     onManualExpiryEdit={openManualExpiryEditor}
+                    onRefreshQuota={handleRefreshSingleCodexQuota}
                     onAccountMemoOpen={openAccountMemoEditor}
                     onDelete={handleDelete}
                     onToggleStatus={handleStatusToggle}
