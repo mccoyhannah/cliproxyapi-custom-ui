@@ -36,10 +36,13 @@ const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_
 const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
 const MAX_ROTATION_PASSES = 8;
 const RETRYABLE_QUOTA_ERROR_KINDS = new Set([
+  'local_proxy_unavailable',
+  'connection_transient',
   'request_interrupted',
-  'network_transient',
   'input_too_large',
   'content_policy',
+  'rate_limited',
+  'upstream_service_error',
 ]);
 const UPSTREAM_STATUS_PATTERNS = [
   {
@@ -57,14 +60,29 @@ const UPSTREAM_STATUS_PATTERNS = [
       /\b(?:request_interrupted|context\s+cancell?ed|context\s+deadline\s+exceeded|stream\s+error:?[^\n]*(?:internal_error|received\s+from\s+peer)|internal_error;\s*received\s+from\s+peer)\b/i,
   },
   {
-    kind: 'network_transient',
+    kind: 'local_proxy_unavailable',
     pattern:
-      /\b(?:network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed)\b/i,
+      /\b(?:local_proxy_unavailable|proxyconnect|connectex|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i,
+  },
+  {
+    kind: 'connection_transient',
+    pattern:
+      /\b(?:connection_transient|network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|wsarecv[^\n]*(?:forcibly\s+closed|reset)|forcibly\s+closed\s+by\s+the\s+remote\s+host)\b/i,
+  },
+  {
+    kind: 'rate_limited',
+    pattern:
+      /\b(?:429|rate[_\s-]?limit(?:ed)?|too[_\s-]?many[_\s-]?requests|insufficient[_\s-]?quota|quota[_\s-]?exceeded)\b/i,
   },
   {
     kind: 'credential_invalid',
     pattern:
       /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i,
+  },
+  {
+    kind: 'upstream_service_error',
+    pattern:
+      /\b(?:upstream_service_error|status[:\s]+5\d\d|http[:\s]+5\d\d|server\s+error|service\s+unavailable|bad\s+gateway|gateway\s+timeout|\b5\d\d\b)\b/i,
   },
 ];
 
@@ -153,15 +171,15 @@ function clampInteger(value, fallback, min, max) {
 
 export function classifyUpstreamStatusText(text = '', statusCode = undefined) {
   const numericStatus = Number(statusCode);
-  if (Number.isFinite(numericStatus) && numericStatus >= 500 && numericStatus <= 599) {
-    return 'network_transient';
-  }
-
   const haystack = String(text ?? '');
   const matched = UPSTREAM_STATUS_PATTERNS.find(({ pattern }) => pattern.test(haystack));
   if (matched) return matched.kind;
 
   if (numericStatus === 401 || numericStatus === 403) return 'credential_invalid';
+  if (numericStatus === 429) return 'rate_limited';
+  if (Number.isFinite(numericStatus) && numericStatus >= 500 && numericStatus <= 599) {
+    return 'upstream_service_error';
+  }
   return null;
 }
 

@@ -253,12 +253,16 @@ export interface CodexQuotaState {
   subscriptionStatusMessage?: string | null;
   error?: string;
   errorStatus?: number;
+  errorObservedAt?: number;
   errorKind?:
     | 'credential_invalid'
+    | 'local_proxy_unavailable'
+    | 'connection_transient'
     | 'request_interrupted'
-    | 'network_transient'
     | 'input_too_large'
-    | 'content_policy';
+    | 'content_policy'
+    | 'rate_limited'
+    | 'upstream_service_error';
   retryable?: boolean;
 }
 

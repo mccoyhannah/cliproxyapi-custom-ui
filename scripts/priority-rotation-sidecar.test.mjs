@@ -46,7 +46,17 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
 });
 
 {
-  assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'network_transient');
+  assert.equal(
+    classifyUpstreamStatusText(
+      'Post "https://chatgpt.com/backend-api/codex/responses": proxyconnect tcp: dial tcp 127.0.0.1:33210: connectex: No connection could be made because the target machine actively refused it.'
+    ),
+    'local_proxy_unavailable'
+  );
+  assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'connection_transient');
+  assert.equal(
+    classifyUpstreamStatusText('wsarecv: An existing connection was forcibly closed by the remote host.'),
+    'connection_transient'
+  );
   assert.equal(classifyUpstreamStatusText('context canceled'), 'request_interrupted');
   assert.equal(classifyUpstreamStatusText('context cancelled'), 'request_interrupted');
   assert.equal(classifyUpstreamStatusText('context deadline exceeded'), 'request_interrupted');
@@ -66,6 +76,9 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
     classifyUpstreamStatusText('invalidated oauth token for this account'),
     'credential_invalid'
   );
+  assert.equal(classifyUpstreamStatusText('quota_exceeded'), 'rate_limited');
+  assert.equal(classifyUpstreamStatusText('', 429), 'rate_limited');
+  assert.equal(classifyUpstreamStatusText('', 503), 'upstream_service_error');
 }
 
 {
@@ -233,7 +246,7 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
   const result = analyzeCodexPriorityRotation(
     files,
     {
-      'active-eof-a.json': retryableQuotaError('network_transient', 'EOF'),
+      'active-eof-a.json': retryableQuotaError('connection_transient', 'EOF'),
       'active-eof-b.json': retryableQuotaError('input_too_large', 'context_too_large'),
       'active-interrupted.json': retryableQuotaError(
         'request_interrupted',

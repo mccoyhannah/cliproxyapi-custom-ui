@@ -1682,6 +1682,7 @@ export const CODEX_CONFIG: QuotaConfig<
     windows: [],
     error: message,
     errorStatus: status,
+    errorObservedAt: Date.now(),
   }),
   cardClassName: styles.codexCard,
   controlsClassName: styles.codexControls,

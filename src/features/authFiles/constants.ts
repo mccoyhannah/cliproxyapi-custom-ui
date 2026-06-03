@@ -138,10 +138,13 @@ export type AuthFileCredentialProblem = {
 
 export type AuthFileStatusCategory =
   | 'credential_invalid'
+  | 'local_proxy_unavailable'
+  | 'connection_transient'
   | 'request_interrupted'
-  | 'network_transient'
   | 'input_too_large'
-  | 'content_policy';
+  | 'content_policy'
+  | 'rate_limited'
+  | 'upstream_service_error';
 
 export type AuthFileStatusProblem = AuthFileCredentialProblem & {
   category: AuthFileStatusCategory;
@@ -149,14 +152,20 @@ export type AuthFileStatusProblem = AuthFileCredentialProblem & {
 
 const AUTH_FILE_CREDENTIAL_STATUS_PATTERN =
   /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i;
-const AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN =
-  /\b(?:network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed)\b/i;
+const AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN =
+  /\b(?:local_proxy_unavailable|proxyconnect|connectex|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i;
+const AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN =
+  /\b(?:connection_transient|network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|wsarecv[^\n]*(?:forcibly\s+closed|reset)|forcibly\s+closed\s+by\s+the\s+remote\s+host)\b/i;
 const AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN =
   /\b(?:request_interrupted|context\s+cancell?ed|context\s+deadline\s+exceeded|stream\s+error:?[^\n]*(?:internal_error|received\s+from\s+peer)|internal_error;\s*received\s+from\s+peer)\b/i;
 const AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN =
   /\b(?:context_too_large|context\s+window|input\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i;
 const AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN =
   /\b(?:content[_\s-]?conceal(?:ed)?|content_filter|content_policy|safety)\b/i;
+const AUTH_FILE_RATE_LIMITED_STATUS_PATTERN =
+  /\b(?:429|rate[_\s-]?limit(?:ed)?|too[_\s-]?many[_\s-]?requests|insufficient[_\s-]?quota|quota[_\s-]?exceeded)\b/i;
+const AUTH_FILE_UPSTREAM_SERVICE_ERROR_STATUS_PATTERN =
+  /\b(?:upstream_service_error|status[:\s]+5\d\d|http[:\s]+5\d\d|server\s+error|service\s+unavailable|bad\s+gateway|gateway\s+timeout|\b5\d\d\b)\b/i;
 const AUTH_FILE_STATUS_PARSE_DEPTH = 5;
 const AUTH_FILE_STATUS_MESSAGE_KEYS = [
   'detail',
@@ -269,14 +278,29 @@ const AUTH_FILE_STATUS_PATTERNS: Array<{
     signalOnlyPattern: AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN,
   },
   {
-    category: 'network_transient',
-    pattern: AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_NETWORK_TRANSIENT_STATUS_PATTERN,
+    category: 'local_proxy_unavailable',
+    pattern: AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN,
+  },
+  {
+    category: 'connection_transient',
+    pattern: AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN,
+  },
+  {
+    category: 'rate_limited',
+    pattern: AUTH_FILE_RATE_LIMITED_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_RATE_LIMITED_STATUS_PATTERN,
   },
   {
     category: 'credential_invalid',
     pattern: AUTH_FILE_CREDENTIAL_STATUS_PATTERN,
     signalOnlyPattern: /^(401|403|invalid_grant|invalid_token|authentication_error|auth_unavailable)$/i,
+  },
+  {
+    category: 'upstream_service_error',
+    pattern: AUTH_FILE_UPSTREAM_SERVICE_ERROR_STATUS_PATTERN,
+    signalOnlyPattern: AUTH_FILE_UPSTREAM_SERVICE_ERROR_STATUS_PATTERN,
   },
 ];
 
