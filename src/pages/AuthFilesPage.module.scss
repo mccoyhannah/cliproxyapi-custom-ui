@@ -3330,40 +3330,13 @@ button.codexSubscriptionValue {
   }
 }
 
-.stateWarningIconBadge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
-  padding: 0;
-  border-radius: 999px;
-  color: color-mix(in srgb, var(--warning-text) 94%, var(--text-primary));
-  background: color-mix(in srgb, var(--warning-bg) 72%, var(--surface-control));
-  border: 1px solid color-mix(in srgb, var(--warning-border) 82%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
-    0 1px 2px color-mix(in srgb, var(--warning-border) 16%, transparent);
-  cursor: help;
-  flex: 0 0 22px;
-}
-
-.stateWarningIconBadge:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--warning-border) 34%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
-}
-
 .statusProblemTooltipWrap {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-.statusProblemTooltipWrap .stateBadge:focus-visible,
-.statusProblemTooltipWrap .stateWarningIconBadge:focus-visible {
+.statusProblemTooltipWrap .stateBadge:focus-visible {
   outline: none;
   box-shadow:
     0 0 0 2px color-mix(in srgb, #38bdf8 22%, transparent),
@@ -3372,14 +3345,11 @@ button.codexSubscriptionValue {
 }
 
 .statusProblemTooltip {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 10px);
+  position: fixed;
   z-index: $z-dropdown;
   display: grid;
   gap: 7px;
   width: max-content;
-  max-width: min(360px, calc(100vw - 40px));
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--warning-border) 36%, var(--border-color));
   border-radius: 12px;
@@ -3400,25 +3370,21 @@ button.codexSubscriptionValue {
   &::before {
     content: '';
     position: absolute;
-    right: 13px;
+    left: var(--status-problem-arrow-left, 20px);
     top: 100%;
+    transform: translateX(-50%);
     border: 7px solid transparent;
     border-top-color: color-mix(in srgb, var(--surface-card) 94%, #fff7ed);
     filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--warning-border) 32%, transparent));
   }
 }
 
-.cardHeaderStatusBadges .statusProblemTooltip {
-  top: calc(100% + 8px);
-  bottom: auto;
-
-  &::before {
-    top: auto;
-    bottom: 100%;
-    border-top-color: transparent;
-    border-bottom-color: color-mix(in srgb, var(--surface-card) 94%, #fff7ed);
-    filter: drop-shadow(0 -1px 0 color-mix(in srgb, var(--warning-border) 32%, transparent));
-  }
+.statusProblemTooltipBelow::before {
+  top: auto;
+  bottom: 100%;
+  border-top-color: transparent;
+  border-bottom-color: color-mix(in srgb, var(--surface-card) 94%, #fff7ed);
+  filter: drop-shadow(0 -1px 0 color-mix(in srgb, var(--warning-border) 32%, transparent));
 }
 
 .statusProblemTooltipHeader {

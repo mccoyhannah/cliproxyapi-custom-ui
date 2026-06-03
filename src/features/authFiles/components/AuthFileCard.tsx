@@ -1,11 +1,20 @@
-import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
-  IconCircleAlert,
   IconChevronDown,
   IconDownload,
   IconFileText,
@@ -72,6 +81,13 @@ type StatusProblemTooltipInfo = {
   requestWindow?: string;
   observedAt?: string;
   closeLabel?: string;
+};
+type StatusProblemTooltipPosition = {
+  left: number;
+  top: number;
+  width: number;
+  arrowLeft: number;
+  placement: 'top' | 'bottom';
 };
 
 const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
@@ -236,6 +252,35 @@ const formatStatusDuration = (durationMs: number): string => {
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 };
 
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+const simplifyStatusMessage = (
+  category: AuthFileStatusCategory | null,
+  message: string
+): string => {
+  const normalized = message
+    .replace(/\b(?:GET|POST|PUT|PATCH|DELETE)\s+"[^"]+"\s*:\s*/gi, '')
+    .replace(/upstream connect error or disconnect\/reset before headers\.?\s*/i, '')
+    .replace(/transport failure reason:\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return message.trim();
+  if (category === 'connection_transient' && /\b(?:unexpected\s+)?EOF\b/i.test(normalized)) {
+    return /unexpected\s+EOF/i.test(normalized) ? 'unexpected EOF' : 'EOF';
+  }
+  if (category === 'local_proxy_unavailable' && /connection\s+refused/i.test(normalized)) {
+    return 'Connection refused';
+  }
+  if (category === 'request_interrupted' && /context\s+cancell?ed/i.test(normalized)) {
+    return /context\s+cancelled/i.test(normalized) ? 'context cancelled' : 'context canceled';
+  }
+
+  if (normalized.length <= 180) return normalized;
+  return `${normalized.slice(0, 110)} ... ${normalized.slice(-52)}`;
+};
+
 const getLatestFailureWindow = (
   statusData: AuthFileStatusBarData
 ): { index: number; label: string } | null => {
@@ -262,7 +307,37 @@ function StatusProblemTooltip({
   onActiveChange?: (active: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
+  const tooltipRef = useRef<HTMLSpanElement | null>(null);
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<StatusProblemTooltipPosition | null>(null);
+
+  const updatePosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    if (!anchor || typeof window === 'undefined') return;
+
+    const rect = anchor.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const width = Math.min(420, Math.max(260, viewportWidth - 24));
+    const measuredHeight = tooltipRef.current?.offsetHeight ?? 132;
+    const centerX = rect.left + rect.width / 2;
+    const left = clampNumber(centerX - width / 2, 12, Math.max(12, viewportWidth - width - 12));
+    const canPlaceBelow = rect.bottom + measuredHeight + 14 <= viewportHeight || rect.top < measuredHeight + 14;
+    const top = canPlaceBelow
+      ? rect.bottom + 10
+      : clampNumber(rect.top - measuredHeight - 10, 12, viewportHeight - measuredHeight - 12);
+    const arrowLeft = clampNumber(centerX - left, 18, width - 18);
+
+    setPosition({
+      left,
+      top,
+      width,
+      arrowLeft,
+      placement: canPlaceBelow ? 'bottom' : 'top',
+    });
+  }, []);
+
   const show = () => {
     setOpen(true);
     onActiveChange?.(true);
@@ -272,8 +347,32 @@ function StatusProblemTooltip({
     onActiveChange?.(false);
   };
 
+  useEffect(() => {
+    if (!open) return;
+
+    updatePosition();
+    const frameId = window.requestAnimationFrame(updatePosition);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, updatePosition, info.message, info.requestWindow, info.closeLabel]);
+
+  const tooltipStyle = position
+    ? ({
+        left: `${position.left}px`,
+        top: `${position.top}px`,
+        maxWidth: `${position.width}px`,
+        '--status-problem-arrow-left': `${position.arrowLeft}px`,
+      } as CSSProperties)
+    : undefined;
+
   return (
     <span
+      ref={anchorRef}
       className={`${styles.statusProblemTooltipWrap} ${className ?? ''}`}
       onPointerEnter={show}
       onPointerLeave={hide}
@@ -281,43 +380,53 @@ function StatusProblemTooltip({
       onBlur={hide}
     >
       {children}
-      {open && (
-        <span className={styles.statusProblemTooltip} role="tooltip">
-          <span className={styles.statusProblemTooltipHeader}>
-            <span className={styles.statusProblemTooltipDot} aria-hidden="true" />
-            <span>{info.label}</span>
-          </span>
-          <span className={styles.statusProblemTooltipMessage}>{info.message}</span>
-          {(info.requestWindow || info.observedAt || info.closeLabel) && (
-            <span className={styles.statusProblemTooltipMeta}>
-              {info.requestWindow && (
-                <span>
-                  <span className={styles.statusProblemTooltipMetaLabel}>
-                    {t('auth_files.status_problem_window_short', { defaultValue: '时段' })}
-                  </span>
-                  {info.requestWindow}
-                </span>
-              )}
-              {!info.requestWindow && info.observedAt && (
-                <span>
-                  <span className={styles.statusProblemTooltipMetaLabel}>
-                    {t('auth_files.status_problem_observed_short', { defaultValue: '记录' })}
-                  </span>
-                  {info.observedAt}
-                </span>
-              )}
-              {info.closeLabel && (
-                <span>
-                  <span className={styles.statusProblemTooltipMetaLabel}>
-                    {t('auth_files.status_problem_close_short', { defaultValue: '关闭' })}
-                  </span>
-                  {info.closeLabel}
-                </span>
-              )}
+      {open &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <span
+            ref={tooltipRef}
+            className={`${styles.statusProblemTooltip} ${
+              position?.placement === 'bottom' ? styles.statusProblemTooltipBelow : ''
+            }`}
+            role="tooltip"
+            style={tooltipStyle}
+          >
+            <span className={styles.statusProblemTooltipHeader}>
+              <span className={styles.statusProblemTooltipDot} aria-hidden="true" />
+              <span>{info.label}</span>
             </span>
-          )}
-        </span>
-      )}
+            <span className={styles.statusProblemTooltipMessage}>{info.message}</span>
+            {(info.requestWindow || info.observedAt || info.closeLabel) && (
+              <span className={styles.statusProblemTooltipMeta}>
+                {info.requestWindow && (
+                  <span>
+                    <span className={styles.statusProblemTooltipMetaLabel}>
+                      {t('auth_files.status_problem_window_short', { defaultValue: '时段' })}
+                    </span>
+                    {info.requestWindow}
+                  </span>
+                )}
+                {!info.requestWindow && info.observedAt && (
+                  <span>
+                    <span className={styles.statusProblemTooltipMetaLabel}>
+                      {t('auth_files.status_problem_observed_short', { defaultValue: '记录' })}
+                    </span>
+                    {info.observedAt}
+                  </span>
+                )}
+                {info.closeLabel && (
+                  <span>
+                    <span className={styles.statusProblemTooltipMetaLabel}>
+                      {t('auth_files.status_problem_close_short', { defaultValue: '关闭' })}
+                    </span>
+                    {info.closeLabel}
+                  </span>
+                )}
+              </span>
+            )}
+          </span>,
+          document.body
+        )}
     </span>
   );
 };
@@ -472,13 +581,13 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       });
     }
 
-    return {
-      label,
-      message: message.trim(),
-      requestWindow,
-      observedAt,
-      closeLabel,
-    };
+  return {
+    label,
+    message: simplifyStatusMessage(problem?.category ?? null, message),
+    requestWindow,
+    observedAt,
+    closeLabel,
+  };
   };
   const credentialInvalidBadgeLabel = getStatusBadgeLabel('credential_invalid');
   const authFileStatusBadgeLabel = visibleAuthFileStatusProblem
@@ -527,14 +636,6 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     hasAuthFileStatusProblem &&
     hasVisibleQuotaError &&
     visibleQuotaStatusProblem?.category === visibleAuthFileStatusProblem?.category;
-  const activeWarningLabel = hasVisibleQuotaError
-    ? quotaErrorBadgeLabel
-    : visibleAuthFileStatusProblem
-      ? authFileStatusBadgeLabel
-    : t('auth_files.health_status_warning');
-  const activeWarningMessage = hasVisibleQuotaError
-    ? visibleQuotaStatusProblem?.message || quotaErrorMessage
-    : visibleAuthFileStatusProblem?.message || rawStatusMessage;
   const hasVisibleStatusWarning =
     hasVisibleQuotaError || hasAuthFileStatusProblem || (hasStatusWarning && !authFileStatusProblem);
 
@@ -730,15 +831,6 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
             message: quotaErrorMessage,
           }
         : null;
-  const activeWarningInfo = hasVisibleQuotaError
-    ? quotaErrorInfo
-    : visibleAuthFileStatusProblem
-      ? authFileStatusInfo
-      : {
-          label: activeWarningLabel,
-          message: activeWarningMessage,
-          requestWindow: latestFailureRequestWindow?.label,
-        };
   const setRequestWindowHighlight = (
     active: boolean,
     info: StatusProblemTooltipInfo | null
@@ -1358,23 +1450,6 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   <span className={styles.statusToggleLabel}>
                     {t('auth_files.status_toggle_label')}
                   </span>
-                  {hasVisibleStatusWarning && activeWarningInfo && (
-                    <StatusProblemTooltip
-                      info={activeWarningInfo}
-                      onActiveChange={(active) =>
-                        setRequestWindowHighlight(active, activeWarningInfo)
-                      }
-                    >
-                      <span
-                        className={styles.stateWarningIconBadge}
-                        aria-label={`${activeWarningLabel}: ${activeWarningMessage}`}
-                        role="img"
-                        tabIndex={0}
-                      >
-                        <IconCircleAlert size={14} aria-hidden="true" />
-                      </span>
-                    </StatusProblemTooltip>
-                  )}
                   <ToggleSwitch
                     ariaLabel={t('auth_files.status_toggle_label')}
                     checked={!file.disabled}
