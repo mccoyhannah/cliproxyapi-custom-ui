@@ -25,13 +25,6 @@ function rateToColor(rate: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const h = date.getHours().toString().padStart(2, '0');
-  const m = date.getMinutes().toString().padStart(2, '0');
-  return `${h}:${m}`;
-}
-
 function formatSuccessRate(rate: number): string {
   const rounded = rate.toFixed(1);
   return `${rounded.endsWith('.0') ? rounded.slice(0, -2) : rounded}%`;
@@ -104,15 +97,9 @@ export function ProviderStatusBar({
   const renderTooltip = (detail: StatusBlockDetail, idx: number) => {
     const total = detail.success + detail.failure;
     const posClass = getTooltipPositionClass(idx, statusData.blockDetails.length);
-    const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
-    const requestWindowLabel = t('status_bar.request_window', {
-      window: timeRange,
-      defaultValue: '请求时段 {{window}}',
-    });
 
     return (
       <div className={`${s.statusTooltip} ${posClass}`}>
-        <span className={s.tooltipTime}>{requestWindowLabel}</span>
         {total > 0 ? (
           <span className={s.tooltipStats}>
             <span className={s.tooltipSuccess}>{t('status_bar.success_short')} {detail.success}</span>
@@ -121,13 +108,6 @@ export function ProviderStatusBar({
           </span>
         ) : (
           <span className={s.tooltipStats}>{t('status_bar.no_requests')}</span>
-        )}
-        {detail.failure > 0 && (
-          <span className={s.tooltipErrorHint}>
-            {t('status_bar.failure_window_hint', {
-              defaultValue: '此时段有失败请求',
-            })}
-          </span>
         )}
       </div>
     );

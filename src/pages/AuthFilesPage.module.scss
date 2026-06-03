@@ -13248,8 +13248,24 @@ button.codexSubscriptionValue {
 }
 
 .accountMemoCodexLoginButton {
-  --codex-login-accent: #06b6d4;
-  --codex-login-accent-strong: #0e7490;
+  --codex-login-accent: var(--primary-color);
+  --codex-login-accent-strong: var(--primary-color);
+
+  border-color: color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 9%, var(--surface-control));
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--primary-color) 46%, var(--border-color));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+      color-mix(in srgb, var(--primary-color) 11%, var(--surface-control));
+    color: color-mix(in srgb, var(--primary-color) 84%, var(--text-primary));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-color) 13%, transparent);
+  }
 }
 
 @include mobile {
