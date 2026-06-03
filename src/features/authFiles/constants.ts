@@ -153,7 +153,7 @@ export type AuthFileStatusProblem = AuthFileCredentialProblem & {
 const AUTH_FILE_CREDENTIAL_STATUS_PATTERN =
   /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i;
 const AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN =
-  /\b(?:local_proxy_unavailable|proxyconnect|connectex|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i;
+  /\b(?:local_proxy_unavailable|proxyconnect|connectex|delayed\s+connect\s+error|connection\s+refused|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i;
 const AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN =
   /\b(?:connection_transient|network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|wsarecv[^\n]*(?:forcibly\s+closed|reset)|forcibly\s+closed\s+by\s+the\s+remote\s+host)\b/i;
 const AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN =

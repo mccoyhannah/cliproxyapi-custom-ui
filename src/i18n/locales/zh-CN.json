@@ -673,6 +673,11 @@
     "status_rate_limited_title": "上游限流或额度不足：{{message}}。可稍后重试或换号。",
     "status_upstream_service_error_badge": "上游服务异常",
     "status_upstream_service_error_title": "上游服务返回异常：{{message}}。可稍后重试。",
+    "status_problem_request_window": "最近失败请求时段：{{window}}",
+    "status_problem_observed_at": "错误记录时间：{{time}}",
+    "status_problem_visible_since": "提示开始显示：{{time}}",
+    "status_problem_visible_remaining": "还会显示：{{time}}",
+    "status_problem_visible_persistent": "持续显示：直到认证恢复或状态清除",
     "quota_error_badge": "额度异常",
     "quota_credential_error_badge": "认证异常",
     "quota_compact_error": "额度异常：{{message}}",
@@ -1284,7 +1289,9 @@
   "status_bar": {
     "success_short": "✓",
     "failure_short": "✗",
-    "no_requests": "无请求"
+    "no_requests": "无请求",
+    "request_window": "请求时段 {{window}}",
+    "failure_window_hint": "此时段有失败请求"
   },
   "service_health": {
     "title": "服务健康监测",

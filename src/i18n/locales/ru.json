@@ -622,6 +622,11 @@
     "status_rate_limited_title": "Достигнут лимит или квота вышестоящего сервиса: {{message}}. Повторите позже или используйте другую учётную запись.",
     "status_upstream_service_error_badge": "Ошибка сервиса",
     "status_upstream_service_error_title": "Вышестоящий сервис вернул ошибку: {{message}}. Повторите позже.",
+    "status_problem_request_window": "Последнее окно с ошибкой: {{window}}",
+    "status_problem_observed_at": "Ошибка записана в: {{time}}",
+    "status_problem_visible_since": "Метка показана с: {{time}}",
+    "status_problem_visible_remaining": "Метка скроется через: {{time}}",
+    "status_problem_visible_persistent": "Показывается до восстановления авторизации или очистки статуса",
     "codex_quota_five_hour_short": "5ч",
     "codex_quota_weekly_short": "Нед",
     "page_size_label": "На странице",
@@ -1204,7 +1209,9 @@
   "status_bar": {
     "success_short": "✓",
     "failure_short": "✗",
-    "no_requests": "Нет запросов"
+    "no_requests": "Нет запросов",
+    "request_window": "Окно запросов {{window}}",
+    "failure_window_hint": "В этом окне есть неудачные запросы"
   },
   "service_health": {
     "title": "Состояние сервиса",

@@ -100,10 +100,14 @@ export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderSt
     const total = detail.success + detail.failure;
     const posClass = getTooltipPositionClass(idx, statusData.blockDetails.length);
     const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
+    const requestWindowLabel = t('status_bar.request_window', {
+      window: timeRange,
+      defaultValue: '请求时段 {{window}}',
+    });
 
     return (
       <div className={`${s.statusTooltip} ${posClass}`}>
-        <span className={s.tooltipTime}>{timeRange}</span>
+        <span className={s.tooltipTime}>{requestWindowLabel}</span>
         {total > 0 ? (
           <span className={s.tooltipStats}>
             <span className={s.tooltipSuccess}>{t('status_bar.success_short')} {detail.success}</span>
@@ -112,6 +116,13 @@ export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderSt
           </span>
         ) : (
           <span className={s.tooltipStats}>{t('status_bar.no_requests')}</span>
+        )}
+        {detail.failure > 0 && (
+          <span className={s.tooltipErrorHint}>
+            {t('status_bar.failure_window_hint', {
+              defaultValue: '此时段有失败请求',
+            })}
+          </span>
         )}
       </div>
     );
@@ -124,11 +135,24 @@ export function ProviderStatusBar({ statusData, styles: stylesProp }: ProviderSt
           const isIdle = detail.rate === -1;
           const blockStyle = isIdle ? undefined : { backgroundColor: rateToColor(detail.rate) };
           const isActive = activeTooltip === idx;
+          const total = detail.success + detail.failure;
+          const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
+          const nativeTitle =
+            total > 0
+              ? `${t('status_bar.request_window', {
+                  window: timeRange,
+                  defaultValue: '请求时段 {{window}}',
+                })}\n${t('stats.recent_success')}: ${detail.success} · ${t('stats.recent_failure')}: ${detail.failure}`
+              : `${t('status_bar.request_window', {
+                  window: timeRange,
+                  defaultValue: '请求时段 {{window}}',
+                })}\n${t('status_bar.no_requests')}`;
 
           return (
             <div
               key={idx}
               className={`${s.statusBlockWrapper} ${isActive ? s.statusBlockActive : ''}`}
+              title={nativeTitle}
               onPointerEnter={(e) => handlePointerEnter(e, idx)}
               onPointerLeave={handlePointerLeave}
               onPointerDown={(e) => handlePointerDown(e, idx)}

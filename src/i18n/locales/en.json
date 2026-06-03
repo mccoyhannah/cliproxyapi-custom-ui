@@ -653,6 +653,11 @@
     "status_rate_limited_title": "Upstream rate limit or quota was hit: {{message}}. Retry later or use another account.",
     "status_upstream_service_error_badge": "Upstream service error",
     "status_upstream_service_error_title": "Upstream service returned an error: {{message}}. Retry later.",
+    "status_problem_request_window": "Latest failed request window: {{window}}",
+    "status_problem_observed_at": "Error recorded at: {{time}}",
+    "status_problem_visible_since": "Badge shown since: {{time}}",
+    "status_problem_visible_remaining": "Badge hides in: {{time}}",
+    "status_problem_visible_persistent": "Persistent until auth recovers or status clears",
     "quota_error_badge": "Quota issue",
     "quota_credential_error_badge": "Auth issue",
     "quota_compact_error": "Quota issue: {{message}}",
@@ -1264,7 +1269,9 @@
   "status_bar": {
     "success_short": "✓",
     "failure_short": "✗",
-    "no_requests": "No requests"
+    "no_requests": "No requests",
+    "request_window": "Request window {{window}}",
+    "failure_window_hint": "This window has failed requests"
   },
   "service_health": {
     "title": "Service Health",

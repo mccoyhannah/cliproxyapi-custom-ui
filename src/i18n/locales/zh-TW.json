@@ -652,6 +652,11 @@
     "status_rate_limited_title": "上游限流或額度不足：{{message}}。可稍後重試或換號。",
     "status_upstream_service_error_badge": "上游服務異常",
     "status_upstream_service_error_title": "上游服務返回異常：{{message}}。可稍後重試。",
+    "status_problem_request_window": "最近失敗請求時段：{{window}}",
+    "status_problem_observed_at": "錯誤記錄時間：{{time}}",
+    "status_problem_visible_since": "提示開始顯示：{{time}}",
+    "status_problem_visible_remaining": "還會顯示：{{time}}",
+    "status_problem_visible_persistent": "持續顯示：直到認證恢復或狀態清除",
     "codex_quota_five_hour_short": "5h",
     "codex_quota_weekly_short": "週",
     "page_size_label": "單頁數量",
@@ -1273,7 +1278,9 @@
   "status_bar": {
     "success_short": "✓",
     "failure_short": "✗",
-    "no_requests": "無請求"
+    "no_requests": "無請求",
+    "request_window": "請求時段 {{window}}",
+    "failure_window_hint": "此時段有失敗請求"
   },
   "service_health": {
     "title": "服務健康監測",

@@ -52,6 +52,12 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
     ),
     'local_proxy_unavailable'
   );
+  assert.equal(
+    classifyUpstreamStatusText(
+      'upstream connect error or disconnect/reset before headers. transport failure reason: delayed connect error: Connection refused'
+    ),
+    'local_proxy_unavailable'
+  );
   assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'connection_transient');
   assert.equal(
     classifyUpstreamStatusText('wsarecv: An existing connection was forcibly closed by the remote host.'),

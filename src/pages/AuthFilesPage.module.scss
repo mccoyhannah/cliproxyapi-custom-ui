@@ -4361,6 +4361,13 @@ button.codexSubscriptionValue {
   gap: 8px;
 }
 
+.tooltipErrorHint {
+  display: block;
+  margin-top: 4px;
+  color: color-mix(in srgb, var(--danger-color) 88%, #fff);
+  font-weight: 650;
+}
+
 .tooltipSuccess {
   color: var(--success-color, #22c55e);
 }

@@ -60,6 +60,12 @@ type CodexCardQuotaState = {
   errorKind?: AuthFileStatusCategory;
   retryable?: boolean;
 };
+type VisibleStatusProblem<T> = T & {
+  visibleSinceMs: number;
+  visibleUntilMs: number | null;
+  visibleRemainingMs: number | null;
+  visibleTtlMs: number | null;
+};
 
 const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
   credential_invalid: 'auth_files.credential_invalid_badge',
@@ -113,7 +119,7 @@ const getStatusProblemKey = (
 function useVisibleStatusProblem<T extends { category: AuthFileStatusCategory; message: string; rawMessage: string }>(
   problem: T | null,
   resetKey: string
-): T | null {
+): VisibleStatusProblem<T> | null {
   const issueKey = getStatusProblemKey(problem, resetKey);
   const ttlMs = problem ? AUTH_STATUS_BADGE_TTL_MS[problem.category] : null;
   const [issueState, setIssueState] = useState({ key: '', firstSeenAt: 0 });
@@ -139,18 +145,33 @@ function useVisibleStatusProblem<T extends { category: AuthFileStatusCategory; m
     if (!issueKey || ttlMs === null) return;
     if (issueState.key !== issueKey) return;
 
-    const remainingMs = ttlMs - (Date.now() - issueState.firstSeenAt);
-    const timeoutId = window.setTimeout(
-      () => setNowMs(Date.now()),
-      Math.max(0, remainingMs) + 50
-    );
-    return () => window.clearTimeout(timeoutId);
+    const intervalId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
   }, [issueKey, issueState, ttlMs]);
 
   if (!problem) return null;
-  if (ttlMs === null) return problem;
-  if (issueState.key !== issueKey) return problem;
-  return nowMs - issueState.firstSeenAt < ttlMs ? problem : null;
+  const visibleSinceMs =
+    issueState.key === issueKey && issueState.firstSeenAt > 0 ? issueState.firstSeenAt : nowMs;
+  if (ttlMs === null) {
+    return {
+      ...problem,
+      visibleSinceMs,
+      visibleUntilMs: null,
+      visibleRemainingMs: null,
+      visibleTtlMs: null,
+    };
+  }
+
+  const visibleRemainingMs = Math.max(0, ttlMs - (nowMs - visibleSinceMs));
+  if (issueState.key === issueKey && visibleRemainingMs <= 0) return null;
+
+  return {
+    ...problem,
+    visibleSinceMs,
+    visibleUntilMs: visibleSinceMs + ttlMs,
+    visibleRemainingMs,
+    visibleTtlMs: ttlMs,
+  };
 }
 
 export type AuthFileCardProps = {
@@ -190,6 +211,28 @@ const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
   const provider = resolveAuthProvider(file);
   if (!QUOTA_PROVIDER_TYPES.has(provider as QuotaProviderType)) return null;
   return provider as QuotaProviderType;
+};
+
+const formatStatusClock = (timestampMs: number, includeSeconds = false): string =>
+  new Date(timestampMs).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(includeSeconds ? { second: '2-digit' as const } : {}),
+  });
+
+const formatStatusDuration = (durationMs: number): string => {
+  const totalSeconds = Math.max(0, Math.ceil(durationMs / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+};
+
+const getLatestFailureWindowLabel = (statusData: AuthFileStatusBarData): string => {
+  const detail = [...statusData.blockDetails].reverse().find((item) => item.failure > 0);
+  if (!detail) return '';
+  return `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`;
 };
 
 export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps) {
@@ -311,6 +354,60 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     t(AUTH_STATUS_LABEL_KEY[category], {
       defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
     });
+  const latestFailureRequestWindow = getLatestFailureWindowLabel(statusData);
+  const buildStatusProblemTitle = (
+    baseTitle: string,
+    problem: VisibleStatusProblem<{
+      category: AuthFileStatusCategory;
+      message: string;
+      rawMessage: string;
+    }> | null,
+    options: { observedAtMs?: number; requestWindow?: string } = {}
+  ) => {
+    const lines = [baseTitle.trim()].filter(Boolean);
+    const requestWindow = options.requestWindow ?? latestFailureRequestWindow;
+
+    if (requestWindow) {
+      lines.push(
+        t('auth_files.status_problem_request_window', {
+          window: requestWindow,
+          defaultValue: '最近失败请求时段：{{window}}',
+        })
+      );
+    } else if (options.observedAtMs) {
+      lines.push(
+        t('auth_files.status_problem_observed_at', {
+          time: formatStatusClock(options.observedAtMs, true),
+          defaultValue: '错误记录时间：{{time}}',
+        })
+      );
+    }
+
+    if (problem) {
+      lines.push(
+        t('auth_files.status_problem_visible_since', {
+          time: formatStatusClock(problem.visibleSinceMs, true),
+          defaultValue: '提示开始显示：{{time}}',
+        })
+      );
+      if (problem.visibleRemainingMs !== null) {
+        lines.push(
+          t('auth_files.status_problem_visible_remaining', {
+            time: formatStatusDuration(problem.visibleRemainingMs),
+            defaultValue: '还会显示：{{time}}',
+          })
+        );
+      } else {
+        lines.push(
+          t('auth_files.status_problem_visible_persistent', {
+            defaultValue: '持续显示：直到认证恢复或状态清除',
+          })
+        );
+      }
+    }
+
+    return lines.join('\n');
+  };
   const credentialInvalidBadgeLabel = getStatusBadgeLabel('credential_invalid');
   const authFileStatusBadgeLabel = visibleAuthFileStatusProblem
     ? getStatusBadgeLabel(visibleAuthFileStatusProblem.category)
@@ -531,7 +628,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           message: credentialStatusMessage,
           defaultValue: '上游已拒绝此认证：{{message}}。请重新登录获取新凭证。',
         });
-  const authFileStatusTitle = visibleAuthFileStatusProblem
+  const authFileStatusBaseTitle = visibleAuthFileStatusProblem
     ? visibleAuthFileStatusProblem.category === 'credential_invalid'
       ? credentialInvalidTitle
       : t(AUTH_STATUS_TITLE_KEY[visibleAuthFileStatusProblem.category], {
@@ -539,6 +636,24 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           defaultValue: `${authFileStatusBadgeLabel}: ${visibleAuthFileStatusProblem.message}`,
         })
     : '';
+  const authFileStatusTitle = visibleAuthFileStatusProblem
+    ? buildStatusProblemTitle(authFileStatusBaseTitle, visibleAuthFileStatusProblem)
+    : '';
+  const quotaErrorTitle =
+    hasVisibleQuotaError && visibleQuotaStatusProblem
+      ? buildStatusProblemTitle(visibleQuotaStatusProblem.message || quotaErrorMessage, visibleQuotaStatusProblem, {
+          observedAtMs:
+            typeof codexQuotaEntry?.errorObservedAt === 'number'
+              ? codexQuotaEntry.errorObservedAt
+              : undefined,
+          requestWindow: '',
+        })
+      : quotaErrorMessage;
+  const activeWarningTitle = hasVisibleQuotaError
+    ? quotaErrorTitle
+    : visibleAuthFileStatusProblem
+      ? authFileStatusTitle
+      : activeWarningMessage;
   const authFileStatusBadgeClass =
     visibleAuthFileStatusProblem?.category === 'credential_invalid'
       ? styles.stateBadgeQuotaError
@@ -902,7 +1017,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                         ? styles.stateBadgeWarning
                         : styles.stateBadgeQuotaError
                     }`}
-                    title={visibleQuotaStatusProblem?.message || quotaErrorMessage}
+                    title={quotaErrorTitle}
                   >
                     {quotaErrorBadgeLabel}
                   </span>
@@ -1140,7 +1255,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   {hasVisibleStatusWarning && (
                     <span
                       className={styles.stateWarningIconBadge}
-                      title={activeWarningMessage}
+                      title={activeWarningTitle}
                       aria-label={`${activeWarningLabel}: ${activeWarningMessage}`}
                       role="img"
                       tabIndex={0}

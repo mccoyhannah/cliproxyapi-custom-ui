@@ -62,7 +62,7 @@ const UPSTREAM_STATUS_PATTERNS = [
   {
     kind: 'local_proxy_unavailable',
     pattern:
-      /\b(?:local_proxy_unavailable|proxyconnect|connectex|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i,
+      /\b(?:local_proxy_unavailable|proxyconnect|connectex|delayed\s+connect\s+error|connection\s+refused|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i,
   },
   {
     kind: 'connection_transient',
