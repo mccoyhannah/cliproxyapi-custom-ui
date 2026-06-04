@@ -14,6 +14,12 @@ interface PageTransitionProps {
   getRouteOrder?: (pathname: string) => number | null;
   getTransitionVariant?: (fromPathname: string, toPathname: string) => TransitionVariant;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
+  resolveEnterScrollTop?: (context: {
+    location: Location;
+    scrollContainer: HTMLElement;
+    layerElement: HTMLElement;
+    defaultScrollTop: number;
+  }) => number | null | undefined;
 }
 
 const VERTICAL_TRANSITION_DURATION = 0.4;
@@ -67,6 +73,7 @@ export function PageTransition({
   getRouteOrder,
   getTransitionVariant,
   scrollContainerRef,
+  resolveEnterScrollTop,
 }: PageTransitionProps) {
   const location = useLocation();
   const currentLayerRef = useRef<HTMLDivElement>(null);
@@ -90,6 +97,7 @@ export function PageTransition({
   const locationRouteIdentity = buildRouteIdentity(location);
   const currentLayer =
     layers.find((layer) => layer.status === 'current') ?? layers[layers.length - 1];
+  const currentLayerLocation = currentLayer?.location;
   const currentLayerKey = currentLayer?.key ?? locationLayerKey;
   const currentLayerPathname = currentLayer?.location.pathname;
   const currentLayerRouteIdentity = currentLayer
@@ -241,7 +249,21 @@ export function PageTransition({
 
     const scrollContainer = resolveScrollContainer();
     const exitScrollOffset = exitScrollOffsetRef.current;
-    const enterScrollOffset = enterScrollOffsetRef.current;
+    let enterScrollOffset = enterScrollOffsetRef.current;
+    if (scrollContainer && currentLayerLocation) {
+      const resolvedEnterScrollTop = resolveEnterScrollTop?.({
+        location: currentLayerLocation,
+        scrollContainer,
+        layerElement: currentLayerEl,
+        defaultScrollTop: enterScrollOffset,
+      });
+      if (typeof resolvedEnterScrollTop === 'number' && Number.isFinite(resolvedEnterScrollTop)) {
+        const maxScrollTop = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight);
+        enterScrollOffset = Math.max(0, Math.min(maxScrollTop, resolvedEnterScrollTop));
+        enterScrollOffsetRef.current = enterScrollOffset;
+        scrollPositionsRef.current.set(currentLayerKey, enterScrollOffset);
+      }
+    }
     if (scrollContainer && exitScrollOffset !== enterScrollOffset) {
       scrollContainer.scrollTo({ top: enterScrollOffset, left: 0, behavior: 'auto' });
     }
@@ -401,7 +423,13 @@ export function PageTransition({
       cancelled = true;
       activeAnimations.forEach((animation) => animation.stop());
     };
-  }, [isAnimating, resolveScrollContainer]);
+  }, [
+    currentLayerKey,
+    currentLayerLocation,
+    isAnimating,
+    resolveEnterScrollTop,
+    resolveScrollContainer,
+  ]);
 
   return (
     <div className={`page-transition${isAnimating ? ' page-transition--animating' : ''}`}>

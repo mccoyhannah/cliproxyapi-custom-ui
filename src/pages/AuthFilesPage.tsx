@@ -126,8 +126,10 @@ import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from
 import type { AuthFileItem, CodexQuotaState } from '@/types';
 import {
   AUTH_FILES_FOCUS_CARDS_EVENT,
-  AUTH_FILES_FOCUS_CARDS_VALUE,
-  AUTH_FILES_FOCUS_QUERY_KEY,
+  AUTH_FILES_FOCUS_CARDS_GRID_ATTR,
+  AUTH_FILES_FOCUS_CARDS_HEADER_ATTR,
+  getAuthFilesCardsScrollTop,
+  isAuthFilesCardsFocusLocation,
 } from '@/router/authFilesFocus';
 import {
   normalizeRecentRequestAuthIndex,
@@ -160,11 +162,6 @@ const ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS = 900 * 1024;
 const ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS = 4_000_000;
 const ACCOUNT_MEMO_IMAGE_QUALITIES = [0.86, 0.78, 0.68, 0.58, 0.48] as const;
 const ACCOUNT_MEMO_LINK_LIMIT = 8;
-const CARD_FOCUS_BOTTOM_GAP = 8;
-const CARD_FOCUS_HEADER_COMFORT_GAP = 28;
-const CARD_FOCUS_HEADER_TUCK_LIMIT = 24;
-const CARD_FOCUS_PREVIOUS_LINE_CLEARANCE = 2;
-const CARD_FOCUS_HEADER_LINE_CLEARANCE = 2;
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
 const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
 
@@ -990,7 +987,7 @@ export function AuthFilesPage() {
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const fileListHeaderRef = useRef<HTMLDivElement>(null);
   const fileGridRef = useRef<HTMLDivElement>(null);
-  const focusedFileListOnOpenRef = useRef('');
+  const focusedFileListOnOpenRef = useRef({ search: '', header: false, grid: false });
   const pageDragDepthRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
   const filesLengthRef = useRef(0);
@@ -3539,55 +3536,10 @@ export function AuthFilesPage() {
       return;
     }
 
-    const containerRect = container.getBoundingClientRect();
-    const headerRect = header.getBoundingClientRect();
-    const gridRect = (grid ?? header).getBoundingClientRect();
-    const previousSectionBottom = (() => {
-      let section = header.previousElementSibling;
-      let bottom = Number.NEGATIVE_INFINITY;
-      while (section) {
-        bottom = Math.max(bottom, section.getBoundingClientRect().bottom);
-        section = section.previousElementSibling;
-      }
-      return Number.isFinite(bottom) ? bottom : null;
-    })();
-    const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-    const headerComfortScroll =
-      container.scrollTop + headerRect.top - containerRect.top - CARD_FOCUS_HEADER_COMFORT_GAP;
-    const gridBottomScroll =
-      container.scrollTop +
-      gridRect.bottom -
-      containerRect.top -
-      container.clientHeight +
-      CARD_FOCUS_BOTTOM_GAP;
-    const verticalSpan = gridRect.bottom - headerRect.top;
-    const canPreserveBottomGap =
-      Boolean(grid) &&
-      verticalSpan + CARD_FOCUS_HEADER_COMFORT_GAP + CARD_FOCUS_BOTTOM_GAP <=
-        container.clientHeight;
-    const preferredScrollTop = canPreserveBottomGap
-      ? Math.max(headerComfortScroll, gridBottomScroll)
-      : grid
-        ? Math.min(gridBottomScroll, headerComfortScroll + CARD_FOCUS_HEADER_TUCK_LIMIT)
-        : headerComfortScroll;
-    const previousLineHiddenScroll =
-      previousSectionBottom === null
-        ? 0
-        : container.scrollTop +
-          previousSectionBottom -
-          containerRect.top +
-          CARD_FOCUS_PREVIOUS_LINE_CLEARANCE;
-    const headerLineHiddenScroll =
-      container.scrollTop + headerRect.top - containerRect.top + CARD_FOCUS_HEADER_LINE_CLEARANCE;
-    const targetScrollTop = Math.max(
-      0,
-      Math.min(
-        maxScrollTop,
-        Math.max(preferredScrollTop, previousLineHiddenScroll, headerLineHiddenScroll)
-      )
-    );
-
-    container.scrollTo({ top: targetScrollTop, behavior });
+    container.scrollTo({
+      top: getAuthFilesCardsScrollTop({ container, header, grid }),
+      behavior,
+    });
   }, []);
 
   const scheduleFileCardsScroll = useCallback(
@@ -3621,23 +3573,29 @@ export function AuthFilesPage() {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
 
-    const shouldFocusCards =
-      new URLSearchParams(location.search).get(AUTH_FILES_FOCUS_QUERY_KEY) ===
-      AUTH_FILES_FOCUS_CARDS_VALUE;
-    if (!shouldFocusCards) {
-      focusedFileListOnOpenRef.current = '';
+    if (!isAuthFilesCardsFocusLocation(location)) {
+      focusedFileListOnOpenRef.current = { search: '', header: false, grid: false };
       return;
     }
-    const focusSignature = location.search;
-    if (focusedFileListOnOpenRef.current === focusSignature || loading) return;
+    if (focusedFileListOnOpenRef.current.search !== location.search) {
+      focusedFileListOnOpenRef.current = { search: location.search, header: false, grid: false };
+    }
 
     const target = fileListHeaderRef.current;
-    const needsRenderedGrid = pageItems.length > 0;
-    if (!target || (needsRenderedGrid && !fileGridRef.current)) return;
+    if (!target) return;
 
-    focusedFileListOnOpenRef.current = focusSignature;
+    const hasGrid = Boolean(fileGridRef.current);
+    if (focusedFileListOnOpenRef.current.header && (!hasGrid || focusedFileListOnOpenRef.current.grid)) {
+      return;
+    }
+
+    focusedFileListOnOpenRef.current = {
+      ...focusedFileListOnOpenRef.current,
+      header: true,
+      grid: focusedFileListOnOpenRef.current.grid || hasGrid,
+    };
     return scheduleFileCardsScroll('auto');
-  }, [isCurrentLayer, loading, location.search, pageItems.length, scheduleFileCardsScroll]);
+  }, [isCurrentLayer, loading, location, pageItems.length, scheduleFileCardsScroll]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -5069,7 +5027,11 @@ export function AuthFilesPage() {
               </div>
             </div>
 
-            <div className={styles.fileListHeader} ref={fileListHeaderRef}>
+            <div
+              className={styles.fileListHeader}
+              ref={fileListHeaderRef}
+              {...{ [AUTH_FILES_FOCUS_CARDS_HEADER_ATTR]: 'true' }}
+            >
               <div className={styles.fileListHeaderText}>
                 <span className={styles.fileListKicker}>
                   {t('auth_files.list_kicker', { defaultValue: '日常管理' })}
@@ -5187,6 +5149,7 @@ export function AuthFilesPage() {
               <div
                 ref={fileGridRef}
                 className={`${styles.fileGrid} ${quotaFilterType ? styles.fileGridQuotaManaged : ''} ${compactMode ? styles.fileGridCompact : ''}`}
+                {...{ [AUTH_FILES_FOCUS_CARDS_GRID_ATTR]: 'true' }}
               >
                 {pageItems.map((file) => (
                   <AuthFileCard

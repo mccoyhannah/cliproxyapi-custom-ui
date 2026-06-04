@@ -6,6 +6,7 @@ import { CodexQuotaBackgroundRefresher } from '@/components/quota';
 import {
   AUTH_FILES_FOCUS_CARDS_EVENT,
   AUTH_FILES_FOCUS_CARDS_PATH,
+  resolveAuthFilesCardsEnterScrollTop,
 } from '@/router/authFilesFocus';
 import { MainRoutes } from '@/router/MainRoutes';
 import { getRouteOrder, getTransitionVariant } from '@/router/navMeta';
@@ -221,6 +222,7 @@ export function MainLayout() {
               getRouteOrder={resolveRouteOrder}
               getTransitionVariant={getTransitionVariant}
               scrollContainerRef={contentRef}
+              resolveEnterScrollTop={resolveAuthFilesCardsEnterScrollTop}
             />
           </main>
         </div>
