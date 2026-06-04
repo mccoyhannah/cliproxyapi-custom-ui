@@ -440,7 +440,7 @@ export function SystemPage() {
                 size="sm"
                 leftIcon={<IconRefreshCw size={15} />}
                 onClick={handleBackendRestart}
-                loading={backendRestarting || backendControlWaking}
+                loading={backendRestarting}
                 disabled={
                   auth.connectionStatus !== 'connected' ||
                   backendRestarting ||
