@@ -32,8 +32,12 @@ Else
     backendPort = "8317"
 End If
 
-If WScript.Arguments.Count >= 5 And IsNumeric(WScript.Arguments.Item(4)) Then
-    idleShutdownMinutes = WScript.Arguments.Item(4)
+If WScript.Arguments.Count >= 5 Then
+    If IsNumeric(WScript.Arguments.Item(4)) Then
+        idleShutdownMinutes = WScript.Arguments.Item(4)
+    Else
+        idleShutdownMinutes = "10"
+    End If
 Else
     idleShutdownMinutes = "10"
 End If

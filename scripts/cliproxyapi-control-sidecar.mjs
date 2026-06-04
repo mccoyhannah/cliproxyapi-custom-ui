@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -113,6 +114,26 @@ export function isOriginAllowedValue(origin) {
   return !value || ALLOWED_ORIGINS.has(value);
 }
 
+export function resolvePwshPath(env = process.env, fileExists = existsSync) {
+  const programFiles = env.ProgramFiles || 'C:\\Program Files';
+  const windowsDir = env.WINDIR || env.SystemRoot || 'C:\\Windows';
+  const candidates = [
+    'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+    path.win32.join(programFiles, 'PowerShell', '7', 'pwsh.exe'),
+    'D:\\Tools\\PowerShell\\7\\pwsh.exe',
+    path.win32.join(windowsDir, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    'pwsh.exe',
+  ];
+
+  for (const candidate of [...new Set(candidates)]) {
+    if (candidate === 'pwsh.exe' || fileExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return 'pwsh.exe';
+}
+
 function isOriginAllowed(req) {
   return isOriginAllowedValue(req.headers.origin);
 }
@@ -219,8 +240,9 @@ export async function validateManagementKey(key, apiBase) {
 
 function runPwsh(script, input = '') {
   return new Promise((resolve, reject) => {
+    const pwshPath = resolvePwshPath();
     const child = spawn(
-      'pwsh.exe',
+      pwshPath,
       ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script],
       {
         windowsHide: true,
@@ -235,12 +257,14 @@ function runPwsh(script, input = '') {
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString('utf8');
     });
-    child.on('error', reject);
+    child.on('error', (err) => {
+      reject(new Error(`failed to launch PowerShell (${pwshPath}): ${err.message}`));
+    });
     child.on('close', (code) => {
       if (code === 0) {
         resolve(stdout.trim());
       } else {
-        reject(new Error(stderr.trim() || `pwsh exited with ${code}`));
+        reject(new Error(stderr.trim() || `${path.basename(pwshPath)} exited with ${code}`));
       }
     });
     child.stdin.end(input, 'utf8');
@@ -249,8 +273,9 @@ function runPwsh(script, input = '') {
 
 function runPwshFile(filePath, argumentList = []) {
   return new Promise((resolve, reject) => {
+    const pwshPath = resolvePwshPath();
     const child = spawn(
-      'pwsh.exe',
+      pwshPath,
       ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', filePath, ...argumentList],
       {
         windowsHide: true,
@@ -265,12 +290,14 @@ function runPwshFile(filePath, argumentList = []) {
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString('utf8');
     });
-    child.on('error', reject);
+    child.on('error', (err) => {
+      reject(new Error(`failed to launch PowerShell (${pwshPath}): ${err.message}`));
+    });
     child.on('close', (code) => {
       if (code === 0) {
         resolve(stdout.trim());
       } else {
-        reject(new Error(stderr.trim() || stdout.trim() || `pwsh exited with ${code}`));
+        reject(new Error(stderr.trim() || stdout.trim() || `${path.basename(pwshPath)} exited with ${code}`));
       }
     });
   });
