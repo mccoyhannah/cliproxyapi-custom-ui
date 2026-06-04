@@ -13209,21 +13209,44 @@ button.codexSubscriptionValue {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  min-width: 0;
 }
 
 .cardHeaderContent {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cardHeaderContent .displayNameButton {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cardHeaderContent .displayNameText {
   flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
 }
 
 .cardHeaderStatusBadges {
   display: inline-flex;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: flex-end;
   gap: 5px;
-  max-width: min(46%, 190px);
+  max-width: min(42%, 170px);
   margin-left: auto;
   padding-top: 1px;
 }

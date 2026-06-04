@@ -3,6 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PageTransition } from '@/components/common/PageTransition';
 import { CodexQuotaBackgroundRefresher } from '@/components/quota';
+import {
+  AUTH_FILES_FOCUS_CARDS_EVENT,
+  AUTH_FILES_FOCUS_CARDS_PATH,
+} from '@/router/authFilesFocus';
 import { MainRoutes } from '@/router/MainRoutes';
 import { getRouteOrder, getTransitionVariant } from '@/router/navMeta';
 import {
@@ -17,7 +21,6 @@ import { HeaderActions } from './HeaderActions';
 import { SidebarNav } from './SidebarNav';
 
 const SIDEBAR_ID = 'primary-sidebar';
-const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
 
 export function MainLayout() {
   const { t } = useTranslation();
@@ -160,7 +163,7 @@ export function MainLayout() {
       window.dispatchEvent(new Event(AUTH_FILES_FOCUS_CARDS_EVENT));
       return;
     }
-    navigate('/auth-files?focus=cards');
+    navigate(AUTH_FILES_FOCUS_CARDS_PATH);
   }, [location.pathname, navigate]);
 
   const resolveRouteOrder = useCallback(

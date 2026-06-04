@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import {
@@ -13,6 +13,7 @@ import {
   IconSidebarSystem,
   IconSidebarUsage,
 } from '@/components/ui/icons';
+import { AUTH_FILES_FOCUS_CARDS_EVENT } from '@/router/authFilesFocus';
 import { getVisibleNavItems, type NavItemMeta, type SidebarIconKey } from '@/router/navMeta';
 
 interface SidebarNavProps {
@@ -48,6 +49,7 @@ export function SidebarNav({
   onNavigate,
 }: SidebarNavProps) {
   const { t } = useTranslation();
+  const location = useLocation();
   const abbrBrandName = t('title.abbr');
   const isVisuallyCollapsed = collapsed && !open;
   const navItems = getVisibleNavItems({ loggingToFile });
@@ -66,13 +68,20 @@ export function SidebarNav({
       <nav className="nav-section" aria-label={t('nav.main_navigation', { defaultValue: 'Main navigation' })}>
         {navItems.map((item) => {
           const label = getNavLabel(item, t);
+          const navTarget = item.navTo ?? item.path;
+          const handleNavigate = () => {
+            onNavigate();
+            if (item.key === 'authFiles' && location.pathname === item.path) {
+              window.dispatchEvent(new Event(AUTH_FILES_FOCUS_CARDS_EVENT));
+            }
+          };
 
           return (
             <NavLink
               key={item.path}
-              to={item.path}
+              to={navTarget}
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              onClick={onNavigate}
+              onClick={handleNavigate}
               title={isVisuallyCollapsed ? label : undefined}
             >
               <span className="nav-icon">{sidebarIcons[item.icon]}</span>

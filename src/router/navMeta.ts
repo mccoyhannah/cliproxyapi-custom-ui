@@ -1,3 +1,5 @@
+import { AUTH_FILES_FOCUS_CARDS_PATH } from './authFilesFocus';
+
 export type SidebarIconKey =
   | 'dashboard'
   | 'aiProviders'
@@ -14,6 +16,7 @@ export type TransitionVariant = 'vertical' | 'ios';
 export interface NavItemMeta {
   key: string;
   path: string;
+  navTo?: string;
   labelKey: string;
   defaultLabel?: string;
   icon: SidebarIconKey;
@@ -33,7 +36,13 @@ export const NAV_ITEMS: readonly NavItemMeta[] = [
   { key: 'dashboard', path: '/dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
   { key: 'config', path: '/config', labelKey: 'nav.config_management', icon: 'config' },
   { key: 'aiProviders', path: '/ai-providers', labelKey: 'nav.ai_providers', icon: 'aiProviders' },
-  { key: 'authFiles', path: '/auth-files', labelKey: 'nav.auth_files', icon: 'authFiles' },
+  {
+    key: 'authFiles',
+    path: '/auth-files',
+    navTo: AUTH_FILES_FOCUS_CARDS_PATH,
+    labelKey: 'nav.auth_files',
+    icon: 'authFiles',
+  },
   { key: 'oauth', path: '/oauth', labelKey: 'nav.oauth', defaultLabel: 'OAuth', icon: 'oauth' },
   { key: 'quota', path: '/quota', labelKey: 'nav.quota_management', icon: 'quota' },
   {

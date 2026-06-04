@@ -125,6 +125,11 @@ import { CODEX_CONFIG, useQuotaLoader } from '@/components/quota';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, CodexQuotaState } from '@/types';
 import {
+  AUTH_FILES_FOCUS_CARDS_EVENT,
+  AUTH_FILES_FOCUS_CARDS_VALUE,
+  AUTH_FILES_FOCUS_QUERY_KEY,
+} from '@/router/authFilesFocus';
+import {
   normalizeRecentRequestAuthIndex,
   normalizeRecentRequestBuckets,
   statusBarDataFromRecentRequests,
@@ -160,7 +165,6 @@ const CARD_FOCUS_HEADER_COMFORT_GAP = 28;
 const CARD_FOCUS_HEADER_TUCK_LIMIT = 24;
 const CARD_FOCUS_PREVIOUS_LINE_CLEARANCE = 2;
 const CARD_FOCUS_HEADER_LINE_CLEARANCE = 2;
-const AUTH_FILES_FOCUS_CARDS_EVENT = 'cpamc:auth-files-focus-cards';
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
 const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
 
@@ -3615,8 +3619,11 @@ export function AuthFilesPage() {
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isCurrentLayer) return;
 
-    const shouldFocusCards = new URLSearchParams(location.search).get('focus') === 'cards';
+    const shouldFocusCards =
+      new URLSearchParams(location.search).get(AUTH_FILES_FOCUS_QUERY_KEY) ===
+      AUTH_FILES_FOCUS_CARDS_VALUE;
     if (!shouldFocusCards) {
       focusedFileListOnOpenRef.current = '';
       return;
@@ -3630,17 +3637,18 @@ export function AuthFilesPage() {
 
     focusedFileListOnOpenRef.current = focusSignature;
     return scheduleFileCardsScroll('auto');
-  }, [loading, location.search, pageItems.length, scheduleFileCardsScroll]);
+  }, [isCurrentLayer, loading, location.search, pageItems.length, scheduleFileCardsScroll]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isCurrentLayer) return;
 
     const handleFocusCards = () => {
       scheduleFileCardsScroll('auto');
     };
     window.addEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
     return () => window.removeEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
-  }, [scheduleFileCardsScroll]);
+  }, [isCurrentLayer, scheduleFileCardsScroll]);
 
   useEffect(() => {
     setBatchActionBarVisible(selectionCount > 0);
