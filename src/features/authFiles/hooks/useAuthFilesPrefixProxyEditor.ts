@@ -54,7 +54,7 @@ export type PrefixProxyEditorState = {
 
 export type UseAuthFilesPrefixProxyEditorOptions = {
   disableControls: boolean;
-  loadFiles: () => Promise<void>;
+  loadFiles: () => Promise<unknown>;
 };
 
 export type UseAuthFilesPrefixProxyEditorResult = {

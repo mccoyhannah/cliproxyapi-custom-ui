@@ -226,7 +226,7 @@ export type AuthFileCardProps = {
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
   onPriorityChange: (file: AuthFileItem, priority: number) => Promise<void>;
-  onDisplayNameChange: (file: AuthFileItem, note: string) => Promise<void>;
+  onDisplayNameChange: (file: AuthFileItem, note: string) => Promise<boolean>;
   onPriorityInvalid: () => void;
   onToggleSelect: (name: string) => void;
 };
@@ -289,6 +289,22 @@ const getLatestFailureWindow = (
   for (let index = statusData.blockDetails.length - 1; index >= 0; index -= 1) {
     const detail = statusData.blockDetails[index];
     if (detail.failure <= 0) continue;
+    if (now - detail.endTime > RECENT_FAILURE_WINDOW_MAX_AGE_MS) continue;
+    return {
+      index,
+      label: `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`,
+    };
+  }
+  return null;
+};
+
+const getLatestRecoveryWindow = (
+  statusData: AuthFileStatusBarData
+): { index: number; label: string } | null => {
+  const now = Date.now();
+  for (let index = statusData.blockDetails.length - 1; index >= 0; index -= 1) {
+    const detail = statusData.blockDetails[index];
+    if (detail.success <= 0 || detail.failure > 0) continue;
     if (now - detail.endTime > RECENT_FAILURE_WINDOW_MAX_AGE_MS) continue;
     return {
       index,
@@ -539,17 +555,30 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
   const authFileStatusProblem =
     !isRuntimeOnly && !file.disabled ? getAuthFileStatusProblem(file) : null;
+  const latestFailureRequestWindow = getLatestFailureWindow(statusData);
+  const latestRecoveryRequestWindow = getLatestRecoveryWindow(statusData);
+  const codexQuotaSucceeded = resolvedQuotaType === 'codex' && codexQuotaEntry?.status === 'success';
+  const credentialInvalidHasRecovery =
+    authFileStatusProblem?.category === 'credential_invalid' &&
+    (codexQuotaSucceeded ||
+      (latestRecoveryRequestWindow !== null &&
+        (latestFailureRequestWindow === null ||
+          latestRecoveryRequestWindow.index > latestFailureRequestWindow.index)));
+  const effectiveAuthFileStatusProblem = credentialInvalidHasRecovery
+    ? null
+    : authFileStatusProblem;
+  const shouldShowRawStatusWarning = hasStatusWarning && !credentialInvalidHasRecovery;
   const authStatusVisibilityKey = [
     statusData.totalFailure,
     file.lastRefresh ?? '',
     file.modified ?? '',
     file['modtime'] ?? '',
+    codexQuotaEntry?.status ?? '',
   ].join('|');
   const visibleAuthFileStatusProblem = useVisibleStatusProblem(
-    authFileStatusProblem,
+    effectiveAuthFileStatusProblem,
     authStatusVisibilityKey
   );
-  const latestFailureRequestWindow = getLatestFailureWindow(statusData);
   const shouldShowAuthFileStatusProblem =
     visibleAuthFileStatusProblem !== null &&
     (visibleAuthFileStatusProblem.category === 'credential_invalid' ||
@@ -650,7 +679,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const hasVisibleStatusWarning =
     hasVisibleQuotaError ||
     hasAuthFileStatusProblem ||
-    (hasStatusWarning && !authFileStatusProblem && latestFailureRequestWindow !== null);
+    (shouldShowRawStatusWarning &&
+      !effectiveAuthFileStatusProblem &&
+      latestFailureRequestWindow !== null);
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
@@ -1038,7 +1069,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
         ? t('auth_files.health_status_quota_error', { defaultValue: '额度异常' })
       : hasAuthFileStatusProblem
         ? authFileStatusBadgeLabel
-      : hasStatusWarning && !authFileStatusProblem && latestFailureRequestWindow !== null
+      : shouldShowRawStatusWarning &&
+          !effectiveAuthFileStatusProblem &&
+          latestFailureRequestWindow !== null
         ? t('auth_files.health_status_warning')
         : rawStatusMessage
           ? t('auth_files.health_status_healthy')
@@ -1123,6 +1156,60 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     <IconFileText size={14} />
                   </button>
                 )}
+                {(isRuntimeOnly ||
+                  hasAuthFileStatusProblem ||
+                  (accessTokenOnly && !hasCredentialStatusError) ||
+                  (hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge)) && (
+                  <span className={styles.cardHeaderStatusBadges}>
+                    {isRuntimeOnly && (
+                      <span className={`${styles.stateBadge} ${stateBadgeClass}`}>
+                        {stateLabel}
+                      </span>
+                    )}
+                    {hasAuthFileStatusProblem && authFileStatusInfo && (
+                      <StatusProblemTooltip
+                        info={authFileStatusInfo}
+                        onActiveChange={(active) =>
+                          setRequestWindowHighlight(active, authFileStatusInfo)
+                        }
+                      >
+                        <span
+                          className={`${styles.stateBadge} ${authFileStatusBadgeClass}`}
+                          tabIndex={0}
+                        >
+                          {authFileStatusBadgeLabel}
+                        </span>
+                      </StatusProblemTooltip>
+                    )}
+                    {accessTokenOnly && !hasCredentialStatusError && (
+                      <span
+                        className={`${styles.stateBadge} ${styles.refreshTokenWarningBadge}`}
+                        title={t('auth_files.missing_refresh_token_badge_title', {
+                          defaultValue: '没有 refresh_token，过期后需要重新登录获取新凭证',
+                        })}
+                      >
+                        {t('auth_files.missing_refresh_token_badge', {
+                          defaultValue: '临时凭证',
+                        })}
+                      </span>
+                    )}
+                    {hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge && quotaErrorInfo && (
+                      <StatusProblemTooltip info={quotaErrorInfo}>
+                        <span
+                          className={`${styles.stateBadge} ${
+                            visibleQuotaStatusProblem &&
+                            visibleQuotaStatusProblem.category !== 'credential_invalid'
+                              ? styles.stateBadgeWarning
+                              : styles.stateBadgeQuotaError
+                          }`}
+                          tabIndex={0}
+                        >
+                          {quotaErrorBadgeLabel}
+                        </span>
+                      </StatusProblemTooltip>
+                    )}
+                  </span>
+                )}
               </div>
               {displayNameEditing ? (
                 <input
@@ -1159,58 +1246,6 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 </button>
               )}
             </div>
-            {(isRuntimeOnly ||
-              hasAuthFileStatusProblem ||
-              (accessTokenOnly && !hasCredentialStatusError) ||
-              (hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge)) && (
-              <div className={styles.cardHeaderStatusBadges}>
-                {isRuntimeOnly && (
-                  <span className={`${styles.stateBadge} ${stateBadgeClass}`}>{stateLabel}</span>
-                )}
-                {hasAuthFileStatusProblem && authFileStatusInfo && (
-                  <StatusProblemTooltip
-                    info={authFileStatusInfo}
-                    onActiveChange={(active) =>
-                      setRequestWindowHighlight(active, authFileStatusInfo)
-                    }
-                  >
-                    <span
-                      className={`${styles.stateBadge} ${authFileStatusBadgeClass}`}
-                      tabIndex={0}
-                    >
-                      {authFileStatusBadgeLabel}
-                    </span>
-                  </StatusProblemTooltip>
-                )}
-                {accessTokenOnly && !hasCredentialStatusError && (
-                  <span
-                    className={`${styles.stateBadge} ${styles.refreshTokenWarningBadge}`}
-                    title={t('auth_files.missing_refresh_token_badge_title', {
-                      defaultValue: '没有 refresh_token，过期后需要重新登录获取新凭证',
-                    })}
-                  >
-                    {t('auth_files.missing_refresh_token_badge', {
-                      defaultValue: '临时凭证',
-                    })}
-                  </span>
-                )}
-                {hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge && quotaErrorInfo && (
-                  <StatusProblemTooltip info={quotaErrorInfo}>
-                    <span
-                      className={`${styles.stateBadge} ${
-                        visibleQuotaStatusProblem &&
-                        visibleQuotaStatusProblem.category !== 'credential_invalid'
-                          ? styles.stateBadgeWarning
-                          : styles.stateBadgeQuotaError
-                      }`}
-                      tabIndex={0}
-                    >
-                      {quotaErrorBadgeLabel}
-                    </span>
-                  </StatusProblemTooltip>
-                )}
-              </div>
-            )}
           </div>
 
           <div className={styles.fileNameSource} title={file.name}>

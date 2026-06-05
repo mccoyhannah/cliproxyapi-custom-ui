@@ -231,7 +231,8 @@ const ACCOUNT_MEMO_EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const ACCOUNT_MEMO_CREDENTIAL_LABEL_PATTERN =
   /(?:账号|帳號|账户|帳戶|邮箱|郵箱|邮件|郵件|密码|密碼|pass(?:word)?|email|login|user(?:name)?|account)/i;
 const ACCOUNT_MEMO_CREDENTIAL_SEPARATOR_PATTERN = /[|｜]/;
-const ACCOUNT_MEMO_CREDENTIAL_PART_SEPARATOR_PATTERN = /\s*(?:-{4,}|－{4,}|—{4,})\s*/u;
+const ACCOUNT_MEMO_COPY_PART_SEPARATOR_PATTERN =
+  /\s*(?:-{4,}|\uFF0D{4,}|\u2014{4,}|[|\uFF5C])\s*/gu;
 const ACCOUNT_MEMO_CREDENTIAL_NOTE_SEPARATOR_PATTERN = /[:：]/u;
 const ACCOUNT_MEMO_SINGLE_CREDENTIAL_MIN_LENGTH = 8;
 
@@ -254,7 +255,7 @@ type AccountMemoLinkPreviewBlock = {
   type: 'link';
   link: AccountMemoLink;
   noteText: string;
-  copyText: string;
+  copyParts: AccountMemoCredentialPart[];
   startIndex: number;
 };
 type AccountMemoCredentialPart = {
@@ -321,6 +322,44 @@ const splitAccountMemoCredentialNote = (value: string) => {
   };
 };
 
+const splitAccountMemoRawCopySegments = (
+  value: string,
+  startIndex: number
+): Array<{ text: string; startIndex: number }> => {
+  const segments: Array<{ text: string; startIndex: number }> = [];
+  let segmentStart = 0;
+  ACCOUNT_MEMO_COPY_PART_SEPARATOR_PATTERN.lastIndex = 0;
+
+  const pushSegment = (text: string, absoluteStart: number) => {
+    if (!text.trim()) return;
+    segments.push({ text, startIndex: absoluteStart });
+  };
+
+  let match: RegExpExecArray | null;
+  while ((match = ACCOUNT_MEMO_COPY_PART_SEPARATOR_PATTERN.exec(value)) !== null) {
+    pushSegment(value.slice(segmentStart, match.index), startIndex + segmentStart);
+    segmentStart = match.index + match[0].length;
+  }
+
+  pushSegment(value.slice(segmentStart), startIndex + segmentStart);
+  return segments;
+};
+
+const splitAccountMemoCopyParts = (
+  value: string,
+  startIndex: number,
+  noteText = ''
+): AccountMemoCredentialPart[] =>
+  splitAccountMemoRawCopySegments(value, startIndex).map((segment) => {
+    const leadingSpaces = segment.text.search(/\S/);
+    const text = segment.text.trim();
+    return {
+      text,
+      noteText,
+      startIndex: segment.startIndex + (leadingSpaces > -1 ? leadingSpaces : 0),
+    };
+  });
+
 const splitAccountMemoCredentialParts = (
   blockText: string,
   startIndex: number
@@ -341,24 +380,19 @@ const splitAccountMemoCredentialParts = (
         continue;
       }
 
-      let segmentStart = 0;
-      const segments = line.split(ACCOUNT_MEMO_CREDENTIAL_PART_SEPARATOR_PATTERN);
+      const segments = splitAccountMemoRawCopySegments(line, contentLineStart);
       for (const segment of segments) {
-        const parsedPart = splitAccountMemoCredentialNote(segment);
+        const parsedPart = splitAccountMemoCredentialNote(segment.text);
         const part = parsedPart.text;
         if (part && isLikelyAccountMemoCredentialPart(part)) {
-          const localIndex = line.indexOf(segment, segmentStart);
           parts.push({
             text: part,
             noteText: parsedPart.noteText || pendingNoteText,
             startIndex:
-              contentLineStart +
-              (localIndex > -1 ? localIndex : segmentStart) +
-              (parsedPart.textOffset > -1 ? parsedPart.textOffset : 0),
+              segment.startIndex + (parsedPart.textOffset > -1 ? parsedPart.textOffset : 0),
           });
           pendingNoteText = '';
         }
-        segmentStart += segment.length;
       }
     }
     lineStart += rawLine.length + 1;
@@ -410,12 +444,13 @@ const parseAccountMemoPreviewBlocks = (text: string): AccountMemoPreviewBlock[] 
       const contentStart = matchIndex + raw.length;
       const noteText = blockText.slice(0, matchIndex).trim();
       const copyText = blockText.slice(contentStart).trim();
+      const copyParts = splitAccountMemoCopyParts(copyText, startIndex + contentStart);
       ACCOUNT_MEMO_URL_PATTERN.lastIndex = 0;
       blocks.push({
         type: 'link',
         link,
         noteText,
-        copyText,
+        copyParts,
         startIndex: startIndex + matchIndex,
       });
       canMergeCredentialBlock = false;
@@ -930,6 +965,7 @@ export function AuthFilesPage() {
   );
   const [accountMemoEditorFile, setAccountMemoEditorFile] = useState<AuthFileItem | null>(null);
   const [accountMemoDraft, setAccountMemoDraft] = useState('');
+  const [accountMemoDisplayNameDraft, setAccountMemoDisplayNameDraft] = useState('');
   const [accountMemoImagesDraft, setAccountMemoImagesDraft] = useState<AuthFileAccountMemoImage[]>(
     []
   );
@@ -1159,6 +1195,31 @@ export function AuthFilesPage() {
     });
   }, []);
 
+  const refreshAuthFilesAndCodexQuota = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const nextFiles = await loadFiles({
+        preserveExisting: true,
+        silent: options.silent ?? true,
+      });
+      const quotaTargets = (nextFiles ?? files).filter(
+        (file) =>
+          CODEX_CONFIG.filterFn(file) &&
+          !isRuntimeOnlyAuthFile(file) &&
+          !isDisabledAuthFile(file)
+      );
+
+      if (quotaTargets.length > 0) {
+        await loadCodexQuota(quotaTargets, 'all', setCodexQuotaRefreshLoading, {
+          preserveExisting: true,
+          silent: true,
+        });
+      }
+
+      return nextFiles;
+    },
+    [files, loadCodexQuota, loadFiles, setCodexQuotaRefreshLoading]
+  );
+
   const startCodexOAuthPolling = useCallback(
     (state: string, attemptId: number) => {
       clearCodexOAuthPollTimer();
@@ -1170,6 +1231,7 @@ export function AuthFilesPage() {
 
           if (result.status === 'ok') {
             finishCodexOAuthAttempt();
+            void refreshAuthFilesAndCodexQuota({ silent: true });
             showNotification(
               t('auth_files.codex_oauth_success', { defaultValue: 'Codex 认证成功。' }),
               'success'
@@ -1208,7 +1270,13 @@ export function AuthFilesPage() {
         CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS
       );
     },
-    [clearCodexOAuthPollTimer, finishCodexOAuthAttempt, showNotification, t]
+    [
+      clearCodexOAuthPollTimer,
+      finishCodexOAuthAttempt,
+      refreshAuthFilesAndCodexQuota,
+      showNotification,
+      t,
+    ]
   );
 
   const handleCancelCodexOAuth = useCallback(() => {
@@ -1873,11 +1941,11 @@ export function AuthFilesPage() {
 
   const handleHeaderRefresh = useCallback(async () => {
     await Promise.all([
-      loadFiles({ preserveExisting: true, silent: files.length > 0 }),
+      refreshAuthFilesAndCodexQuota({ silent: files.length > 0 }),
       loadExcluded(),
       loadModelAlias(),
     ]);
-  }, [files.length, loadFiles, loadExcluded, loadModelAlias]);
+  }, [files.length, loadExcluded, loadModelAlias, refreshAuthFilesAndCodexQuota]);
 
   useHeaderRefresh(handleHeaderRefresh);
 
@@ -1885,10 +1953,29 @@ export function AuthFilesPage() {
     if (!isCurrentLayer) return;
     const preserveExisting = loadedFilesOnceRef.current || filesLengthRef.current > 0;
     loadedFilesOnceRef.current = true;
-    loadFiles({ preserveExisting, silent: preserveExisting });
+    void loadFiles({ preserveExisting, silent: preserveExisting }).then((nextFiles) => {
+      const quotaTargets = (nextFiles ?? []).filter(
+        (file) =>
+          CODEX_CONFIG.filterFn(file) &&
+          !isRuntimeOnlyAuthFile(file) &&
+          !isDisabledAuthFile(file)
+      );
+      if (quotaTargets.length === 0) return;
+      void loadCodexQuota(quotaTargets, 'all', setCodexQuotaRefreshLoading, {
+        preserveExisting: true,
+        silent: true,
+      });
+    });
     loadExcluded();
     loadModelAlias();
-  }, [isCurrentLayer, loadFiles, loadExcluded, loadModelAlias]);
+  }, [
+    isCurrentLayer,
+    loadCodexQuota,
+    loadFiles,
+    loadExcluded,
+    loadModelAlias,
+    setCodexQuotaRefreshLoading,
+  ]);
 
   useInterval(
     () => {
@@ -2298,6 +2385,7 @@ export function AuthFilesPage() {
       setAccountMemoImageProcessing(false);
       setAccountMemoEditorFile(file);
       setAccountMemoDraft(memoText);
+      setAccountMemoDisplayNameDraft(typeof file.note === 'string' ? file.note.trim() : '');
       setAccountMemoImagesDraft(images);
       setAccountMemoEditMode(parseAccountMemoPreviewBlocks(memoText).length === 0);
       setAccountMemoPreviewImage(null);
@@ -2329,6 +2417,7 @@ export function AuthFilesPage() {
     accountMemoImageProcessingRef.current = false;
     setAccountMemoEditorFile(null);
     setAccountMemoDraft('');
+    setAccountMemoDisplayNameDraft('');
     setAccountMemoImagesDraft([]);
     setAccountMemoEditMode(false);
     setAccountMemoImageProcessing(false);
@@ -2446,17 +2535,21 @@ export function AuthFilesPage() {
     }
   }, [showNotification, t]);
 
-  const saveAccountMemo = useCallback(() => {
+  const saveAccountMemo = useCallback(async () => {
     if (!accountMemoEditorFile) return;
 
+    const editorFile = accountMemoEditorFile;
     const nextText = accountMemoDraft.trim();
+    const nextDisplayName = accountMemoDisplayNameDraft.trim();
+    const previousDisplayName = typeof editorFile.note === 'string' ? editorFile.note.trim() : '';
+    const displayNameChanged = previousDisplayName !== nextDisplayName;
     const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
     const updatedAt = Date.now();
     const next = { ...accountMemosByFile };
     if (nextText || nextImages.length > 0) {
-      next[accountMemoEditorFile.name] = { text: nextText, images: nextImages, updatedAt };
+      next[editorFile.name] = { text: nextText, images: nextImages, updatedAt };
     } else {
-      delete next[accountMemoEditorFile.name];
+      delete next[editorFile.name];
     }
 
     if (JSON.stringify(next).length > ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS) {
@@ -2480,14 +2573,25 @@ export function AuthFilesPage() {
     }
 
     setAccountMemosByFile(next);
+    const displayNameSaved = displayNameChanged
+      ? await handleDisplayNameChange(editorFile, nextDisplayName)
+      : true;
+    if (!displayNameSaved) return;
+
+    if (displayNameChanged) {
+      setAccountMemoEditorFile((current) =>
+        current?.name === editorFile.name ? { ...current, note: nextDisplayName } : current
+      );
+    }
+
     showNotification(
       nextText || nextImages.length > 0
         ? t('auth_files.account_memo_saved', {
-            name: accountMemoEditorFile.name,
+            name: editorFile.name,
             defaultValue: '已保存账号备注',
           })
         : t('auth_files.account_memo_cleared', {
-            name: accountMemoEditorFile.name,
+            name: editorFile.name,
             defaultValue: '已清除账号备注',
           }),
       'success'
@@ -2495,9 +2599,11 @@ export function AuthFilesPage() {
     setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
   }, [
     accountMemoDraft,
+    accountMemoDisplayNameDraft,
     accountMemoEditorFile,
     accountMemoImagesDraft,
     accountMemosByFile,
+    handleDisplayNameChange,
     showNotification,
     t,
   ]);
@@ -3689,6 +3795,9 @@ export function AuthFilesPage() {
     ? getAuthFileDisplayName(accountMemoEditorFile)
     : '';
   const accountMemoEditorFileName = accountMemoEditorFile?.name ?? '';
+  const accountMemoEditorDisplayNameSaving = accountMemoEditorFile
+    ? noteUpdating[accountMemoEditorFile.name] === true
+    : false;
   const accountMemoEditorExistingMemo = accountMemoEditorFile
     ? getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)
     : null;
@@ -3698,6 +3807,10 @@ export function AuthFilesPage() {
     (accountMemoEditorExistingMemo?.images.length ?? 0) > 0;
   const accountMemoHasDraftContent =
     Boolean(accountMemoDraft.trim()) || accountMemoImagesDraft.length > 0;
+  const accountMemoSaveDisabled =
+    accountMemoImageProcessing || accountMemoEditorDisplayNameSaving;
+  const accountMemoClearDisabled =
+    accountMemoSaveDisabled || (!accountMemoEditorHasExisting && !accountMemoHasDraftContent);
   const accountMemoPreviewBlocks = useMemo(
     () => parseAccountMemoPreviewBlocks(accountMemoDraft),
     [accountMemoDraft]
@@ -5522,6 +5635,20 @@ export function AuthFilesPage() {
                 )}
               </span>
             </div>
+            <label className={styles.accountMemoDisplayNameField}>
+              <span>
+                {t('auth_files.account_memo_display_name_label', { defaultValue: '显示名' })}
+              </span>
+              <input
+                value={accountMemoDisplayNameDraft}
+                onChange={(event) => setAccountMemoDisplayNameDraft(event.currentTarget.value)}
+                placeholder={accountMemoEditorFileName}
+                disabled={disableControls || accountMemoEditorDisplayNameSaving}
+                aria-label={t('auth_files.account_memo_display_name_label', {
+                  defaultValue: '显示名',
+                })}
+              />
+            </label>
             <span className={styles.accountMemoTargetFile}>
               {t('auth_files.account_memo_file_label', { defaultValue: '文件' })}
               <strong>{accountMemoEditorFileName}</strong>
@@ -5539,7 +5666,7 @@ export function AuthFilesPage() {
                     variant="ghost"
                     size="xs"
                     onClick={clearAccountMemo}
-                    disabled={!accountMemoEditorHasExisting && !accountMemoHasDraftContent}
+                    disabled={accountMemoClearDisabled}
                   >
                     {t('auth_files.account_memo_clear', { defaultValue: '清除' })}
                   </Button>
@@ -5547,8 +5674,12 @@ export function AuthFilesPage() {
                     type="button"
                     variant="secondary"
                     size="xs"
-                    onClick={saveAccountMemo}
-                    disabled={accountMemoImageProcessing}
+                    onClick={() => void saveAccountMemo()}
+                    disabled={accountMemoSaveDisabled}
+                    loading={accountMemoEditorDisplayNameSaving}
+                    loadingLabel={t('auth_files.account_memo_saving', {
+                      defaultValue: '保存中',
+                    })}
                   >
                     {t('auth_files.account_memo_save_keep_open', { defaultValue: '保存备注' })}
                   </Button>
@@ -5612,8 +5743,11 @@ export function AuthFilesPage() {
                             <span>{block.link.label}</span>
                           </button>
                         </div>
-                        {block.copyText && (
-                          <div className={styles.accountMemoCopyRow}>
+                        {block.copyParts.map((part, partIndex) => (
+                          <div
+                            className={styles.accountMemoCopyRow}
+                            key={`${part.startIndex}-${part.text}-${partIndex}`}
+                          >
                             <Button
                               type="button"
                               variant="secondary"
@@ -5627,13 +5761,13 @@ export function AuthFilesPage() {
                               title={t('auth_files.account_memo_copy_button', {
                                 defaultValue: '复制',
                               })}
-                              onClick={() => void handleCopyAccountMemoPreviewText(block.copyText)}
+                              onClick={() => void handleCopyAccountMemoPreviewText(part.text)}
                             />
-                            <p className={styles.accountMemoCopyText} title={block.copyText}>
-                              {formatAccountMemoCopyPreview(block.copyText)}
+                            <p className={styles.accountMemoCopyText} title={part.text}>
+                              {formatAccountMemoCopyPreview(part.text)}
                             </p>
                           </div>
-                        )}
+                        ))}
                       </>
                     ) : (
                       <div className={styles.accountMemoCredentialGroup}>

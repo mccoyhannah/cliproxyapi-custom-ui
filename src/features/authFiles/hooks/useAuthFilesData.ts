@@ -85,6 +85,8 @@ export type LoadAuthFilesOptions = {
   preserveExisting?: boolean;
 };
 
+export type LoadAuthFilesResult = AuthFileItem[] | null;
+
 export type UseAuthFilesDataResult = {
   files: AuthFileItem[];
   selectedFiles: Set<string>;
@@ -102,7 +104,7 @@ export type UseAuthFilesDataResult = {
   batchPriorityUpdating: boolean;
   noteUpdating: Record<string, boolean>;
   fileInputRef: RefObject<HTMLInputElement | null>;
-  loadFiles: (options?: LoadAuthFilesOptions) => Promise<void>;
+  loadFiles: (options?: LoadAuthFilesOptions) => Promise<LoadAuthFilesResult>;
   uploadAuthFiles: (filesToUpload: File[]) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -111,7 +113,7 @@ export type UseAuthFilesDataResult = {
   handleDownload: (name: string) => Promise<void>;
   handleStatusToggle: (item: AuthFileItem, enabled: boolean) => Promise<void>;
   handlePriorityChange: (item: AuthFileItem, priority: number) => Promise<void>;
-  handleDisplayNameChange: (item: AuthFileItem, note: string) => Promise<void>;
+  handleDisplayNameChange: (item: AuthFileItem, note: string) => Promise<boolean>;
   toggleSelect: (name: string) => void;
   selectAllVisible: (visibleFiles: AuthFileItem[]) => void;
   invertVisibleSelection: (visibleFiles: AuthFileItem[]) => void;
@@ -371,6 +373,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const filesRef = useRef<AuthFileItem[]>([]);
   const loadFilesRequestSeqRef = useRef(0);
   const loadFilesLoadingSeqRef = useRef(0);
   const batchProgressRunRef = useRef(0);
@@ -484,6 +487,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   }, []);
 
   useEffect(() => {
+    filesRef.current = files;
     if (selectedFiles.size === 0) return;
     const existingNames = new Set(files.map((file) => file.name));
     setSelectedFiles((prev) => {
@@ -510,19 +514,21 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     setError('');
     try {
       const data = await authFilesApi.list();
-      if (requestSeq !== loadFilesRequestSeqRef.current) return;
+      if (requestSeq !== loadFilesRequestSeqRef.current) return null;
       const nextFiles = data?.files || [];
-      rememberAuthFileDisplayNames(nextFiles);
-      setFiles((prev) => {
-        if (options.preserveExisting && prev.length > 0 && nextFiles.length === 0) {
-          return prev;
-        }
-        return nextFiles;
-      });
+      const resolvedFiles =
+        options.preserveExisting && filesRef.current.length > 0 && nextFiles.length === 0
+          ? filesRef.current
+          : nextFiles;
+      rememberAuthFileDisplayNames(resolvedFiles);
+      filesRef.current = resolvedFiles;
+      setFiles(resolvedFiles);
+      return resolvedFiles;
     } catch (err: unknown) {
-      if (requestSeq !== loadFilesRequestSeqRef.current) return;
+      if (requestSeq !== loadFilesRequestSeqRef.current) return null;
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(errorMessage);
+      return null;
     } finally {
       if (!options.silent && requestSeq === loadFilesLoadingSeqRef.current) {
         setLoading(false);
@@ -1092,7 +1098,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       const name = item.name;
       const previousNote = typeof item.note === 'string' ? item.note : '';
       const nextNote = note.trim();
-      if (previousNote.trim() === nextNote) return;
+      if (previousNote.trim() === nextNote) return true;
 
       setNoteUpdating((prev) => ({ ...prev, [name]: true }));
       setFiles((prev) =>
@@ -1108,12 +1114,14 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             : t('auth_files.display_name_clear_success', { name }),
           'success'
         );
+        return true;
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : '';
         setFiles((prev) =>
           prev.map((file) => (file.name === name ? { ...file, note: previousNote } : file))
         );
         showNotification(`${t('notification.update_failed')}: ${errorMessage}`, 'error');
+        return false;
       } finally {
         setNoteUpdating((prev) => {
           if (!prev[name]) return prev;

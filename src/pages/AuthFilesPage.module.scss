@@ -13180,6 +13180,50 @@ button.codexSubscriptionValue {
   white-space: nowrap;
 }
 
+.accountMemoDisplayNameField {
+  display: grid;
+  grid-template-columns: minmax(48px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 740;
+    white-space: nowrap;
+  }
+
+  input {
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 6px 9px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--surface-control) 90%, var(--bg-primary));
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 650;
+    outline: none;
+    transition:
+      border-color 0.16s ease,
+      box-shadow 0.16s ease,
+      background-color 0.16s ease;
+
+    &:focus {
+      border-color: color-mix(in srgb, var(--primary-color) 46%, var(--border-color));
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.64;
+    }
+  }
+}
+
 .accountMemoCodexActions {
   flex: 0 0 auto;
   display: inline-flex;
@@ -13241,20 +13285,21 @@ button.codexSubscriptionValue {
 
 .cardHeaderStatusBadges {
   display: inline-flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 5px;
-  max-width: min(42%, 170px);
-  margin-left: auto;
-  padding-top: 1px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  margin-left: 0;
+  padding-top: 0;
 }
 
 .cardHeaderStatusBadges .stateBadge {
   max-width: 100%;
-  min-height: 22px;
-  padding: 3px 8px;
+  min-height: 18px;
+  padding: 2px 6px;
   overflow: hidden;
   font-size: 10px;
   line-height: 1;
