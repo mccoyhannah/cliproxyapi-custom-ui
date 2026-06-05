@@ -3791,9 +3791,6 @@ export function AuthFilesPage() {
   const manualExpiryEditorExistingMs = manualExpiryEditorFile
     ? getManualExpiryMs(manualExpiryByFile, manualExpiryEditorFile.name)
     : null;
-  const accountMemoEditorDisplayName = accountMemoEditorFile
-    ? getAuthFileDisplayName(accountMemoEditorFile)
-    : '';
   const accountMemoEditorFileName = accountMemoEditorFile?.name ?? '';
   const accountMemoEditorDisplayNameSaving = accountMemoEditorFile
     ? noteUpdating[accountMemoEditorFile.name] === true
@@ -5602,7 +5599,6 @@ export function AuthFilesPage() {
         <div className={styles.accountMemoEditor}>
           <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
             <div className={styles.accountMemoTargetHeader}>
-              <span className={styles.accountMemoTargetName}>{accountMemoEditorDisplayName}</span>
               <span className={styles.accountMemoCodexActions}>
                 <Button
                   variant="secondary"

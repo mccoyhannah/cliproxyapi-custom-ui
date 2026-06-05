@@ -13163,21 +13163,9 @@ button.codexSubscriptionValue {
 .accountMemoTargetHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 10px;
   min-width: 0;
-}
-
-.accountMemoTargetName {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .accountMemoDisplayNameField {
