@@ -5599,6 +5599,20 @@ export function AuthFilesPage() {
         <div className={styles.accountMemoEditor}>
           <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
             <div className={styles.accountMemoTargetHeader}>
+              <label className={styles.accountMemoDisplayNameField}>
+                <span>
+                  {t('auth_files.account_memo_display_name_label', { defaultValue: '显示名' })}
+                </span>
+                <input
+                  value={accountMemoDisplayNameDraft}
+                  onChange={(event) => setAccountMemoDisplayNameDraft(event.currentTarget.value)}
+                  placeholder={accountMemoEditorFileName}
+                  disabled={disableControls || accountMemoEditorDisplayNameSaving}
+                  aria-label={t('auth_files.account_memo_display_name_label', {
+                    defaultValue: '显示名',
+                  })}
+                />
+              </label>
               <span className={styles.accountMemoCodexActions}>
                 <Button
                   variant="secondary"
@@ -5631,20 +5645,6 @@ export function AuthFilesPage() {
                 )}
               </span>
             </div>
-            <label className={styles.accountMemoDisplayNameField}>
-              <span>
-                {t('auth_files.account_memo_display_name_label', { defaultValue: '显示名' })}
-              </span>
-              <input
-                value={accountMemoDisplayNameDraft}
-                onChange={(event) => setAccountMemoDisplayNameDraft(event.currentTarget.value)}
-                placeholder={accountMemoEditorFileName}
-                disabled={disableControls || accountMemoEditorDisplayNameSaving}
-                aria-label={t('auth_files.account_memo_display_name_label', {
-                  defaultValue: '显示名',
-                })}
-              />
-            </label>
             <span className={styles.accountMemoTargetFile}>
               {t('auth_files.account_memo_file_label', { defaultValue: '文件' })}
               <strong>{accountMemoEditorFileName}</strong>

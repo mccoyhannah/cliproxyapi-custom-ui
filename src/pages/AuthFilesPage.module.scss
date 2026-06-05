@@ -13147,9 +13147,9 @@ button.codexSubscriptionValue {
 .accountMemoTarget {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid color-mix(in srgb, #14b8a6 18%, var(--border-color));
   border-radius: 8px;
   background: linear-gradient(
@@ -13161,9 +13161,10 @@ button.codexSubscriptionValue {
 }
 
 .accountMemoTargetHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: stretch;
   gap: 10px;
   min-width: 0;
 }
@@ -13217,6 +13218,7 @@ button.codexSubscriptionValue {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
   gap: 6px;
   max-width: 100%;
   min-width: 0;
@@ -13771,11 +13773,11 @@ button.codexSubscriptionValue {
 
 @include mobile {
   .accountMemoTargetHeader {
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .accountMemoCodexActions {
+    justify-self: start;
     width: 100%;
     justify-content: flex-start;
     flex-wrap: wrap;
