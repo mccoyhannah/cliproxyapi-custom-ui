@@ -20,6 +20,8 @@ interface ModalProps {
   className?: string;
   overlayClassName?: string;
   closeDisabled?: boolean;
+  onCloseRequest?: () => boolean | void;
+  onAfterClose?: () => void;
 }
 
 const CLOSE_ANIMATION_DURATION = 350;
@@ -126,6 +128,8 @@ export function Modal({
   className,
   overlayClassName,
   closeDisabled = false,
+  onCloseRequest,
+  onAfterClose,
   children,
 }: PropsWithChildren<ModalProps>) {
   const { t } = useTranslation();
@@ -155,9 +159,10 @@ export function Modal({
         if (notifyParent) {
           onClose();
         }
+        onAfterClose?.();
       }, CLOSE_ANIMATION_DURATION);
     },
-    [onClose]
+    [onAfterClose, onClose]
   );
 
   useEffect(() => {
@@ -186,8 +191,9 @@ export function Modal({
   }, [open, isVisible, startClose]);
 
   const handleClose = useCallback(() => {
+    if (onCloseRequest?.() === false) return;
     startClose(true);
-  }, [startClose]);
+  }, [onCloseRequest, startClose]);
 
   useEffect(() => {
     return () => {

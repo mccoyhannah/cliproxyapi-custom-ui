@@ -963,18 +963,23 @@ export function AuthFilesPage() {
   const [accountMemosByFile, setAccountMemosByFile] = useState<AuthFilesAccountMemoMap>(() =>
     readAuthFilesAccountMemos()
   );
+  const [accountMemoEditorOpen, setAccountMemoEditorOpen] = useState(false);
   const [accountMemoEditorFile, setAccountMemoEditorFile] = useState<AuthFileItem | null>(null);
   const [accountMemoDraft, setAccountMemoDraft] = useState('');
   const [accountMemoDisplayNameDraft, setAccountMemoDisplayNameDraft] = useState('');
+  const [accountMemoDisplayNameSaved, setAccountMemoDisplayNameSaved] = useState('');
   const [accountMemoImagesDraft, setAccountMemoImagesDraft] = useState<AuthFileAccountMemoImage[]>(
     []
   );
   const [accountMemoEditMode, setAccountMemoEditMode] = useState(false);
   const [accountMemoImageProcessing, setAccountMemoImageProcessing] = useState(false);
+  const [accountMemoDisplayNameSaving, setAccountMemoDisplayNameSaving] = useState(false);
+  const [accountMemoClosing, setAccountMemoClosing] = useState(false);
   const [accountMemoPreviewImage, setAccountMemoPreviewImage] =
     useState<AuthFileAccountMemoImage | null>(null);
   const accountMemoImageSessionRef = useRef(0);
   const accountMemoImageProcessingRef = useRef(false);
+  const accountMemoDisplayNameSavePromiseRef = useRef<Promise<boolean> | null>(null);
   const [priorityRotationSettings, setPriorityRotationSettings] =
     useState<PriorityRotationSidecarDraftSettings>(DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT);
   const [priorityRotationThresholdInput, setPriorityRotationThresholdInput] = useState(() =>
@@ -2379,13 +2384,18 @@ export function AuthFilesPage() {
       const memo = getAuthFileAccountMemo(accountMemosByFile, file.name);
       const memoText = memo?.text ?? '';
       const images = memo?.images ?? [];
+      const displayName = typeof file.note === 'string' ? file.note.trim() : '';
       accountMemoImageSessionRef.current += 1;
       const sessionId = accountMemoImageSessionRef.current;
       accountMemoImageProcessingRef.current = false;
       setAccountMemoImageProcessing(false);
+      setAccountMemoClosing(false);
+      setAccountMemoDisplayNameSaving(false);
+      setAccountMemoEditorOpen(true);
       setAccountMemoEditorFile(file);
       setAccountMemoDraft(memoText);
-      setAccountMemoDisplayNameDraft(typeof file.note === 'string' ? file.note.trim() : '');
+      setAccountMemoDisplayNameDraft(displayName);
+      setAccountMemoDisplayNameSaved(displayName);
       setAccountMemoImagesDraft(images);
       setAccountMemoEditMode(parseAccountMemoPreviewBlocks(memoText).length === 0);
       setAccountMemoPreviewImage(null);
@@ -2412,15 +2422,19 @@ export function AuthFilesPage() {
     [accountMemosByFile]
   );
 
-  const closeAccountMemoEditor = useCallback(() => {
+  const resetAccountMemoEditor = useCallback(() => {
     accountMemoImageSessionRef.current += 1;
     accountMemoImageProcessingRef.current = false;
+    setAccountMemoEditorOpen(false);
     setAccountMemoEditorFile(null);
     setAccountMemoDraft('');
     setAccountMemoDisplayNameDraft('');
+    setAccountMemoDisplayNameSaved('');
     setAccountMemoImagesDraft([]);
     setAccountMemoEditMode(false);
     setAccountMemoImageProcessing(false);
+    setAccountMemoDisplayNameSaving(false);
+    setAccountMemoClosing(false);
     setAccountMemoPreviewImage(null);
   }, []);
 
@@ -2535,14 +2549,71 @@ export function AuthFilesPage() {
     }
   }, [showNotification, t]);
 
+  const saveAccountMemoDisplayName = useCallback(async () => {
+    if (!accountMemoEditorFile) return true;
+
+    const editorFile = accountMemoEditorFile;
+    const previousDisplayName = accountMemoDisplayNameSaved;
+    const nextDisplayName = accountMemoDisplayNameDraft.trim();
+    if (previousDisplayName === nextDisplayName) {
+      setAccountMemoDisplayNameDraft(nextDisplayName);
+      return true;
+    }
+    if (accountMemoDisplayNameSavePromiseRef.current) {
+      return accountMemoDisplayNameSavePromiseRef.current;
+    }
+
+    setAccountMemoDisplayNameSaving(true);
+    const savePromise = (async () => {
+      const displayNameSaved = await handleDisplayNameChange(editorFile, nextDisplayName);
+      if (!displayNameSaved) {
+        setAccountMemoDisplayNameDraft(previousDisplayName);
+        return false;
+      }
+
+      setAccountMemoDisplayNameDraft(nextDisplayName);
+      setAccountMemoDisplayNameSaved(nextDisplayName);
+      setAccountMemoEditorFile((current) =>
+        current?.name === editorFile.name ? { ...current, note: nextDisplayName } : current
+      );
+      return true;
+    })();
+
+    accountMemoDisplayNameSavePromiseRef.current = savePromise;
+    try {
+      return await savePromise;
+    } finally {
+      if (accountMemoDisplayNameSavePromiseRef.current === savePromise) {
+        accountMemoDisplayNameSavePromiseRef.current = null;
+      }
+      setAccountMemoDisplayNameSaving(false);
+    }
+  }, [
+    accountMemoDisplayNameDraft,
+    accountMemoDisplayNameSaved,
+    accountMemoEditorFile,
+    handleDisplayNameChange,
+  ]);
+
+  const requestCloseAccountMemoEditor = useCallback(() => {
+    if (accountMemoClosing) return false;
+    setAccountMemoClosing(true);
+    void (async () => {
+      const displayNameSaved = await saveAccountMemoDisplayName();
+      if (displayNameSaved) {
+        setAccountMemoEditorOpen(false);
+        return;
+      }
+      setAccountMemoClosing(false);
+    })();
+    return false;
+  }, [accountMemoClosing, saveAccountMemoDisplayName]);
+
   const saveAccountMemo = useCallback(async () => {
     if (!accountMemoEditorFile) return;
 
     const editorFile = accountMemoEditorFile;
     const nextText = accountMemoDraft.trim();
-    const nextDisplayName = accountMemoDisplayNameDraft.trim();
-    const previousDisplayName = typeof editorFile.note === 'string' ? editorFile.note.trim() : '';
-    const displayNameChanged = previousDisplayName !== nextDisplayName;
     const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
     const updatedAt = Date.now();
     const next = { ...accountMemosByFile };
@@ -2573,16 +2644,8 @@ export function AuthFilesPage() {
     }
 
     setAccountMemosByFile(next);
-    const displayNameSaved = displayNameChanged
-      ? await handleDisplayNameChange(editorFile, nextDisplayName)
-      : true;
+    const displayNameSaved = await saveAccountMemoDisplayName();
     if (!displayNameSaved) return;
-
-    if (displayNameChanged) {
-      setAccountMemoEditorFile((current) =>
-        current?.name === editorFile.name ? { ...current, note: nextDisplayName } : current
-      );
-    }
 
     showNotification(
       nextText || nextImages.length > 0
@@ -2599,11 +2662,10 @@ export function AuthFilesPage() {
     setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
   }, [
     accountMemoDraft,
-    accountMemoDisplayNameDraft,
     accountMemoEditorFile,
     accountMemoImagesDraft,
     accountMemosByFile,
-    handleDisplayNameChange,
+    saveAccountMemoDisplayName,
     showNotification,
     t,
   ]);
@@ -3793,8 +3855,12 @@ export function AuthFilesPage() {
     : null;
   const accountMemoEditorFileName = accountMemoEditorFile?.name ?? '';
   const accountMemoEditorDisplayNameSaving = accountMemoEditorFile
-    ? noteUpdating[accountMemoEditorFile.name] === true
+    ? accountMemoDisplayNameSaving || noteUpdating[accountMemoEditorFile.name] === true
     : false;
+  const accountMemoDisplayNameDirty =
+    Boolean(accountMemoEditorFile) && accountMemoDisplayNameDraft.trim() !== accountMemoDisplayNameSaved;
+  const accountMemoDisplayNameSaveVisible =
+    accountMemoDisplayNameDirty || accountMemoDisplayNameSaving;
   const accountMemoEditorExistingMemo = accountMemoEditorFile
     ? getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)
     : null;
@@ -5584,14 +5650,16 @@ export function AuthFilesPage() {
       </Modal>
 
       <Modal
-        open={Boolean(accountMemoEditorFile)}
+        open={accountMemoEditorOpen && Boolean(accountMemoEditorFile)}
         title={
           <span className={styles.accountMemoModalTitle}>
             {t('auth_files.account_memo_title', { defaultValue: '账号备注' })}
           </span>
         }
-        onClose={closeAccountMemoEditor}
-        closeDisabled={Boolean(accountMemoPreviewImage)}
+        onClose={() => setAccountMemoEditorOpen(false)}
+        onCloseRequest={requestCloseAccountMemoEditor}
+        onAfterClose={resetAccountMemoEditor}
+        closeDisabled={Boolean(accountMemoPreviewImage) || accountMemoClosing}
         width={720}
         className={styles.accountMemoModal}
         overlayClassName={styles.accountMemoOverlay}
@@ -5599,20 +5667,45 @@ export function AuthFilesPage() {
         <div className={styles.accountMemoEditor}>
           <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
             <div className={styles.accountMemoTargetHeader}>
-              <label className={styles.accountMemoDisplayNameField}>
-                <span>
-                  {t('auth_files.account_memo_display_name_label', { defaultValue: '显示名' })}
-                </span>
-                <input
-                  value={accountMemoDisplayNameDraft}
-                  onChange={(event) => setAccountMemoDisplayNameDraft(event.currentTarget.value)}
-                  placeholder={accountMemoEditorFileName}
-                  disabled={disableControls || accountMemoEditorDisplayNameSaving}
-                  aria-label={t('auth_files.account_memo_display_name_label', {
-                    defaultValue: '显示名',
-                  })}
-                />
-              </label>
+              <div className={styles.accountMemoDisplayNameField}>
+                <label className={styles.accountMemoDisplayNameControl}>
+                  <span>
+                    {t('auth_files.account_memo_display_name_label', { defaultValue: '显示名' })}
+                  </span>
+                  <input
+                    value={accountMemoDisplayNameDraft}
+                    onChange={(event) => setAccountMemoDisplayNameDraft(event.currentTarget.value)}
+                    onBlur={() => void saveAccountMemoDisplayName()}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                      void saveAccountMemoDisplayName();
+                    }}
+                    placeholder={accountMemoEditorFileName}
+                    disabled={disableControls || accountMemoEditorDisplayNameSaving || accountMemoClosing}
+                    aria-label={t('auth_files.account_memo_display_name_label', {
+                      defaultValue: '显示名',
+                    })}
+                  />
+                </label>
+                {accountMemoDisplayNameSaveVisible && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="xs"
+                    className={styles.accountMemoDisplayNameSaveButton}
+                    onClick={() => void saveAccountMemoDisplayName()}
+                    disabled={disableControls || accountMemoEditorDisplayNameSaving || accountMemoClosing}
+                    loading={accountMemoEditorDisplayNameSaving}
+                    loadingLabel={t('auth_files.account_memo_saving', {
+                      defaultValue: '保存中',
+                    })}
+                  >
+                    {t('common.save', { defaultValue: '保存' })}
+                  </Button>
+                )}
+              </div>
               <span className={styles.accountMemoCodexActions}>
                 <Button
                   variant="secondary"

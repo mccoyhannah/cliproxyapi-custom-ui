@@ -13171,6 +13171,14 @@ button.codexSubscriptionValue {
 
 .accountMemoDisplayNameField {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.accountMemoDisplayNameControl {
+  display: grid;
   grid-template-columns: minmax(48px, auto) minmax(0, 1fr);
   align-items: center;
   gap: 8px;
@@ -13211,6 +13219,12 @@ button.codexSubscriptionValue {
       opacity: 0.64;
     }
   }
+}
+
+.accountMemoDisplayNameSaveButton {
+  min-height: 30px;
+  padding-inline: 10px;
+  white-space: nowrap;
 }
 
 .accountMemoCodexActions {
@@ -13774,6 +13788,14 @@ button.codexSubscriptionValue {
 @include mobile {
   .accountMemoTargetHeader {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .accountMemoDisplayNameField {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .accountMemoDisplayNameSaveButton {
+    justify-self: start;
   }
 
   .accountMemoCodexActions {
