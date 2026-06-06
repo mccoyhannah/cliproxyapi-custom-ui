@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -6,7 +6,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { IconRefreshCw } from '@/components/ui/icons';
+import { IconPlus, IconRefreshCw, IconSettings, IconTrash2 } from '@/components/ui/icons';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type {
   TokenLedgerEntry,
   TokenLedgerFilters,
@@ -14,18 +15,25 @@ import type {
 } from '@/types/usageStatistics';
 import {
   DEFAULT_TOKEN_LEDGER_FILTERS,
+  MODEL_PRICING_OVERRIDES_STORAGE_KEY,
   TOKEN_LEDGER_RECENT_HOUR_OPTIONS,
   TOKEN_LEDGER_RANGE_OPTIONS,
+  type ModelPricingOverride,
   buildTokenLedgerModelUsage,
+  calculateTokenLedgerCostSummary,
   calculateTokenLedgerMetrics,
+  estimateTokenUsageCost,
   filterTokenLedgerEntries,
   formatDateTime,
   formatPercent,
   formatTokenCount,
   formatTokenLedgerRangeLabel,
   formatTokenLedgerSpan,
+  formatUsdCost,
   getTokenLedgerEntrySpan,
   getTokenLedgerRangeWindow,
+  isModelPricingOverrideUsable,
+  sanitizeModelPricingOverrides,
 } from '../lib';
 import styles from '@/pages/UsageStatisticsPage.module.scss';
 
@@ -47,11 +55,23 @@ const TOKEN_LEDGER_RECENT_HOUR_SELECT_OPTIONS = TOKEN_LEDGER_RECENT_HOUR_OPTIONS
   value: String(option.value),
   label: option.label,
 }));
+const EMPTY_PRICING_OVERRIDE: ModelPricingOverride = {
+  pattern: '',
+  inputUsdPer1M: 0,
+  cachedInputUsdPer1M: 0,
+  outputUsdPer1M: 0,
+  enabled: true,
+};
 
 const parseDateMs = (value: string | null | undefined): number | null => {
   if (!value) return null;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const parseRateInput = (value: string): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 };
 
 export function TokenLedgerPanel({
@@ -64,9 +84,25 @@ export function TokenLedgerPanel({
   setFilterValue,
 }: TokenLedgerPanelProps) {
   const { i18n } = useTranslation();
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [pricingOverrides, setPricingOverrides] = useLocalStorage<ModelPricingOverride[]>(
+    MODEL_PRICING_OVERRIDES_STORAGE_KEY,
+    []
+  );
   const normalizedFilters = useMemo(
     () => ({ ...DEFAULT_TOKEN_LEDGER_FILTERS, ...filters }),
     [filters]
+  );
+  const editablePricingOverrides = useMemo(
+    () => sanitizeModelPricingOverrides(pricingOverrides),
+    [pricingOverrides]
+  );
+  const effectivePricingOverrides = useMemo(
+    () =>
+      editablePricingOverrides.filter(
+        (rule) => rule.enabled !== false && isModelPricingOverrideUsable(rule)
+      ),
+    [editablePricingOverrides]
   );
   const entries = ledger?.entries ?? EMPTY_LEDGER_ENTRIES;
   const rangeWindow = useMemo(
@@ -84,6 +120,18 @@ export function TokenLedgerPanel({
   const modelUsage = useMemo(
     () => buildTokenLedgerModelUsage(filteredEntries),
     [filteredEntries]
+  );
+  const costSummary = useMemo(
+    () => calculateTokenLedgerCostSummary(filteredEntries, effectivePricingOverrides),
+    [effectivePricingOverrides, filteredEntries]
+  );
+  const modelUsageWithCosts = useMemo(
+    () =>
+      modelUsage.map((item) => ({
+        ...item,
+        cost: estimateTokenUsageCost(item.model, item, effectivePricingOverrides),
+      })),
+    [effectivePricingOverrides, modelUsage]
   );
   const selectedSpan = useMemo(
     () => getTokenLedgerEntrySpan(filteredEntries),
@@ -104,6 +152,28 @@ export function TokenLedgerPanel({
     Boolean(ledger) &&
     ((rangeWindow.start !== null && coverageStart !== null && rangeWindow.start < coverageStart) ||
       (rangeWindow.end !== null && coverageEnd !== null && rangeWindow.end > coverageEnd));
+  const activePricingOverrideCount = effectivePricingOverrides.length;
+
+  const updatePricingOverride = (index: number, patch: Partial<ModelPricingOverride>) => {
+    setPricingOverrides((current) => {
+      const rows = sanitizeModelPricingOverrides(current);
+      return rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row));
+    });
+  };
+
+  const addPricingOverride = () => {
+    setPricingOverrides((current) => [
+      ...sanitizeModelPricingOverrides(current),
+      { ...EMPTY_PRICING_OVERRIDE },
+    ]);
+    setPricingOpen(true);
+  };
+
+  const removePricingOverride = (index: number) => {
+    setPricingOverrides((current) =>
+      sanitizeModelPricingOverrides(current).filter((_, rowIndex) => rowIndex !== index)
+    );
+  };
 
   const tokenSegments = [
     {
@@ -147,6 +217,16 @@ export function TokenLedgerPanel({
           >
             刷新台账
           </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setPricingOpen((current) => !current)}
+            leftIcon={<IconSettings size={15} />}
+            aria-expanded={pricingOpen}
+          >
+            价格设置
+          </Button>
         </div>
       </div>
 
@@ -180,6 +260,113 @@ export function TokenLedgerPanel({
         )}
         {ledger && <span className={styles.ledgerRangeNote}>当前范围 {selectedSpanLabel}</span>}
       </div>
+
+      {pricingOpen && (
+        <div className={styles.pricingPanel}>
+          <div className={styles.pricingPanelHeader}>
+            <div>
+              <h3>本地价格覆盖</h3>
+              <span>
+                {activePricingOverrideCount > 0
+                  ? `${activePricingOverrideCount} 条启用`
+                  : '使用内置官方价表，空价格不参与计价'}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={addPricingOverride}
+              leftIcon={<IconPlus size={14} />}
+            >
+              添加
+            </Button>
+          </div>
+
+          {editablePricingOverrides.length === 0 ? (
+            <div className={styles.pricingEmpty}>暂无本地覆盖规则</div>
+          ) : (
+            <div className={styles.pricingOverrideList}>
+              <div className={styles.pricingOverrideHeader}>
+                <span>启用</span>
+                <span>模型匹配</span>
+                <span>输入</span>
+                <span>缓存输入</span>
+                <span>输出</span>
+                <span />
+              </div>
+              {editablePricingOverrides.map((rule, index) => (
+                <div key={index} className={styles.pricingOverrideRow}>
+                  <label className={styles.pricingEnabledToggle}>
+                    <input
+                      type="checkbox"
+                      checked={rule.enabled !== false}
+                      onChange={(event) =>
+                        updatePricingOverride(index, { enabled: event.target.checked })
+                      }
+                    />
+                  </label>
+                  <Input
+                    value={rule.pattern}
+                    placeholder="gpt-5.4-custom*"
+                    aria-label="模型匹配"
+                    onChange={(event) =>
+                      updatePricingOverride(index, { pattern: event.target.value })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={rule.inputUsdPer1M}
+                    aria-label="输入 USD 每百万 Token"
+                    onChange={(event) =>
+                      updatePricingOverride(index, {
+                        inputUsdPer1M: parseRateInput(event.target.value),
+                      })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={rule.cachedInputUsdPer1M}
+                    aria-label="缓存输入 USD 每百万 Token"
+                    onChange={(event) =>
+                      updatePricingOverride(index, {
+                        cachedInputUsdPer1M: parseRateInput(event.target.value),
+                      })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={rule.outputUsdPer1M}
+                    aria-label="输出 USD 每百万 Token"
+                    onChange={(event) =>
+                      updatePricingOverride(index, {
+                        outputUsdPer1M: parseRateInput(event.target.value),
+                      })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    iconOnly
+                    title="删除覆盖规则"
+                    aria-label="删除覆盖规则"
+                    onClick={() => removePricingOverride(index)}
+                  >
+                    <IconTrash2 size={14} />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {normalizedFilters.range === 'custom' && (
         <div className={styles.customRange}>
@@ -226,6 +413,15 @@ export function TokenLedgerPanel({
                 {formatPercent(metrics.coverageRate)} / {formatPercent(metrics.parsedRate)}
               </strong>
               <small>缺 usage 显示为未上报</small>
+            </div>
+            <div className={styles.ledgerSummaryItem}>
+              <span>估算费用</span>
+              <strong>{formatUsdCost(costSummary.costUsd)}</strong>
+              <small>
+                {costSummary.unpricedModels > 0
+                  ? `${costSummary.unpricedModels} 个模型未计价`
+                  : 'OpenAI Standard USD'}
+              </small>
             </div>
             <div className={styles.ledgerSummaryItem}>
               <span>当前覆盖起止</span>
@@ -292,7 +488,7 @@ export function TokenLedgerPanel({
                   <EmptyState title="暂无模型占比" description="当前范围没有已上报 usage 的请求。" />
                 ) : (
                   <div className={styles.modelBars}>
-                    {modelUsage.map((item) => (
+                    {modelUsageWithCosts.map((item) => (
                       <div key={item.model} className={styles.modelBarRow}>
                         <span className={styles.modelBarName} title={item.model}>
                           {item.model}
@@ -304,7 +500,8 @@ export function TokenLedgerPanel({
                           />
                         </span>
                         <span className={styles.modelBarMeta}>
-                          {item.requests} 次 · {formatTokenCount(item.total)} Token
+                          {item.requests} 次 · {formatTokenCount(item.total)} Token ·{' '}
+                          {item.cost.pricingPattern ? formatUsdCost(item.cost.costUsd) : '未计价'}
                         </span>
                       </div>
                     ))}

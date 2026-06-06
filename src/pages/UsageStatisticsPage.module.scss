@@ -498,10 +498,10 @@
 
 .ledgerSummaryGrid {
   display: grid;
-  grid-template-columns: minmax(180px, 0.95fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(180px, 0.95fr) repeat(4, minmax(0, 1fr));
   gap: 8px;
 
-  @media (max-width: 1180px) {
+  @media (max-width: 1280px) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -583,7 +583,7 @@
 
   .modelBarRow {
     cursor: default;
-    grid-template-columns: minmax(112px, 0.85fr) minmax(96px, 1fr) auto;
+    grid-template-columns: minmax(112px, 0.8fr) minmax(96px, 1fr) minmax(168px, auto);
     padding: 7px 8px;
     border-color: color-mix(in srgb, var(--border-color) 60%, transparent);
     border-radius: 8px;
@@ -606,7 +606,127 @@
   .modelBarMeta {
     font-size: 11px;
     font-weight: 760;
+    text-align: right;
+    white-space: normal;
   }
+
+  @include mobile {
+    .modelBarRow {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .modelBarMeta {
+      text-align: left;
+    }
+  }
+}
+
+.pricingPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-primary) 50%, transparent);
+}
+
+.pricingPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 820;
+    letter-spacing: 0;
+  }
+
+  span {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 740;
+  }
+
+  @include mobile {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+.pricingEmpty {
+  padding: 10px;
+  border: 1px dashed color-mix(in srgb, var(--border-color) 74%, transparent);
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.pricingOverrideList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pricingOverrideHeader,
+.pricingOverrideRow {
+  display: grid;
+  grid-template-columns: 46px minmax(150px, 1.1fr) repeat(3, minmax(92px, 0.7fr)) 36px;
+  gap: 6px;
+  align-items: center;
+}
+
+.pricingOverrideHeader {
+  padding: 0 2px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 780;
+
+  @media (max-width: 980px) {
+    display: none;
+  }
+}
+
+.pricingOverrideRow {
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-control) 60%, transparent);
+
+  :global(.form-group) {
+    margin: 0;
+  }
+
+  :global(.input) {
+    min-height: 32px;
+    font-size: 12px;
+  }
+
+  @media (max-width: 980px) {
+    grid-template-columns: 46px minmax(160px, 1fr) repeat(2, minmax(94px, 1fr));
+
+    > :last-child {
+      justify-self: start;
+    }
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricingEnabledToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
 }
 
 .ledgerSubHeader {
