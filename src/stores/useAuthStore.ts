@@ -28,6 +28,32 @@ interface AuthStoreState extends AuthState {
 
 let restoreSessionPromise: Promise<boolean> | null = null;
 
+const readErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Connection failed';
+};
+
+const isAuthFailure = (error: unknown): boolean => {
+  const status = typeof (error as { status?: unknown } | null)?.status === 'number'
+    ? (error as { status: number }).status
+    : undefined;
+  if (status === 401 || status === 403) return true;
+
+  const message = readErrorMessage(error).toLowerCase();
+  return (
+    message.includes('ip banned') ||
+    message.includes('too many failed attempts') ||
+    message.includes('unauthorized') ||
+    message.includes('forbidden')
+  );
+};
+
+const disableStoredAutoLogin = () => {
+  restoreSessionPromise = null;
+  localStorage.removeItem('isLoggedIn');
+};
+
 export const useAuthStore = create<AuthStoreState>()(
   persist(
     (set, get) => ({
@@ -76,6 +102,9 @@ export const useAuthStore = create<AuthStoreState>()(
               return true;
             } catch (error) {
               console.warn('Auto login failed:', error);
+              if (isAuthFailure(error)) {
+                disableStoredAutoLogin();
+              }
               return false;
             }
           }
@@ -120,12 +149,7 @@ export const useAuthStore = create<AuthStoreState>()(
             localStorage.removeItem('isLoggedIn');
           }
         } catch (error: unknown) {
-          const message =
-            error instanceof Error
-              ? error.message
-              : typeof error === 'string'
-                ? error
-                : 'Connection failed';
+          const message = readErrorMessage(error);
           set({
             connectionStatus: 'error',
             connectionError: message || 'Connection failed'
@@ -172,7 +196,10 @@ export const useAuthStore = create<AuthStoreState>()(
           });
 
           return true;
-        } catch {
+        } catch (error: unknown) {
+          if (isAuthFailure(error)) {
+            disableStoredAutoLogin();
+          }
           set({
             isAuthenticated: false,
             connectionStatus: 'error'

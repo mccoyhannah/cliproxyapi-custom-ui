@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -31,6 +31,17 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
         : typeof error === 'string'
           ? error
           : '';
+  const lowerMessage = message.toLowerCase();
+
+  if (
+    lowerMessage.includes('ip banned') ||
+    lowerMessage.includes('too many failed attempts') ||
+    lowerMessage.includes('too many requests')
+  ) {
+    const retryMatch = message.match(/try again in\s+(.+)$/i);
+    const retryText = retryMatch?.[1]?.trim();
+    return retryText ? `请求过多，请等待 ${retryText} 后重试` : '请求过多，请稍后重试';
+  }
 
   // 根据 HTTP 状态码判断
   if (status === 401) {
@@ -47,18 +58,18 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
   }
 
   // 根据 axios 错误码判断
-  if (code === 'ECONNABORTED' || message.toLowerCase().includes('timeout')) {
+  if (code === 'ECONNABORTED' || lowerMessage.includes('timeout')) {
     return t('login.error_timeout');
   }
-  if (code === 'ERR_NETWORK' || message.toLowerCase().includes('network error')) {
+  if (code === 'ERR_NETWORK' || lowerMessage.includes('network error')) {
     return t('login.error_network');
   }
-  if (code === 'ERR_CERT_AUTHORITY_INVALID' || message.toLowerCase().includes('certificate')) {
+  if (code === 'ERR_CERT_AUTHORITY_INVALID' || lowerMessage.includes('certificate')) {
     return t('login.error_ssl');
   }
 
   // 检查 CORS 错误
-  if (message.toLowerCase().includes('cors') || message.toLowerCase().includes('cross-origin')) {
+  if (lowerMessage.includes('cors') || lowerMessage.includes('cross-origin')) {
     return t('login.error_cors');
   }
 
@@ -89,6 +100,7 @@ export function LoginPage() {
   const [autoLoading, setAutoLoading] = useState(true);
   const [autoLoginSuccess, setAutoLoginSuccess] = useState(false);
   const [error, setError] = useState('');
+  const submitInFlightRef = useRef(false);
 
   const detectedBase = useMemo(() => detectApiBaseFromLocation(), []);
   const languageOptions = useMemo(
@@ -137,12 +149,17 @@ export function LoginPage() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    if (loading || submitInFlightRef.current) {
+      return;
+    }
+
     if (!managementKey.trim()) {
       setError(t('login.error_required'));
       return;
     }
 
     const baseToUse = apiBase ? normalizeApiBase(apiBase) : detectedBase;
+    submitInFlightRef.current = true;
     setLoading(true);
     setError('');
     try {
@@ -158,12 +175,14 @@ export function LoginPage() {
       setError(message);
       showNotification(`${t('notification.login_failed')}: ${message}`, 'error');
     } finally {
+      submitInFlightRef.current = false;
       setLoading(false);
     }
   }, [
     apiBase,
     detectedBase,
     login,
+    loading,
     managementKey,
     navigate,
     rememberPassword,

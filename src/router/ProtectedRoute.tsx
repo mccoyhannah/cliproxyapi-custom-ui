@@ -3,6 +3,9 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
+const hasStoredAutoLoginIntent = () =>
+  typeof window !== 'undefined' && window.localStorage.getItem('isLoggedIn') === 'true';
+
 export function ProtectedRoute({ children }: { children: ReactElement }) {
   const location = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -13,7 +16,7 @@ export function ProtectedRoute({ children }: { children: ReactElement }) {
 
   useEffect(() => {
     const tryRestore = async () => {
-      if (!isAuthenticated && managementKey && apiBase) {
+      if (!isAuthenticated && managementKey && apiBase && hasStoredAutoLoginIntent()) {
         setChecking(true);
         try {
           await checkAuth();
