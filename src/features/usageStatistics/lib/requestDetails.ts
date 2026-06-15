@@ -1,4 +1,5 @@
 import type {
+  TokenLedgerEntry,
   TokenUsage,
   UsageRequestDetail,
   UsageRequestDetailStatus,
@@ -48,6 +49,26 @@ export const emptyDetail = (
   finalStatusCode: null,
   errorSummary,
   loadedAt: detailStatus === 'loading' ? null : Date.now(),
+});
+
+export const detailFromTokenLedgerEntry = (entry: TokenLedgerEntry): UsageRequestDetail => ({
+  requestId: entry.requestId ?? entry.fileName,
+  detailStatus: entry.detailStatus === 'error' ? 'error' : 'ledger-summary',
+  tokenUsage: entry.tokenUsage,
+  configuredModel: entry.configuredModel,
+  upstreamModel: null,
+  responseModel: entry.actualModel,
+  actualModel: entry.actualModel,
+  upstreamUrl: null,
+  provider: null,
+  authLabel: null,
+  authId: null,
+  originator: null,
+  userAgent: null,
+  upstreamStatusCode: null,
+  finalStatusCode: null,
+  errorSummary: '来自长期台账摘要，完整详情尚未解析或不可用。',
+  loadedAt: Date.now(),
 });
 
 const firstValue = <T,>(values: Array<T | null | undefined>): T | null =>

@@ -97,6 +97,25 @@ const pathExists = async (filePath) => {
   }
 };
 
+const directoryExists = async (dirPath) => {
+  try {
+    const stats = await fs.stat(dirPath);
+    return stats.isDirectory();
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+};
+
+const normalizeSourceDir = (logsDir) => path.normalize(path.resolve(logsDir));
+
+const makeSourceKey = (logsDir, fileName) => `${normalizeSourceDir(logsDir)}::${fileName}`;
+
+const resolveLogDirs = (args, installDir) => {
+  if (args['logs-dir']) return [args['logs-dir']];
+  return [path.join(installDir, 'logs'), path.join(installDir, 'auths', 'logs')];
+};
+
 const escapeJsonForHtml = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
 
 const buildEmbeddedLedgerScript = (projection) =>
@@ -337,7 +356,7 @@ const readLogPreview = async (filePath, stats) => {
   }
 };
 
-const parseLogFile = async (filePath, fileName, stats) => {
+const parseLogFile = async (filePath, fileName, stats, sourceDir) => {
   const filenameInfo = parseFilename(fileName, stats);
   const { head, tail } = await readLogPreview(filePath, stats);
   const preview = head === tail ? head : `${head}\n${tail}`;
@@ -350,6 +369,8 @@ const parseLogFile = async (filePath, fileName, stats) => {
     fileType: filenameInfo.fileType,
     timestampMs: filenameInfo.timestampMs,
     requestId: filenameInfo.requestId,
+    sourceDir: normalizeSourceDir(sourceDir),
+    sourceKey: makeSourceKey(sourceDir, fileName),
     detailStatus: configuredModel && actualModel ? 'ready' : 'missing-fields',
     configuredModel,
     actualModel,
@@ -359,13 +380,15 @@ const parseLogFile = async (filePath, fileName, stats) => {
   };
 };
 
-const errorEntry = (fileName, stats, error) => {
+const errorEntry = (fileName, stats, sourceDir, error) => {
   const filenameInfo = parseFilename(fileName, stats);
   return {
     fileName,
     fileType: filenameInfo.fileType,
     timestampMs: filenameInfo.timestampMs,
     requestId: filenameInfo.requestId,
+    sourceDir: normalizeSourceDir(sourceDir),
+    sourceKey: makeSourceKey(sourceDir, fileName),
     detailStatus: 'error',
     configuredModel: null,
     actualModel: null,
@@ -376,12 +399,35 @@ const errorEntry = (fileName, stats, error) => {
   };
 };
 
-const listLogFiles = async (logsDir) => {
-  const items = await fs.readdir(logsDir, { withFileTypes: true });
-  return items
-    .filter((item) => item.isFile() && LOG_FILE_PATTERN.test(item.name))
-    .map((item) => item.name)
-    .sort();
+const listLogFiles = async (logsDirs) => {
+  const results = [];
+
+  for (const logsDir of logsDirs) {
+    let items;
+    try {
+      items = await fs.readdir(logsDir, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue;
+      throw error;
+    }
+
+    results.push(
+      ...items
+        .filter((item) => item.isFile() && LOG_FILE_PATTERN.test(item.name))
+        .map((item) => ({
+          fileName: item.name,
+          logsDir,
+          filePath: path.join(logsDir, item.name),
+          sourceKey: makeSourceKey(logsDir, item.name),
+        }))
+    );
+  }
+
+  return results.sort((left, right) => {
+    const nameCompare = left.fileName.localeCompare(right.fileName);
+    if (nameCompare !== 0) return nameCompare;
+    return normalizeSourceDir(left.logsDir).localeCompare(normalizeSourceDir(right.logsDir));
+  });
 };
 
 const calculateCoverage = (entries) => {
@@ -405,11 +451,65 @@ const calculateCoverage = (entries) => {
   };
 };
 
-const buildProjection = ({ entries, generatedAt, logsDir, scannedFiles, updatedFiles, skippedFiles, errorFiles }) => ({
+const tokenUsageScore = (entry) => {
+  if (entry.tokenUsage?.status === 'available') return 2;
+  if (entry.tokenUsage?.status === 'unreported') return 1;
+  return 0;
+};
+
+const detailStatusScore = (entry) => {
+  if (entry.detailStatus === 'ready') return 2;
+  if (entry.detailStatus === 'missing-fields') return 1;
+  return 0;
+};
+
+const sourcePriority = (entry) => {
+  const normalized = (entry.sourceDir ?? '').replace(/\\/g, '/').toLowerCase();
+  return normalized.endsWith('/auths/logs') ? 1 : 0;
+};
+
+const numericScore = (value) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const preferredEntry = (left, right) => {
+  const rankers = [
+    tokenUsageScore,
+    detailStatusScore,
+    (entry) => numericScore(entry.timestampMs),
+    sourcePriority,
+    (entry) => numericScore(entry.lastModifiedMs),
+    (entry) => numericScore(entry.fileSize),
+  ];
+
+  for (const ranker of rankers) {
+    const leftScore = ranker(left);
+    const rightScore = ranker(right);
+    if (leftScore !== rightScore) return leftScore > rightScore ? left : right;
+  }
+
+  return String(left.sourceKey ?? left.fileName).localeCompare(String(right.sourceKey ?? right.fileName)) <= 0
+    ? left
+    : right;
+};
+
+const dedupeEntries = (entries) => {
+  const entriesByRequest = new Map();
+
+  entries.forEach((entry) => {
+    const key = entry.requestId ? `request:${entry.requestId}` : `source:${entry.sourceKey ?? entry.fileName}`;
+    const current = entriesByRequest.get(key);
+    entriesByRequest.set(key, current ? preferredEntry(current, entry) : entry);
+  });
+
+  return Array.from(entriesByRequest.values());
+};
+
+const buildProjection = ({ entries, generatedAt, logsDirs, scannedFiles, updatedFiles, skippedFiles, errorFiles }) => ({
   version: VERSION,
   generatedAt,
   source: {
-    logsDir,
+    logsDir: logsDirs[0] ?? null,
+    logsDirs,
     patterns: ['v1-responses-*.log', 'v1-chat-completions-*.log', 'v1-messages-*.log'],
     scannedFiles,
     updatedFiles,
@@ -419,6 +519,16 @@ const buildProjection = ({ entries, generatedAt, logsDir, scannedFiles, updatedF
   coverage: calculateCoverage(entries),
   entries,
 });
+
+const normalizePreviousEntry = (entry, fallbackSourceDir) => {
+  const sourceDir = entry.sourceDir ? normalizeSourceDir(entry.sourceDir) : fallbackSourceDir;
+  const sourceKey = entry.sourceKey ?? makeSourceKey(sourceDir, entry.fileName);
+  return {
+    ...entry,
+    sourceDir,
+    sourceKey,
+  };
+};
 
 const main = async () => {
   const args = parseArgs(process.argv.slice(2));
@@ -430,7 +540,8 @@ const main = async () => {
   }
 
   const installDir = args['install-dir'] ?? DEFAULT_INSTALL_DIR;
-  const logsDir = args['logs-dir'] ?? path.join(installDir, 'logs');
+  const logsDirs = resolveLogDirs(args, installDir);
+  const normalizedLogDirs = logsDirs.map(normalizeSourceDir);
   const ledgerDir = args['ledger-dir'] ?? path.join(installDir, 'usage-backups', 'token-ledger');
   const staticDir = args['static-dir'] ?? path.join(installDir, 'static');
   const cwdLooksLikeCustomUi = await pathExists(path.join(process.cwd(), 'package.json'));
@@ -444,47 +555,71 @@ const main = async () => {
 
   const previous = (await readJson(ledgerPath)) ?? {};
   const previousEntries = Array.isArray(previous.entries) ? previous.entries : [];
-  const entriesByFile = new Map(previousEntries.map((entry) => [entry.fileName, entry]));
-  const fingerprints = { ...(previous.state?.fileFingerprints ?? {}) };
+  const fallbackPreviousSourceDir = normalizeSourceDir(
+    previous.source?.logsDir ?? previous.source?.logsDirs?.[0] ?? logsDirs[0]
+  );
+  const entriesBySourceKey = new Map(
+    previousEntries.map((entry) => {
+      const normalizedEntry = normalizePreviousEntry(entry, fallbackPreviousSourceDir);
+      return [normalizedEntry.sourceKey, normalizedEntry];
+    })
+  );
+  const previousFingerprints = { ...(previous.state?.fileFingerprints ?? {}) };
+  const nextFingerprints = { ...previousFingerprints };
 
-  const logFiles = await listLogFiles(logsDir);
+  const existingLogDirs = [];
+  for (const logsDir of logsDirs) {
+    if (await directoryExists(logsDir)) {
+      existingLogDirs.push(logsDir);
+    }
+  }
+
+  if (existingLogDirs.length === 0) {
+    throw new Error(`No CLIProxyAPI log directories found: ${normalizedLogDirs.join(', ')}`);
+  }
+
+  const logFiles = await listLogFiles(logsDirs);
   let updatedFiles = 0;
   let skippedFiles = 0;
   let errorFiles = 0;
 
-  for (const fileName of logFiles) {
-    const filePath = path.join(logsDir, fileName);
+  for (const { fileName, filePath, logsDir, sourceKey } of logFiles) {
     const stats = await fs.stat(filePath);
     const fingerprint = `${stats.size}:${Math.floor(stats.mtimeMs)}`;
+    const migratedFingerprint = previousFingerprints[sourceKey] ?? previousFingerprints[fileName];
 
-    if (!args.rebuild && fingerprints[fileName] === fingerprint && entriesByFile.has(fileName)) {
+    if (!args.rebuild && migratedFingerprint === fingerprint && entriesBySourceKey.has(sourceKey)) {
+      nextFingerprints[sourceKey] = fingerprint;
       skippedFiles += 1;
       continue;
     }
 
     try {
-      const entry = await parseLogFile(filePath, fileName, stats);
-      entriesByFile.set(fileName, entry);
-      fingerprints[fileName] = fingerprint;
+      const entry = await parseLogFile(filePath, fileName, stats, logsDir);
+      entriesBySourceKey.set(sourceKey, entry);
+      nextFingerprints[sourceKey] = fingerprint;
       updatedFiles += 1;
     } catch (error) {
-      entriesByFile.set(fileName, errorEntry(fileName, stats, error));
-      fingerprints[fileName] = fingerprint;
+      entriesBySourceKey.set(sourceKey, errorEntry(fileName, stats, logsDir, error));
+      nextFingerprints[sourceKey] = fingerprint;
       errorFiles += 1;
     }
   }
 
-  const entries = Array.from(entriesByFile.values()).sort((a, b) => {
-    const left = b.timestampMs ?? 0;
-    const right = a.timestampMs ?? 0;
-    if (left !== right) return left - right;
-    return a.fileName.localeCompare(b.fileName);
-  });
+  const entries = dedupeEntries(Array.from(entriesBySourceKey.values()))
+    .sort((a, b) => {
+      const left = b.timestampMs ?? 0;
+      const right = a.timestampMs ?? 0;
+      if (left !== right) return left - right;
+      const nameCompare = a.fileName.localeCompare(b.fileName);
+      if (nameCompare !== 0) return nameCompare;
+      return (a.sourceDir ?? '').localeCompare(b.sourceDir ?? '');
+    });
   const generatedAt = new Date().toISOString();
   const projection = buildProjection({
     entries,
     generatedAt,
-    logsDir,
+    logsDirs: normalizedLogDirs,
     scannedFiles: logFiles.length,
     updatedFiles,
     skippedFiles,
@@ -493,7 +628,7 @@ const main = async () => {
   const ledger = {
     ...projection,
     state: {
-      fileFingerprints: fingerprints,
+      fileFingerprints: nextFingerprints,
     },
   };
 
@@ -524,6 +659,7 @@ const main = async () => {
         ledgerPath,
         projectionPath,
         embeddedHtmlFiles,
+        source: projection.source,
         scannedFiles: logFiles.length,
         updatedFiles,
         skippedFiles,

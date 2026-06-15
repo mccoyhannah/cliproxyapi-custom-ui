@@ -6,6 +6,7 @@ export type UsageRequestDetailStatus =
   | 'pending'
   | 'loading'
   | 'ready'
+  | 'ledger-summary'
   | 'missing-fields'
   | 'unavailable'
   | 'download-error'
@@ -46,12 +47,24 @@ export interface TokenLedgerEntry {
   fileType: string;
   timestampMs: number | null;
   requestId: string | null;
+  sourceDir?: string | null;
+  sourceKey?: string | null;
   detailStatus: TokenLedgerEntryStatus;
   configuredModel: string | null;
   actualModel: string | null;
   tokenUsage: TokenUsage;
   fileSize: number | null;
   lastModifiedMs: number | null;
+}
+
+export interface TokenLedgerSource {
+  logsDir?: string | null;
+  logsDirs?: string[];
+  patterns?: string[];
+  scannedFiles?: number;
+  updatedFiles?: number;
+  skippedFiles?: number;
+  errorFiles?: number;
 }
 
 export interface TokenLedgerCoverage {
@@ -68,6 +81,7 @@ export interface TokenLedgerCoverage {
 export interface TokenLedgerSnapshot {
   version: number;
   generatedAt: string;
+  source?: TokenLedgerSource;
   coverage: TokenLedgerCoverage;
   entries: TokenLedgerEntry[];
 }

@@ -102,6 +102,7 @@ export const getMatchLabel = (status: ModelMatchStatus): string => {
 export const getDetailStatusLabel = (status: UsageRequestDetailStatus): string => {
   if (status === 'loading') return '正在核验';
   if (status === 'ready') return '已核验';
+  if (status === 'ledger-summary') return '台账摘要';
   if (status === 'missing-fields') return '日志缺字段';
   if (status === 'unavailable') return '无详情';
   if (status === 'download-error') return '详情下载失败';

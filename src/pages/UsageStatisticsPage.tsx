@@ -32,6 +32,7 @@ import {
   calculateAggregateTotals,
   calculateRequestMetrics,
   calculateTokenUsageMetrics,
+  detailFromTokenLedgerEntry,
   emptyDetail,
   enrichRecord,
   filterUsageRecords,
@@ -56,6 +57,7 @@ import { downloadBlob } from '@/utils/download';
 import type { ApiKeyUsageResponse } from '@/utils/recentRequests';
 import type {
   TokenLedgerFilters,
+  TokenLedgerEntry,
   TokenLedgerSnapshot,
   UsageRequestDetail,
   UsageStatsRecord,
@@ -106,6 +108,60 @@ const REQUEST_DETAIL_EMPTY_MESSAGE = '详情日志为空，请刷新后重试';
 const REQUEST_DETAIL_DOWNLOAD_MESSAGE = '详情下载失败';
 
 const isPartialRequestLogStatus = (status?: number): boolean => status === 206 || status === 304;
+
+const tokenLedgerStatusScore = (entry: TokenLedgerEntry): number => {
+  if (entry.tokenUsage?.status === 'available') return 2;
+  if (entry.tokenUsage?.status === 'unreported') return 1;
+  return 0;
+};
+
+const tokenLedgerDetailScore = (entry: TokenLedgerEntry): number => {
+  if (entry.detailStatus === 'ready') return 2;
+  if (entry.detailStatus === 'missing-fields') return 1;
+  return 0;
+};
+
+const tokenLedgerSourceScore = (entry: TokenLedgerEntry): number => {
+  const normalized = (entry.sourceDir ?? '').replace(/\\/g, '/').toLowerCase();
+  return normalized.endsWith('/auths/logs') ? 1 : 0;
+};
+
+const numericLedgerScore = (value: number | null | undefined): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const isPreferredTokenLedgerEntry = (
+  candidate: TokenLedgerEntry,
+  current: TokenLedgerEntry | undefined
+): boolean => {
+  if (!current) return true;
+
+  const candidateScores = [
+    tokenLedgerStatusScore(candidate),
+    tokenLedgerDetailScore(candidate),
+    numericLedgerScore(candidate.timestampMs),
+    tokenLedgerSourceScore(candidate),
+    numericLedgerScore(candidate.lastModifiedMs),
+    numericLedgerScore(candidate.fileSize),
+  ];
+  const currentScores = [
+    tokenLedgerStatusScore(current),
+    tokenLedgerDetailScore(current),
+    numericLedgerScore(current.timestampMs),
+    tokenLedgerSourceScore(current),
+    numericLedgerScore(current.lastModifiedMs),
+    numericLedgerScore(current.fileSize),
+  ];
+
+  for (let index = 0; index < candidateScores.length; index += 1) {
+    if (candidateScores[index] !== currentScores[index]) {
+      return candidateScores[index] > currentScores[index];
+    }
+  }
+
+  return String(candidate.sourceKey ?? candidate.fileName).localeCompare(
+    String(current.sourceKey ?? current.fileName)
+  ) < 0;
+};
 
 const buildDetailDownloadMessage = (message: string, status?: number | null): string => {
   if (status === 206) return REQUEST_DETAIL_PARTIAL_MESSAGE;
@@ -160,6 +216,7 @@ export function UsageStatisticsPage() {
   const detailInFlightRef = useRef<Set<string>>(new Set());
   const tokenLedgerLoadedRef = useRef(false);
   const requestDetailsRef = useRef<Record<string, UsageRequestDetail>>({});
+  const tokenLedgerDetailsRef = useRef<Map<string, UsageRequestDetail>>(new Map());
 
   useEffect(() => {
     requestDetailsRef.current = requestDetails;
@@ -190,6 +247,25 @@ export function UsageStatisticsPage() {
   ) => {
     setTokenLedgerFilters((prev) => ({ ...DEFAULT_TOKEN_LEDGER_FILTERS, ...prev, [key]: value }));
   };
+
+  const tokenLedgerDetailsByRequestId = useMemo(() => {
+    const entries = new Map<string, TokenLedgerEntry>();
+    tokenLedger?.entries.forEach((entry) => {
+      if (!entry.requestId) return;
+      if (isPreferredTokenLedgerEntry(entry, entries.get(entry.requestId))) {
+        entries.set(entry.requestId, entry);
+      }
+    });
+    const details = new Map<string, UsageRequestDetail>();
+    entries.forEach((entry, requestId) => {
+      details.set(requestId, detailFromTokenLedgerEntry(entry));
+    });
+    return details;
+  }, [tokenLedger]);
+
+  useEffect(() => {
+    tokenLedgerDetailsRef.current = tokenLedgerDetailsByRequestId;
+  }, [tokenLedgerDetailsByRequestId]);
 
   const loadTokenLedger = useCallback(async (forceNetwork = false) => {
     const isInitialLoad = !tokenLedgerLoadedRef.current;
@@ -276,15 +352,18 @@ export function UsageStatisticsPage() {
           } catch (err: unknown) {
             const status = getErrorStatus(err);
             const message = getErrorMessage(err);
+            const ledgerDetail = status === 404 ? tokenLedgerDetailsRef.current.get(id) : undefined;
             setRequestDetails((prev) => ({
               ...prev,
-              [id]: emptyDetail(
-                id,
-                status === 404 ? 'unavailable' : 'download-error',
-                status === 404
-                  ? '后端没有找到对应详情日志'
-                  : buildDetailDownloadMessage(message, status)
-              ),
+              [id]:
+                ledgerDetail ??
+                emptyDetail(
+                  id,
+                  status === 404 ? 'unavailable' : 'download-error',
+                  status === 404
+                    ? '后端没有找到对应详情日志'
+                    : buildDetailDownloadMessage(message, status)
+                ),
             }));
           } finally {
             detailInFlightRef.current.delete(id);
@@ -379,8 +458,16 @@ export function UsageStatisticsPage() {
   );
 
   const enrichedRecords = useMemo(
-    () => baseRecords.map((record) => enrichRecord(record, requestDetails)),
-    [baseRecords, requestDetails]
+    () => {
+      const effectiveDetails: Record<string, UsageRequestDetail> = {};
+      Object.entries(requestDetails).forEach(([requestId, detail]) => {
+        const ledgerDetail = tokenLedgerDetailsByRequestId.get(requestId);
+        effectiveDetails[requestId] =
+          detail.detailStatus === 'unavailable' && ledgerDetail ? ledgerDetail : detail;
+      });
+      return baseRecords.map((record) => enrichRecord(record, effectiveDetails));
+    },
+    [baseRecords, requestDetails, tokenLedgerDetailsByRequestId]
   );
 
   const modelOptions = useMemo(() => buildModelOptions(enrichedRecords), [enrichedRecords]);
