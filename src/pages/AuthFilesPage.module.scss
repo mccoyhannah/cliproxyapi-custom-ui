@@ -9085,11 +9085,27 @@ button.codexSubscriptionValue {
 
 .fileListCodexCancelButton {
   flex: 0 0 auto;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
   min-height: 30px;
-  padding: 5px 10px;
+  padding: 0;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--text-secondary) 86%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--border-color) 72%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+    color-mix(in srgb, var(--surface-control) 76%, var(--bg-primary));
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
   font-variant-numeric: tabular-nums;
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, #dc2626 34%, var(--border-color));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent),
+      color-mix(in srgb, #dc2626 7%, var(--surface-control));
+    color: color-mix(in srgb, #dc2626 82%, var(--text-primary));
+    box-shadow: 0 4px 12px color-mix(in srgb, #dc2626 10%, transparent);
+  }
 }
 
 .fileListCodexCopyButton {
@@ -9190,7 +9206,7 @@ button.codexSubscriptionValue {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
   padding-left: 8px;
 }
 
@@ -13283,6 +13299,14 @@ button.codexSubscriptionValue {
 
 .accountMemoCodexCopyButton {
   padding-inline: 9px 10px;
+}
+
+.accountMemoCodexCancelButton {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
 }
 
 // Keep card identity/actions on the left and operational warnings on the right.

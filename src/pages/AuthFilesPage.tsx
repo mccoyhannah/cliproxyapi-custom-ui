@@ -34,6 +34,7 @@ import {
   IconSlidersHorizontal,
   IconTrash2,
   IconUploadCloud,
+  IconX,
 } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
@@ -1096,6 +1097,7 @@ export function AuthFilesPage() {
 
   const finishCodexOAuthAttempt = useCallback(() => {
     clearCodexOAuthPollTimer();
+    setCodexOAuthLastUrl('');
     setCodexOAuthAttemptExpiresAt(null);
     setCodexOAuthNowMs(Date.now());
   }, [clearCodexOAuthPollTimer]);
@@ -1176,7 +1178,7 @@ export function AuthFilesPage() {
   const codexOAuthButtonLabel = codexOAuthCountdownActive
     ? t('auth_files.codex_oauth_reauth_countdown', {
         time: codexOAuthCountdownText,
-        defaultValue: `重新认证 ${codexOAuthCountdownText}`,
+        defaultValue: `认证 ${codexOAuthCountdownText}`,
       })
     : t('auth_files.codex_oauth_shortcut_compact', { defaultValue: '登录' });
   const codexOAuthButtonTitle = codexOAuthCountdownActive
@@ -1429,6 +1431,7 @@ export function AuthFilesPage() {
 
     const openRequestId = codexOAuthOpenRequestIdRef.current + 1;
     codexOAuthOpenRequestIdRef.current = openRequestId;
+    setCodexOAuthLastUrl('');
     let authWindow: Window | null = null;
     if (typeof window !== 'undefined') {
       authWindow = window.open('about:blank', '_blank');
@@ -3792,6 +3795,20 @@ export function AuthFilesPage() {
     [scrollToFileCards]
   );
 
+  const refocusFileCardsAfterListViewChange = useCallback(() => {
+    scheduleFileCardsScroll('auto');
+  }, [scheduleFileCardsScroll]);
+
+  const handleListPageChange = useCallback(
+    (nextPage: number) => {
+      const boundedPage = Math.min(totalPages, Math.max(1, nextPage));
+      if (boundedPage === currentPage) return;
+      setPage(boundedPage);
+      refocusFileCardsAfterListViewChange();
+    },
+    [currentPage, refocusFileCardsAfterListViewChange, totalPages]
+  );
+
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
@@ -5197,6 +5214,7 @@ export function AuthFilesPage() {
                         onChange={(value) => {
                           setProblemOnly(value);
                           setPage(1);
+                          refocusFileCardsAfterListViewChange();
                         }}
                         ariaLabel={t('auth_files.problem_filter_only')}
                         label={
@@ -5215,6 +5233,7 @@ export function AuthFilesPage() {
                             setDisabledOnly(false);
                           }
                           setPage(1);
+                          refocusFileCardsAfterListViewChange();
                         }}
                         ariaLabel={t('auth_files.enabled_filter_only')}
                         label={
@@ -5233,6 +5252,7 @@ export function AuthFilesPage() {
                             setEnabledOnly(false);
                           }
                           setPage(1);
+                          refocusFileCardsAfterListViewChange();
                         }}
                         ariaLabel={t('auth_files.disabled_filter_only')}
                         label={
@@ -5245,7 +5265,10 @@ export function AuthFilesPage() {
                     <div className={styles.filterToggleCard}>
                       <ToggleSwitch
                         checked={compactMode}
-                        onChange={(value) => setCompactMode(value)}
+                        onChange={(value) => {
+                          setCompactMode(value);
+                          refocusFileCardsAfterListViewChange();
+                        }}
                         ariaLabel={t('auth_files.compact_mode_label')}
                         label={
                           <span className={styles.filterToggleLabel}>
@@ -5309,7 +5332,7 @@ export function AuthFilesPage() {
                     variant="secondary"
                     size="sm"
                     className={styles.fileListPaginationButton}
-                    onClick={() => setPage(Math.max(1, currentPage - 1))}
+                    onClick={() => handleListPageChange(currentPage - 1)}
                     disabled={currentPage <= 1}
                   >
                     {t('auth_files.pagination_prev')}
@@ -5321,7 +5344,7 @@ export function AuthFilesPage() {
                     variant="secondary"
                     size="sm"
                     className={styles.fileListPaginationButton}
-                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() => handleListPageChange(currentPage + 1)}
                     disabled={currentPage >= totalPages}
                   >
                     {t('auth_files.pagination_next')}
@@ -5355,22 +5378,25 @@ export function AuthFilesPage() {
                       defaultValue: '复制最近生成的 Codex 登录链接',
                     })}
                   >
-                    {t('auth_files.codex_oauth_copy_link', { defaultValue: '复制链接' })}
+                    {t('auth_files.codex_oauth_copy_link', { defaultValue: '复制' })}
                   </Button>
                 )}
                 {codexOAuthCountdownActive && (
                   <Button
                     variant="secondary"
                     size="sm"
+                    iconOnly
                     className={styles.fileListCodexCancelButton}
+                    leftIcon={<IconX size={14} />}
                     onClick={handleCancelCodexOAuth}
                     disabled={disableControls}
+                    aria-label={t('auth_files.codex_oauth_cancel', {
+                      defaultValue: '取消登录',
+                    })}
                     title={t('auth_files.codex_oauth_cancel_title', {
                       defaultValue: '停止等待本次 Codex 登录',
                     })}
-                  >
-                    {t('auth_files.codex_oauth_cancel', { defaultValue: '取消登录' })}
-                  </Button>
+                  />
                 )}
               </div>
             </div>
@@ -5807,22 +5833,25 @@ export function AuthFilesPage() {
                       defaultValue: '复制最近生成的 Codex 登录链接',
                     })}
                   >
-                    {t('auth_files.codex_oauth_copy_link', { defaultValue: '复制链接' })}
+                    {t('auth_files.codex_oauth_copy_link', { defaultValue: '复制' })}
                   </Button>
                 )}
                 {codexOAuthCountdownActive && (
                   <Button
                     variant="secondary"
                     size="sm"
+                    iconOnly
                     className={`${styles.fileListCodexCancelButton} ${styles.accountMemoCodexCancelButton}`}
+                    leftIcon={<IconX size={13} />}
                     onClick={handleCancelCodexOAuth}
                     disabled={disableControls}
+                    aria-label={t('auth_files.codex_oauth_cancel', {
+                      defaultValue: '取消登录',
+                    })}
                     title={t('auth_files.codex_oauth_cancel_title', {
                       defaultValue: '停止等待本次 Codex 登录',
                     })}
-                  >
-                    {t('auth_files.codex_oauth_cancel', { defaultValue: '取消登录' })}
-                  </Button>
+                  />
                 )}
               </span>
             </div>
