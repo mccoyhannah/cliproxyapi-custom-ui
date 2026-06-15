@@ -1643,6 +1643,16 @@
           "logging_to_file_desc": "將記錄儲存到檔案",
           "logs_max_size": "記錄檔大小限制（MB）"
         },
+        "plugins": {
+          "title": "外掛設定",
+          "description": "外掛總開關、目錄與商店來源設定",
+          "enabled": "啟用外掛系統",
+          "enabled_desc": "開啟後後端才會載入已設定外掛；第三方外掛仍需單獨安裝和確認。",
+          "dir": "外掛目錄",
+          "dir_hint": "相對於 CLIProxyAPI 執行目錄的外掛目錄，預設 plugins。",
+          "store_sources": "外掛商店來源",
+          "store_sources_hint": "每行一個 registry URL；留空只使用後端預設來源，儲存前不會自動加入第三方來源。"
+        },
         "network": {
           "title": "網路設定",
           "description": "代理、重試和路由設定",

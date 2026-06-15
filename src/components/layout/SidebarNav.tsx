@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import {
@@ -15,7 +15,12 @@ import {
   IconSidebarUsage,
 } from '@/components/ui/icons';
 import { AUTH_FILES_FOCUS_CARDS_EVENT } from '@/router/authFilesFocus';
-import { getVisibleNavItems, type NavItemMeta, type SidebarIconKey } from '@/router/navMeta';
+import {
+  getVisibleNavItems,
+  normalizeRoutePath,
+  type NavItemMeta,
+  type SidebarIconKey,
+} from '@/router/navMeta';
 
 interface SidebarNavProps {
   id: string;
@@ -46,6 +51,23 @@ const fullBrandName = 'CLI Proxy API Management Center';
 const getNavLabel = (item: NavItemMeta, t: ReturnType<typeof useTranslation>['t']) =>
   item.defaultLabel ? t(item.labelKey, { defaultValue: item.defaultLabel }) : t(item.labelKey);
 
+const isWithinRoute = (pathname: string, routePath: string) =>
+  pathname === routePath || pathname.startsWith(`${routePath}/`);
+
+const isNavItemActive = (item: NavItemMeta, pathname: string) => {
+  const currentPath = normalizeRoutePath(pathname);
+  const itemPath = normalizeRoutePath(item.path);
+
+  if (!isWithinRoute(currentPath, itemPath)) return false;
+
+  if (item.key === 'aiProviders') {
+    const workbenchPath = '/ai-providers/workbench';
+    return !isWithinRoute(currentPath, workbenchPath);
+  }
+
+  return true;
+};
+
 export function SidebarNav({
   id,
   open,
@@ -75,6 +97,7 @@ export function SidebarNav({
         {navItems.map((item) => {
           const label = getNavLabel(item, t);
           const navTarget = item.navTo ?? item.path;
+          const isActive = isNavItemActive(item, location.pathname);
           const handleNavigate = () => {
             onNavigate();
             if (item.key === 'authFiles' && location.pathname === item.path) {
@@ -83,16 +106,17 @@ export function SidebarNav({
           };
 
           return (
-            <NavLink
+            <Link
               key={item.path}
               to={navTarget}
-              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              className={`nav-item ${isActive ? 'active' : ''}`}
               onClick={handleNavigate}
               title={isVisuallyCollapsed ? label : undefined}
+              aria-current={isActive ? 'page' : undefined}
             >
               <span className="nav-icon">{sidebarIcons[item.icon]}</span>
               <span className="nav-label">{label}</span>
-            </NavLink>
+            </Link>
           );
         })}
       </nav>

@@ -1634,6 +1634,16 @@
           "logging_to_file_desc": "Save logs to files",
           "logs_max_size": "Log File Size Limit (MB)"
         },
+        "plugins": {
+          "title": "Plugin Settings",
+          "description": "Global plugin switch, plugin directory, and store registry sources",
+          "enabled": "Enable plugin system",
+          "enabled_desc": "Allows the backend to load configured plugins; third-party plugins still require explicit installation and confirmation.",
+          "dir": "Plugin directory",
+          "dir_hint": "Relative to the CLIProxyAPI runtime directory. Default: plugins.",
+          "store_sources": "Plugin store sources",
+          "store_sources_hint": "One registry URL per line. Leave blank to use backend defaults only; third-party sources are never added automatically."
+        },
         "network": {
           "title": "Network Configuration",
           "description": "Proxy, retry, and routing settings",

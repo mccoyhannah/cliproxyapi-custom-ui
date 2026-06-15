@@ -1654,6 +1654,16 @@
           "logging_to_file_desc": "将日志保存到文件",
           "logs_max_size": "日志文件大小限制 (MB)"
         },
+        "plugins": {
+          "title": "插件配置",
+          "description": "插件总开关、目录与商店源设置",
+          "enabled": "启用插件系统",
+          "enabled_desc": "开启后后端才会加载已配置插件；第三方插件仍需单独安装和确认。",
+          "dir": "插件目录",
+          "dir_hint": "相对于 CLIProxyAPI 运行目录的插件目录，默认 plugins。",
+          "store_sources": "插件商店源",
+          "store_sources_hint": "每行一个 registry URL；留空只使用后端默认源，保存前不会自动添加第三方源。"
+        },
         "network": {
           "title": "网络配置",
           "description": "代理、重试和路由设置",

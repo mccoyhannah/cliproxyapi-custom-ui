@@ -267,12 +267,14 @@
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .focusDescription {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .workspace {
@@ -353,6 +355,7 @@
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .mobileSectionNavBadge {
@@ -531,6 +534,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .navIcon {
@@ -542,16 +546,20 @@
 }
 
 .navLabel {
+  min-width: 0;
   color: var(--text-primary);
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .navDescription {
+  display: block;
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .navBadge {
@@ -628,12 +636,14 @@
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 .toggleDescription {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .fieldShell {
@@ -648,6 +658,7 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
 }
 
 .fieldControl {
@@ -658,6 +669,7 @@
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .inlinePill {
@@ -700,6 +712,7 @@
   font-size: 16px;
   font-weight: 700;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .subsectionDescription {
@@ -707,6 +720,7 @@
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .sectionIssueBadge {
