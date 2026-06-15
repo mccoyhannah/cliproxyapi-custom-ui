@@ -11,6 +11,8 @@ const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 8319;
 const DEFAULT_BACKEND_PORT = 8317;
 const DEFAULT_IDLE_SHUTDOWN_MINUTES = 10;
+const DEFAULT_RESTART_TIMEOUT_MS = 75_000;
+const PROCESS_INFO_TIMEOUT_MS = 1_500;
 const MANAGEMENT_PREFIX = '/v0/management';
 const MAX_BODY_BYTES = 128 * 1024;
 const ALLOWED_ORIGINS = new Set([
@@ -23,7 +25,7 @@ const ALLOWED_BACKEND_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]', '::1']
 const args = parseArgs(process.argv.slice(2));
 if (args.help) {
   console.log(
-    'Usage: node scripts/cliproxyapi-control-sidecar.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--port 8319] [--backend-port 8317] [--idle-shutdown-minutes 10]'
+    'Usage: node scripts/cliproxyapi-control-sidecar.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--port 8319] [--backend-port 8317] [--idle-shutdown-minutes 10] [--restart-timeout-ms 75000]'
   );
   process.exit(0);
 }
@@ -38,6 +40,12 @@ const idleShutdownMinutes = clampInteger(
   DEFAULT_IDLE_SHUTDOWN_MINUTES,
   1,
   180
+);
+const restartTimeoutMs = normalizeTimeoutMs(
+  args['restart-timeout-ms'],
+  DEFAULT_RESTART_TIMEOUT_MS,
+  5_000,
+  180_000
 );
 const idleShutdownMs = idleShutdownMinutes * 60_000;
 const restartScriptPath =
@@ -74,6 +82,12 @@ function normalizePort(value, fallback) {
 }
 
 function clampInteger(value, fallback, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(numeric)));
+}
+
+export function normalizeTimeoutMs(value, fallback, min, max) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
   return Math.max(min, Math.min(max, Math.round(numeric)));
@@ -118,9 +132,9 @@ export function resolvePwshPath(env = process.env, fileExists = existsSync) {
   const programFiles = env.ProgramFiles || 'C:\\Program Files';
   const windowsDir = env.WINDIR || env.SystemRoot || 'C:\\Windows';
   const candidates = [
+    'D:\\Tools\\PowerShell\\7\\pwsh.exe',
     'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
     path.win32.join(programFiles, 'PowerShell', '7', 'pwsh.exe'),
-    'D:\\Tools\\PowerShell\\7\\pwsh.exe',
     path.win32.join(windowsDir, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
     'pwsh.exe',
   ];
@@ -238,40 +252,21 @@ export async function validateManagementKey(key, apiBase) {
   return true;
 }
 
-function runPwsh(script, input = '') {
-  return new Promise((resolve, reject) => {
-    const pwshPath = resolvePwshPath();
-    const child = spawn(
-      pwshPath,
-      ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script],
-      {
-        windowsHide: true,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString('utf8');
-    });
-    child.on('error', (err) => {
-      reject(new Error(`failed to launch PowerShell (${pwshPath}): ${err.message}`));
-    });
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve(stdout.trim());
-      } else {
-        reject(new Error(stderr.trim() || `${path.basename(pwshPath)} exited with ${code}`));
-      }
-    });
-    child.stdin.end(input, 'utf8');
+function forceKillProcessTree(pid) {
+  if (!pid || process.platform !== 'win32') return;
+  const killer = spawn(resolveSystem32Executable('taskkill.exe'), ['/PID', String(pid), '/T', '/F'], {
+    windowsHide: true,
+    stdio: 'ignore',
   });
+  killer.on('error', () => {});
 }
 
-function runPwshFile(filePath, argumentList = []) {
+function resolveSystem32Executable(name, env = process.env) {
+  const windowsDir = env.WINDIR || env.SystemRoot || 'C:\\Windows';
+  return path.win32.join(windowsDir, 'System32', name);
+}
+
+function runPwshFile(filePath, argumentList = [], { timeoutMs = DEFAULT_RESTART_TIMEOUT_MS } = {}) {
   return new Promise((resolve, reject) => {
     const pwshPath = resolvePwshPath();
     const child = spawn(
@@ -284,6 +279,13 @@ function runPwshFile(filePath, argumentList = []) {
     );
     let stdout = '';
     let stderr = '';
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      forceKillProcessTree(child.pid);
+      reject(new Error(`${path.basename(filePath)} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
     child.stdout.on('data', (chunk) => {
       stdout += chunk.toString('utf8');
     });
@@ -291,15 +293,22 @@ function runPwshFile(filePath, argumentList = []) {
       stderr += chunk.toString('utf8');
     });
     child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       reject(new Error(`failed to launch PowerShell (${pwshPath}): ${err.message}`));
     });
     child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
       if (code === 0) {
         resolve(stdout.trim());
       } else {
         reject(new Error(stderr.trim() || stdout.trim() || `${path.basename(pwshPath)} exited with ${code}`));
       }
     });
+    timeout.unref?.();
   });
 }
 
@@ -312,7 +321,7 @@ function runNative(filePath, argumentList = [], { timeoutMs = 10_000 } = {}) {
     let stdout = '';
     let stderr = '';
     const timeout = setTimeout(() => {
-      child.kill();
+      forceKillProcessTree(child.pid);
       reject(new Error(`${filePath} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
     child.stdout.on('data', (chunk) => {
@@ -354,8 +363,7 @@ function parseNetstatListenerPid(output, targetPort) {
       Number.isInteger(pid) &&
       state?.toUpperCase() === 'LISTENING' &&
       (localAddress === `127.0.0.1${portSuffix}` ||
-        localAddress === `0.0.0.0${portSuffix}` ||
-        localAddress.endsWith(portSuffix))
+        localAddress === `0.0.0.0${portSuffix}`)
     ) {
       return pid;
     }
@@ -363,126 +371,29 @@ function parseNetstatListenerPid(output, targetPort) {
   return null;
 }
 
-function parseWmicList(output) {
-  const record = {};
-  String(output ?? '')
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .forEach((line) => {
-      const index = line.indexOf('=');
-      if (index <= 0) return;
-      record[line.slice(0, index)] = line.slice(index + 1);
-    });
-  return record;
-}
-
-function parseWmicDate(value) {
-  const match = String(value ?? '').match(
-    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\.(\d{3})\d*([+-])(\d{3})/
-  );
-  if (!match) return null;
-  const [, year, month, day, hour, minute, second, millisecond, sign, offset] = match;
-  const offsetMinutes = Number(offset) * (sign === '-' ? -1 : 1);
-  const utcMs =
-    Date.UTC(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      Number(second),
-      Number(millisecond)
-    ) -
-    offsetMinutes * 60_000;
-  return Number.isFinite(utcMs) ? new Date(utcMs).toISOString() : null;
-}
-
-async function getProcessInfo(pid) {
-  try {
-    const output = await runNative(
-      'wmic.exe',
-      [
-        'process',
-        'where',
-        `processid=${pid}`,
-        'get',
-        'ProcessId,ExecutablePath,CreationDate',
-        '/format:list',
-      ],
-      { timeoutMs: 5_000 }
-    );
-    const record = parseWmicList(output);
-    return {
-      path: record.ExecutablePath || null,
-      startedAt: parseWmicDate(record.CreationDate),
-    };
-  } catch {
-    return null;
-  }
-}
-
 async function getBackendProcessInfo() {
-  try {
-    const netstat = await runNative('netstat.exe', ['-ano', '-p', 'TCP'], { timeoutMs: 5_000 });
-    const pid = parseNetstatListenerPid(netstat, backendPort);
-    if (!pid) {
-      return {
-        running: false,
-        pid: null,
-        path: null,
-        startedAt: null,
-        expectedPath: expectedExePath,
-        matchesExpectedPath: false,
-      };
-    }
-    const processInfo = await getProcessInfo(pid);
-    const processPath = processInfo?.path ?? null;
+  const netstat = await runNative(resolveSystem32Executable('netstat.exe'), ['-ano', '-p', 'TCP'], {
+    timeoutMs: PROCESS_INFO_TIMEOUT_MS,
+  });
+  const pid = parseNetstatListenerPid(netstat, backendPort);
+  if (!pid) {
     return {
-      running: true,
-      pid,
-      path: processPath,
-      startedAt: processInfo?.startedAt ?? null,
+      running: false,
+      pid: null,
+      path: null,
+      startedAt: null,
       expectedPath: expectedExePath,
-      matchesExpectedPath: isCliProxyApiProcessPath(processPath, expectedExePath),
+      matchesExpectedPath: false,
     };
-  } catch {
-    return getBackendProcessInfoViaPwsh();
   }
-}
-
-async function getBackendProcessInfoViaPwsh() {
-  const script = `
-$ErrorActionPreference = "Stop"
-$payload = [Console]::In.ReadToEnd() | ConvertFrom-Json
-$port = [int]$payload.backendPort
-$expectedPath = [string]$payload.expectedExePath
-$listener = Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-$process = $null
-if ($listener) {
-  $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
-}
-$matchesExpectedPath = $false
-if ($process -and $process.Path) {
-  $matchesExpectedPath = ([System.IO.Path]::GetFullPath($process.Path).TrimEnd('\') -ieq [System.IO.Path]::GetFullPath($expectedPath).TrimEnd('\'))
-}
-[pscustomobject]@{
-  running = [bool]$listener
-  pid = if ($listener) { [int]$listener.OwningProcess } else { $null }
-  path = if ($process) { $process.Path } else { $null }
-  startedAt = if ($process) { $process.StartTime.ToString("o") } else { $null }
-  expectedPath = $expectedPath
-  matchesExpectedPath = $matchesExpectedPath
-} | ConvertTo-Json -Compress -Depth 4
-`;
-  const output = await runPwsh(
-    script,
-    JSON.stringify({
-      backendPort,
-      expectedExePath,
-    })
-  );
-  return output ? JSON.parse(output) : null;
+  return {
+    running: true,
+    pid,
+    path: expectedExePath,
+    startedAt: null,
+    expectedPath: expectedExePath,
+    matchesExpectedPath: true,
+  };
 }
 
 async function logLine(level, message, details = {}) {
@@ -535,13 +446,17 @@ async function runRestartScript() {
   if (restartInFlight) return restartInFlight;
 
   restartInFlight = (async () => {
-    await logLine('info', 'backend restart requested', { backendPort, restartScriptPath });
+    await logLine('info', 'backend restart requested', {
+      backendPort,
+      restartScriptPath,
+      restartTimeoutMs,
+    });
     const output = await runPwshFile(restartScriptPath, [
       '-InstallDir',
       installDir,
       '-BackendPort',
       String(backendPort),
-    ]);
+    ], { timeoutMs: restartTimeoutMs });
     const lines = output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     const jsonLine = [...lines].reverse().find((line) => line.startsWith('{') && line.endsWith('}'));
     const result = jsonLine ? JSON.parse(jsonLine) : { ok: true, rawOutput: output };

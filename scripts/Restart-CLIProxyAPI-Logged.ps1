@@ -2,7 +2,8 @@ param(
     [string]$InstallDir = "D:\CLIProxyAPI",
     [int]$BackendPort = 8317,
     [int]$StopTimeoutSeconds = 12,
-    [int]$StartTimeoutSeconds = 30
+    [int]$StartTimeoutSeconds = 30,
+    [int]$ListenerProbeTimeoutSeconds = 15
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,9 +27,79 @@ function Write-RestartLog {
     Add-Content -LiteralPath $latestLogPath -Value $line -Encoding UTF8
 }
 
+function Invoke-NativeWithTimeout {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [int]$TimeoutSeconds = 5
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    foreach ($argument in $ArgumentList) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+    if (-not $process.WaitForExit([Math]::Max(1, $TimeoutSeconds) * 1000)) {
+        try {
+            $process.Kill($true)
+        }
+        catch {
+            $process.Kill()
+        }
+        throw "$FilePath timed out after ${TimeoutSeconds}s."
+    }
+    $process.WaitForExit()
+
+    $stdout = $stdoutTask.GetAwaiter().GetResult()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
+    if ($process.ExitCode -ne 0) {
+        $message = $stderr.Trim()
+        if ([string]::IsNullOrWhiteSpace($message)) {
+            $message = "$FilePath exited with $($process.ExitCode)."
+        }
+        throw $message
+    }
+    return $stdout
+}
+
 function Get-CLIProxyAPIListener {
-    Get-NetTCPConnection -LocalAddress "127.0.0.1" -LocalPort $BackendPort -State Listen -ErrorAction SilentlyContinue |
-        Select-Object -First 1
+    $netstat = Join-Path $env:WINDIR "System32\netstat.exe"
+    $output = Invoke-NativeWithTimeout -FilePath $netstat -ArgumentList @("-ano", "-p", "TCP") -TimeoutSeconds $ListenerProbeTimeoutSeconds
+    $portSuffix = ":$BackendPort"
+    foreach ($line in ($output -split "`r?`n")) {
+        $parts = $line.Trim() -split "\s+"
+        if ($parts.Count -lt 5 -or $parts[0] -ne "TCP") {
+            continue
+        }
+        $localAddress = $parts[1]
+        $state = $parts[3]
+        $pidText = $parts[4]
+        $listenerPid = 0
+        if (
+            $state -eq "LISTENING" -and
+            ($localAddress -eq "127.0.0.1$portSuffix" -or $localAddress -eq "0.0.0.0$portSuffix") -and
+            [int]::TryParse($pidText, [ref]$listenerPid)
+        ) {
+            return [pscustomobject]@{
+                LocalAddress = "127.0.0.1"
+                LocalPort = $BackendPort
+                State = "Listen"
+                OwningProcess = $listenerPid
+            }
+        }
+    }
+    return $null
 }
 
 function Get-CLIProxyAPIListenerProcess {
@@ -55,6 +126,7 @@ function Test-ExpectedProcessPath {
 
 function Resolve-PwshPath {
     $candidates = @(
+        "D:\Tools\PowerShell\7\pwsh.exe",
         "C:\Program Files\PowerShell\7\pwsh.exe",
         (Join-Path $env:ProgramFiles "PowerShell\7\pwsh.exe"),
         (Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe")
@@ -78,10 +150,24 @@ function Invoke-StartupWrapper {
     foreach ($argument in @("-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $startScript, "-DelaySeconds", "0")) {
         [void]$startInfo.ArgumentList.Add($argument)
     }
-    $process = [System.Diagnostics.Process]::Start($startInfo)
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
+
+    if (-not $process.WaitForExit([Math]::Max(5, $StartTimeoutSeconds) * 1000)) {
+        try {
+            $process.Kill($true)
+        }
+        catch {
+            $process.Kill()
+        }
+        throw "Startup wrapper timed out after ${StartTimeoutSeconds}s."
+    }
     $process.WaitForExit()
+    $stdout = $stdoutTask.GetAwaiter().GetResult()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
 
     if ($stdout) {
         Write-RestartLog "Startup stdout: $($stdout.Trim())"

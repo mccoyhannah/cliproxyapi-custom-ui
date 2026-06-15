@@ -3809,6 +3809,11 @@ export function AuthFilesPage() {
     [currentPage, refocusFileCardsAfterListViewChange, totalPages]
   );
 
+  const handleRefreshCodexQuotaFromListHeader = useCallback(() => {
+    refocusFileCardsAfterListViewChange();
+    void handleRefreshCodexQuota().finally(refocusFileCardsAfterListViewChange);
+  }, [handleRefreshCodexQuota, refocusFileCardsAfterListViewChange]);
+
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
@@ -5298,7 +5303,7 @@ export function AuthFilesPage() {
                     size="sm"
                     className={styles.fileListQuotaRefreshButton}
                     leftIcon={<IconRefreshCw size={15} />}
-                    onClick={() => void handleRefreshCodexQuota()}
+                    onClick={handleRefreshCodexQuotaFromListHeader}
                     disabled={
                       disableControls ||
                       codexQuotaRefreshing ||

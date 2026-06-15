@@ -4,6 +4,7 @@ import {
   isLocalBackendApiBaseValue,
   isOriginAllowedValue,
   normalizeApiBase,
+  normalizeTimeoutMs,
   resolvePwshPath,
 } from './cliproxyapi-control-sidecar.mjs';
 
@@ -25,8 +26,21 @@ assert.equal(
 );
 
 assert.equal(
-  resolvePwshPath({}, (candidate) => candidate === 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'),
-  'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+  resolvePwshPath({}, (candidate) =>
+    ['D:\\Tools\\PowerShell\\7\\pwsh.exe', 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'].includes(
+      candidate
+    )
+  ),
+  'D:\\Tools\\PowerShell\\7\\pwsh.exe'
+);
+assert.equal(
+  resolvePwshPath(
+    { ProgramFiles: 'C:\\Program Files', WINDIR: 'C:\\Windows' },
+    (candidate) =>
+      candidate === 'C:\\Program Files\\PowerShell\\7\\pwsh.exe' ||
+      candidate === 'D:\\Tools\\PowerShell\\7\\pwsh.exe'
+  ),
+  'D:\\Tools\\PowerShell\\7\\pwsh.exe'
 );
 assert.equal(
   resolvePwshPath(
@@ -50,5 +64,12 @@ assert.equal(
   'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
 );
 assert.equal(resolvePwshPath({ ProgramFiles: 'D:\\Missing', WINDIR: 'C:\\Missing' }, () => false), 'pwsh.exe');
+
+assert.equal(normalizeTimeoutMs(undefined, 75_000, 5_000, 180_000), 75_000);
+assert.equal(normalizeTimeoutMs('not-a-number', 75_000, 5_000, 180_000), 75_000);
+assert.equal(normalizeTimeoutMs(Number.POSITIVE_INFINITY, 75_000, 5_000, 180_000), 75_000);
+assert.equal(normalizeTimeoutMs('1000', 75_000, 5_000, 180_000), 5_000);
+assert.equal(normalizeTimeoutMs('120000', 75_000, 5_000, 180_000), 120_000);
+assert.equal(normalizeTimeoutMs('300000', 75_000, 5_000, 180_000), 180_000);
 
 console.log('cliproxyapi-control-sidecar tests passed');
