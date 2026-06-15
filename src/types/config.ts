@@ -12,6 +12,12 @@ export interface QuotaExceededConfig {
   antigravityCredits?: boolean;
 }
 
+export interface PluginsConfig {
+  enabled?: boolean;
+  dir?: string;
+  storeSources?: string[];
+}
+
 export interface Config {
   debug?: boolean;
   proxyUrl?: string;
@@ -31,6 +37,8 @@ export interface Config {
   vertexApiKeys?: ProviderKeyConfig[];
   openaiCompatibility?: OpenAIProviderConfig[];
   oauthExcludedModels?: Record<string, string[]>;
+  plugins?: PluginsConfig;
+  supportsPlugin?: boolean;
   raw?: Record<string, unknown>;
 }
 
@@ -52,7 +60,8 @@ export type RawConfigSection =
   | 'claude-api-key'
   | 'vertex-api-key'
   | 'openai-compatibility'
-  | 'oauth-excluded-models';
+  | 'oauth-excluded-models'
+  | 'plugins';
 
 export interface ConfigCache {
   data: Config;

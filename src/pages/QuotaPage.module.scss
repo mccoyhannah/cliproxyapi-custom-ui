@@ -766,6 +766,19 @@
   }
 }
 
+.quotaCardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.quotaResetCreditButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .quotaError {
   font-size: 12px;
   color: var(--danger-color);

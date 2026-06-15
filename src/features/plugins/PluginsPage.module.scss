@@ -1,0 +1,516 @@
+@use '../../styles/variables' as *;
+@use '../../styles/mixins' as *;
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+  width: 100%;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-md;
+
+  @include mobile {
+    flex-direction: column;
+  }
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.description {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.errorBox,
+.warningBox {
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.errorBox {
+  border: 1px solid var(--danger-color);
+  background: color-mix(in srgb, $error-color 10%, transparent);
+  color: var(--danger-color);
+}
+
+.warningBox {
+  border: 1px solid color-mix(in srgb, $warning-color 42%, var(--border-color));
+  background: color-mix(in srgb, $warning-color 9%, var(--bg-secondary));
+  color: var(--text-primary);
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+  flex-wrap: wrap;
+}
+
+.statusPill {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  border-radius: $radius-full;
+  background: color-mix(in srgb, var(--bg-primary) 56%, transparent);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.statusDotOn {
+  background: $success-color;
+  box-shadow: 0 0 6px color-mix(in srgb, $success-color 50%, transparent);
+}
+
+.statusDotOff {
+  background: var(--text-tertiary);
+}
+
+.statusLabel {
+  color: var(--text-secondary);
+}
+
+.statusValue {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.statusPathValue {
+  display: block;
+  min-width: 0;
+  max-width: min(360px, 58vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusDivider {
+  width: 1px;
+  height: 20px;
+  background: color-mix(in srgb, var(--border-color) 60%, transparent);
+  flex-shrink: 0;
+
+  @include mobile {
+    display: none;
+  }
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+
+  :global(.form-group) {
+    flex: 1;
+    max-width: 480px;
+    margin: 0;
+  }
+
+  :global(.input) {
+    padding-right: 36px;
+  }
+}
+
+.pluginList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  border-radius: $radius-lg;
+  background: color-mix(in srgb, var(--border-color) 30%, transparent);
+}
+
+.pluginRow {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  background: var(--bg-primary);
+  transition: background-color $transition-fast;
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+
+  @include mobile {
+    grid-template-columns: 36px minmax(0, 1fr);
+    padding: $spacing-md;
+  }
+}
+
+.logoBox {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.pluginInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pluginName {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: $spacing-sm;
+
+  h2 {
+    min-width: 0;
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 1.3;
+    @include text-ellipsis;
+  }
+}
+
+.pluginId {
+  color: var(--text-tertiary);
+  font-family: $font-mono;
+  font-size: 12px;
+  @include text-ellipsis;
+}
+
+.pluginMeta,
+.badgeRow,
+.resourceLinks,
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.metaItem {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+
+  strong {
+    color: var(--text-secondary);
+    font-weight: 650;
+  }
+}
+
+.metaPath {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge,
+.badgeSuccess,
+.badgeWarning,
+.badgeMuted {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.badge {
+  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+  color: var(--text-secondary);
+}
+
+.badgeSuccess {
+  border: 1px solid color-mix(in srgb, $success-color 24%, transparent);
+  background: color-mix(in srgb, $success-color 10%, transparent);
+  color: var(--success-color);
+}
+
+.badgeWarning {
+  border: 1px solid color-mix(in srgb, $warning-color 24%, transparent);
+  background: color-mix(in srgb, $warning-color 10%, transparent);
+  color: var(--warning-color);
+}
+
+.badgeMuted {
+  border: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+  color: var(--text-tertiary);
+}
+
+.resourceLinks {
+  margin-top: 2px;
+}
+
+.resourceLink {
+  display: inline-flex;
+  max-width: 260px;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  @include text-ellipsis;
+
+  &:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+  }
+}
+
+.rowActions {
+  justify-content: flex-end;
+  max-width: min(560px, 48vw);
+  flex-shrink: 0;
+
+  @include mobile {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    max-width: none;
+  }
+}
+
+.iconLink {
+  display: inline-flex;
+  width: 30px;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-hover);
+    color: var(--primary-color);
+  }
+}
+
+.skeletonRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  padding: $spacing-md $spacing-lg;
+  background: var(--bg-primary);
+}
+
+.skeletonAvatar,
+.skeletonLine {
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--bg-secondary) 86%, transparent) 25%,
+    color-mix(in srgb, var(--bg-hover) 70%, transparent) 37%,
+    color-mix(in srgb, var(--bg-secondary) 86%, transparent) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeletonPulse 1.35s ease-in-out infinite;
+}
+
+.skeletonAvatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.skeletonText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeletonLine {
+  width: 45%;
+  height: 14px;
+
+  &:last-child {
+    width: 70%;
+    height: 10px;
+  }
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-sm;
+}
+
+.configForm {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-lg;
+}
+
+.formSection {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+
+  h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  :global(.form-group) {
+    margin: 0;
+  }
+}
+
+.fieldRow {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  padding: $spacing-md;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+}
+
+.fieldText {
+  min-width: 0;
+}
+
+.fieldLabel {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.fieldDescription,
+.fieldHint {
+  margin-top: 4px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 650;
+    overflow-wrap: anywhere;
+  }
+}
+
+.textarea {
+  min-height: 148px;
+  resize: vertical;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-md;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: $font-mono;
+  font-size: 13px;
+  line-height: 1.5;
+
+  &:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 18%, transparent);
+  }
+}
+
+.fieldError {
+  padding: 8px 10px;
+  border-radius: $radius-sm;
+  background: color-mix(in srgb, $error-color 10%, transparent);
+  color: var(--danger-color);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.emptyConfig,
+.loadingText {
+  padding: $spacing-md;
+  border: 1px dashed var(--border-color);
+  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+@keyframes skeletonPulse {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}

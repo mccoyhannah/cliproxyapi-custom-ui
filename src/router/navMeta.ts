@@ -3,12 +3,15 @@ import { AUTH_FILES_FOCUS_CARDS_PATH } from './authFilesFocus';
 export type SidebarIconKey =
   | 'dashboard'
   | 'aiProviders'
+  | 'providerWorkbench'
   | 'authFiles'
   | 'oauth'
   | 'quota'
   | 'usageStatistics'
   | 'config'
   | 'logs'
+  | 'plugins'
+  | 'pluginStore'
   | 'system';
 
 export type TransitionVariant = 'vertical' | 'ios';
@@ -21,10 +24,12 @@ export interface NavItemMeta {
   defaultLabel?: string;
   icon: SidebarIconKey;
   requiresLoggingToFile?: boolean;
+  requiresPluginSupport?: boolean;
 }
 
 interface VisibleNavOptions {
   loggingToFile?: boolean | null;
+  supportsPlugin?: boolean | null;
 }
 
 interface NestedRouteOrder {
@@ -36,6 +41,13 @@ export const NAV_ITEMS: readonly NavItemMeta[] = [
   { key: 'dashboard', path: '/dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
   { key: 'config', path: '/config', labelKey: 'nav.config_management', icon: 'config' },
   { key: 'aiProviders', path: '/ai-providers', labelKey: 'nav.ai_providers', icon: 'aiProviders' },
+  {
+    key: 'providerWorkbench',
+    path: '/ai-providers/workbench',
+    labelKey: 'nav.provider_workbench',
+    defaultLabel: 'Provider Workbench',
+    icon: 'providerWorkbench',
+  },
   {
     key: 'authFiles',
     path: '/auth-files',
@@ -53,6 +65,22 @@ export const NAV_ITEMS: readonly NavItemMeta[] = [
     icon: 'usageStatistics',
   },
   { key: 'logs', path: '/logs', labelKey: 'nav.logs', icon: 'logs', requiresLoggingToFile: true },
+  {
+    key: 'plugins',
+    path: '/plugins',
+    labelKey: 'nav.plugins',
+    defaultLabel: '插件管理',
+    icon: 'plugins',
+    requiresPluginSupport: true,
+  },
+  {
+    key: 'pluginStore',
+    path: '/plugin-store',
+    labelKey: 'nav.plugin_store',
+    defaultLabel: '插件商店',
+    icon: 'pluginStore',
+    requiresPluginSupport: true,
+  },
   { key: 'system', path: '/system', labelKey: 'nav.system_info', icon: 'system' },
 ];
 
@@ -63,6 +91,7 @@ const AI_PROVIDER_ROUTE_ORDER: readonly NestedRouteOrder[] = [
   { prefix: '/ai-providers/vertex', offset: 0.4 },
   { prefix: '/ai-providers/ampcode', offset: 0.5 },
   { prefix: '/ai-providers/openai', offset: 0.6 },
+  { prefix: '/ai-providers/workbench', offset: 0.7 },
 ];
 
 const AUTH_FILES_ROUTE_ORDER: readonly NestedRouteOrder[] = [
@@ -70,8 +99,12 @@ const AUTH_FILES_ROUTE_ORDER: readonly NestedRouteOrder[] = [
   { prefix: '/auth-files/oauth-model-alias', offset: 0.2 },
 ];
 
-export function getVisibleNavItems({ loggingToFile }: VisibleNavOptions = {}) {
-  return NAV_ITEMS.filter((item) => !item.requiresLoggingToFile || Boolean(loggingToFile));
+export function getVisibleNavItems({ loggingToFile, supportsPlugin }: VisibleNavOptions = {}) {
+  return NAV_ITEMS.filter(
+    (item) =>
+      (!item.requiresLoggingToFile || Boolean(loggingToFile)) &&
+      (!item.requiresPluginSupport || supportsPlugin === true)
+  );
 }
 
 export function normalizeRoutePath(pathname: string) {

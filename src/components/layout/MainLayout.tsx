@@ -31,6 +31,8 @@ export function MainLayout() {
   const logout = useAuthStore((state) => state.logout);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const serverVersion = useAuthStore((state) => state.serverVersion);
+  const supportsPlugin = useAuthStore((state) => state.supportsPlugin);
+  const updateServerCapabilities = useAuthStore((state) => state.updateServerCapabilities);
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
@@ -113,6 +115,11 @@ export function MainLayout() {
   }, [fetchConfig]);
 
   useEffect(() => {
+    if (!config) return;
+    updateServerCapabilities({ supportsPlugin: config.supportsPlugin === true });
+  }, [config, updateServerCapabilities]);
+
+  useEffect(() => {
     if (!sidebarOpen) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -167,8 +174,9 @@ export function MainLayout() {
   }, [location.pathname, navigate]);
 
   const resolveRouteOrder = useCallback(
-    (pathname: string) => getRouteOrder(pathname, { loggingToFile: config?.loggingToFile }),
-    [config?.loggingToFile]
+    (pathname: string) =>
+      getRouteOrder(pathname, { loggingToFile: config?.loggingToFile, supportsPlugin }),
+    [config?.loggingToFile, supportsPlugin]
   );
 
   return (
@@ -210,6 +218,7 @@ export function MainLayout() {
           open={sidebarOpen}
           collapsed={sidebarCollapsed}
           loggingToFile={config?.loggingToFile}
+          supportsPlugin={supportsPlugin}
           onNavigate={() => setSidebarOpen(false)}
         />
 

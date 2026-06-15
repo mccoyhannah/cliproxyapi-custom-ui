@@ -50,6 +50,7 @@ type VisualSectionId =
   | 'remote'
   | 'auth'
   | 'system'
+  | 'plugins'
   | 'network'
   | 'quota'
   | 'streaming'
@@ -191,6 +192,8 @@ export function VisualConfigEditor({
   const nonstreamKeepaliveInputId = useId();
   const nonstreamKeepaliveHintId = `${nonstreamKeepaliveInputId}-hint`;
   const nonstreamKeepaliveErrorId = `${nonstreamKeepaliveInputId}-error`;
+  const pluginsStoreSourcesInputId = useId();
+  const pluginsStoreSourcesHintId = `${pluginsStoreSourcesInputId}-hint`;
   const [activeSectionId, setActiveSectionId] = useState<VisualSectionId>('server');
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const sidebarAnchorRef = useRef<HTMLElement | null>(null);
@@ -289,6 +292,13 @@ export function VisualConfigEditor({
         description: t('config_management.visual.sections.system.description'),
         icon: IconDiamond,
         errorCount: countErrors(['logsMaxTotalSizeMb']),
+      },
+      {
+        id: 'plugins',
+        title: t('config_management.visual.sections.plugins.title'),
+        description: t('config_management.visual.sections.plugins.description'),
+        icon: IconCode,
+        errorCount: 0,
       },
       {
         id: 'network',
@@ -806,11 +816,57 @@ export function VisualConfigEditor({
           </ConfigSection>
 
           <ConfigSection
+            id="plugins"
+            ref={(node) => {
+              sectionRefs.current.plugins = node;
+            }}
+            indexLabel="06"
+            icon={<IconCode size={16} />}
+            title={t('config_management.visual.sections.plugins.title')}
+            description={t('config_management.visual.sections.plugins.description')}
+          >
+            <SectionStack>
+              <ToggleRow
+                title={t('config_management.visual.sections.plugins.enabled')}
+                description={t('config_management.visual.sections.plugins.enabled_desc')}
+                checked={values.pluginsEnabled}
+                disabled={disabled}
+                onChange={(pluginsEnabled) => onChange({ pluginsEnabled })}
+              />
+              <SectionGrid>
+                <Input
+                  label={t('config_management.visual.sections.plugins.dir')}
+                  placeholder="plugins"
+                  value={values.pluginsDir}
+                  onChange={(e) => onChange({ pluginsDir: e.target.value })}
+                  disabled={disabled}
+                  hint={t('config_management.visual.sections.plugins.dir_hint')}
+                />
+                <FieldShell
+                  label={t('config_management.visual.sections.plugins.store_sources')}
+                  htmlFor={pluginsStoreSourcesInputId}
+                  hint={t('config_management.visual.sections.plugins.store_sources_hint')}
+                  hintId={pluginsStoreSourcesHintId}
+                >
+                  <textarea
+                    id={pluginsStoreSourcesInputId}
+                    className="input"
+                    value={values.pluginsStoreSourcesText}
+                    onChange={(e) => onChange({ pluginsStoreSourcesText: e.target.value })}
+                    disabled={disabled}
+                    spellCheck={false}
+                  />
+                </FieldShell>
+              </SectionGrid>
+            </SectionStack>
+          </ConfigSection>
+
+          <ConfigSection
             id="network"
             ref={(node) => {
               sectionRefs.current.network = node;
             }}
-            indexLabel="06"
+            indexLabel="07"
             icon={<IconTrendingUp size={16} />}
             title={t('config_management.visual.sections.network.title')}
             description={t('config_management.visual.sections.network.description')}
@@ -922,7 +978,7 @@ export function VisualConfigEditor({
             ref={(node) => {
               sectionRefs.current.quota = node;
             }}
-            indexLabel="07"
+            indexLabel="08"
             icon={<IconTimer size={16} />}
             title={t('config_management.visual.sections.quota.title')}
             description={t('config_management.visual.sections.quota.description')}
@@ -959,7 +1015,7 @@ export function VisualConfigEditor({
             ref={(node) => {
               sectionRefs.current.streaming = node;
             }}
-            indexLabel="08"
+            indexLabel="09"
             icon={<IconSatellite size={16} />}
             title={t('config_management.visual.sections.streaming.title')}
             description={t('config_management.visual.sections.streaming.description')}
@@ -1060,7 +1116,7 @@ export function VisualConfigEditor({
             ref={(node) => {
               sectionRefs.current.payload = node;
             }}
-            indexLabel="09"
+            indexLabel="10"
             icon={<IconCode size={16} />}
             title={t('config_management.visual.sections.payload.title')}
             description={t('config_management.visual.sections.payload.description')}

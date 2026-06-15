@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import {
+  IconCode,
   IconSidebarAuthFiles,
   IconSidebarConfig,
   IconSidebarDashboard,
@@ -21,18 +22,22 @@ interface SidebarNavProps {
   open: boolean;
   collapsed: boolean;
   loggingToFile?: boolean | null;
+  supportsPlugin?: boolean | null;
   onNavigate: () => void;
 }
 
 const sidebarIcons: Record<SidebarIconKey, ReactNode> = {
   dashboard: <IconSidebarDashboard size={18} />,
   aiProviders: <IconSidebarProviders size={18} />,
+  providerWorkbench: <IconSidebarProviders size={18} />,
   authFiles: <IconSidebarAuthFiles size={18} />,
   oauth: <IconSidebarOauth size={18} />,
   quota: <IconSidebarQuota size={18} />,
   usageStatistics: <IconSidebarUsage size={18} />,
   config: <IconSidebarConfig size={18} />,
   logs: <IconSidebarLogs size={18} />,
+  plugins: <IconCode size={18} />,
+  pluginStore: <IconCode size={18} />,
   system: <IconSidebarSystem size={18} />,
 };
 
@@ -46,13 +51,14 @@ export function SidebarNav({
   open,
   collapsed,
   loggingToFile,
+  supportsPlugin,
   onNavigate,
 }: SidebarNavProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const abbrBrandName = t('title.abbr');
   const isVisuallyCollapsed = collapsed && !open;
-  const navItems = getVisibleNavItems({ loggingToFile });
+  const navItems = getVisibleNavItems({ loggingToFile, supportsPlugin });
 
   return (
     <aside

@@ -23,6 +23,7 @@ interface AuthStoreState extends AuthState {
   checkAuth: () => Promise<boolean>;
   restoreSession: () => Promise<boolean>;
   updateServerVersion: (version: string | null, buildDate?: string | null) => void;
+  updateServerCapabilities: (capabilities: { supportsPlugin?: boolean | null }) => void;
   updateConnectionStatus: (status: ConnectionStatus, error?: string | null) => void;
 }
 
@@ -54,6 +55,9 @@ const disableStoredAutoLogin = () => {
   localStorage.removeItem('isLoggedIn');
 };
 
+const readPluginSupport = (config: { supportsPlugin?: boolean } | null | undefined) =>
+  config?.supportsPlugin === true;
+
 export const useAuthStore = create<AuthStoreState>()(
   persist(
     (set, get) => ({
@@ -64,6 +68,7 @@ export const useAuthStore = create<AuthStoreState>()(
       rememberPassword: false,
       serverVersion: null,
       serverBuildDate: null,
+      supportsPlugin: null,
       connectionStatus: 'disconnected',
       connectionError: null,
 
@@ -132,7 +137,7 @@ export const useAuthStore = create<AuthStoreState>()(
           });
 
           // 测试连接 - 获取配置
-          await useConfigStore.getState().fetchConfig(undefined, true);
+          const config = await useConfigStore.getState().fetchConfig(undefined, true);
 
           // 登录成功
           set({
@@ -140,6 +145,7 @@ export const useAuthStore = create<AuthStoreState>()(
             apiBase,
             managementKey,
             rememberPassword,
+            supportsPlugin: readPluginSupport(config),
             connectionStatus: 'connected',
             connectionError: null
           });
@@ -169,6 +175,7 @@ export const useAuthStore = create<AuthStoreState>()(
           managementKey: '',
           serverVersion: null,
           serverBuildDate: null,
+          supportsPlugin: null,
           connectionStatus: 'disconnected',
           connectionError: null
         });
@@ -188,10 +195,11 @@ export const useAuthStore = create<AuthStoreState>()(
           apiClient.setConfig({ apiBase, managementKey });
 
           // 验证连接
-          await useConfigStore.getState().fetchConfig();
+          const config = await useConfigStore.getState().fetchConfig();
 
           set({
             isAuthenticated: true,
+            supportsPlugin: readPluginSupport(config),
             connectionStatus: 'connected'
           });
 
@@ -211,6 +219,12 @@ export const useAuthStore = create<AuthStoreState>()(
       // 更新服务器版本
       updateServerVersion: (version, buildDate) => {
         set({ serverVersion: version || null, serverBuildDate: buildDate || null });
+      },
+
+      updateServerCapabilities: (capabilities) => {
+        if (capabilities.supportsPlugin !== undefined) {
+          set({ supportsPlugin: capabilities.supportsPlugin });
+        }
       },
 
       // 更新连接状态

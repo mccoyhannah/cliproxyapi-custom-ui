@@ -14,6 +14,8 @@ import {
   IconCode,
   IconDownload,
   IconEyeOff,
+  IconMaximize2,
+  IconMinimize2,
   IconRefreshCw,
   IconSearch,
   IconSlidersHorizontal,
@@ -24,7 +26,7 @@ import {
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
-import { logsApi } from '@/services/api/logs';
+import { logsApi, type LogCursor, type LogsQuery } from '@/services/api/logs';
 import { copyToClipboard } from '@/utils/clipboard';
 import { downloadBlob } from '@/utils/download';
 import { MANAGEMENT_API_PREFIX } from '@/utils/constants';
@@ -65,6 +67,49 @@ const getErrorMessage = (err: unknown): string => {
 
 type TabType = 'logs' | 'errors';
 
+interface LogPosition {
+  after: LogCursor | null;
+  cursor: string;
+}
+
+const EMPTY_LOG_POSITION: LogPosition = { after: null, cursor: '' };
+
+const normalizeAfterCursor = (value: LogCursor | null | undefined): LogCursor | null => {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const numeric = Number(trimmed);
+  return Number.isFinite(numeric) && /^-?\d+(\.\d+)?$/.test(trimmed) ? numeric : trimmed;
+};
+
+const buildIncrementalQuery = (position: LogPosition): LogsQuery => {
+  if (position.cursor) return { cursor: position.cursor, limit: MAX_BUFFER_LINES };
+  if (position.after !== null) return { after: position.after, limit: MAX_BUFFER_LINES };
+  return { limit: MAX_BUFFER_LINES };
+};
+
+const findLineOverlap = (existing: string[], incoming: string[]) => {
+  const maxOverlap = Math.min(existing.length, incoming.length, 200);
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    let matched = true;
+    for (let index = 0; index < size; index += 1) {
+      if (existing[existing.length - size + index] !== incoming[index]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return size;
+  }
+  return 0;
+};
+
+const mergeIncrementalLines = (existing: string[], incoming: string[]) => {
+  if (incoming.length === 0) return existing;
+  const overlap = findLineOverlap(existing, incoming);
+  return overlap > 0 ? [...existing, ...incoming.slice(overlap)] : [...existing, ...incoming];
+};
+
 export function LogsPage() {
   const { t } = useTranslation();
   const { showNotification, showConfirmation } = useNotificationStore();
@@ -94,6 +139,7 @@ export function LogsPage() {
   const [errorLogsError, setErrorLogsError] = useState('');
   const [requestLogId, setRequestLogId] = useState<string | null>(null);
   const [requestLogDownloading, setRequestLogDownloading] = useState(false);
+  const [fullscreenLogs, setFullscreenLogs] = useLocalStorage('logsPage.fullscreenLogs', false);
 
   const logScrollerRef = useRef<ReturnType<typeof useLogScroller> | null>(null);
   const longPressRef = useRef<{
@@ -105,8 +151,7 @@ export function LogsPage() {
   const logRequestInFlightRef = useRef(false);
   const pendingFullReloadRef = useRef(false);
 
-  // 保存最新时间戳用于增量获取
-  const latestTimestampRef = useRef<number>(0);
+  const logPositionRef = useRef<LogPosition>(EMPTY_LOG_POSITION);
 
   const disableControls = connectionStatus !== 'connected';
 
@@ -139,22 +184,20 @@ export function LogsPage() {
         scrollerInstance?.requestScrollToBottom();
       }
 
-      const params =
-        incremental && latestTimestampRef.current > 0 ? { after: latestTimestampRef.current } : {};
+      const params = incremental ? buildIncrementalQuery(logPositionRef.current) : {};
       const data = await logsApi.fetchLogs(params);
 
-      // 更新时间戳
-      if (data['latest-timestamp']) {
-        latestTimestampRef.current = data['latest-timestamp'];
-      }
+      logPositionRef.current = {
+        after: normalizeAfterCursor(data.latestAfter ?? data['latest-timestamp']),
+        cursor: data.nextCursor || logPositionRef.current.cursor,
+      };
 
       const newLines = Array.isArray(data.lines) ? data.lines : [];
 
-      if (incremental && newLines.length > 0) {
-        // 增量更新：追加新日志并限制缓冲区大小（避免内存与渲染膨胀）
+      if (incremental && newLines.length > 0 && !data.cursorReset) {
         setLogState((prev) => {
           const prevRenderedCount = prev.buffer.length - prev.visibleFrom;
-          const combined = [...prev.buffer, ...newLines];
+          const combined = mergeIncrementalLines(prev.buffer, newLines);
           const dropCount = Math.max(combined.length - MAX_BUFFER_LINES, 0);
           const buffer = dropCount > 0 ? combined.slice(dropCount) : combined;
           let visibleFrom = Math.max(prev.visibleFrom - dropCount, 0);
@@ -166,7 +209,7 @@ export function LogsPage() {
 
           return { buffer, visibleFrom };
         });
-      } else if (!incremental) {
+      } else if (!incremental || data.cursorReset) {
         // 全量加载：默认只渲染最后 100 行，向上滚动再展开更多
         const buffer = newLines.slice(-MAX_BUFFER_LINES);
         const visibleFrom = Math.max(buffer.length - INITIAL_DISPLAY_LINES, 0);
@@ -201,7 +244,7 @@ export function LogsPage() {
         try {
           await logsApi.clearLogs();
           setLogState({ buffer: [], visibleFrom: 0 });
-          latestTimestampRef.current = 0;
+          logPositionRef.current = EMPTY_LOG_POSITION;
           showNotification(t('logs.clear_success'), 'success');
         } catch (err: unknown) {
           const message = getErrorMessage(err);
@@ -260,7 +303,7 @@ export function LogsPage() {
 
   useEffect(() => {
     if (connectionStatus === 'connected') {
-      latestTimestampRef.current = 0;
+      logPositionRef.current = EMPTY_LOG_POSITION;
       loadLogs(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -488,7 +531,9 @@ export function LogsPage() {
 
       <div className={styles.content}>
         {activeTab === 'logs' && (
-          <Card className={styles.logCard}>
+          <Card
+            className={`${styles.logCard} ${fullscreenLogs ? styles.logCardFullscreen : ''}`}
+          >
             {error && (
               <EmptyState
                 title={t('logs.load_error')}
@@ -753,6 +798,28 @@ export function LogsPage() {
                     <span className={styles.buttonContent}>
                       <IconDownload size={16} />
                       {t('logs.download_button')}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setFullscreenLogs((value) => !value)}
+                    className={styles.actionButton}
+                    title={
+                      fullscreenLogs
+                        ? t('logs.exit_fullscreen', { defaultValue: 'Exit fullscreen' })
+                        : t('logs.enter_fullscreen', { defaultValue: 'Fullscreen' })
+                    }
+                  >
+                    <span className={styles.buttonContent}>
+                      {fullscreenLogs ? (
+                        <IconMinimize2 size={16} />
+                      ) : (
+                        <IconMaximize2 size={16} />
+                      )}
+                      {fullscreenLogs
+                        ? t('logs.exit_fullscreen', { defaultValue: 'Exit fullscreen' })
+                        : t('logs.enter_fullscreen', { defaultValue: 'Fullscreen' })}
                     </span>
                   </Button>
                   <Button

@@ -64,6 +64,27 @@ function resolveApiKeysText(parsed: Record<string, unknown>): string {
   return parseApiKeysText(configApiKeyProvider['api-keys']);
 }
 
+function parseStringListText(raw: unknown): string {
+  if (Array.isArray(raw)) {
+    return raw.map((item) => String(item ?? '').trim()).filter(Boolean).join('\n');
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
+function serializeStringListText(value: string): string[] {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 type YamlDocument = ReturnType<typeof parseDocument>;
 type YamlPath = string[];
 
@@ -135,6 +156,16 @@ function setIntFromStringInDoc(doc: YamlDocument, path: YamlPath, value: unknown
     doc.setIn(path, parsed);
     return;
   }
+}
+
+function setManagedBooleanInDoc(
+  doc: YamlDocument,
+  path: YamlPath,
+  value: boolean,
+  shouldWrite: boolean
+): void {
+  if (!shouldWrite) return;
+  doc.setIn(path, Boolean(value));
 }
 
 function getNonNegativeIntegerError(value: string): 'non_negative_integer' | undefined {
@@ -659,6 +690,18 @@ function getNextDirtyFields(
       nextValues.quotaAntigravityCredits === baselineValues.quotaAntigravityCredits
     );
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'pluginsEnabled')) {
+    updateDirty('pluginsEnabled', nextValues.pluginsEnabled === baselineValues.pluginsEnabled);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'pluginsDir')) {
+    updateDirty('pluginsDir', nextValues.pluginsDir === baselineValues.pluginsDir);
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'pluginsStoreSourcesText')) {
+    updateDirty(
+      'pluginsStoreSourcesText',
+      nextValues.pluginsStoreSourcesText === baselineValues.pluginsStoreSourcesText
+    );
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'routingStrategy')) {
     updateDirty('routingStrategy', nextValues.routingStrategy === baselineValues.routingStrategy);
   }
@@ -808,6 +851,7 @@ export function useVisualConfig() {
       const tls = asRecord(parsed.tls);
       const remoteManagement = asRecord(parsed['remote-management']);
       const quotaExceeded = asRecord(parsed['quota-exceeded']);
+      const plugins = asRecord(parsed.plugins);
       const routing = asRecord(parsed.routing);
       const payload = asRecord(parsed.payload);
       const streaming = asRecord(parsed.streaming);
@@ -851,6 +895,12 @@ export function useVisualConfig() {
         quotaSwitchProject: Boolean(quotaExceeded?.['switch-project'] ?? true),
         quotaSwitchPreviewModel: Boolean(quotaExceeded?.['switch-preview-model'] ?? true),
         quotaAntigravityCredits: Boolean(quotaExceeded?.['antigravity-credits'] ?? false),
+
+        pluginsEnabled: Boolean(plugins?.enabled ?? false),
+        pluginsDir: typeof plugins?.dir === 'string' ? plugins.dir : '',
+        pluginsStoreSourcesText: parseStringListText(
+          plugins?.['store-sources'] ?? plugins?.storeSources ?? plugins?.['store_sources']
+        ),
 
         routingStrategy: routing?.strategy === 'fill-first' ? 'fill-first' : 'round-robin',
         routingSessionAffinity: Boolean(
@@ -989,6 +1039,42 @@ export function useVisualConfig() {
             );
           }
           deleteIfMapEmpty(doc, ['quota-exceeded']);
+        }
+
+        const shouldWritePlugins =
+          docHas(doc, ['plugins']) ||
+          dirtyFields.has('pluginsEnabled') ||
+          dirtyFields.has('pluginsDir') ||
+          dirtyFields.has('pluginsStoreSourcesText');
+        if (shouldWritePlugins) {
+          ensureMapInDoc(doc, ['plugins']);
+          setManagedBooleanInDoc(
+            doc,
+            ['plugins', 'enabled'],
+            values.pluginsEnabled,
+            shouldWriteManagedField(doc, ['plugins', 'enabled'], dirtyFields, 'pluginsEnabled')
+          );
+          if (
+            shouldWriteManagedField(doc, ['plugins', 'dir'], dirtyFields, 'pluginsDir') ||
+            values.pluginsDir.trim()
+          ) {
+            setStringInDoc(doc, ['plugins', 'dir'], values.pluginsDir);
+          }
+
+          if (
+            shouldWriteManagedField(
+              doc,
+              ['plugins', 'store-sources'],
+              dirtyFields,
+              'pluginsStoreSourcesText'
+            )
+          ) {
+            doc.setIn(
+              ['plugins', 'store-sources'],
+              serializeStringListText(values.pluginsStoreSourcesText)
+            );
+          }
+          deleteIfMapEmpty(doc, ['plugins']);
         }
 
         if (

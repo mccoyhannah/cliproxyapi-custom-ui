@@ -8,6 +8,8 @@ export interface ModelAlias {
   alias?: string;
   priority?: number;
   testModel?: string;
+  image?: boolean;
+  thinking?: Record<string, unknown>;
 }
 
 export interface ApiKeyEntry {
@@ -21,6 +23,7 @@ export interface CloakConfig {
   mode?: string;
   strictMode?: boolean;
   sensitiveWords?: string[];
+  cacheUserId?: boolean;
 }
 
 export interface GeminiKeyConfig {
@@ -29,6 +32,7 @@ export interface GeminiKeyConfig {
   prefix?: string;
   baseUrl?: string;
   proxyUrl?: string;
+  disableCooling?: boolean;
   models?: ModelAlias[];
   headers?: Record<string, string>;
   excludedModels?: string[];
@@ -42,10 +46,12 @@ export interface ProviderKeyConfig {
   baseUrl?: string;
   websockets?: boolean;
   proxyUrl?: string;
+  disableCooling?: boolean;
   headers?: Record<string, string>;
   models?: ModelAlias[];
   excludedModels?: string[];
   cloak?: CloakConfig;
+  experimentalCchSigning?: boolean;
   authIndex?: string;
 }
 
@@ -59,6 +65,31 @@ export interface OpenAIProviderConfig {
   models?: ModelAlias[];
   priority?: number;
   testModel?: string;
+  disableCooling?: boolean;
   authIndex?: string;
   [key: string]: unknown;
+}
+
+export type ProviderBrand =
+  | 'gemini'
+  | 'codex'
+  | 'claude'
+  | 'vertex'
+  | 'openaiCompatibility';
+
+export interface ProviderModelDiscoveryRequest {
+  brand: ProviderBrand;
+  baseUrl?: string;
+  apiKey?: string;
+  authIndex?: string;
+  headers?: Record<string, string>;
+}
+
+export interface ProviderConnectivityRequest {
+  brand: Exclude<ProviderBrand, 'vertex'>;
+  baseUrl?: string;
+  apiKey?: string;
+  authIndex?: string;
+  headers?: Record<string, string>;
+  model: string;
 }

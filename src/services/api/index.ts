@@ -14,3 +14,4 @@ export * from './priorityRotationSidecar';
 export * from './cliProxyBackendControl';
 export * from './transformers';
 export * from './vertex';
+export * from './plugins';

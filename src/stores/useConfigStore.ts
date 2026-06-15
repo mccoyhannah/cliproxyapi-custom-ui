@@ -51,7 +51,8 @@ const SECTION_KEYS: RawConfigSection[] = [
   'claude-api-key',
   'vertex-api-key',
   'openai-compatibility',
-  'oauth-excluded-models'
+  'oauth-excluded-models',
+  'plugins'
 ];
 
 const extractSectionValue = (config: Config | null, section?: RawConfigSection) => {
@@ -93,6 +94,8 @@ const extractSectionValue = (config: Config | null, section?: RawConfigSection) 
       return config.openaiCompatibility;
     case 'oauth-excluded-models':
       return config.oauthExcludedModels;
+    case 'plugins':
+      return config.plugins;
     default:
       if (!section) return undefined;
       return config.raw?.[section];
@@ -240,6 +243,10 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
           break;
         case 'oauth-excluded-models':
           nextConfig.oauthExcludedModels = value as Config['oauthExcludedModels'];
+          break;
+        case 'plugins':
+          nextConfig.plugins = value as Config['plugins'];
+          nextConfig.supportsPlugin = true;
           break;
         default:
           break;

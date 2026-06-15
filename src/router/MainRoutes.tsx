@@ -20,6 +20,8 @@ import { UsageStatisticsPage } from '@/pages/UsageStatisticsPage';
 import { ConfigPage } from '@/pages/ConfigPage';
 import { LogsPage } from '@/pages/LogsPage';
 import { SystemPage } from '@/pages/SystemPage';
+import { PluginsPage, PluginResourcePage, PluginStorePage } from '@/features/plugins';
+import { ProvidersWorkbenchPage } from '@/features/providers';
 import { AUTH_FILES_FOCUS_CARDS_PATH } from './authFilesFocus';
 
 const mainRoutes = [
@@ -66,6 +68,7 @@ const mainRoutes = [
     ],
   },
   { path: '/ai-providers/ampcode', element: <AiProvidersAmpcodeEditPage /> },
+  { path: '/ai-providers/workbench', element: <ProvidersWorkbenchPage /> },
   { path: '/ai-providers', element: <AiProvidersPage /> },
   { path: '/ai-providers/*', element: <AiProvidersPage /> },
   { path: '/auth-files', element: <AuthFilesPage /> },
@@ -76,6 +79,9 @@ const mainRoutes = [
   { path: '/usage-statistics', element: <UsageStatisticsPage /> },
   { path: '/config', element: <ConfigPage /> },
   { path: '/logs', element: <LogsPage /> },
+  { path: '/plugins', element: <PluginsPage /> },
+  { path: '/plugin-store', element: <PluginStorePage /> },
+  { path: '/plugin-pages/:pluginId/:menuIndex', element: <PluginResourcePage /> },
   { path: '/system', element: <SystemPage /> },
   { path: '*', element: <Navigate to={AUTH_FILES_FOCUS_CARDS_PATH} replace /> },
 ];

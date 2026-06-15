@@ -18,6 +18,7 @@ export interface AuthState {
   rememberPassword: boolean;
   serverVersion: string | null;
   serverBuildDate: string | null;
+  supportsPlugin: boolean | null;
 }
 
 // 连接状态

@@ -364,6 +364,36 @@ const normalizeAmpcodeConfig = (payload: unknown): AmpcodeConfig | undefined => 
   return config;
 };
 
+const normalizeStringList = (input: unknown): string[] => {
+  if (Array.isArray(input)) {
+    return input.map((item) => String(item ?? '').trim()).filter(Boolean);
+  }
+  if (typeof input === 'string') {
+    return input
+      .split(/\r?\n|,/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const normalizePluginsConfig = (payload: unknown): Config['plugins'] | undefined => {
+  if (!isRecord(payload)) return undefined;
+
+  return {
+    enabled: normalizeBoolean(payload.enabled),
+    dir:
+      typeof payload.dir === 'string'
+        ? payload.dir
+        : payload.dir === undefined || payload.dir === null
+          ? undefined
+          : String(payload.dir),
+    storeSources: normalizeStringList(
+      payload['store-sources'] ?? payload.storeSources ?? payload['store_sources']
+    ),
+  };
+};
+
 /**
  * 规范化 /config 返回值
  */
@@ -468,6 +498,13 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
   const oauthExcluded = normalizeOauthExcluded(raw['oauth-excluded-models'] ?? raw.oauthExcludedModels);
   if (oauthExcluded) {
     config.oauthExcludedModels = oauthExcluded;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(raw, 'plugins')) {
+    config.supportsPlugin = true;
+    config.plugins = normalizePluginsConfig(raw.plugins);
+  } else {
+    config.supportsPlugin = false;
   }
 
   return config;
