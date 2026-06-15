@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PageTransition } from '@/components/common/PageTransition';
-import { CodexQuotaBackgroundRefresher } from '@/components/quota';
 import {
   AUTH_FILES_FOCUS_CARDS_EVENT,
   AUTH_FILES_FOCUS_CARDS_PATH,
@@ -174,7 +173,6 @@ export function MainLayout() {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''}`}>
-      <CodexQuotaBackgroundRefresher />
       <div className="top-gradient-blur" aria-hidden="true" />
 
       <header className="main-header" ref={headerRef}>

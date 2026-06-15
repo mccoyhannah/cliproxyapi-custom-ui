@@ -9,6 +9,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { IconInfo, IconX } from '@/components/ui/icons';
 import { SecondaryScreenShell } from '@/components/common/SecondaryScreenShell';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
+import { AUTH_FILES_FOCUS_CARDS_PATH } from '@/router/authFilesFocus';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { authFilesApi } from '@/services/api';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
@@ -143,7 +144,7 @@ export function AuthFilesOAuthModelAliasEditPage() {
       navigate(-1);
       return;
     }
-    navigate('/auth-files', { replace: true });
+    navigate(AUTH_FILES_FOCUS_CARDS_PATH, { replace: true });
   }, [location.state, navigate]);
 
   const swipeRef = useEdgeSwipeBack({ onBack: handleBack });

@@ -128,6 +128,7 @@ import {
   AUTH_FILES_FOCUS_CARDS_EVENT,
   AUTH_FILES_FOCUS_CARDS_GRID_ATTR,
   AUTH_FILES_FOCUS_CARDS_HEADER_ATTR,
+  consumeAuthFilesInitialQuotaRefresh,
   getAuthFilesCardsScrollTop,
   isAuthFilesCardsFocusLocation,
 } from '@/router/authFilesFocus';
@@ -974,6 +975,7 @@ export function AuthFilesPage() {
   const [accountMemoEditMode, setAccountMemoEditMode] = useState(false);
   const [accountMemoImageProcessing, setAccountMemoImageProcessing] = useState(false);
   const [accountMemoDisplayNameSaving, setAccountMemoDisplayNameSaving] = useState(false);
+  const [accountMemoSaving, setAccountMemoSaving] = useState(false);
   const [accountMemoClosing, setAccountMemoClosing] = useState(false);
   const [accountMemoPreviewImage, setAccountMemoPreviewImage] =
     useState<AuthFileAccountMemoImage | null>(null);
@@ -1016,6 +1018,7 @@ export function AuthFilesPage() {
     Record<string, boolean>
   >({});
   const [codexOAuthOpening, setCodexOAuthOpening] = useState(false);
+  const [codexOAuthLastUrl, setCodexOAuthLastUrl] = useState('');
   const [codexOAuthAttemptExpiresAt, setCodexOAuthAttemptExpiresAt] = useState<number | null>(
     null
   );
@@ -1031,7 +1034,10 @@ export function AuthFilesPage() {
   const focusedFileListOnOpenRef = useRef({ search: '', header: false, grid: false });
   const pageDragDepthRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
+  const filesRef = useRef<AuthFileItem[]>([]);
   const filesLengthRef = useRef(0);
+  const initialQuotaRefreshInFlightRef = useRef(false);
+  const initialQuotaRefreshConsumedRef = useRef(false);
   const priorityRotationSidecarDraftTouchedRef = useRef(false);
   const priorityRotationSidecarAutoSaveSignatureRef = useRef('');
   const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
@@ -1095,8 +1101,9 @@ export function AuthFilesPage() {
   }, [clearCodexOAuthPollTimer]);
 
   useEffect(() => {
+    filesRef.current = files;
     filesLengthRef.current = files.length;
-  }, [files.length]);
+  }, [files]);
 
   useEffect(() => {
     if (codexOAuthAttemptExpiresAt === null) return;
@@ -1206,7 +1213,7 @@ export function AuthFilesPage() {
         preserveExisting: true,
         silent: options.silent ?? true,
       });
-      const quotaTargets = (nextFiles ?? files).filter(
+      const quotaTargets = (nextFiles ?? filesRef.current).filter(
         (file) =>
           CODEX_CONFIG.filterFn(file) &&
           !isRuntimeOnlyAuthFile(file) &&
@@ -1222,7 +1229,7 @@ export function AuthFilesPage() {
 
       return nextFiles;
     },
-    [files, loadCodexQuota, loadFiles, setCodexQuotaRefreshLoading]
+    [loadCodexQuota, loadFiles, setCodexQuotaRefreshLoading]
   );
 
   const startCodexOAuthPolling = useCallback(
@@ -1236,7 +1243,7 @@ export function AuthFilesPage() {
 
           if (result.status === 'ok') {
             finishCodexOAuthAttempt();
-            void refreshAuthFilesAndCodexQuota({ silent: true });
+            void loadFiles({ preserveExisting: true, silent: true });
             showNotification(
               t('auth_files.codex_oauth_success', { defaultValue: 'Codex 认证成功。' }),
               'success'
@@ -1278,7 +1285,7 @@ export function AuthFilesPage() {
     [
       clearCodexOAuthPollTimer,
       finishCodexOAuthAttempt,
-      refreshAuthFilesAndCodexQuota,
+      loadFiles,
       showNotification,
       t,
     ]
@@ -1451,6 +1458,7 @@ export function AuthFilesPage() {
       if (!response.url) {
         throw new Error(t('auth_files.codex_oauth_missing_url', { defaultValue: '未返回授权链接' }));
       }
+      setCodexOAuthLastUrl(response.url);
 
       let openedAuthPage = false;
       if (authWindow && !authWindow.closed) {
@@ -1958,28 +1966,33 @@ export function AuthFilesPage() {
     if (!isCurrentLayer) return;
     const preserveExisting = loadedFilesOnceRef.current || filesLengthRef.current > 0;
     loadedFilesOnceRef.current = true;
-    void loadFiles({ preserveExisting, silent: preserveExisting }).then((nextFiles) => {
-      const quotaTargets = (nextFiles ?? []).filter(
-        (file) =>
-          CODEX_CONFIG.filterFn(file) &&
-          !isRuntimeOnlyAuthFile(file) &&
-          !isDisabledAuthFile(file)
-      );
-      if (quotaTargets.length === 0) return;
-      void loadCodexQuota(quotaTargets, 'all', setCodexQuotaRefreshLoading, {
-        preserveExisting: true,
-        silent: true,
+    const shouldRunInitialQuotaRefresh =
+      isAuthFilesCardsFocusLocation({
+        pathname: location.pathname,
+        search: location.search,
+      }) &&
+      !initialQuotaRefreshConsumedRef.current &&
+      consumeAuthFilesInitialQuotaRefresh();
+
+    if (shouldRunInitialQuotaRefresh) {
+      initialQuotaRefreshConsumedRef.current = true;
+      initialQuotaRefreshInFlightRef.current = true;
+      void refreshAuthFilesAndCodexQuota({ silent: preserveExisting }).finally(() => {
+        initialQuotaRefreshInFlightRef.current = false;
       });
-    });
+    } else if (!initialQuotaRefreshInFlightRef.current) {
+      void loadFiles({ preserveExisting, silent: preserveExisting });
+    }
     loadExcluded();
     loadModelAlias();
   }, [
     isCurrentLayer,
-    loadCodexQuota,
     loadFiles,
     loadExcluded,
     loadModelAlias,
-    setCodexQuotaRefreshLoading,
+    location.pathname,
+    location.search,
+    refreshAuthFilesAndCodexQuota,
   ]);
 
   useInterval(
@@ -2391,6 +2404,7 @@ export function AuthFilesPage() {
       setAccountMemoImageProcessing(false);
       setAccountMemoClosing(false);
       setAccountMemoDisplayNameSaving(false);
+      setAccountMemoSaving(false);
       setAccountMemoEditorOpen(true);
       setAccountMemoEditorFile(file);
       setAccountMemoDraft(memoText);
@@ -2434,6 +2448,7 @@ export function AuthFilesPage() {
     setAccountMemoEditMode(false);
     setAccountMemoImageProcessing(false);
     setAccountMemoDisplayNameSaving(false);
+    setAccountMemoSaving(false);
     setAccountMemoClosing(false);
     setAccountMemoPreviewImage(null);
   }, []);
@@ -2610,61 +2625,67 @@ export function AuthFilesPage() {
   }, [accountMemoClosing, saveAccountMemoDisplayName]);
 
   const saveAccountMemo = useCallback(async () => {
-    if (!accountMemoEditorFile) return;
+    if (!accountMemoEditorFile || accountMemoSaving) return;
 
-    const editorFile = accountMemoEditorFile;
-    const nextText = accountMemoDraft.trim();
-    const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
-    const updatedAt = Date.now();
-    const next = { ...accountMemosByFile };
-    if (nextText || nextImages.length > 0) {
-      next[editorFile.name] = { text: nextText, images: nextImages, updatedAt };
-    } else {
-      delete next[editorFile.name];
-    }
+    setAccountMemoSaving(true);
+    try {
+      const editorFile = accountMemoEditorFile;
+      const nextText = accountMemoDraft.trim();
+      const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
+      const updatedAt = Date.now();
+      const next = { ...accountMemosByFile };
+      if (nextText || nextImages.length > 0) {
+        next[editorFile.name] = { text: nextText, images: nextImages, updatedAt };
+      } else {
+        delete next[editorFile.name];
+      }
 
-    if (JSON.stringify(next).length > ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS) {
-      showNotification(
-        t('auth_files.account_memo_save_failed', {
-          defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
-        }),
-        'error'
-      );
-      return;
-    }
-
-    if (!writeAuthFilesAccountMemos(next)) {
-      showNotification(
-        t('auth_files.account_memo_save_failed', {
-          defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
-        }),
-        'error'
-      );
-      return;
-    }
-
-    setAccountMemosByFile(next);
-    const displayNameSaved = await saveAccountMemoDisplayName();
-    if (!displayNameSaved) return;
-
-    showNotification(
-      nextText || nextImages.length > 0
-        ? t('auth_files.account_memo_saved', {
-            name: editorFile.name,
-            defaultValue: '已保存账号备注',
-          })
-        : t('auth_files.account_memo_cleared', {
-            name: editorFile.name,
-            defaultValue: '已清除账号备注',
+      if (JSON.stringify(next).length > ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS) {
+        showNotification(
+          t('auth_files.account_memo_save_failed', {
+            defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
           }),
-      'success'
-    );
-    setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
+          'error'
+        );
+        return;
+      }
+
+      if (!writeAuthFilesAccountMemos(next)) {
+        showNotification(
+          t('auth_files.account_memo_save_failed', {
+            defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+          }),
+          'error'
+        );
+        return;
+      }
+
+      setAccountMemosByFile(next);
+      const displayNameSaved = await saveAccountMemoDisplayName();
+      if (!displayNameSaved) return;
+
+      showNotification(
+        nextText || nextImages.length > 0
+          ? t('auth_files.account_memo_saved', {
+              name: editorFile.name,
+              defaultValue: '已保存账号备注',
+            })
+          : t('auth_files.account_memo_cleared', {
+              name: editorFile.name,
+              defaultValue: '已清除账号备注',
+            }),
+        'success'
+      );
+      setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
+    } finally {
+      setAccountMemoSaving(false);
+    }
   }, [
     accountMemoDraft,
     accountMemoEditorFile,
     accountMemoImagesDraft,
     accountMemosByFile,
+    accountMemoSaving,
     saveAccountMemoDisplayName,
     showNotification,
     t,
@@ -3634,6 +3655,11 @@ export function AuthFilesPage() {
     [showNotification, t]
   );
 
+  const handleCopyCodexOAuthUrl = useCallback(() => {
+    if (!codexOAuthLastUrl) return;
+    void copyTextWithNotification(codexOAuthLastUrl);
+  }, [codexOAuthLastUrl, copyTextWithNotification]);
+
   const openExcludedEditor = useCallback(
     (provider?: string) => {
       const providerValue = (provider || (filter !== 'all' ? String(filter) : '')).trim();
@@ -3698,9 +3724,38 @@ export function AuthFilesPage() {
     const grid = fileGridRef.current;
     if (!header) return;
 
-    const container = header.closest('.content') as HTMLElement | null;
-    if (!container) {
-      header.scrollIntoView({ block: 'start', inline: 'nearest', behavior });
+    const contentContainer = header.closest('.content') as HTMLElement | null;
+    const contentScrollContainer = (() => {
+      if (!contentContainer) return null;
+      const overflowY = window.getComputedStyle(contentContainer).overflowY;
+      if (
+        overflowY !== 'visible' &&
+        overflowY !== 'clip' &&
+        contentContainer.scrollHeight > contentContainer.clientHeight + 1
+      ) {
+        return contentContainer;
+      }
+      return null;
+    })();
+    const container =
+      contentScrollContainer ??
+      (document.scrollingElement instanceof HTMLElement
+        ? document.scrollingElement
+        : document.documentElement);
+
+    if (container === document.scrollingElement || container === document.documentElement) {
+      const headerHeight = Number.parseFloat(
+        window.getComputedStyle(document.documentElement).getPropertyValue('--header-height')
+      );
+      const stickyOffset = Number.isFinite(headerHeight) ? headerHeight + 14 : 14;
+      const maxScrollTop = Math.max(0, container.scrollHeight - window.innerHeight);
+      container.scrollTo({
+        top: Math.min(
+          maxScrollTop,
+          Math.max(0, container.scrollTop + header.getBoundingClientRect().top - stickyOffset)
+        ),
+        behavior,
+      });
       return;
     }
 
@@ -3871,7 +3926,7 @@ export function AuthFilesPage() {
   const accountMemoHasDraftContent =
     Boolean(accountMemoDraft.trim()) || accountMemoImagesDraft.length > 0;
   const accountMemoSaveDisabled =
-    accountMemoImageProcessing || accountMemoEditorDisplayNameSaving;
+    accountMemoSaving || accountMemoImageProcessing || accountMemoEditorDisplayNameSaving || accountMemoClosing;
   const accountMemoClearDisabled =
     accountMemoSaveDisabled || (!accountMemoEditorHasExisting && !accountMemoHasDraftContent);
   const accountMemoPreviewBlocks = useMemo(
@@ -4281,6 +4336,7 @@ export function AuthFilesPage() {
           total: sorted.length,
           defaultValue: `本页 ${pageItems.length} / 筛选 ${sorted.length}`,
         });
+  const shouldRenderFileListFocusBuffer = isAuthFilesCardsFocusLocation(location);
   const summaryChipItems = [
     {
       key: 'total',
@@ -5288,6 +5344,20 @@ export function AuthFilesPage() {
                 >
                   {codexOAuthButtonLabel}
                 </Button>
+                {codexOAuthLastUrl && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={styles.fileListCodexCopyButton}
+                    leftIcon={<IconCopy size={15} />}
+                    onClick={handleCopyCodexOAuthUrl}
+                    title={t('auth_files.codex_oauth_copy_link_title', {
+                      defaultValue: '复制最近生成的 Codex 登录链接',
+                    })}
+                  >
+                    {t('auth_files.codex_oauth_copy_link', { defaultValue: '复制链接' })}
+                  </Button>
+                )}
                 {codexOAuthCountdownActive && (
                   <Button
                     variant="secondary"
@@ -5368,6 +5438,10 @@ export function AuthFilesPage() {
           </div>
         </div>
       </Card>
+
+      {shouldRenderFileListFocusBuffer && (
+        <div className={styles.fileListFocusScrollBuffer} aria-hidden="true" />
+      )}
 
       <section
         className={styles.oauthConfigSection}
@@ -5722,6 +5796,20 @@ export function AuthFilesPage() {
                 >
                   {codexOAuthButtonLabel}
                 </Button>
+                {codexOAuthLastUrl && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={`${styles.fileListCodexCopyButton} ${styles.accountMemoCodexCopyButton}`}
+                    leftIcon={<IconCopy size={14} />}
+                    onClick={handleCopyCodexOAuthUrl}
+                    title={t('auth_files.codex_oauth_copy_link_title', {
+                      defaultValue: '复制最近生成的 Codex 登录链接',
+                    })}
+                  >
+                    {t('auth_files.codex_oauth_copy_link', { defaultValue: '复制链接' })}
+                  </Button>
+                )}
                 {codexOAuthCountdownActive && (
                   <Button
                     variant="secondary"
@@ -5765,7 +5853,7 @@ export function AuthFilesPage() {
                     size="xs"
                     onClick={() => void saveAccountMemo()}
                     disabled={accountMemoSaveDisabled}
-                    loading={accountMemoEditorDisplayNameSaving}
+                    loading={accountMemoSaving}
                     loadingLabel={t('auth_files.account_memo_saving', {
                       defaultValue: '保存中',
                     })}

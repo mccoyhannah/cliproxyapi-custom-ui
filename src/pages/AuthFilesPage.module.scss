@@ -1920,6 +1920,11 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
 }
 
+.fileListFocusScrollBuffer {
+  height: clamp(360px, 64vh, 720px);
+  pointer-events: none;
+}
+
 .authFilesEmptyState:global(.empty-state) {
   min-height: 220px;
   border-radius: 8px;
@@ -9087,6 +9092,29 @@ button.codexSubscriptionValue {
   font-variant-numeric: tabular-nums;
 }
 
+.fileListCodexCopyButton {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 10px 5px 9px;
+  border-radius: 999px;
+  border-color: color-mix(in srgb, var(--primary-color) 26%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 7%, var(--surface-control));
+  color: color-mix(in srgb, var(--primary-color) 78%, var(--text-primary));
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--primary-color) 42%, var(--border-color));
+    background:
+      linear-gradient(180deg, color-mix(in srgb, #fff 11%, transparent), transparent),
+      color-mix(in srgb, var(--primary-color) 10%, var(--surface-control));
+    color: color-mix(in srgb, var(--primary-color) 86%, var(--text-primary));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary-color) 12%, transparent);
+  }
+}
+
 .fileListTitle {
   flex: 0 1 auto;
   margin: 0;
@@ -13239,7 +13267,8 @@ button.codexSubscriptionValue {
 }
 
 .accountMemoCodexLoginButton,
-.accountMemoCodexCancelButton {
+.accountMemoCodexCancelButton,
+.accountMemoCodexCopyButton {
   min-height: 28px;
   padding-block: 4px;
   font-size: 12px;
@@ -13249,6 +13278,10 @@ button.codexSubscriptionValue {
   --codex-login-accent: #0891b2;
   --codex-login-accent-strong: #0e7490;
 
+  padding-inline: 9px 10px;
+}
+
+.accountMemoCodexCopyButton {
   padding-inline: 9px 10px;
 }
 

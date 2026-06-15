@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { AUTH_FILES_FOCUS_CARDS_PATH } from '@/router/authFilesFocus';
 import { useNotificationStore, useThemeStore } from '@/stores';
 import { oauthApi, type OAuthProvider } from '@/services/api/oauth';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
@@ -579,7 +580,11 @@ export function OAuthPage() {
                   )}
                   {state.status === 'success' && (
                     <div className={styles.successActions}>
-                      <Button variant="secondary" size="sm" onClick={() => navigate('/auth-files')}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(AUTH_FILES_FOCUS_CARDS_PATH)}
+                      >
                         {t('auth_login.view_auth_files')}
                       </Button>
                     </div>

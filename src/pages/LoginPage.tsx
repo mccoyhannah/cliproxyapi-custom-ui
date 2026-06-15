@@ -6,6 +6,10 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { IconEye, IconEyeOff } from '@/components/ui/icons';
+import {
+  AUTH_FILES_FOCUS_CARDS_PATH,
+  requestAuthFilesInitialQuotaRefresh,
+} from '@/router/authFilesFocus';
 import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
@@ -17,7 +21,35 @@ import styles from './LoginPage.module.scss';
 /**
  * 将 API 错误转换为本地化的用户友好消息
  */
-type RedirectState = { from?: { pathname?: string } };
+type RedirectLocation = {
+  pathname?: string;
+  search?: string;
+  hash?: string;
+};
+
+type RedirectState = { from?: RedirectLocation };
+
+function buildLoginRedirect(from?: RedirectLocation): string {
+  const pathname = from?.pathname || '/';
+  const rawSearch = from?.search || '';
+  const rawHash = from?.hash || '';
+  const search = rawSearch && !rawSearch.startsWith('?') ? `?${rawSearch}` : rawSearch;
+  const hash = rawHash && !rawHash.startsWith('#') ? `#${rawHash}` : rawHash;
+
+  if ((pathname === '/' || pathname === '/auth-files') && !search && !hash) {
+    return AUTH_FILES_FOCUS_CARDS_PATH;
+  }
+
+  return `${pathname}${search}${hash}`;
+}
+
+function buildPostLoginRedirect(from?: RedirectLocation): string {
+  const redirect = buildLoginRedirect(from);
+  if (redirect === AUTH_FILES_FOCUS_CARDS_PATH) {
+    requestAuthFilesInitialQuotaRefresh();
+  }
+  return redirect;
+}
 
 function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): string {
   const apiError = error as Partial<ApiError>;
@@ -129,7 +161,7 @@ export function LoginPage() {
           setAutoLoginSuccess(true);
           // 延迟跳转，让用户看到成功动画
           setTimeout(() => {
-            const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
+            const redirect = buildPostLoginRedirect((location.state as RedirectState | null)?.from);
             navigate(redirect, { replace: true });
           }, 1500);
         } else {
@@ -169,7 +201,9 @@ export function LoginPage() {
         rememberPassword,
       });
       showNotification(t('common.connected_status'), 'success');
-      navigate('/', { replace: true });
+      navigate(buildPostLoginRedirect((location.state as RedirectState | null)?.from), {
+        replace: true,
+      });
     } catch (err: unknown) {
       const message = getLocalizedErrorMessage(err, t);
       setError(message);
@@ -183,6 +217,7 @@ export function LoginPage() {
     detectedBase,
     login,
     loading,
+    location.state,
     managementKey,
     navigate,
     rememberPassword,
@@ -201,7 +236,7 @@ export function LoginPage() {
   );
 
   if (isAuthenticated && !autoLoading && !autoLoginSuccess) {
-    const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
+    const redirect = buildLoginRedirect((location.state as RedirectState | null)?.from);
     return <Navigate to={redirect} replace />;
   }
 

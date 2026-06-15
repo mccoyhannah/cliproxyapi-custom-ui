@@ -6,12 +6,13 @@ export const AUTH_FILES_FOCUS_CARDS_HEADER_ATTR = 'data-auth-files-focus-cards-h
 export const AUTH_FILES_FOCUS_CARDS_GRID_ATTR = 'data-auth-files-focus-cards-grid';
 export const AUTH_FILES_FOCUS_CARDS_HEADER_SELECTOR = `[${AUTH_FILES_FOCUS_CARDS_HEADER_ATTR}="true"]`;
 export const AUTH_FILES_FOCUS_CARDS_GRID_SELECTOR = `[${AUTH_FILES_FOCUS_CARDS_GRID_ATTR}="true"]`;
+export const AUTH_FILES_INITIAL_QUOTA_REFRESH_SESSION_KEY =
+  'cpamc:auth-files-initial-quota-refresh';
 
-const CARD_FOCUS_BOTTOM_GAP = 8;
 const CARD_FOCUS_HEADER_COMFORT_GAP = 28;
-const CARD_FOCUS_HEADER_TUCK_LIMIT = 24;
 const CARD_FOCUS_PREVIOUS_LINE_CLEARANCE = 2;
 const CARD_FOCUS_HEADER_LINE_CLEARANCE = 2;
+const INITIAL_QUOTA_REFRESH_TICKET_TTL_MS = 5 * 60 * 1000;
 
 type AuthFilesFocusLocation = {
   pathname: string;
@@ -32,6 +33,39 @@ export const isAuthFilesCardsFocusLocation = (location: AuthFilesFocusLocation) 
   new URLSearchParams(location.search).get(AUTH_FILES_FOCUS_QUERY_KEY) ===
     AUTH_FILES_FOCUS_CARDS_VALUE;
 
+export function requestAuthFilesInitialQuotaRefresh() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.sessionStorage.setItem(
+      AUTH_FILES_INITIAL_QUOTA_REFRESH_SESSION_KEY,
+      String(Date.now())
+    );
+  } catch {
+    // Best effort only: storage can be unavailable in restricted browser modes.
+  }
+}
+
+export function consumeAuthFilesInitialQuotaRefresh() {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const requestedAtRaw = window.sessionStorage.getItem(
+      AUTH_FILES_INITIAL_QUOTA_REFRESH_SESSION_KEY
+    );
+    if (requestedAtRaw === null) return false;
+
+    window.sessionStorage.removeItem(AUTH_FILES_INITIAL_QUOTA_REFRESH_SESSION_KEY);
+    const requestedAt = Number(requestedAtRaw);
+    if (!Number.isFinite(requestedAt)) return true;
+
+    const ageMs = Date.now() - requestedAt;
+    return ageMs >= 0 && ageMs <= INITIAL_QUOTA_REFRESH_TICKET_TTL_MS;
+  } catch {
+    return false;
+  }
+}
+
 export function getAuthFilesCardsScrollTop({
   container,
   header,
@@ -39,7 +73,8 @@ export function getAuthFilesCardsScrollTop({
 }: AuthFilesCardsScrollElements): number {
   const containerRect = container.getBoundingClientRect();
   const headerRect = header.getBoundingClientRect();
-  const gridRect = (grid ?? header).getBoundingClientRect();
+  const gridRect = grid?.getBoundingClientRect();
+  const topAnchorTop = gridRect ? Math.min(headerRect.top, gridRect.top) : headerRect.top;
   const previousSectionBottom = (() => {
     let section = header.previousElementSibling;
     let bottom = Number.NEGATIVE_INFINITY;
@@ -51,23 +86,8 @@ export function getAuthFilesCardsScrollTop({
   })();
   const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
   const headerComfortScroll =
-    container.scrollTop + headerRect.top - containerRect.top - CARD_FOCUS_HEADER_COMFORT_GAP;
-  const gridBottomScroll =
-    container.scrollTop +
-    gridRect.bottom -
-    containerRect.top -
-    container.clientHeight +
-    CARD_FOCUS_BOTTOM_GAP;
-  const verticalSpan = gridRect.bottom - headerRect.top;
-  const canPreserveBottomGap =
-    Boolean(grid) &&
-    verticalSpan + CARD_FOCUS_HEADER_COMFORT_GAP + CARD_FOCUS_BOTTOM_GAP <=
-      container.clientHeight;
-  const preferredScrollTop = canPreserveBottomGap
-    ? Math.max(headerComfortScroll, gridBottomScroll)
-    : grid
-      ? Math.min(gridBottomScroll, headerComfortScroll + CARD_FOCUS_HEADER_TUCK_LIMIT)
-      : headerComfortScroll;
+    container.scrollTop + topAnchorTop - containerRect.top - CARD_FOCUS_HEADER_COMFORT_GAP;
+  const preferredScrollTop = headerComfortScroll;
   const previousLineHiddenScroll =
     previousSectionBottom === null
       ? 0

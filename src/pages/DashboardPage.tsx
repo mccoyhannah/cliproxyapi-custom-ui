@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IconKey, IconBot, IconFileText, IconSatellite } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { AUTH_FILES_FOCUS_CARDS_PATH } from '@/router/authFilesFocus';
 import { useAuthStore, useConfigStore, useModelsStore } from '@/stores';
 import { apiKeysApi, providersApi, authFilesApi } from '@/services/api';
 import styles from './DashboardPage.module.scss';
@@ -237,7 +238,7 @@ export function DashboardPage() {
       label: t('nav.auth_files'),
       value: stats.authFiles ?? '-',
       icon: <IconFileText size={24} />,
-      path: '/auth-files',
+      path: AUTH_FILES_FOCUS_CARDS_PATH,
       loading: loading && stats.authFiles === null,
       sublabel: t('dashboard.oauth_credentials'),
     },
