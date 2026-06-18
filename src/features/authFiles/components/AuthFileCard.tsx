@@ -34,6 +34,7 @@ import {
   normalizePlanType,
   resolveCodexPlanType,
   resolveAuthProvider,
+  type CodexAuthTimeSnapshot,
   type CodexAuthTokenSnapshot,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
@@ -212,6 +213,7 @@ export type AuthFileCardProps = {
   quotaRefreshDisabled: boolean;
   quotaFilterType: QuotaProviderType | null;
   statusData: AuthFileStatusBarData;
+  authTimeSnapshot?: CodexAuthTimeSnapshot | null;
   authTokenSnapshot?: CodexAuthTokenSnapshot | null;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
   manualExpiryMs?: number | null;
@@ -469,6 +471,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     quotaRefreshDisabled,
     quotaFilterType,
     statusData,
+    authTimeSnapshot,
     authTokenSnapshot,
     codexSubscriptionSnapshot,
     manualExpiryMs,
@@ -707,6 +710,31 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const cardQuotaRefreshLabel = t('auth_files.quota_refresh_single_button', {
     defaultValue: '刷新这个认证文件的额度',
   });
+  const visibleAuthTimeSnapshot =
+    showCardQuotaRefreshButton && authTimeSnapshot?.authenticatedAtShort ? authTimeSnapshot : null;
+  const authTimeTitle = visibleAuthTimeSnapshot
+    ? visibleAuthTimeSnapshot.authTimeStatus === 'fallback'
+      ? t('auth_files.auth_time_fallback_title', {
+          time:
+            visibleAuthTimeSnapshot.authenticatedAt ??
+            visibleAuthTimeSnapshot.authenticatedAtShort,
+          defaultValue: '未识别 token 认证时间，显示文件更新时间：{{time}}',
+        })
+      : t('auth_files.auth_time_title', {
+          time:
+            visibleAuthTimeSnapshot.authenticatedAt ??
+            visibleAuthTimeSnapshot.authenticatedAtShort,
+          defaultValue: '认证时间：{{time}}',
+        })
+    : '';
+  const authTimeClassName = [
+    styles.codexAuthTimeActionMeta,
+    visibleAuthTimeSnapshot?.authTimeStatus === 'fallback'
+      ? styles.codexAuthTimeActionMetaFallback
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const displayNameInputId = `auth-display-name-${file.name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const [displayNameDraft, setDisplayNameDraft] = useState({
     fileName: file.name,
@@ -1464,24 +1492,36 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   </div>
                 )}
                 {showCardQuotaRefreshButton && (
-                  <button
-                    type="button"
-                    className={`${styles.cardQuotaRefreshButton} ${
-                      quotaRefreshing ? styles.cardQuotaRefreshButtonLoading : ''
-                    }`}
-                    onClick={() => onRefreshQuota(file)}
-                    disabled={
-                      disableControls || file.disabled || quotaRefreshDisabled || quotaRefreshing
-                    }
-                    aria-label={cardQuotaRefreshLabel}
-                    title={cardQuotaRefreshLabel}
-                  >
-                    {quotaRefreshing ? (
-                      <LoadingSpinner size={12} />
-                    ) : (
-                      <IconRefreshCw size={13} />
+                  <span className={styles.codexAuthTimeRefreshGroup}>
+                    {visibleAuthTimeSnapshot && (
+                      <span className={authTimeClassName} title={authTimeTitle}>
+                        <span className={styles.codexAuthTimeActionLabel}>
+                          {t('auth_files.auth_time_short_label', { defaultValue: '认证' })}
+                        </span>
+                        <span className={styles.codexAuthTimeActionValue}>
+                          {visibleAuthTimeSnapshot.authenticatedAtShort}
+                        </span>
+                      </span>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      className={`${styles.cardQuotaRefreshButton} ${
+                        quotaRefreshing ? styles.cardQuotaRefreshButtonLoading : ''
+                      }`}
+                      onClick={() => onRefreshQuota(file)}
+                      disabled={
+                        disableControls || file.disabled || quotaRefreshDisabled || quotaRefreshing
+                      }
+                      aria-label={cardQuotaRefreshLabel}
+                      title={cardQuotaRefreshLabel}
+                    >
+                      {quotaRefreshing ? (
+                        <LoadingSpinner size={12} />
+                      ) : (
+                        <IconRefreshCw size={13} />
+                      )}
+                    </button>
+                  </span>
                 )}
               </div>
               {!isRuntimeOnly && (

@@ -148,7 +148,12 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       );
     }
 
-    if (!compactAccessTokenOnly && !manualExpiry && !compactCodexExpiry && !compactCanSetManualExpiry) return null;
+    if (
+      !compactAccessTokenOnly &&
+      !manualExpiry &&
+      !compactCodexExpiry &&
+      !compactCanSetManualExpiry
+    ) return null;
 
     const expiryMs = compactAccessTokenOnly
       ? authTokenSnapshot?.accessTokenExpiresAtMs
@@ -192,20 +197,22 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         className={`${styles.quotaSection} ${styles.quotaSectionCompact} ${styles.quotaSectionReady}`}
       >
         <div className={`${styles.codexInfoGrid} ${styles.codexInfoGridCompact}`}>
-          <div className={`${styles.codexInfoItem} ${styles.codexInfoItemCompact}`}>
-            <span className={styles.codexPlanLabel}>
-              {expiryLabel}
-            </span>
-            <span
-              className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
-              title={expiryTitle}
-              onClick={compactAccessTokenOnly ? undefined : onManualExpiryEdit}
-              role={!compactAccessTokenOnly && onManualExpiryEdit ? 'button' : undefined}
-              tabIndex={!compactAccessTokenOnly && onManualExpiryEdit ? 0 : undefined}
-            >
-              {expiryValue}
-            </span>
-          </div>
+          {(compactAccessTokenOnly || manualExpiry || compactCodexExpiry || compactCanSetManualExpiry) && (
+            <div className={`${styles.codexInfoItem} ${styles.codexInfoItemCompact}`}>
+              <span className={styles.codexPlanLabel}>
+                {expiryLabel}
+              </span>
+              <span
+                className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
+                title={expiryTitle}
+                onClick={compactAccessTokenOnly ? undefined : onManualExpiryEdit}
+                role={!compactAccessTokenOnly && onManualExpiryEdit ? 'button' : undefined}
+                tabIndex={!compactAccessTokenOnly && onManualExpiryEdit ? 0 : undefined}
+              >
+                {expiryValue}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     );

@@ -2094,7 +2094,11 @@ export function AuthFilesPage() {
     : isExpirySortMode
       ? filtered
       : baseSorted.slice(start, start + pageSize);
-  const { authTokenSnapshots, subscriptionSnapshots: codexSubscriptionSnapshots } =
+  const {
+    authTimeSnapshots,
+    authTokenSnapshots,
+    subscriptionSnapshots: codexSubscriptionSnapshots,
+  } =
     useCodexAuthFileSnapshots(codexSnapshotFiles);
 
   const priorityRotationTierDetailGroups = useMemo(() => {
@@ -5442,6 +5446,7 @@ export function AuthFilesPage() {
                     quotaRefreshDisabled={loading || codexQuotaRefreshing}
                     quotaFilterType={quotaFilterType}
                     statusData={statusDataByFileName.get(file.name)!}
+                    authTimeSnapshot={authTimeSnapshots.get(file.name)}
                     authTokenSnapshot={authTokenSnapshots.get(file.name)}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}
                     manualExpiryMs={getManualExpiryMs(manualExpiryByFile, file.name)}

@@ -10,4 +10,5 @@ export * from './validators';
 export * from './builders';
 export * from './codexSubscription';
 export * from './codexAuthTokens';
+export * from './codexAuthTime';
 export * from './codexRemaining';

@@ -5,8 +5,10 @@ import {
   EMPTY_CODEX_AUTH_TOKEN_SNAPSHOT,
   EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT,
   isCodexFile,
+  readCodexAuthTimeSnapshotFromRecord,
   readCodexAuthTokenSnapshotFromRecord,
   readCodexSubscriptionSnapshotFromRecord,
+  type CodexAuthTimeSnapshot,
   type CodexAuthTokenSnapshot,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
@@ -14,11 +16,13 @@ import {
 type SnapshotCacheEntry = {
   signature: string;
   authToken: CodexAuthTokenSnapshot;
+  authTime: CodexAuthTimeSnapshot;
   subscription: CodexSubscriptionSnapshot;
 };
 
 export type CodexAuthFileSnapshots = {
   authTokenSnapshots: Map<string, CodexAuthTokenSnapshot>;
+  authTimeSnapshots: Map<string, CodexAuthTimeSnapshot>;
   subscriptionSnapshots: Map<string, CodexSubscriptionSnapshot>;
 };
 
@@ -110,6 +114,7 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
             name: file.name,
             signature,
             authToken: readCodexAuthTokenSnapshotFromRecord(authJson, { assumeComplete: true }),
+            authTime: readCodexAuthTimeSnapshotFromRecord(authJson, file),
             subscription:
               readCodexSubscriptionSnapshotFromRecord(authJson) ??
               EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT,
@@ -122,6 +127,7 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
               ...EMPTY_CODEX_AUTH_TOKEN_SNAPSHOT,
               accessTokenStatus: 'unknown' as const,
             },
+            authTime: readCodexAuthTimeSnapshotFromRecord(file),
             subscription: {
               ...EMPTY_CODEX_SUBSCRIPTION_SNAPSHOT,
               subscriptionStatus: 'read_error' as const,
@@ -137,6 +143,7 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
           next[result.name] = {
             signature: result.signature,
             authToken: result.authToken,
+            authTime: result.authTime,
             subscription: result.subscription,
           };
         });
@@ -151,6 +158,7 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
 
   return useMemo(() => {
     const authTokenSnapshots = new Map<string, CodexAuthTokenSnapshot>();
+    const authTimeSnapshots = new Map<string, CodexAuthTimeSnapshot>();
     const subscriptionSnapshots = new Map<string, CodexSubscriptionSnapshot>();
 
     files.forEach((file) => {
@@ -160,10 +168,16 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
 
       if (cached?.signature === signature) {
         authTokenSnapshots.set(file.name, cached.authToken);
+        authTimeSnapshots.set(file.name, cached.authTime);
         if (hasVisibleSubscription(cached.subscription)) {
           subscriptionSnapshots.set(file.name, cached.subscription);
         }
         return;
+      }
+
+      const listAuthTime = readCodexAuthTimeSnapshotFromRecord(file);
+      if (listAuthTime.authTimeStatus !== 'missing') {
+        authTimeSnapshots.set(file.name, listAuthTime);
       }
 
       const listSubscription = listSubscriptionSnapshots.get(file.name);
@@ -172,6 +186,6 @@ export function useCodexAuthFileSnapshots(files: AuthFileItem[]): CodexAuthFileS
       }
     });
 
-    return { authTokenSnapshots, subscriptionSnapshots };
+    return { authTokenSnapshots, authTimeSnapshots, subscriptionSnapshots };
   }, [cache, files, listSubscriptionSnapshots]);
 }
