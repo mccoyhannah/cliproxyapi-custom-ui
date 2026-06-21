@@ -200,36 +200,43 @@ export function TokenLedgerPanel({
   return (
     <Card className={styles.ledgerCard}>
       <div className={styles.ledgerHeader}>
-        <div>
+        <div className={styles.ledgerTitleBlock}>
           <h2>长期 Token 台账</h2>
           <p>来自本机详情日志聚合，只保存 Token 摘要和日志文件元信息。</p>
         </div>
         <div className={styles.ledgerHeaderActions}>
-          <span>
-            台账覆盖 {coverageSpan}
-            {generatedAtMs !== null ? ` · 更新 ${formatDateTime(generatedAtMs, i18n.language)}` : ''}
-          </span>
-          <Button
-            type="button"
-            variant="warning"
-            size="sm"
-            loading={pruning}
-            disabled={pruneDisabled || loading}
-            onClick={onPruneRecordedLogs}
-            leftIcon={<IconTrash2 size={15} />}
-          >
-            清理已入账日志
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setPricingOpen((current) => !current)}
-            leftIcon={<IconSettings size={15} />}
-            aria-expanded={pricingOpen}
-          >
-            价格设置
-          </Button>
+          <div className={styles.ledgerMeta} aria-label="Token 台账状态">
+            <span>台账覆盖</span>
+            <strong>{coverageSpan}</strong>
+            {generatedAtMs !== null && (
+              <em>更新 {formatDateTime(generatedAtMs, i18n.language)}</em>
+            )}
+          </div>
+          <div className={styles.ledgerActionGroup}>
+            <Button
+              type="button"
+              variant="warning"
+              size="sm"
+              loading={pruning}
+              disabled={pruneDisabled || loading}
+              onClick={onPruneRecordedLogs}
+              leftIcon={<IconTrash2 size={15} />}
+              className={styles.ledgerPruneButton}
+            >
+              清理已入账日志
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setPricingOpen((current) => !current)}
+              leftIcon={<IconSettings size={15} />}
+              aria-expanded={pricingOpen}
+              className={styles.ledgerPricingButton}
+            >
+              价格设置
+            </Button>
+          </div>
         </div>
       </div>
 

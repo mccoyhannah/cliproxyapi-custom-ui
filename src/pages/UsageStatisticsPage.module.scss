@@ -374,10 +374,11 @@
 }
 
 .ledgerHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, auto);
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
 
   h2 {
     margin: 0;
@@ -393,35 +394,119 @@
     line-height: 1.45;
   }
 
+  @media (max-width: 1120px) {
+    grid-template-columns: 1fr;
+  }
+
   @include mobile {
-    flex-direction: column;
+    gap: 10px;
   }
 }
 
-.ledgerHeaderActions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
+.ledgerTitleBlock {
+  min-width: 0;
+  padding-top: 2px;
+}
 
-  > span {
-    max-width: 420px;
-    color: var(--text-tertiary);
-    font-size: 12px;
-    font-weight: 740;
-    line-height: 1.45;
-    text-align: right;
+.ledgerHeaderActions {
+  display: grid;
+  grid-template-columns: minmax(214px, 290px) auto;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+
+  @media (max-width: 1120px) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
   }
 
   @include mobile {
     width: 100%;
-    justify-content: flex-start;
+    grid-template-columns: 1fr;
+  }
+}
 
-    > span {
-      text-align: left;
+.ledgerMeta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--primary-color) 8%, transparent),
+      color-mix(in srgb, var(--bg-primary) 64%, transparent)
+    ),
+    color-mix(in srgb, var(--bg-primary) 52%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+
+  span {
+    color: color-mix(in srgb, var(--primary-active) 72%, var(--text-secondary));
+    font-size: 10px;
+    font-weight: 820;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  strong {
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  em {
+    min-width: 0;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 740;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.ledgerActionGroup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: max-content;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 64%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-primary) 46%, transparent);
+
+  @media (max-width: 1120px) {
+    justify-content: flex-end;
+  }
+
+  @include mobile {
+    align-items: stretch;
+    flex-direction: column;
+    min-width: 0;
+
+    .ledgerPruneButton,
+    .ledgerPricingButton {
+      width: 100%;
+      justify-content: center;
     }
   }
+}
+
+.ledgerPruneButton,
+.ledgerPricingButton {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .ledgerControlRow {

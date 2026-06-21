@@ -520,9 +520,9 @@ export function UsageStatisticsPage() {
     [connectionStatus, requestLogEnabled]
   );
 
-  const handleRefreshStatsAndLedger = useCallback(async () => {
+  const handleUpdateTokenLedger = useCallback(async () => {
     if (connectionStatus !== 'connected' || !apiBase || !managementKey) {
-      showNotification('请先连接管理后台，再刷新统计和台账', 'warning');
+      showNotification('请先连接管理后台，再更新 Token 台账', 'warning');
       return;
     }
 
@@ -535,12 +535,11 @@ export function UsageStatisticsPage() {
         managementKey,
       });
       await loadTokenLedger(true);
-      await loadUsageStats(false);
-      showNotification('统计和台账已刷新', 'success');
+      showNotification('Token 台账已更新', 'success');
     } catch (err: unknown) {
       const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
-      setTokenLedgerError(`刷新统计和台账失败${message ? `: ${message}` : ''}`);
-      showNotification(`刷新统计和台账失败${message ? `: ${message}` : ''}`, 'error');
+      setTokenLedgerError(`更新 Token 台账失败${message ? `: ${message}` : ''}`);
+      showNotification(`更新 Token 台账失败${message ? `: ${message}` : ''}`, 'error');
     } finally {
       setTokenLedgerRefreshRunning(false);
     }
@@ -548,7 +547,6 @@ export function UsageStatisticsPage() {
     apiBase,
     connectionStatus,
     loadTokenLedger,
-    loadUsageStats,
     managementKey,
     showNotification,
     wakeTokenLedgerControlSidecar,
@@ -756,12 +754,12 @@ export function UsageStatisticsPage() {
           <Button
             type="button"
             variant="primary"
-            onClick={() => void handleRefreshStatsAndLedger()}
-            loading={tokenLedgerRefreshRunning || loading || tokenLedgerLoading}
+            onClick={() => void handleUpdateTokenLedger()}
+            loading={tokenLedgerRefreshRunning || tokenLedgerLoading}
             disabled={connectionStatus !== 'connected' || tokenLedgerPruneRunning}
           >
             <IconRefreshCw size={16} />
-            刷新统计 / 更新台账
+            更新 Token 台账
           </Button>
         </div>
       </div>
