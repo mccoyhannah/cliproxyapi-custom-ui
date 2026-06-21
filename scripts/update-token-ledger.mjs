@@ -9,6 +9,8 @@ const LOG_FILE_PATTERN =
   /^v1-(responses|chat-completions|messages)-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-([A-Za-z0-9_-]+)\.log$/;
 const HEAD_BYTES = 64 * 1024;
 const TAIL_BYTES = 256 * 1024;
+const DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES = 5;
+const PRUNE_ERROR_SAMPLE_LIMIT = 10;
 const EMBEDDED_LEDGER_ID = 'cpamc-token-ledger';
 const MODEL_NAME_RULES = JSON.parse(
   await fs.readFile(
@@ -198,6 +200,14 @@ const numberValue = (value) => {
   }
   return null;
 };
+
+const nonNegativeInteger = (value, fallback) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.floor(parsed));
+};
+
+const fingerprintForStats = (stats) => `${stats.size}:${Math.floor(stats.mtimeMs)}`;
 
 const recordValue = (value) =>
   value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -520,6 +530,93 @@ const buildProjection = ({ entries, generatedAt, logsDirs, scannedFiles, updated
   entries,
 });
 
+const emptyPruneSummary = ({ enabled, dryRun, logsDirs, activeWindowMinutes }) => ({
+  enabled,
+  dryRun,
+  logsDirs: logsDirs.map(normalizeSourceDir),
+  activeWindowMinutes,
+  activeCutoffMs: null,
+  scannedFiles: 0,
+  deletedFiles: 0,
+  deletedBytes: 0,
+  deletedGB: 0,
+  failedDeletes: 0,
+  keptActiveFiles: 0,
+  keptUnrecordedFiles: 0,
+  keptFingerprintMismatchFiles: 0,
+  errorSamples: [],
+});
+
+const pruneRecordedLogs = async ({
+  dryRun,
+  entriesBySourceKey,
+  logFiles,
+  logsDirs,
+  nextFingerprints,
+  activeWindowMinutes,
+}) => {
+  const summary = emptyPruneSummary({
+    enabled: true,
+    dryRun,
+    logsDirs,
+    activeWindowMinutes,
+  });
+  const nowMs = Date.now();
+  const activeWindowMs = activeWindowMinutes * 60_000;
+  const activeCutoffMs = nowMs - activeWindowMs;
+  summary.activeCutoffMs = activeCutoffMs;
+
+  for (const { filePath, sourceKey } of logFiles) {
+    let stats;
+    try {
+      stats = await fs.stat(filePath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue;
+      summary.failedDeletes += 1;
+      if (summary.errorSamples.length < PRUNE_ERROR_SAMPLE_LIMIT) {
+        summary.errorSamples.push({ filePath, error: error instanceof Error ? error.message : String(error) });
+      }
+      continue;
+    }
+
+    summary.scannedFiles += 1;
+
+    if (activeWindowMs > 0 && stats.mtimeMs >= activeCutoffMs) {
+      summary.keptActiveFiles += 1;
+      continue;
+    }
+
+    const ledgerFingerprint = nextFingerprints[sourceKey];
+    if (!ledgerFingerprint || !entriesBySourceKey.has(sourceKey)) {
+      summary.keptUnrecordedFiles += 1;
+      continue;
+    }
+
+    if (ledgerFingerprint !== fingerprintForStats(stats)) {
+      summary.keptFingerprintMismatchFiles += 1;
+      continue;
+    }
+
+    if (!dryRun) {
+      try {
+        await fs.rm(filePath, { force: true });
+      } catch (error) {
+        summary.failedDeletes += 1;
+        if (summary.errorSamples.length < PRUNE_ERROR_SAMPLE_LIMIT) {
+          summary.errorSamples.push({ filePath, error: error instanceof Error ? error.message : String(error) });
+        }
+        continue;
+      }
+    }
+
+    summary.deletedFiles += 1;
+    summary.deletedBytes += stats.size;
+  }
+
+  summary.deletedGB = Number((summary.deletedBytes / 1024 ** 3).toFixed(2));
+  return summary;
+};
+
 const normalizePreviousEntry = (entry, fallbackSourceDir) => {
   const sourceDir = entry.sourceDir ? normalizeSourceDir(entry.sourceDir) : fallbackSourceDir;
   const sourceKey = entry.sourceKey ?? makeSourceKey(sourceDir, entry.fileName);
@@ -534,7 +631,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
-      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--no-embed]'
+        'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--no-embed] [--prune-recorded-logs] [--active-window-minutes 5]'
     );
     return;
   }
@@ -585,7 +682,7 @@ const main = async () => {
 
   for (const { fileName, filePath, logsDir, sourceKey } of logFiles) {
     const stats = await fs.stat(filePath);
-    const fingerprint = `${stats.size}:${Math.floor(stats.mtimeMs)}`;
+    const fingerprint = fingerprintForStats(stats);
     const migratedFingerprint = previousFingerprints[sourceKey] ?? previousFingerprints[fileName];
 
     if (!args.rebuild && migratedFingerprint === fingerprint && entriesBySourceKey.has(sourceKey)) {
@@ -633,6 +730,16 @@ const main = async () => {
   };
 
   const embeddedHtmlFiles = [];
+  let prune = emptyPruneSummary({
+    enabled: false,
+    dryRun: Boolean(args.dryRun),
+    logsDirs: normalizedLogDirs,
+    activeWindowMinutes: nonNegativeInteger(
+      args['active-window-minutes'],
+      DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
+    ),
+  });
+
   if (!args.dryRun) {
     await atomicWriteJson(ledgerPath, ledger);
     await atomicWriteJson(projectionPath, projection);
@@ -651,6 +758,20 @@ const main = async () => {
     }
   }
 
+  if (args['prune-recorded-logs']) {
+    prune = await pruneRecordedLogs({
+      dryRun: Boolean(args.dryRun),
+      entriesBySourceKey,
+      logFiles,
+      logsDirs: normalizedLogDirs,
+      nextFingerprints,
+      activeWindowMinutes: nonNegativeInteger(
+        args['active-window-minutes'],
+        DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
+      ),
+    });
+  }
+
   console.log(
     JSON.stringify(
       {
@@ -665,6 +786,7 @@ const main = async () => {
         skippedFiles,
         errorFiles,
         coverage: projection.coverage,
+        prune,
       },
       null,
       2

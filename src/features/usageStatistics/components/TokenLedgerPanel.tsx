@@ -215,7 +215,7 @@ export function TokenLedgerPanel({
             onClick={onRefresh}
             leftIcon={<IconRefreshCw size={15} />}
           >
-            刷新台账
+            入账并清日志
           </Button>
           <Button
             type="button"

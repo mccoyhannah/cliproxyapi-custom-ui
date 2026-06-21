@@ -15,6 +15,7 @@ export type CliProxyBackendControlStatus = {
   backendPathMatches: boolean;
   backendError: string | null;
   restarting: boolean;
+  tokenLedgerRefreshing?: boolean;
 };
 
 export type CliProxyBackendRestartResult = {
@@ -32,6 +33,52 @@ export type CliProxyBackendRestartResponse = {
   ok: boolean;
   controlPid: number;
   result: CliProxyBackendRestartResult;
+  status: CliProxyBackendControlStatus;
+};
+
+export type TokenLedgerPruneSummary = {
+  enabled: boolean;
+  dryRun: boolean;
+  logsDirs: string[];
+  activeWindowMinutes: number;
+  activeCutoffMs: number | null;
+  scannedFiles: number;
+  deletedFiles: number;
+  deletedBytes: number;
+  deletedGB: number;
+  failedDeletes: number;
+  keptActiveFiles: number;
+  keptUnrecordedFiles: number;
+  keptFingerprintMismatchFiles: number;
+  errorSamples: Array<{ filePath: string; error: string }>;
+};
+
+export type TokenLedgerRefreshPruneResult = {
+  status: 'completed' | 'dry-run';
+  generatedAt: string;
+  ledgerPath: string;
+  projectionPath: string;
+  scannedFiles: number;
+  updatedFiles: number;
+  skippedFiles: number;
+  errorFiles: number;
+  coverage: {
+    totalEntries: number;
+    parsedEntries: number;
+    knownEntries: number;
+    unreportedEntries: number;
+    coverageRate: number;
+    parsedRate: number;
+    earliestTimestampMs: number | null;
+    latestTimestampMs: number | null;
+  };
+  prune: TokenLedgerPruneSummary;
+};
+
+export type TokenLedgerRefreshPruneResponse = {
+  ok: boolean;
+  controlPid: number;
+  result: TokenLedgerRefreshPruneResult;
   status: CliProxyBackendControlStatus;
 };
 
@@ -115,6 +162,17 @@ export const cliProxyBackendControlApi = {
 
   restart: (payload: { apiBase: string; managementKey: string }) =>
     requestControl<CliProxyBackendRestartResponse>('/restart', {
+      method: 'POST',
+      managementKey: payload.managementKey,
+      body: JSON.stringify(payload),
+    }),
+
+  refreshAndPruneTokenLedger: (payload: {
+    apiBase: string;
+    managementKey: string;
+    activeWindowMinutes?: number;
+  }) =>
+    requestControl<TokenLedgerRefreshPruneResponse>('/token-ledger/refresh-prune', {
       method: 'POST',
       managementKey: payload.managementKey,
       body: JSON.stringify(payload),

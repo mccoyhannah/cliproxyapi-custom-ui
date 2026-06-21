@@ -2,7 +2,9 @@ param(
     [string]$InstallDir = "D:\CLIProxyAPI",
     [string]$CustomUiDir = "D:\CLIProxyAPI_Maintenance\custom-ui",
     [switch]$Rebuild,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$PruneRecordedLogs,
+    [int]$ActiveWindowMinutes = 5
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,6 +28,13 @@ if ($Rebuild) {
 }
 if ($DryRun) {
     $arguments += "--dry-run"
+}
+if ($PruneRecordedLogs) {
+    $arguments += "--prune-recorded-logs"
+}
+if ($PSBoundParameters.ContainsKey("ActiveWindowMinutes")) {
+    $arguments += "--active-window-minutes"
+    $arguments += [string]$ActiveWindowMinutes
 }
 
 & $node.Source @arguments

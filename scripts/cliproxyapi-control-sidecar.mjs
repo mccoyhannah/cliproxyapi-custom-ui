@@ -12,6 +12,7 @@ const DEFAULT_PORT = 8319;
 const DEFAULT_BACKEND_PORT = 8317;
 const DEFAULT_IDLE_SHUTDOWN_MINUTES = 10;
 const DEFAULT_RESTART_TIMEOUT_MS = 75_000;
+const DEFAULT_TOKEN_LEDGER_TIMEOUT_MS = 30 * 60_000;
 const PROCESS_INFO_TIMEOUT_MS = 1_500;
 const MANAGEMENT_PREFIX = '/v0/management';
 const MAX_BODY_BYTES = 128 * 1024;
@@ -50,6 +51,8 @@ const restartTimeoutMs = normalizeTimeoutMs(
 const idleShutdownMs = idleShutdownMinutes * 60_000;
 const restartScriptPath =
   args['restart-script'] ?? path.join(installDir, 'Restart-CLIProxyAPI-Logged.ps1');
+const tokenLedgerScriptPath =
+  args['token-ledger-script'] ?? path.join(customUiDir, 'scripts', 'update-token-ledger.ps1');
 const logsDir = args['logs-dir'] ?? path.join(installDir, 'logs');
 const expectedExePath = path.join(installDir, 'cli-proxy-api.exe');
 
@@ -57,6 +60,7 @@ let serverRef = null;
 let idleShutdownTimer = null;
 let lastActivityAt = Date.now();
 let restartInFlight = null;
+let tokenLedgerInFlight = null;
 
 function parseArgs(rawArgs) {
   const parsed = {};
@@ -439,6 +443,7 @@ async function buildStatusPayload() {
     backendPathMatches: backend?.matchesExpectedPath === true,
     backendError,
     restarting: Boolean(restartInFlight),
+    tokenLedgerRefreshing: Boolean(tokenLedgerInFlight),
   };
 }
 
@@ -477,6 +482,66 @@ async function runRestartScript() {
     throw error;
   } finally {
     restartInFlight = null;
+  }
+}
+
+function parseJsonOutput(output, label) {
+  const trimmed = String(output ?? '').trim();
+  if (!trimmed) return {};
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf('{');
+    const end = trimmed.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1));
+    }
+    throw new Error(`${label} did not return JSON`);
+  }
+}
+
+async function runTokenLedgerRefreshPrune({ activeWindowMinutes } = {}) {
+  if (tokenLedgerInFlight) return tokenLedgerInFlight;
+
+  tokenLedgerInFlight = (async () => {
+    const argumentList = [
+      '-InstallDir',
+      installDir,
+      '-CustomUiDir',
+      customUiDir,
+      '-PruneRecordedLogs',
+    ];
+    if (Number.isFinite(Number(activeWindowMinutes))) {
+      argumentList.push('-ActiveWindowMinutes', String(Math.max(0, Math.floor(Number(activeWindowMinutes)))));
+    }
+
+    await logLine('info', 'token ledger refresh-prune requested', {
+      tokenLedgerScriptPath,
+      activeWindowMinutes,
+    });
+    const output = await runPwshFile(tokenLedgerScriptPath, argumentList, {
+      timeoutMs: DEFAULT_TOKEN_LEDGER_TIMEOUT_MS,
+    });
+    const result = parseJsonOutput(output, path.basename(tokenLedgerScriptPath));
+    await logLine('info', 'token ledger refresh-prune completed', {
+      scannedFiles: result.scannedFiles,
+      updatedFiles: result.updatedFiles,
+      skippedFiles: result.skippedFiles,
+      deletedFiles: result.prune?.deletedFiles,
+      deletedGB: result.prune?.deletedGB,
+    });
+    return result;
+  })();
+
+  try {
+    return await tokenLedgerInFlight;
+  } catch (error) {
+    await logLine('error', 'token ledger refresh-prune failed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  } finally {
+    tokenLedgerInFlight = null;
   }
 }
 
@@ -540,6 +605,23 @@ async function handleRequest(req, res) {
     const result = await runRestartScript();
     sendJson(req, res, 200, {
       ok: result.ok !== false,
+      controlPid: process.pid,
+      result,
+      status: await buildStatusPayload(),
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/token-ledger/refresh-prune') {
+    const body = await readBody(req);
+    const key = extractBearer(req) || String(body.managementKey ?? '').trim();
+    const apiBase = normalizeApiBase(body.apiBase);
+    await validateManagementKey(key, apiBase);
+    const result = await runTokenLedgerRefreshPrune({
+      activeWindowMinutes: body.activeWindowMinutes,
+    });
+    sendJson(req, res, 200, {
+      ok: true,
       controlPid: process.pid,
       result,
       status: await buildStatusPayload(),

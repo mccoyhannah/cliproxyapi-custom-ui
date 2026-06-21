@@ -1,6 +1,6 @@
 Option Explicit
 
-Dim shell, fso, scriptDir, installDir, customUiDir, programFiles, pwshPath, scriptPath, command, exitCode
+Dim shell, fso, scriptDir, installDir, customUiDir, disableMarker, programFiles, pwshPath, scriptPath, command, exitCode
 
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -17,6 +17,11 @@ If WScript.Arguments.Count >= 2 Then
     customUiDir = WScript.Arguments.Item(1)
 Else
     customUiDir = "D:\CLIProxyAPI_Maintenance\custom-ui"
+End If
+
+disableMarker = fso.BuildPath(installDir, "usage-backups\token-ledger\scheduled-refresh.disabled")
+If fso.FileExists(disableMarker) Then
+    WScript.Quit 0
 End If
 
 programFiles = shell.ExpandEnvironmentStrings("%ProgramFiles%")

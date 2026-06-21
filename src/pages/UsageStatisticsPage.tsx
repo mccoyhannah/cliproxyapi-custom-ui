@@ -51,6 +51,10 @@ import {
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { apiKeyUsageApi } from '@/services/api/apiKeyUsage';
 import { configApi, logsApi } from '@/services/api';
+import {
+  cliProxyBackendControlApi,
+  launchCliProxyBackendControlSidecar,
+} from '@/services/api/cliProxyBackendControl';
 import { tokenLedgerApi } from '@/services/runtime/tokenLedger';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { downloadBlob } from '@/utils/download';
@@ -106,6 +110,25 @@ const buildCurrentWindowSummary = (
 const REQUEST_DETAIL_PARTIAL_MESSAGE = '详情日志只返回了部分内容，请刷新后重试';
 const REQUEST_DETAIL_EMPTY_MESSAGE = '详情日志为空，请刷新后重试';
 const REQUEST_DETAIL_DOWNLOAD_MESSAGE = '详情下载失败';
+const TOKEN_LEDGER_CONTROL_WAKE_ATTEMPTS = 18;
+const TOKEN_LEDGER_CONTROL_WAKE_INTERVAL_MS = 850;
+const TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES = 5;
+
+const wait = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const isControlOfflineError = (err: unknown): boolean => {
+  const message = err instanceof Error ? err.message : String(err);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('failed to fetch') ||
+    normalized.includes('fetch failed') ||
+    normalized.includes('networkerror') ||
+    normalized.includes('network request failed') ||
+    normalized.includes('load failed') ||
+    normalized.includes('connection refused') ||
+    normalized.includes('err_connection_refused')
+  );
+};
 
 const isPartialRequestLogStatus = (status?: number): boolean => status === 206 || status === 304;
 
@@ -175,6 +198,8 @@ export function UsageStatisticsPage() {
   const { t, i18n } = useTranslation();
   const { showNotification } = useNotificationStore();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const apiBase = useAuthStore((state) => state.apiBase);
+  const managementKey = useAuthStore((state) => state.managementKey);
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
@@ -203,6 +228,7 @@ export function UsageStatisticsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [tokenLedgerLoading, setTokenLedgerLoading] = useState(false);
   const [tokenLedgerRefreshing, setTokenLedgerRefreshing] = useState(false);
+  const [tokenLedgerMaintenanceRunning, setTokenLedgerMaintenanceRunning] = useState(false);
   const [error, setError] = useState('');
   const [tokenLedgerError, setTokenLedgerError] = useState('');
   const [enablingRequestLog, setEnablingRequestLog] = useState(false);
@@ -287,6 +313,77 @@ export function UsageStatisticsPage() {
       setTokenLedgerRefreshing(false);
     }
   }, []);
+
+  const wakeTokenLedgerControlSidecar = useCallback(async () => {
+    try {
+      await cliProxyBackendControlApi.getStatus();
+      return;
+    } catch (err) {
+      if (!isControlOfflineError(err)) throw err;
+    }
+
+    if (!launchCliProxyBackendControlSidecar()) {
+      throw new Error('本机控制 helper 无法从浏览器唤起');
+    }
+
+    let lastError = '';
+    for (let attempt = 0; attempt < TOKEN_LEDGER_CONTROL_WAKE_ATTEMPTS; attempt += 1) {
+      await wait(attempt === 0 ? 650 : TOKEN_LEDGER_CONTROL_WAKE_INTERVAL_MS);
+      try {
+        await cliProxyBackendControlApi.getStatus();
+        return;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+    }
+
+    throw new Error(`本机控制 helper 启动失败${lastError ? `: ${lastError}` : ''}`);
+  }, []);
+
+  const handleRefreshAndPruneTokenLedger = useCallback(async () => {
+    if (connectionStatus !== 'connected' || !apiBase || !managementKey) {
+      showNotification('请先连接管理后台，再执行入账清理', 'warning');
+      return;
+    }
+
+    setTokenLedgerMaintenanceRunning(true);
+    setTokenLedgerError('');
+    try {
+      await wakeTokenLedgerControlSidecar();
+      const response = await cliProxyBackendControlApi.refreshAndPruneTokenLedger({
+        apiBase,
+        managementKey,
+        activeWindowMinutes: TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES,
+      });
+      await loadTokenLedger(true);
+
+      const prune = response.result.prune;
+      const deletedLabel =
+        prune.deletedGB >= 0.01
+          ? `${prune.deletedGB}GB`
+          : `${Math.round(prune.deletedBytes / 1024)}KB`;
+      showNotification(
+        `台账已更新，清理 ${prune.deletedFiles} 个已入账日志，释放 ${deletedLabel}`,
+        'success'
+      );
+      if (prune.failedDeletes > 0) {
+        showNotification(`有 ${prune.failedDeletes} 个日志删除失败，已保留`, 'warning');
+      }
+    } catch (err: unknown) {
+      const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
+      setTokenLedgerError(`入账清理失败${message ? `: ${message}` : ''}`);
+      showNotification(`入账清理失败${message ? `: ${message}` : ''}`, 'error');
+    } finally {
+      setTokenLedgerMaintenanceRunning(false);
+    }
+  }, [
+    apiBase,
+    connectionStatus,
+    loadTokenLedger,
+    managementKey,
+    showNotification,
+    wakeTokenLedgerControlSidecar,
+  ]);
 
   const loadRequestDetails = useCallback(
     async (ids: string[], force = false) => {
@@ -637,7 +734,7 @@ export function UsageStatisticsPage() {
               void loadUsageStats(true);
               void loadTokenLedger(true);
             }}
-            loading={refreshing || tokenLedgerRefreshing}
+            loading={refreshing || tokenLedgerRefreshing || tokenLedgerMaintenanceRunning}
             disabled={connectionStatus !== 'connected'}
           >
             <IconRefreshCw size={16} />
@@ -650,7 +747,7 @@ export function UsageStatisticsPage() {
               void loadUsageStats(false);
               void loadTokenLedger(true);
             }}
-            loading={loading || tokenLedgerLoading}
+            loading={loading || tokenLedgerLoading || tokenLedgerMaintenanceRunning}
             disabled={connectionStatus !== 'connected'}
           >
             <IconRefreshCw size={16} />
@@ -664,8 +761,8 @@ export function UsageStatisticsPage() {
         filters={tokenLedgerFilters}
         ledger={tokenLedger}
         loading={tokenLedgerLoading}
-        onRefresh={() => void loadTokenLedger(true)}
-        refreshing={tokenLedgerRefreshing}
+        onRefresh={() => void handleRefreshAndPruneTokenLedger()}
+        refreshing={tokenLedgerRefreshing || tokenLedgerMaintenanceRunning}
         setFilterValue={setTokenLedgerFilterValue}
       />
 

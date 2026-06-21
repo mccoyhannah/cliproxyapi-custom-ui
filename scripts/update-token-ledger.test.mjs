@@ -17,6 +17,11 @@ const makeLogText = (model, totalTokens) => `
 {"model":"${model}","usage":{"input_tokens":${totalTokens - 2},"output_tokens":2,"total_tokens":${totalTokens}}}
 `;
 
+const setFileAgeMinutes = async (filePath, minutesAgo) => {
+  const date = new Date(Date.now() - minutesAgo * 60_000);
+  await fs.utimes(filePath, date, date);
+};
+
 const runLedgerProcess = (installDir, extraArgs = []) =>
   spawnSync(
     process.execPath,
@@ -50,6 +55,15 @@ const runLedgerWrite = (installDir, extraArgs = []) => {
 
 const readProjection = async (installDir) =>
   JSON.parse(await fs.readFile(path.join(installDir, 'static', 'token-ledger.json'), 'utf8'));
+
+const pathExistsForTest = async (filePath) => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-'));
 
@@ -105,6 +119,49 @@ try {
   assert.equal(duplicateEntries.length, 1);
   assert.equal(duplicateEntries[0].tokenUsage.total, 34);
   assert.equal(path.normalize(duplicateEntries[0].sourceDir), path.normalize(authLogsDir));
+
+  const pruneRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-prune-'));
+  try {
+    const pruneLogsDir = path.join(pruneRoot, 'logs');
+    await fs.mkdir(pruneLogsDir, { recursive: true });
+    const recordedLog = path.join(pruneLogsDir, 'v1-responses-2026-06-16T010000-prune001.log');
+    const activeLog = path.join(pruneLogsDir, 'v1-responses-2026-06-16T010100-active01.log');
+    const nonDetailLog = path.join(pruneLogsDir, 'control-sidecar-20260616.log');
+    await fs.writeFile(recordedLog, makeLogText('gpt-test-prune', 45), 'utf8');
+    await fs.writeFile(activeLog, makeLogText('gpt-test-active', 67), 'utf8');
+    await fs.writeFile(nonDetailLog, '{"message":"sidecar log"}\n', 'utf8');
+    await setFileAgeMinutes(recordedLog, 10);
+    await setFileAgeMinutes(activeLog, 1);
+    await setFileAgeMinutes(nonDetailLog, 10);
+
+    const pruneDryRun = runLedgerWrite(pruneRoot, [
+      '--no-embed',
+      '--prune-recorded-logs',
+      '--active-window-minutes',
+      '5',
+      '--dry-run',
+    ]);
+    assert.equal(pruneDryRun.prune.deletedFiles, 1);
+    assert.equal(pruneDryRun.prune.keptActiveFiles, 1);
+    assert.equal(await pathExistsForTest(recordedLog), true);
+
+    const pruneResult = runLedgerWrite(pruneRoot, [
+      '--no-embed',
+      '--prune-recorded-logs',
+      '--active-window-minutes',
+      '5',
+    ]);
+    assert.equal(pruneResult.prune.deletedFiles, 1);
+    assert.equal(pruneResult.prune.keptActiveFiles, 1);
+    assert.equal(await pathExistsForTest(recordedLog), false);
+    assert.equal(await pathExistsForTest(activeLog), true);
+    assert.equal(await pathExistsForTest(nonDetailLog), true);
+
+    const prunedProjection = await readProjection(pruneRoot);
+    assert.equal(prunedProjection.entries.length, 2);
+  } finally {
+    await fs.rm(pruneRoot, { recursive: true, force: true });
+  }
 
   const missingRoot = path.join(tmpRoot, 'missing-install');
   const projectionPath = path.join(missingRoot, 'static', 'token-ledger.json');
