@@ -53,8 +53,9 @@ export type TokenLedgerPruneSummary = {
   errorSamples: Array<{ filePath: string; error: string }>;
 };
 
-export type TokenLedgerRefreshPruneResult = {
+export type TokenLedgerMaintenanceResult = {
   status: 'completed' | 'dry-run';
+  mode?: 'prune-only';
   generatedAt: string;
   ledgerPath: string;
   projectionPath: string;
@@ -75,12 +76,15 @@ export type TokenLedgerRefreshPruneResult = {
   prune: TokenLedgerPruneSummary;
 };
 
-export type TokenLedgerRefreshPruneResponse = {
+export type TokenLedgerMaintenanceResponse = {
   ok: boolean;
   controlPid: number;
-  result: TokenLedgerRefreshPruneResult;
+  result: TokenLedgerMaintenanceResult;
   status: CliProxyBackendControlStatus;
 };
+
+export type TokenLedgerRefreshPruneResult = TokenLedgerMaintenanceResult;
+export type TokenLedgerRefreshPruneResponse = TokenLedgerMaintenanceResponse;
 
 export type CliProxyBackendControlRequestError = Error & {
   status?: number;
@@ -162,6 +166,24 @@ export const cliProxyBackendControlApi = {
 
   restart: (payload: { apiBase: string; managementKey: string }) =>
     requestControl<CliProxyBackendRestartResponse>('/restart', {
+      method: 'POST',
+      managementKey: payload.managementKey,
+      body: JSON.stringify(payload),
+    }),
+
+  refreshTokenLedger: (payload: { apiBase: string; managementKey: string }) =>
+    requestControl<TokenLedgerMaintenanceResponse>('/token-ledger/refresh', {
+      method: 'POST',
+      managementKey: payload.managementKey,
+      body: JSON.stringify(payload),
+    }),
+
+  pruneRecordedTokenLedgerLogs: (payload: {
+    apiBase: string;
+    managementKey: string;
+    activeWindowMinutes?: number;
+  }) =>
+    requestControl<TokenLedgerMaintenanceResponse>('/token-ledger/prune-recorded', {
       method: 'POST',
       managementKey: payload.managementKey,
       body: JSON.stringify(payload),

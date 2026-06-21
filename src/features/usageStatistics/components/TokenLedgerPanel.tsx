@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { IconPlus, IconRefreshCw, IconSettings, IconTrash2 } from '@/components/ui/icons';
+import { IconPlus, IconSettings, IconTrash2 } from '@/components/ui/icons';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type {
   TokenLedgerEntry,
@@ -42,8 +42,9 @@ interface TokenLedgerPanelProps {
   filters: TokenLedgerFilters;
   ledger: TokenLedgerSnapshot | null;
   loading: boolean;
-  onRefresh: () => void;
-  refreshing: boolean;
+  onPruneRecordedLogs: () => void;
+  pruneDisabled: boolean;
+  pruning: boolean;
   setFilterValue: <K extends keyof TokenLedgerFilters>(
     key: K,
     value: TokenLedgerFilters[K]
@@ -79,8 +80,9 @@ export function TokenLedgerPanel({
   filters,
   ledger,
   loading,
-  onRefresh,
-  refreshing,
+  onPruneRecordedLogs,
+  pruneDisabled,
+  pruning,
   setFilterValue,
 }: TokenLedgerPanelProps) {
   const { i18n } = useTranslation();
@@ -209,13 +211,14 @@ export function TokenLedgerPanel({
           </span>
           <Button
             type="button"
-            variant="secondary"
+            variant="warning"
             size="sm"
-            loading={refreshing || loading}
-            onClick={onRefresh}
-            leftIcon={<IconRefreshCw size={15} />}
+            loading={pruning}
+            disabled={pruneDisabled || loading}
+            onClick={onPruneRecordedLogs}
+            leftIcon={<IconTrash2 size={15} />}
           >
-            入账并清日志
+            清理已入账日志
           </Button>
           <Button
             type="button"

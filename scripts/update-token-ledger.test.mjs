@@ -163,6 +163,40 @@ try {
     await fs.rm(pruneRoot, { recursive: true, force: true });
   }
 
+  const pruneOnlyRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-prune-only-'));
+  try {
+    const pruneOnlyLogsDir = path.join(pruneOnlyRoot, 'logs');
+    await fs.mkdir(pruneOnlyLogsDir, { recursive: true });
+    const recordedLog = path.join(pruneOnlyLogsDir, 'v1-responses-2026-06-17T010000-known001.log');
+    const unrecordedLog = path.join(pruneOnlyLogsDir, 'v1-responses-2026-06-17T020000-new00001.log');
+    await fs.writeFile(recordedLog, makeLogText('gpt-test-known', 89), 'utf8');
+    await setFileAgeMinutes(recordedLog, 10);
+
+    const initialLedger = runLedgerWrite(pruneOnlyRoot, ['--no-embed']);
+    assert.equal(initialLedger.coverage.totalEntries, 1);
+
+    await fs.writeFile(unrecordedLog, makeLogText('gpt-test-unrecorded', 101), 'utf8');
+    await setFileAgeMinutes(unrecordedLog, 10);
+
+    const pruneOnlyResult = runLedgerWrite(pruneOnlyRoot, [
+      '--no-embed',
+      '--prune-recorded-logs',
+      '--prune-only',
+      '--active-window-minutes',
+      '5',
+    ]);
+    assert.equal(pruneOnlyResult.mode, 'prune-only');
+    assert.equal(pruneOnlyResult.prune.deletedFiles, 1);
+    assert.equal(pruneOnlyResult.prune.keptUnrecordedFiles, 1);
+    assert.equal(await pathExistsForTest(recordedLog), false);
+    assert.equal(await pathExistsForTest(unrecordedLog), true);
+
+    const pruneOnlyProjection = await readProjection(pruneOnlyRoot);
+    assert.equal(pruneOnlyProjection.entries.length, 1);
+  } finally {
+    await fs.rm(pruneOnlyRoot, { recursive: true, force: true });
+  }
+
   const missingRoot = path.join(tmpRoot, 'missing-install');
   const projectionPath = path.join(missingRoot, 'static', 'token-ledger.json');
   await fs.mkdir(path.dirname(projectionPath), { recursive: true });

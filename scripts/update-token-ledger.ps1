@@ -4,6 +4,7 @@ param(
     [switch]$Rebuild,
     [switch]$DryRun,
     [switch]$PruneRecordedLogs,
+    [switch]$PruneOnly,
     [int]$ActiveWindowMinutes = 5
 )
 
@@ -31,6 +32,9 @@ if ($DryRun) {
 }
 if ($PruneRecordedLogs) {
     $arguments += "--prune-recorded-logs"
+}
+if ($PruneOnly) {
+    $arguments += "--prune-only"
 }
 if ($PSBoundParameters.ContainsKey("ActiveWindowMinutes")) {
     $arguments += "--active-window-minutes"

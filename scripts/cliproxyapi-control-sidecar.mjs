@@ -500,8 +500,15 @@ function parseJsonOutput(output, label) {
   }
 }
 
-async function runTokenLedgerRefreshPrune({ activeWindowMinutes } = {}) {
-  if (tokenLedgerInFlight) return tokenLedgerInFlight;
+async function runTokenLedgerMaintenance({
+  action = 'refresh',
+  activeWindowMinutes,
+  pruneRecordedLogs = false,
+  pruneOnly = false,
+} = {}) {
+  if (tokenLedgerInFlight) {
+    throw new HttpError(409, 'Token ledger maintenance already running');
+  }
 
   tokenLedgerInFlight = (async () => {
     const argumentList = [
@@ -509,13 +516,14 @@ async function runTokenLedgerRefreshPrune({ activeWindowMinutes } = {}) {
       installDir,
       '-CustomUiDir',
       customUiDir,
-      '-PruneRecordedLogs',
     ];
+    if (pruneRecordedLogs) argumentList.push('-PruneRecordedLogs');
+    if (pruneOnly) argumentList.push('-PruneOnly');
     if (Number.isFinite(Number(activeWindowMinutes))) {
       argumentList.push('-ActiveWindowMinutes', String(Math.max(0, Math.floor(Number(activeWindowMinutes)))));
     }
 
-    await logLine('info', 'token ledger refresh-prune requested', {
+    await logLine('info', `token ledger ${action} requested`, {
       tokenLedgerScriptPath,
       activeWindowMinutes,
     });
@@ -523,7 +531,7 @@ async function runTokenLedgerRefreshPrune({ activeWindowMinutes } = {}) {
       timeoutMs: DEFAULT_TOKEN_LEDGER_TIMEOUT_MS,
     });
     const result = parseJsonOutput(output, path.basename(tokenLedgerScriptPath));
-    await logLine('info', 'token ledger refresh-prune completed', {
+    await logLine('info', `token ledger ${action} completed`, {
       scannedFiles: result.scannedFiles,
       updatedFiles: result.updatedFiles,
       skippedFiles: result.skippedFiles,
@@ -536,7 +544,7 @@ async function runTokenLedgerRefreshPrune({ activeWindowMinutes } = {}) {
   try {
     return await tokenLedgerInFlight;
   } catch (error) {
-    await logLine('error', 'token ledger refresh-prune failed', {
+    await logLine('error', `token ledger ${action} failed`, {
       message: error instanceof Error ? error.message : String(error),
     });
     throw error;
@@ -544,6 +552,23 @@ async function runTokenLedgerRefreshPrune({ activeWindowMinutes } = {}) {
     tokenLedgerInFlight = null;
   }
 }
+
+const readAuthorizedBody = async (req) => {
+  const body = await readBody(req);
+  const key = extractBearer(req) || String(body.managementKey ?? '').trim();
+  const apiBase = normalizeApiBase(body.apiBase);
+  await validateManagementKey(key, apiBase);
+  return body;
+};
+
+const sendTokenLedgerResult = async (req, res, result) => {
+  sendJson(req, res, 200, {
+    ok: true,
+    controlPid: process.pid,
+    result,
+    status: await buildStatusPayload(),
+  });
+};
 
 function sendJson(req, res, statusCode, payload) {
   applyCors(req, res);
@@ -613,19 +638,34 @@ async function handleRequest(req, res) {
   }
 
   if (req.method === 'POST' && url.pathname === '/token-ledger/refresh-prune') {
-    const body = await readBody(req);
-    const key = extractBearer(req) || String(body.managementKey ?? '').trim();
-    const apiBase = normalizeApiBase(body.apiBase);
-    await validateManagementKey(key, apiBase);
-    const result = await runTokenLedgerRefreshPrune({
+    const body = await readAuthorizedBody(req);
+    const result = await runTokenLedgerMaintenance({
+      action: 'refresh-prune',
+      pruneRecordedLogs: true,
       activeWindowMinutes: body.activeWindowMinutes,
     });
-    sendJson(req, res, 200, {
-      ok: true,
-      controlPid: process.pid,
-      result,
-      status: await buildStatusPayload(),
+    await sendTokenLedgerResult(req, res, result);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/token-ledger/refresh') {
+    await readAuthorizedBody(req);
+    const result = await runTokenLedgerMaintenance({
+      action: 'refresh',
     });
+    await sendTokenLedgerResult(req, res, result);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/token-ledger/prune-recorded') {
+    const body = await readAuthorizedBody(req);
+    const result = await runTokenLedgerMaintenance({
+      action: 'prune-recorded',
+      pruneRecordedLogs: true,
+      pruneOnly: true,
+      activeWindowMinutes: body.activeWindowMinutes,
+    });
+    await sendTokenLedgerResult(req, res, result);
     return;
   }
 

@@ -631,14 +631,13 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
-        'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--no-embed] [--prune-recorded-logs] [--active-window-minutes 5]'
+      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--no-embed] [--prune-recorded-logs] [--prune-only] [--active-window-minutes 5]'
     );
     return;
   }
 
   const installDir = args['install-dir'] ?? DEFAULT_INSTALL_DIR;
-  const logsDirs = resolveLogDirs(args, installDir);
-  const normalizedLogDirs = logsDirs.map(normalizeSourceDir);
+  let logsDirs = resolveLogDirs(args, installDir);
   const ledgerDir = args['ledger-dir'] ?? path.join(installDir, 'usage-backups', 'token-ledger');
   const staticDir = args['static-dir'] ?? path.join(installDir, 'static');
   const cwdLooksLikeCustomUi = await pathExists(path.join(process.cwd(), 'package.json'));
@@ -646,11 +645,25 @@ const main = async () => {
   const ledgerPath = args['ledger-path'] ?? path.join(ledgerDir, 'ledger.json');
   const projectionPath = args['projection-path'] ?? path.join(staticDir, 'token-ledger.json');
   const shouldEmbed = !args['no-embed'];
+  const pruneOnly = Boolean(args['prune-only']);
+
+  if (pruneOnly && !args['prune-recorded-logs']) {
+    throw new Error('--prune-only requires --prune-recorded-logs');
+  }
 
   await fs.mkdir(ledgerDir, { recursive: true });
   await fs.mkdir(staticDir, { recursive: true });
 
   const previous = (await readJson(ledgerPath)) ?? {};
+  if (
+    pruneOnly &&
+    !args['logs-dir'] &&
+    Array.isArray(previous.source?.logsDirs) &&
+    previous.source.logsDirs.length > 0
+  ) {
+    logsDirs = previous.source.logsDirs;
+  }
+  const normalizedLogDirs = logsDirs.map(normalizeSourceDir);
   const previousEntries = Array.isArray(previous.entries) ? previous.entries : [];
   const fallbackPreviousSourceDir = normalizeSourceDir(
     previous.source?.logsDir ?? previous.source?.logsDirs?.[0] ?? logsDirs[0]
@@ -679,6 +692,53 @@ const main = async () => {
   let updatedFiles = 0;
   let skippedFiles = 0;
   let errorFiles = 0;
+
+  if (pruneOnly) {
+    const activeWindowMinutes = nonNegativeInteger(
+      args['active-window-minutes'],
+      DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
+    );
+    const prune = await pruneRecordedLogs({
+      dryRun: Boolean(args.dryRun),
+      entriesBySourceKey,
+      logFiles,
+      logsDirs: normalizedLogDirs,
+      nextFingerprints: previousFingerprints,
+      activeWindowMinutes,
+    });
+    const entries = dedupeEntries(Array.from(entriesBySourceKey.values()));
+    const coverage = previous.coverage ?? calculateCoverage(entries);
+    console.log(
+      JSON.stringify(
+        {
+          status: args.dryRun ? 'dry-run' : 'completed',
+          mode: 'prune-only',
+          generatedAt: new Date().toISOString(),
+          ledgerPath,
+          projectionPath,
+          embeddedHtmlFiles: [],
+          source: {
+            logsDir: normalizedLogDirs[0] ?? null,
+            logsDirs: normalizedLogDirs,
+            patterns: ['v1-responses-*.log', 'v1-chat-completions-*.log', 'v1-messages-*.log'],
+            scannedFiles: logFiles.length,
+            updatedFiles: 0,
+            skippedFiles: logFiles.length,
+            errorFiles: 0,
+          },
+          scannedFiles: logFiles.length,
+          updatedFiles: 0,
+          skippedFiles: logFiles.length,
+          errorFiles: 0,
+          coverage,
+          prune,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
 
   for (const { fileName, filePath, logsDir, sourceKey } of logFiles) {
     const stats = await fs.stat(filePath);

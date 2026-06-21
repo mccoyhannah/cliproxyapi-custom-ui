@@ -225,10 +225,9 @@ export function UsageStatisticsPage() {
   const [logLines, setLogLines] = useState<string[]>([]);
   const [requestDetails, setRequestDetails] = useState<Record<string, UsageRequestDetail>>({});
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [tokenLedgerLoading, setTokenLedgerLoading] = useState(false);
-  const [tokenLedgerRefreshing, setTokenLedgerRefreshing] = useState(false);
-  const [tokenLedgerMaintenanceRunning, setTokenLedgerMaintenanceRunning] = useState(false);
+  const [tokenLedgerRefreshRunning, setTokenLedgerRefreshRunning] = useState(false);
+  const [tokenLedgerPruneRunning, setTokenLedgerPruneRunning] = useState(false);
   const [error, setError] = useState('');
   const [tokenLedgerError, setTokenLedgerError] = useState('');
   const [enablingRequestLog, setEnablingRequestLog] = useState(false);
@@ -297,8 +296,6 @@ export function UsageStatisticsPage() {
     const isInitialLoad = !tokenLedgerLoadedRef.current;
     if (isInitialLoad) {
       setTokenLedgerLoading(true);
-    } else {
-      setTokenLedgerRefreshing(true);
     }
     setTokenLedgerError('');
 
@@ -310,7 +307,6 @@ export function UsageStatisticsPage() {
       setTokenLedgerError(getErrorMessage(err) || '长期 Token 台账加载失败');
     } finally {
       setTokenLedgerLoading(false);
-      setTokenLedgerRefreshing(false);
     }
   }, []);
 
@@ -340,17 +336,17 @@ export function UsageStatisticsPage() {
     throw new Error(`本机控制 helper 启动失败${lastError ? `: ${lastError}` : ''}`);
   }, []);
 
-  const handleRefreshAndPruneTokenLedger = useCallback(async () => {
+  const handlePruneRecordedTokenLedgerLogs = useCallback(async () => {
     if (connectionStatus !== 'connected' || !apiBase || !managementKey) {
-      showNotification('请先连接管理后台，再执行入账清理', 'warning');
+      showNotification('请先连接管理后台，再清理已入账日志', 'warning');
       return;
     }
 
-    setTokenLedgerMaintenanceRunning(true);
+    setTokenLedgerPruneRunning(true);
     setTokenLedgerError('');
     try {
       await wakeTokenLedgerControlSidecar();
-      const response = await cliProxyBackendControlApi.refreshAndPruneTokenLedger({
+      const response = await cliProxyBackendControlApi.pruneRecordedTokenLedgerLogs({
         apiBase,
         managementKey,
         activeWindowMinutes: TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES,
@@ -363,7 +359,7 @@ export function UsageStatisticsPage() {
           ? `${prune.deletedGB}GB`
           : `${Math.round(prune.deletedBytes / 1024)}KB`;
       showNotification(
-        `台账已更新，清理 ${prune.deletedFiles} 个已入账日志，释放 ${deletedLabel}`,
+        `已清理 ${prune.deletedFiles} 个已入账日志，释放 ${deletedLabel}`,
         'success'
       );
       if (prune.failedDeletes > 0) {
@@ -371,10 +367,10 @@ export function UsageStatisticsPage() {
       }
     } catch (err: unknown) {
       const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
-      setTokenLedgerError(`入账清理失败${message ? `: ${message}` : ''}`);
-      showNotification(`入账清理失败${message ? `: ${message}` : ''}`, 'error');
+      setTokenLedgerError(`清理已入账日志失败${message ? `: ${message}` : ''}`);
+      showNotification(`清理已入账日志失败${message ? `: ${message}` : ''}`, 'error');
     } finally {
-      setTokenLedgerMaintenanceRunning(false);
+      setTokenLedgerPruneRunning(false);
     }
   }, [
     apiBase,
@@ -477,15 +473,12 @@ export function UsageStatisticsPage() {
     async (incremental = false) => {
       if (connectionStatus !== 'connected') {
         setLoading(false);
-        setRefreshing(false);
         return;
       }
 
       if (logRequestInFlightRef.current) return;
       logRequestInFlightRef.current = true;
-      if (incremental) {
-        setRefreshing(true);
-      } else {
+      if (!incremental) {
         setLoading(true);
       }
       setError('');
@@ -521,12 +514,45 @@ export function UsageStatisticsPage() {
         if (!incremental) setError(getErrorMessage(err) || '模型请求统计加载失败');
       } finally {
         setLoading(false);
-        setRefreshing(false);
         logRequestInFlightRef.current = false;
       }
     },
     [connectionStatus, requestLogEnabled]
   );
+
+  const handleRefreshStatsAndLedger = useCallback(async () => {
+    if (connectionStatus !== 'connected' || !apiBase || !managementKey) {
+      showNotification('请先连接管理后台，再刷新统计和台账', 'warning');
+      return;
+    }
+
+    setTokenLedgerRefreshRunning(true);
+    setTokenLedgerError('');
+    try {
+      await wakeTokenLedgerControlSidecar();
+      await cliProxyBackendControlApi.refreshTokenLedger({
+        apiBase,
+        managementKey,
+      });
+      await loadTokenLedger(true);
+      await loadUsageStats(false);
+      showNotification('统计和台账已刷新', 'success');
+    } catch (err: unknown) {
+      const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
+      setTokenLedgerError(`刷新统计和台账失败${message ? `: ${message}` : ''}`);
+      showNotification(`刷新统计和台账失败${message ? `: ${message}` : ''}`, 'error');
+    } finally {
+      setTokenLedgerRefreshRunning(false);
+    }
+  }, [
+    apiBase,
+    connectionStatus,
+    loadTokenLedger,
+    loadUsageStats,
+    managementKey,
+    showNotification,
+    wakeTokenLedgerControlSidecar,
+  ]);
 
   useEffect(() => {
     fetchConfig().catch(() => {
@@ -729,29 +755,13 @@ export function UsageStatisticsPage() {
         <div className={styles.headerActions}>
           <Button
             type="button"
-            variant="secondary"
-            onClick={() => {
-              void loadUsageStats(true);
-              void loadTokenLedger(true);
-            }}
-            loading={refreshing || tokenLedgerRefreshing || tokenLedgerMaintenanceRunning}
-            disabled={connectionStatus !== 'connected'}
-          >
-            <IconRefreshCw size={16} />
-            增量刷新
-          </Button>
-          <Button
-            type="button"
             variant="primary"
-            onClick={() => {
-              void loadUsageStats(false);
-              void loadTokenLedger(true);
-            }}
-            loading={loading || tokenLedgerLoading || tokenLedgerMaintenanceRunning}
-            disabled={connectionStatus !== 'connected'}
+            onClick={() => void handleRefreshStatsAndLedger()}
+            loading={tokenLedgerRefreshRunning || loading || tokenLedgerLoading}
+            disabled={connectionStatus !== 'connected' || tokenLedgerPruneRunning}
           >
             <IconRefreshCw size={16} />
-            {t('common.refresh')}
+            刷新统计 / 更新台账
           </Button>
         </div>
       </div>
@@ -761,8 +771,9 @@ export function UsageStatisticsPage() {
         filters={tokenLedgerFilters}
         ledger={tokenLedger}
         loading={tokenLedgerLoading}
-        onRefresh={() => void handleRefreshAndPruneTokenLedger()}
-        refreshing={tokenLedgerRefreshing || tokenLedgerMaintenanceRunning}
+        onPruneRecordedLogs={() => void handlePruneRecordedTokenLedgerLogs()}
+        pruneDisabled={connectionStatus !== 'connected' || tokenLedgerRefreshRunning}
+        pruning={tokenLedgerPruneRunning}
         setFilterValue={setTokenLedgerFilterValue}
       />
 
