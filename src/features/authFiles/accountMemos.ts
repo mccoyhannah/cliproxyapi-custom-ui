@@ -1,3 +1,5 @@
+import type { CodexAuthTimeSnapshot, CodexAuthTimeSource } from '@/utils/quota';
+
 export type AuthFileAccountMemoImage = {
   id: string;
   name: string;
@@ -9,16 +11,55 @@ export type AuthFileAccountMemoImage = {
   createdAt: number;
 };
 
+export type AuthFileAccountMemoAuthTimeHistoryEntry = {
+  authenticatedAt: string;
+  authenticatedAtShort: string;
+  authenticatedAtMs: number;
+  authTimeSource: Exclude<CodexAuthTimeSource, 'file_modified'>;
+  authTimeStatus: 'found';
+  recordedAt: number;
+};
+
 export type AuthFileAccountMemo = {
   text: string;
   images: AuthFileAccountMemoImage[];
   updatedAt: number;
+  authTimeHistory: AuthFileAccountMemoAuthTimeHistoryEntry[];
 };
 
 export type AuthFilesAccountMemoMap = Record<string, AuthFileAccountMemo>;
 
 const STORAGE_KEY = 'authFilesPage.accountMemos.v1';
 export const AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES = 3;
+export const AUTH_FILE_ACCOUNT_MEMO_MAX_AUTH_TIME_HISTORY = 20;
+
+const AUTH_FILE_ACCOUNT_MEMO_AUTH_TIME_SOURCES = new Set<
+  AuthFileAccountMemoAuthTimeHistoryEntry['authTimeSource']
+>(['id_token_auth_time', 'id_token_iat', 'access_token_iat']);
+
+const normalizePositiveInteger = (value: unknown): number | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null;
+  return Math.round(value);
+};
+
+const formatMemoAuthTime = (valueMs: number): string =>
+  new Date(valueMs).toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+const formatMemoAuthTimeShort = (valueMs: number): string =>
+  new Date(valueMs).toLocaleString(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 
 const normalizeMemoImage = (value: unknown): AuthFileAccountMemoImage | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -51,6 +92,66 @@ const normalizeMemoImage = (value: unknown): AuthFileAccountMemoImage | null => 
   return { id, name, mimeType, dataUrl, size, width, height, createdAt };
 };
 
+const normalizeMemoAuthTimeHistoryEntry = (
+  value: unknown
+): AuthFileAccountMemoAuthTimeHistoryEntry | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const record = value as Record<string, unknown>;
+  const authenticatedAtMs = normalizePositiveInteger(record.authenticatedAtMs);
+  if (authenticatedAtMs === null) return null;
+
+  const authTimeSource =
+    typeof record.authTimeSource === 'string' &&
+    AUTH_FILE_ACCOUNT_MEMO_AUTH_TIME_SOURCES.has(
+      record.authTimeSource as AuthFileAccountMemoAuthTimeHistoryEntry['authTimeSource']
+    )
+      ? (record.authTimeSource as AuthFileAccountMemoAuthTimeHistoryEntry['authTimeSource'])
+      : null;
+  if (!authTimeSource) return null;
+
+  if (record.authTimeStatus !== 'found') return null;
+
+  const authenticatedAt =
+    typeof record.authenticatedAt === 'string' && record.authenticatedAt.trim()
+      ? record.authenticatedAt.trim()
+      : formatMemoAuthTime(authenticatedAtMs);
+  const authenticatedAtShort =
+    typeof record.authenticatedAtShort === 'string' && record.authenticatedAtShort.trim()
+      ? record.authenticatedAtShort.trim()
+      : formatMemoAuthTimeShort(authenticatedAtMs);
+  const recordedAt = normalizePositiveInteger(record.recordedAt) ?? authenticatedAtMs;
+
+  return {
+    authenticatedAt,
+    authenticatedAtShort,
+    authenticatedAtMs,
+    authTimeSource,
+    authTimeStatus: 'found',
+    recordedAt,
+  };
+};
+
+const normalizeMemoAuthTimeHistory = (
+  value: unknown
+): AuthFileAccountMemoAuthTimeHistoryEntry[] => {
+  if (!Array.isArray(value)) return [];
+
+  const byAuthenticatedAt = new Map<number, AuthFileAccountMemoAuthTimeHistoryEntry>();
+  value.forEach((entry) => {
+    const normalized = normalizeMemoAuthTimeHistoryEntry(entry);
+    if (!normalized) return;
+    const existing = byAuthenticatedAt.get(normalized.authenticatedAtMs);
+    if (!existing || normalized.recordedAt > existing.recordedAt) {
+      byAuthenticatedAt.set(normalized.authenticatedAtMs, normalized);
+    }
+  });
+
+  return Array.from(byAuthenticatedAt.values())
+    .sort((a, b) => b.authenticatedAtMs - a.authenticatedAtMs)
+    .slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_AUTH_TIME_HISTORY);
+};
+
 const normalizeMemoEntry = (value: unknown): AuthFileAccountMemo | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
@@ -62,14 +163,15 @@ const normalizeMemoEntry = (value: unknown): AuthFileAccountMemo | null => {
         .filter((image): image is AuthFileAccountMemoImage => Boolean(image))
         .slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES)
     : [];
-  if (!text && images.length === 0) return null;
+  const authTimeHistory = normalizeMemoAuthTimeHistory(record.authTimeHistory);
+  if (!text && images.length === 0 && authTimeHistory.length === 0) return null;
 
   const updatedAt =
     typeof record.updatedAt === 'number' && Number.isFinite(record.updatedAt) && record.updatedAt > 0
       ? Math.round(record.updatedAt)
       : 0;
 
-  return { text, images, updatedAt };
+  return { text, images, updatedAt, authTimeHistory };
 };
 
 const normalizeMemoMap = (value: unknown): AuthFilesAccountMemoMap => {
@@ -119,4 +221,68 @@ export const getAuthFileAccountMemo = (
 ): AuthFileAccountMemo | null => {
   const memo = map[name];
   return memo ? normalizeMemoEntry(memo) : null;
+};
+
+const buildAuthTimeHistoryEntry = (
+  snapshot: CodexAuthTimeSnapshot,
+  recordedAt = Date.now()
+): AuthFileAccountMemoAuthTimeHistoryEntry | null => {
+  const authenticatedAtMs = normalizePositiveInteger(snapshot.authenticatedAtMs);
+  if (authenticatedAtMs === null) return null;
+  if (snapshot.authTimeStatus !== 'found') return null;
+  if (
+    !snapshot.authTimeSource ||
+    !AUTH_FILE_ACCOUNT_MEMO_AUTH_TIME_SOURCES.has(
+      snapshot.authTimeSource as AuthFileAccountMemoAuthTimeHistoryEntry['authTimeSource']
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    authenticatedAt: snapshot.authenticatedAt ?? formatMemoAuthTime(authenticatedAtMs),
+    authenticatedAtShort: snapshot.authenticatedAtShort ?? formatMemoAuthTimeShort(authenticatedAtMs),
+    authenticatedAtMs,
+    authTimeSource: snapshot.authTimeSource as AuthFileAccountMemoAuthTimeHistoryEntry['authTimeSource'],
+    authTimeStatus: 'found',
+    recordedAt: normalizePositiveInteger(recordedAt) ?? Date.now(),
+  };
+};
+
+export const upsertAuthFileAccountMemoAuthTime = (
+  map: AuthFilesAccountMemoMap,
+  name: string,
+  snapshot: CodexAuthTimeSnapshot,
+  recordedAt = Date.now()
+): { changed: boolean; map: AuthFilesAccountMemoMap } => {
+  const normalizedName = String(name ?? '').trim();
+  if (!normalizedName) return { changed: false, map };
+
+  const nextEntry = buildAuthTimeHistoryEntry(snapshot, recordedAt);
+  if (!nextEntry) return { changed: false, map };
+
+  const currentMemo = getAuthFileAccountMemo(map, normalizedName) ?? {
+    text: '',
+    images: [],
+    updatedAt: nextEntry.recordedAt,
+    authTimeHistory: [],
+  };
+  if (
+    currentMemo.authTimeHistory.some(
+      (entry) => entry.authenticatedAtMs === nextEntry.authenticatedAtMs
+    )
+  ) {
+    return { changed: false, map };
+  }
+
+  return {
+    changed: true,
+    map: {
+      ...map,
+      [normalizedName]: {
+        ...currentMemo,
+        authTimeHistory: normalizeMemoAuthTimeHistory([nextEntry, ...currentMemo.authTimeHistory]),
+      },
+    },
+  };
 };

@@ -94,6 +94,7 @@ import {
   AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES,
   getAuthFileAccountMemo,
   readAuthFilesAccountMemos,
+  upsertAuthFileAccountMemoAuthTime,
   writeAuthFilesAccountMemos,
   type AuthFileAccountMemoImage,
   type AuthFilesAccountMemoMap,
@@ -164,6 +165,7 @@ const ACCOUNT_MEMO_IMAGE_MAX_STORAGE_CHARS = 900 * 1024;
 const ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS = 4_000_000;
 const ACCOUNT_MEMO_IMAGE_QUALITIES = [0.86, 0.78, 0.68, 0.58, 0.48] as const;
 const ACCOUNT_MEMO_LINK_LIMIT = 8;
+const ACCOUNT_MEMO_AUTH_TIME_HISTORY_VISIBLE_LIMIT = 8;
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
 const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
 
@@ -983,6 +985,7 @@ export function AuthFilesPage() {
   const accountMemoImageSessionRef = useRef(0);
   const accountMemoImageProcessingRef = useRef(false);
   const accountMemoDisplayNameSavePromiseRef = useRef<Promise<boolean> | null>(null);
+  const accountMemoSuppressDisplayNameBlurRef = useRef(false);
   const [priorityRotationSettings, setPriorityRotationSettings] =
     useState<PriorityRotationSidecarDraftSettings>(DEFAULT_PRIORITY_ROTATION_SIDECAR_DRAFT);
   const [priorityRotationThresholdInput, setPriorityRotationThresholdInput] = useState(() =>
@@ -2101,6 +2104,35 @@ export function AuthFilesPage() {
   } =
     useCodexAuthFileSnapshots(codexSnapshotFiles);
 
+  useEffect(() => {
+    if (authTimeSnapshots.size === 0) return;
+
+    const recordedAt = Date.now();
+    setAccountMemosByFile((current) => {
+      let next = current;
+      let changed = false;
+
+      authTimeSnapshots.forEach((snapshot, fileName) => {
+        const result = upsertAuthFileAccountMemoAuthTime(next, fileName, snapshot, recordedAt);
+        if (!result.changed) return;
+        next = result.map;
+        changed = true;
+      });
+
+      if (!changed) return current;
+      if (!writeAuthFilesAccountMemos(next)) {
+        showNotification(
+          t('auth_files.account_memo_save_failed', {
+            defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+          }),
+          'error'
+        );
+        return current;
+      }
+      return next;
+    });
+  }, [authTimeSnapshots, showNotification, t]);
+
   const priorityRotationTierDetailGroups = useMemo(() => {
     const groups: Record<AuthFilePriorityTier, PriorityRotationTierDetailItem[]> = {
       active: [],
@@ -2617,10 +2649,108 @@ export function AuthFilesPage() {
     handleDisplayNameChange,
   ]);
 
+  const suppressNextAccountMemoDisplayNameBlur = useCallback(() => {
+    accountMemoSuppressDisplayNameBlurRef.current = true;
+    window.setTimeout(() => {
+      accountMemoSuppressDisplayNameBlurRef.current = false;
+    }, 0);
+  }, []);
+
+  const handleAccountMemoDisplayNameBlur = useCallback(() => {
+    if (accountMemoSuppressDisplayNameBlurRef.current) {
+      accountMemoSuppressDisplayNameBlurRef.current = false;
+      return;
+    }
+    void saveAccountMemoDisplayName();
+  }, [saveAccountMemoDisplayName]);
+
+  const saveAccountMemoDraft = useCallback(
+    async (options: { notify?: boolean } = {}) => {
+      if (!accountMemoEditorFile) return true;
+      if (accountMemoSaving) return false;
+
+      const notify = options.notify !== false;
+      setAccountMemoSaving(true);
+      try {
+        const editorFile = accountMemoEditorFile;
+        const nextText = accountMemoDraft.trim();
+        const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
+        const existingMemo = getAuthFileAccountMemo(accountMemosByFile, editorFile.name);
+        const authTimeHistory = existingMemo?.authTimeHistory ?? [];
+        const updatedAt = Date.now();
+        const next = { ...accountMemosByFile };
+        if (nextText || nextImages.length > 0 || authTimeHistory.length > 0) {
+          next[editorFile.name] = {
+            text: nextText,
+            images: nextImages,
+            updatedAt,
+            authTimeHistory,
+          };
+        } else {
+          delete next[editorFile.name];
+        }
+
+        if (JSON.stringify(next).length > ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS) {
+          showNotification(
+            t('auth_files.account_memo_save_failed', {
+              defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+            }),
+            'error'
+          );
+          return false;
+        }
+
+        if (!writeAuthFilesAccountMemos(next)) {
+          showNotification(
+            t('auth_files.account_memo_save_failed', {
+              defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
+            }),
+            'error'
+          );
+          return false;
+        }
+
+        setAccountMemosByFile(next);
+        if (notify) {
+          showNotification(
+            nextText || nextImages.length > 0
+              ? t('auth_files.account_memo_saved', {
+                  name: editorFile.name,
+                  defaultValue: '已保存账号备注',
+                })
+              : t('auth_files.account_memo_cleared', {
+                  name: editorFile.name,
+                  defaultValue: '已清除账号备注',
+                }),
+            'success'
+          );
+        }
+        setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
+        return true;
+      } finally {
+        setAccountMemoSaving(false);
+      }
+    },
+    [
+      accountMemoDraft,
+      accountMemoEditorFile,
+      accountMemoImagesDraft,
+      accountMemosByFile,
+      accountMemoSaving,
+      showNotification,
+      t,
+    ]
+  );
+
   const requestCloseAccountMemoEditor = useCallback(() => {
     if (accountMemoClosing) return false;
     setAccountMemoClosing(true);
     void (async () => {
+      const memoSaved = await saveAccountMemoDraft({ notify: false });
+      if (!memoSaved) {
+        setAccountMemoClosing(false);
+        return;
+      }
       const displayNameSaved = await saveAccountMemoDisplayName();
       if (displayNameSaved) {
         setAccountMemoEditorOpen(false);
@@ -2629,80 +2759,24 @@ export function AuthFilesPage() {
       setAccountMemoClosing(false);
     })();
     return false;
-  }, [accountMemoClosing, saveAccountMemoDisplayName]);
-
-  const saveAccountMemo = useCallback(async () => {
-    if (!accountMemoEditorFile || accountMemoSaving) return;
-
-    setAccountMemoSaving(true);
-    try {
-      const editorFile = accountMemoEditorFile;
-      const nextText = accountMemoDraft.trim();
-      const nextImages = accountMemoImagesDraft.slice(0, AUTH_FILE_ACCOUNT_MEMO_MAX_IMAGES);
-      const updatedAt = Date.now();
-      const next = { ...accountMemosByFile };
-      if (nextText || nextImages.length > 0) {
-        next[editorFile.name] = { text: nextText, images: nextImages, updatedAt };
-      } else {
-        delete next[editorFile.name];
-      }
-
-      if (JSON.stringify(next).length > ACCOUNT_MEMO_STORAGE_SOFT_LIMIT_CHARS) {
-        showNotification(
-          t('auth_files.account_memo_save_failed', {
-            defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
-          }),
-          'error'
-        );
-        return;
-      }
-
-      if (!writeAuthFilesAccountMemos(next)) {
-        showNotification(
-          t('auth_files.account_memo_save_failed', {
-            defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
-          }),
-          'error'
-        );
-        return;
-      }
-
-      setAccountMemosByFile(next);
-      const displayNameSaved = await saveAccountMemoDisplayName();
-      if (!displayNameSaved) return;
-
-      showNotification(
-        nextText || nextImages.length > 0
-          ? t('auth_files.account_memo_saved', {
-              name: editorFile.name,
-              defaultValue: '已保存账号备注',
-            })
-          : t('auth_files.account_memo_cleared', {
-              name: editorFile.name,
-              defaultValue: '已清除账号备注',
-            }),
-        'success'
-      );
-      setAccountMemoEditMode(parseAccountMemoPreviewBlocks(nextText).length === 0);
-    } finally {
-      setAccountMemoSaving(false);
-    }
-  }, [
-    accountMemoDraft,
-    accountMemoEditorFile,
-    accountMemoImagesDraft,
-    accountMemosByFile,
-    accountMemoSaving,
-    saveAccountMemoDisplayName,
-    showNotification,
-    t,
-  ]);
+  }, [accountMemoClosing, saveAccountMemoDisplayName, saveAccountMemoDraft]);
 
   const clearAccountMemo = useCallback(() => {
     if (!accountMemoEditorFile) return;
 
+    const existingMemo = getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name);
+    const authTimeHistory = existingMemo?.authTimeHistory ?? [];
     const next = { ...accountMemosByFile };
-    delete next[accountMemoEditorFile.name];
+    if (authTimeHistory.length > 0) {
+      next[accountMemoEditorFile.name] = {
+        text: '',
+        images: [],
+        updatedAt: Date.now(),
+        authTimeHistory,
+      };
+    } else {
+      delete next[accountMemoEditorFile.name];
+    }
     if (!writeAuthFilesAccountMemos(next)) {
       showNotification(
         t('auth_files.account_memo_save_failed', {
@@ -3946,13 +4020,22 @@ export function AuthFilesPage() {
     ? getAuthFileAccountMemo(accountMemosByFile, accountMemoEditorFile.name)
     : null;
   const accountMemoEditorExistingText = accountMemoEditorExistingMemo?.text ?? '';
+  const accountMemoAuthTimeHistory = accountMemoEditorExistingMemo?.authTimeHistory ?? [];
+  const accountMemoVisibleAuthTimeHistory = accountMemoAuthTimeHistory.slice(
+    0,
+    ACCOUNT_MEMO_AUTH_TIME_HISTORY_VISIBLE_LIMIT
+  );
+  const accountMemoHiddenAuthTimeHistoryCount = Math.max(
+    0,
+    accountMemoAuthTimeHistory.length - accountMemoVisibleAuthTimeHistory.length
+  );
   const accountMemoEditorHasExisting =
     Boolean(accountMemoEditorExistingText) ||
     (accountMemoEditorExistingMemo?.images.length ?? 0) > 0;
   const accountMemoHasDraftContent =
     Boolean(accountMemoDraft.trim()) || accountMemoImagesDraft.length > 0;
   const accountMemoSaveDisabled =
-    accountMemoSaving || accountMemoImageProcessing || accountMemoEditorDisplayNameSaving || accountMemoClosing;
+    accountMemoSaving || accountMemoImageProcessing || accountMemoClosing;
   const accountMemoClearDisabled =
     accountMemoSaveDisabled || (!accountMemoEditorHasExisting && !accountMemoHasDraftContent);
   const accountMemoPreviewBlocks = useMemo(
@@ -5769,7 +5852,7 @@ export function AuthFilesPage() {
         onClose={() => setAccountMemoEditorOpen(false)}
         onCloseRequest={requestCloseAccountMemoEditor}
         onAfterClose={resetAccountMemoEditor}
-        closeDisabled={Boolean(accountMemoPreviewImage) || accountMemoClosing}
+        closeDisabled={Boolean(accountMemoPreviewImage) || accountMemoClosing || accountMemoSaving}
         width={720}
         className={styles.accountMemoModal}
         overlayClassName={styles.accountMemoOverlay}
@@ -5785,7 +5868,7 @@ export function AuthFilesPage() {
                   <input
                     value={accountMemoDisplayNameDraft}
                     onChange={(event) => setAccountMemoDisplayNameDraft(event.currentTarget.value)}
-                    onBlur={() => void saveAccountMemoDisplayName()}
+                    onBlur={handleAccountMemoDisplayNameBlur}
                     onKeyDown={(event) => {
                       if (event.key !== 'Enter') return;
                       event.preventDefault();
@@ -5870,6 +5953,47 @@ export function AuthFilesPage() {
               <strong>{accountMemoEditorFileName}</strong>
             </span>
           </div>
+          <div className={styles.accountMemoAuthHistory}>
+            <div className={styles.accountMemoAuthHistoryHeader}>
+              {t('auth_files.account_memo_auth_history_label', { defaultValue: '认证记录' })}
+            </div>
+            {accountMemoVisibleAuthTimeHistory.length > 0 ? (
+              <div className={styles.accountMemoAuthHistoryChips}>
+                {accountMemoVisibleAuthTimeHistory.map((entry) => (
+                  <span
+                    className={styles.accountMemoAuthHistoryChip}
+                    key={`${entry.authenticatedAtMs}-${entry.authTimeSource}`}
+                    title={t('auth_files.account_memo_auth_history_item_title', {
+                      time: entry.authenticatedAt,
+                      defaultValue: `认证时间：${entry.authenticatedAt}`,
+                    })}
+                  >
+                    {entry.authenticatedAtShort}
+                  </span>
+                ))}
+                {accountMemoHiddenAuthTimeHistoryCount > 0 && (
+                  <span
+                    className={`${styles.accountMemoAuthHistoryChip} ${styles.accountMemoAuthHistoryMoreChip}`}
+                    title={t('auth_files.account_memo_auth_history_more_title', {
+                      count: accountMemoHiddenAuthTimeHistoryCount,
+                      defaultValue: `还有 ${accountMemoHiddenAuthTimeHistoryCount} 条更早认证记录`,
+                    })}
+                  >
+                    {t('auth_files.account_memo_auth_history_more', {
+                      count: accountMemoHiddenAuthTimeHistoryCount,
+                      defaultValue: `+${accountMemoHiddenAuthTimeHistoryCount}`,
+                    })}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className={styles.accountMemoAuthHistoryEmpty}>
+                {t('auth_files.account_memo_auth_history_empty', {
+                  defaultValue: '暂无认证记录',
+                })}
+              </span>
+            )}
+          </div>
           {accountMemoShouldShowEditor && (
             <div className={styles.accountMemoField}>
               <div className={styles.accountMemoFieldHeader}>
@@ -5881,6 +6005,7 @@ export function AuthFilesPage() {
                     type="button"
                     variant="ghost"
                     size="xs"
+                    onPointerDown={suppressNextAccountMemoDisplayNameBlur}
                     onClick={clearAccountMemo}
                     disabled={accountMemoClearDisabled}
                   >
@@ -5890,7 +6015,8 @@ export function AuthFilesPage() {
                     type="button"
                     variant="secondary"
                     size="xs"
-                    onClick={() => void saveAccountMemo()}
+                    onPointerDown={suppressNextAccountMemoDisplayNameBlur}
+                    onClick={() => void saveAccountMemoDraft()}
                     disabled={accountMemoSaveDisabled}
                     loading={accountMemoSaving}
                     loadingLabel={t('auth_files.account_memo_saving', {

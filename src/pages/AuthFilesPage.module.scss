@@ -13529,6 +13529,64 @@ button.codexSubscriptionValue {
   }
 }
 
+.accountMemoAuthHistory {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 2px;
+  color: var(--text-secondary);
+}
+
+.accountMemoAuthHistoryHeader {
+  color: color-mix(in srgb, var(--text-secondary) 86%, transparent);
+  font-size: 12px;
+  font-weight: 740;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.accountMemoAuthHistoryChips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.accountMemoAuthHistoryChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-control) 76%, transparent);
+  color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-primary));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.accountMemoAuthHistoryMoreChip {
+  border-style: dashed;
+  color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+}
+
+.accountMemoAuthHistoryEmpty {
+  min-width: 0;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--text-secondary) 62%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .accountMemoField {
   display: flex;
   flex-direction: column;
@@ -13962,6 +14020,11 @@ button.codexSubscriptionValue {
   .accountMemoTargetFile {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .accountMemoAuthHistory {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
   }
 
   .accountMemoField {
