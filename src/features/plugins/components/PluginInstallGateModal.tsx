@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { IconCircleAlert, IconCode, IconExternalLink } from '@/components/ui/icons';
+import { IconAlertTriangle, IconExternalLink, IconPlug } from '@/components/ui/icons';
 import { useAuthStore } from '@/stores';
 import type { PluginStoreEntry } from '@/types';
 import {
@@ -26,11 +26,10 @@ interface PluginInstallGateModalProps {
 
 function GateLogo({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
-
   return src && !failed ? (
     <img src={src} alt="" onError={() => setFailed(true)} />
   ) : (
-    <IconCode size={26} />
+    <IconPlug size={26} />
   );
 }
 
@@ -42,33 +41,23 @@ export function PluginInstallGateModal({
   onClose,
   onConfirm,
 }: PluginInstallGateModalProps) {
-  if (!entry) return null;
-
-  return (
-    <PluginInstallGateModalContent
-      key={`${open ? 'open' : 'closed'}-${entry.storeId || entry.id}-${isUpdate ? 'update' : 'install'}`}
-      open={open}
-      entry={entry}
-      isUpdate={isUpdate}
-      installing={installing}
-      onClose={onClose}
-      onConfirm={onConfirm}
-    />
-  );
-}
-
-function PluginInstallGateModalContent({
-  open,
-  entry,
-  isUpdate,
-  installing,
-  onClose,
-  onConfirm,
-}: PluginInstallGateModalProps & { entry: PluginStoreEntry }) {
   const { t } = useTranslation();
   const apiBase = useAuthStore((state) => state.apiBase);
   const [step, setStep] = useState(1);
   const [typed, setTyped] = useState('');
+  const [wasOpen, setWasOpen] = useState(false);
+
+  // Reset the gauntlet to step 1 on each fresh open. Adjusting state during render
+  // (React's "you might not need an effect" guidance) avoids a setState-in-effect.
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setStep(1);
+      setTyped('');
+    }
+  }
+
+  if (!entry) return null;
 
   const title = entry.name || entry.id;
   const repoSlug = getPluginRepositorySlug(entry.repository);
@@ -83,14 +72,15 @@ function PluginInstallGateModalContent({
   const tokenMatches = typed.trim() === token;
 
   const handleClose = () => {
-    if (!installing) onClose();
+    if (installing) return;
+    onClose();
   };
 
   const handleFinalConfirm = async () => {
     try {
       await onConfirm();
     } catch {
-      // Caller shows the error notification and keeps the modal open.
+      // The caller surfaces the error via a notification; stay on this step.
     }
   };
 
@@ -136,7 +126,7 @@ function PluginInstallGateModalContent({
       <>
         {identity}
         <div className={styles.warningBanner}>
-          <IconCircleAlert size={18} />
+          <IconAlertTriangle size={18} />
           <span>{t('plugin_store.gate_warning')}</span>
         </div>
         <ul className={styles.effects}>
@@ -148,9 +138,9 @@ function PluginInstallGateModalContent({
           <p className={styles.untrustedText}>{t('plugin_store.gate_untrusted_alert')}</p>
           <dl className={styles.originGrid}>
             <dt>{t('plugin_store.gate_repository_label')}</dt>
-            <dd>{repoSlug || entry.repository || '-'}</dd>
+            <dd>{repoSlug || entry.repository || '—'}</dd>
             <dt>{t('plugin_store.gate_source_label')}</dt>
-            <dd>{sourceText || '-'}</dd>
+            <dd>{sourceText || '—'}</dd>
           </dl>
         </div>
       </>

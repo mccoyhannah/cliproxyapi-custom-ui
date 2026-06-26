@@ -4,18 +4,11 @@
  */
 
 import type { GeminiKeyConfig, ProviderKeyConfig, OpenAIProviderConfig } from './provider';
-import type { AmpcodeConfig } from './ampcode';
 
 export interface QuotaExceededConfig {
   switchProject?: boolean;
   switchPreviewModel?: boolean;
   antigravityCredits?: boolean;
-}
-
-export interface PluginsConfig {
-  enabled?: boolean;
-  dir?: string;
-  storeSources?: string[];
 }
 
 export interface Config {
@@ -30,15 +23,12 @@ export interface Config {
   forceModelPrefix?: boolean;
   routingStrategy?: string;
   apiKeys?: string[];
-  ampcode?: AmpcodeConfig;
   geminiApiKeys?: GeminiKeyConfig[];
   codexApiKeys?: ProviderKeyConfig[];
   claudeApiKeys?: ProviderKeyConfig[];
   vertexApiKeys?: ProviderKeyConfig[];
   openaiCompatibility?: OpenAIProviderConfig[];
   oauthExcludedModels?: Record<string, string[]>;
-  plugins?: PluginsConfig;
-  supportsPlugin?: boolean;
   raw?: Record<string, unknown>;
 }
 
@@ -54,14 +44,12 @@ export type RawConfigSection =
   | 'force-model-prefix'
   | 'routing/strategy'
   | 'api-keys'
-  | 'ampcode'
   | 'gemini-api-key'
   | 'codex-api-key'
   | 'claude-api-key'
   | 'vertex-api-key'
   | 'openai-compatibility'
-  | 'oauth-excluded-models'
-  | 'plugins';
+  | 'oauth-excluded-models';
 
 export interface ConfigCache {
   data: Config;

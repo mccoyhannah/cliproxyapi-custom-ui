@@ -4,18 +4,20 @@
  */
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import type { ApiClientConfig, ApiError, ApiRequestMeta } from '@/types';
+import type { ApiClientConfig, ApiError } from '@/types';
 import {
   BUILD_DATE_HEADER_KEYS,
+  CPA_BUILD_DATE_HEADER_KEYS,
+  CPA_SUPPORT_PLUGIN_HEADER_KEYS,
+  CPA_VERSION_HEADER_KEYS,
+  HOME_BUILD_DATE_HEADER_KEYS,
+  HOME_VERSION_HEADER_KEYS,
   REQUEST_TIMEOUT_MS,
-  VERSION_HEADER_KEYS
+  VERSION_HEADER_KEYS,
 } from '@/utils/constants';
 import { computeApiUrl } from '@/utils/connection';
-import { notifyApiError } from '@/utils/notifyApiError';
-
-export interface ApiRequestConfig extends AxiosRequestConfig {
-  meta?: ApiRequestMeta;
-}
+import { isRecord } from '@/utils/helpers';
+import type { ServerRuntimeKind } from '@/types';
 
 class ApiClient {
   private instance: AxiosInstance;
@@ -26,8 +28,8 @@ class ApiClient {
     this.instance = axios.create({
       timeout: REQUEST_TIMEOUT_MS,
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'application/json',
+      },
     });
 
     this.setupInterceptors();
@@ -47,16 +49,15 @@ class ApiClient {
     }
   }
 
-  private readHeader(
-    headers: Record<string, unknown> | undefined,
-    keys: string[]
-  ): string | null {
+  private readHeader(headers: Record<string, unknown> | undefined, keys: string[]): string | null {
     if (!headers) return null;
 
     const normalizeValue = (value: unknown): string | null => {
       if (value === undefined || value === null) return null;
       if (Array.isArray(value)) {
-        const first = value.find((entry) => entry !== undefined && entry !== null && String(entry).trim());
+        const first = value.find(
+          (entry) => entry !== undefined && entry !== null && String(entry).trim()
+        );
         return first !== undefined ? String(first) : null;
       }
       const text = String(value);
@@ -86,6 +87,19 @@ class ApiClient {
     return null;
   }
 
+  private readBooleanHeader(
+    headers: Record<string, unknown> | undefined,
+    keys: string[]
+  ): boolean | null {
+    const value = this.readHeader(headers, keys);
+    if (value === null) return null;
+
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+    return null;
+  }
+
   /**
    * 设置请求/响应拦截器
    */
@@ -107,57 +121,50 @@ class ApiClient {
 
         return config;
       },
-      (error) => {
-        const apiError = this.handleError(error);
-        this.notifyErrorIfRequested(error, apiError);
-        return Promise.reject(apiError);
-      }
+      (error) => Promise.reject(this.handleError(error))
     );
 
     // 响应拦截器
     this.instance.interceptors.response.use(
       (response) => {
         const headers = response.headers as Record<string, string | undefined>;
-        const version = this.readHeader(headers, VERSION_HEADER_KEYS);
-        const buildDate = this.readHeader(headers, BUILD_DATE_HEADER_KEYS);
+        const homeVersion = this.readHeader(headers, HOME_VERSION_HEADER_KEYS);
+        const homeBuildDate = this.readHeader(headers, HOME_BUILD_DATE_HEADER_KEYS);
+        const cpaVersion = this.readHeader(headers, CPA_VERSION_HEADER_KEYS);
+        const cpaBuildDate = this.readHeader(headers, CPA_BUILD_DATE_HEADER_KEYS);
+        const version = homeVersion || cpaVersion || this.readHeader(headers, VERSION_HEADER_KEYS);
+        const buildDate =
+          homeBuildDate || cpaBuildDate || this.readHeader(headers, BUILD_DATE_HEADER_KEYS);
+        const supportsPlugin = this.readBooleanHeader(headers, CPA_SUPPORT_PLUGIN_HEADER_KEYS);
+        const runtimeKind: ServerRuntimeKind | null =
+          homeVersion || homeBuildDate ? 'home' : cpaVersion || cpaBuildDate ? 'cpa' : null;
 
         // 触发版本更新事件（后续通过 store 处理）
-        if (version || buildDate) {
+        if (version || buildDate || runtimeKind) {
           window.dispatchEvent(
             new CustomEvent('server-version-update', {
-              detail: { version: version || null, buildDate: buildDate || null }
+              detail: { version: version || null, buildDate: buildDate || null, runtimeKind },
+            })
+          );
+        }
+        if (supportsPlugin !== null) {
+          window.dispatchEvent(
+            new CustomEvent('server-plugin-support-update', {
+              detail: { supportsPlugin },
             })
           );
         }
 
         return response;
       },
-      (error) => {
-        const apiError = this.handleError(error);
-        this.notifyErrorIfRequested(error, apiError);
-        return Promise.reject(apiError);
-      }
+      (error) => Promise.reject(this.handleError(error))
     );
-  }
-
-  private notifyErrorIfRequested(error: unknown, apiError: ApiError): void {
-    if (!axios.isAxiosError(error)) return;
-    const meta = (error.config as ApiRequestConfig | undefined)?.meta;
-    if (!meta?.toastOnError || meta.silent) return;
-
-    notifyApiError(apiError, {
-      message: meta.toastMessage,
-      dedupeKey: meta.toastKey,
-    });
   }
 
   /**
    * 错误处理
    */
   private handleError(error: unknown): ApiError {
-    const isRecord = (value: unknown): value is Record<string, unknown> =>
-      value !== null && typeof value === 'object';
-
     if (axios.isAxiosError(error)) {
       const responseData: unknown = error.response?.data;
       const responseRecord = isRecord(responseData) ? responseData : null;
@@ -186,7 +193,11 @@ class ApiClient {
     }
 
     const fallbackMessage =
-      error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error occurred';
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : 'Unknown error occurred';
     const fallback = new Error(fallbackMessage) as ApiError;
     fallback.name = 'ApiError';
     return fallback;
@@ -195,7 +206,7 @@ class ApiClient {
   /**
    * GET 请求
    */
-  async get<T = unknown>(url: string, config?: ApiRequestConfig): Promise<T> {
+  async get<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.instance.get<T>(url, config);
     return response.data;
   }
@@ -203,7 +214,7 @@ class ApiClient {
   /**
    * POST 请求
    */
-  async post<T = unknown>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<T> {
+  async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.instance.post<T>(url, data, config);
     return response.data;
   }
@@ -211,7 +222,7 @@ class ApiClient {
   /**
    * PUT 请求
    */
-  async put<T = unknown>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<T> {
+  async put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.instance.put<T>(url, data, config);
     return response.data;
   }
@@ -219,7 +230,7 @@ class ApiClient {
   /**
    * PATCH 请求
    */
-  async patch<T = unknown>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<T> {
+  async patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.instance.patch<T>(url, data, config);
     return response.data;
   }
@@ -227,7 +238,7 @@ class ApiClient {
   /**
    * DELETE 请求
    */
-  async delete<T = unknown>(url: string, config?: ApiRequestConfig): Promise<T> {
+  async delete<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.instance.delete<T>(url, config);
     return response.data;
   }
@@ -235,7 +246,7 @@ class ApiClient {
   /**
    * 获取原始响应（用于下载等场景）
    */
-  async getRaw(url: string, config?: ApiRequestConfig): Promise<AxiosResponse> {
+  async getRaw(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse> {
     return this.instance.get(url, config);
   }
 
@@ -245,14 +256,14 @@ class ApiClient {
   async postForm<T = unknown>(
     url: string,
     formData: FormData,
-    config?: ApiRequestConfig
+    config?: AxiosRequestConfig
   ): Promise<T> {
     const response = await this.instance.post<T>(url, formData, {
       ...config,
       headers: {
         ...(config?.headers || {}),
-        'Content-Type': 'multipart/form-data'
-      }
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return response.data;
   }
@@ -260,7 +271,7 @@ class ApiClient {
   /**
    * 保留对 axios.request 的访问，便于下载等场景
    */
-  async requestRaw(config: ApiRequestConfig): Promise<AxiosResponse> {
+  async requestRaw(config: AxiosRequestConfig): Promise<AxiosResponse> {
     return this.instance.request(config);
   }
 }

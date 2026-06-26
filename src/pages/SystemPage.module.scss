@@ -6,14 +6,13 @@
   font-size: 28px;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.15;
-  margin: 0 0 20px 0;
+  margin: 0 0 $spacing-xl 0;
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  gap: $spacing-lg;
+  gap: $spacing-xl;
 }
 
 .aboutCard {
@@ -44,7 +43,7 @@
   font-weight: 800;
   line-height: 1.12;
   color: var(--text-primary);
-  letter-spacing: 0;
+  letter-spacing: -0.02em;
   text-align: center;
   text-wrap: balance;
   white-space: normal;
@@ -152,72 +151,6 @@
   display: flex;
   justify-content: flex-end;
   align-items: center;
-}
-
-.maintenanceActions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: $spacing-sm;
-}
-
-.maintenanceGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: $spacing-md;
-
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.maintenanceTile {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  min-height: 104px;
-  padding: $spacing-md;
-  border: 1px solid var(--border-color);
-  border-radius: $radius-md;
-  background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
-}
-
-.maintenanceLabel {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.maintenanceValue {
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.maintenancePath {
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.maintenanceMeta {
-  color: var(--text-tertiary);
-  font-size: 12px;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.statusGood {
-  color: var(--success-color);
-}
-
-.statusMuted {
-  color: var(--text-secondary);
 }
 
 .infoGrid {
@@ -426,7 +359,7 @@
     font-size: clamp(22px, 6.6vw, 34px);
     font-weight: 700;
     line-height: 1.18;
-    letter-spacing: 0;
+    letter-spacing: -0.012em;
   }
 }
 
@@ -436,6 +369,6 @@
     font-size: clamp(20px, 7.2vw, 28px);
     font-weight: 600;
     line-height: 1.22;
-    letter-spacing: 0;
+    letter-spacing: -0.006em;
   }
 }

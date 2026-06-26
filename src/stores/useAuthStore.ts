@@ -5,10 +5,11 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AuthState, LoginCredentials, ConnectionStatus } from '@/types';
+import type { AuthState, LoginCredentials, ConnectionStatus, ServerRuntimeKind } from '@/types';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { obfuscatedStorage } from '@/services/storage/secureStorage';
 import { apiClient } from '@/services/api/client';
+import { versionApi } from '@/services/api/version';
 import { useConfigStore } from './useConfigStore';
 import { useModelsStore } from './useModelsStore';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
@@ -22,41 +23,26 @@ interface AuthStoreState extends AuthState {
   logout: () => void;
   checkAuth: () => Promise<boolean>;
   restoreSession: () => Promise<boolean>;
-  updateServerVersion: (version: string | null, buildDate?: string | null) => void;
-  updateServerCapabilities: (capabilities: { supportsPlugin?: boolean | null }) => void;
+  updateServerVersion: (
+    version: string | null,
+    buildDate?: string | null,
+    runtimeKind?: ServerRuntimeKind | null
+  ) => void;
+  updateServerRuntimeKind: (runtimeKind: ServerRuntimeKind) => void;
+  updateServerPluginSupport: (supportsPlugin: boolean) => void;
   updateConnectionStatus: (status: ConnectionStatus, error?: string | null) => void;
 }
 
 let restoreSessionPromise: Promise<boolean> | null = null;
 
-const readErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  return 'Connection failed';
+const detectRuntimeKind = async (): Promise<ServerRuntimeKind> => {
+  try {
+    return await versionApi.detectRuntimeKind();
+  } catch (error) {
+    console.warn('Runtime kind detection failed:', error);
+    return 'unknown';
+  }
 };
-
-const isAuthFailure = (error: unknown): boolean => {
-  const status = typeof (error as { status?: unknown } | null)?.status === 'number'
-    ? (error as { status: number }).status
-    : undefined;
-  if (status === 401 || status === 403) return true;
-
-  const message = readErrorMessage(error).toLowerCase();
-  return (
-    message.includes('ip banned') ||
-    message.includes('too many failed attempts') ||
-    message.includes('unauthorized') ||
-    message.includes('forbidden')
-  );
-};
-
-const disableStoredAutoLogin = () => {
-  restoreSessionPromise = null;
-  localStorage.removeItem('isLoggedIn');
-};
-
-const readPluginSupport = (config: { supportsPlugin?: boolean } | null | undefined) =>
-  config?.supportsPlugin === true;
 
 export const useAuthStore = create<AuthStoreState>()(
   persist(
@@ -68,7 +54,8 @@ export const useAuthStore = create<AuthStoreState>()(
       rememberPassword: false,
       serverVersion: null,
       serverBuildDate: null,
-      supportsPlugin: null,
+      serverRuntimeKind: 'unknown',
+      supportsPlugin: false,
       connectionStatus: 'disconnected',
       connectionError: null,
 
@@ -86,14 +73,17 @@ export const useAuthStore = create<AuthStoreState>()(
           const legacyKey = obfuscatedStorage.getItem<string>('managementKey');
 
           const { apiBase, managementKey, rememberPassword } = get();
-          const resolvedBase = normalizeApiBase(apiBase || legacyBase || detectApiBaseFromLocation());
+          const resolvedBase = normalizeApiBase(
+            apiBase || legacyBase || detectApiBaseFromLocation()
+          );
           const resolvedKey = managementKey || legacyKey || '';
-          const resolvedRememberPassword = rememberPassword || Boolean(managementKey) || Boolean(legacyKey);
+          const resolvedRememberPassword =
+            rememberPassword || Boolean(managementKey) || Boolean(legacyKey);
 
           set({
             apiBase: resolvedBase,
             managementKey: resolvedKey,
-            rememberPassword: resolvedRememberPassword
+            rememberPassword: resolvedRememberPassword,
           });
           apiClient.setConfig({ apiBase: resolvedBase, managementKey: resolvedKey });
 
@@ -102,14 +92,11 @@ export const useAuthStore = create<AuthStoreState>()(
               await get().login({
                 apiBase: resolvedBase,
                 managementKey: resolvedKey,
-                rememberPassword: resolvedRememberPassword
+                rememberPassword: resolvedRememberPassword,
               });
               return true;
             } catch (error) {
               console.warn('Auto login failed:', error);
-              if (isAuthFailure(error)) {
-                disableStoredAutoLogin();
-              }
               return false;
             }
           }
@@ -127,17 +114,24 @@ export const useAuthStore = create<AuthStoreState>()(
         const rememberPassword = credentials.rememberPassword ?? get().rememberPassword ?? false;
 
         try {
-          set({ connectionStatus: 'connecting' });
+          set({
+            connectionStatus: 'connecting',
+            serverVersion: null,
+            serverBuildDate: null,
+            serverRuntimeKind: 'unknown',
+            supportsPlugin: false,
+          });
           useModelsStore.getState().clearCache();
 
           // 配置 API 客户端
           apiClient.setConfig({
             apiBase,
-            managementKey
+            managementKey,
           });
 
           // 测试连接 - 获取配置
-          const config = await useConfigStore.getState().fetchConfig(undefined, true);
+          await useConfigStore.getState().fetchConfig(undefined, true);
+          const runtimeKind = await detectRuntimeKind();
 
           // 登录成功
           set({
@@ -145,9 +139,9 @@ export const useAuthStore = create<AuthStoreState>()(
             apiBase,
             managementKey,
             rememberPassword,
-            supportsPlugin: readPluginSupport(config),
             connectionStatus: 'connected',
-            connectionError: null
+            connectionError: null,
+            ...(runtimeKind !== 'unknown' ? { serverRuntimeKind: runtimeKind } : {}),
           });
           if (rememberPassword) {
             localStorage.setItem('isLoggedIn', 'true');
@@ -155,10 +149,15 @@ export const useAuthStore = create<AuthStoreState>()(
             localStorage.removeItem('isLoggedIn');
           }
         } catch (error: unknown) {
-          const message = readErrorMessage(error);
+          const message =
+            error instanceof Error
+              ? error.message
+              : typeof error === 'string'
+                ? error
+                : 'Connection failed';
           set({
             connectionStatus: 'error',
-            connectionError: message || 'Connection failed'
+            connectionError: message || 'Connection failed',
           });
           throw error;
         }
@@ -175,9 +174,10 @@ export const useAuthStore = create<AuthStoreState>()(
           managementKey: '',
           serverVersion: null,
           serverBuildDate: null,
-          supportsPlugin: null,
+          serverRuntimeKind: 'unknown',
+          supportsPlugin: false,
           connectionStatus: 'disconnected',
-          connectionError: null
+          connectionError: null,
         });
         localStorage.removeItem('isLoggedIn');
       },
@@ -193,47 +193,53 @@ export const useAuthStore = create<AuthStoreState>()(
         try {
           // 重新配置客户端
           apiClient.setConfig({ apiBase, managementKey });
+          set({ supportsPlugin: false });
 
           // 验证连接
-          const config = await useConfigStore.getState().fetchConfig();
+          await useConfigStore.getState().fetchConfig();
+          const runtimeKind = await detectRuntimeKind();
 
           set({
             isAuthenticated: true,
-            supportsPlugin: readPluginSupport(config),
-            connectionStatus: 'connected'
+            connectionStatus: 'connected',
+            ...(runtimeKind !== 'unknown' ? { serverRuntimeKind: runtimeKind } : {}),
           });
 
           return true;
-        } catch (error: unknown) {
-          if (isAuthFailure(error)) {
-            disableStoredAutoLogin();
-          }
+        } catch {
           set({
             isAuthenticated: false,
-            connectionStatus: 'error'
+            connectionStatus: 'error',
+            supportsPlugin: false,
           });
           return false;
         }
       },
 
       // 更新服务器版本
-      updateServerVersion: (version, buildDate) => {
-        set({ serverVersion: version || null, serverBuildDate: buildDate || null });
+      updateServerVersion: (version, buildDate, runtimeKind) => {
+        set((state) => ({
+          serverVersion: version || null,
+          serverBuildDate: buildDate || null,
+          serverRuntimeKind: runtimeKind || state.serverRuntimeKind,
+        }));
       },
 
-      updateServerCapabilities: (capabilities) => {
-        if (capabilities.supportsPlugin !== undefined) {
-          set({ supportsPlugin: capabilities.supportsPlugin });
-        }
+      updateServerRuntimeKind: (runtimeKind) => {
+        set({ serverRuntimeKind: runtimeKind });
+      },
+
+      updateServerPluginSupport: (supportsPlugin) => {
+        set({ supportsPlugin });
       },
 
       // 更新连接状态
       updateConnectionStatus: (status, error = null) => {
         set({
           connectionStatus: status,
-          connectionError: error
+          connectionError: error,
         });
-      }
+      },
     }),
     {
       name: STORAGE_KEY_AUTH,
@@ -247,15 +253,16 @@ export const useAuthStore = create<AuthStoreState>()(
         },
         removeItem: (name) => {
           obfuscatedStorage.removeItem(name);
-        }
+        },
       })),
       partialize: (state) => ({
         apiBase: state.apiBase,
         ...(state.rememberPassword ? { managementKey: state.managementKey } : {}),
         rememberPassword: state.rememberPassword,
         serverVersion: state.serverVersion,
-        serverBuildDate: state.serverBuildDate
-      })
+        serverBuildDate: state.serverBuildDate,
+        serverRuntimeKind: state.serverRuntimeKind,
+      }),
     }
   )
 );
@@ -266,11 +273,16 @@ if (typeof window !== 'undefined') {
     useAuthStore.getState().logout();
   });
 
-  window.addEventListener(
-    'server-version-update',
-    ((e: CustomEvent) => {
-      const detail = e.detail || {};
-      useAuthStore.getState().updateServerVersion(detail.version || null, detail.buildDate || null);
-    }) as EventListener
-  );
+  window.addEventListener('server-version-update', ((e: CustomEvent) => {
+    const detail = e.detail || {};
+    const runtimeKind =
+      detail.runtimeKind === 'cpa' || detail.runtimeKind === 'home' ? detail.runtimeKind : null;
+    useAuthStore
+      .getState()
+      .updateServerVersion(detail.version || null, detail.buildDate || null, runtimeKind);
+  }) as EventListener);
+
+  window.addEventListener('server-plugin-support-update', ((e: CustomEvent) => {
+    useAuthStore.getState().updateServerPluginSupport(e.detail?.supportsPlugin === true);
+  }) as EventListener);
 }

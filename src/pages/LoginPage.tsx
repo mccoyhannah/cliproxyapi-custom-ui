@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -6,10 +6,6 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { IconEye, IconEyeOff } from '@/components/ui/icons';
-import {
-  AUTH_FILES_FOCUS_CARDS_PATH,
-  requestAuthFilesInitialQuotaRefresh,
-} from '@/router/authFilesFocus';
 import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
@@ -21,35 +17,7 @@ import styles from './LoginPage.module.scss';
 /**
  * 将 API 错误转换为本地化的用户友好消息
  */
-type RedirectLocation = {
-  pathname?: string;
-  search?: string;
-  hash?: string;
-};
-
-type RedirectState = { from?: RedirectLocation };
-
-function buildLoginRedirect(from?: RedirectLocation): string {
-  const pathname = from?.pathname || '/';
-  const rawSearch = from?.search || '';
-  const rawHash = from?.hash || '';
-  const search = rawSearch && !rawSearch.startsWith('?') ? `?${rawSearch}` : rawSearch;
-  const hash = rawHash && !rawHash.startsWith('#') ? `#${rawHash}` : rawHash;
-
-  if ((pathname === '/' || pathname === '/auth-files') && !search && !hash) {
-    return AUTH_FILES_FOCUS_CARDS_PATH;
-  }
-
-  return `${pathname}${search}${hash}`;
-}
-
-function buildPostLoginRedirect(from?: RedirectLocation): string {
-  const redirect = buildLoginRedirect(from);
-  if (redirect === AUTH_FILES_FOCUS_CARDS_PATH) {
-    requestAuthFilesInitialQuotaRefresh();
-  }
-  return redirect;
-}
+type RedirectState = { from?: { pathname?: string } };
 
 function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): string {
   const apiError = error as Partial<ApiError>;
@@ -63,50 +31,54 @@ function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): s
         : typeof error === 'string'
           ? error
           : '';
-  const lowerMessage = message.toLowerCase();
 
-  if (
-    lowerMessage.includes('ip banned') ||
-    lowerMessage.includes('too many failed attempts') ||
-    lowerMessage.includes('too many requests')
-  ) {
-    const retryMatch = message.match(/try again in\s+(.+)$/i);
-    const retryText = retryMatch?.[1]?.trim();
-    return retryText ? `请求过多，请等待 ${retryText} 后重试` : '请求过多，请稍后重试';
-  }
+  const withHttpStatus = (summary: string) => {
+    if (!status) {
+      return summary;
+    }
+
+    const genericAxiosMessage = `Request failed with status code ${status}`;
+    const detail = message.trim();
+    const backendDetail =
+      detail && detail !== genericAxiosMessage
+        ? ` (${t('login.error_backend_detail')}: ${detail})`
+        : '';
+
+    return `HTTP ${status}: ${summary}${backendDetail}`;
+  };
 
   // 根据 HTTP 状态码判断
   if (status === 401) {
-    return t('login.error_unauthorized');
+    return withHttpStatus(t('login.error_unauthorized'));
   }
   if (status === 403) {
-    return t('login.error_forbidden');
+    return withHttpStatus(t('login.error_forbidden'));
   }
   if (status === 404) {
-    return t('login.error_not_found');
+    return withHttpStatus(t('login.error_not_found'));
   }
   if (status && status >= 500) {
-    return t('login.error_server');
+    return withHttpStatus(t('login.error_server'));
   }
 
   // 根据 axios 错误码判断
-  if (code === 'ECONNABORTED' || lowerMessage.includes('timeout')) {
+  if (code === 'ECONNABORTED' || message.toLowerCase().includes('timeout')) {
     return t('login.error_timeout');
   }
-  if (code === 'ERR_NETWORK' || lowerMessage.includes('network error')) {
+  if (code === 'ERR_NETWORK' || message.toLowerCase().includes('network error')) {
     return t('login.error_network');
   }
-  if (code === 'ERR_CERT_AUTHORITY_INVALID' || lowerMessage.includes('certificate')) {
+  if (code === 'ERR_CERT_AUTHORITY_INVALID' || message.toLowerCase().includes('certificate')) {
     return t('login.error_ssl');
   }
 
   // 检查 CORS 错误
-  if (lowerMessage.includes('cors') || lowerMessage.includes('cross-origin')) {
+  if (message.toLowerCase().includes('cors') || message.toLowerCase().includes('cross-origin')) {
     return t('login.error_cors');
   }
 
   // 默认错误消息
-  return t('login.error_invalid');
+  return withHttpStatus(t('login.error_invalid'));
 }
 
 export function LoginPage() {
@@ -132,7 +104,6 @@ export function LoginPage() {
   const [autoLoading, setAutoLoading] = useState(true);
   const [autoLoginSuccess, setAutoLoginSuccess] = useState(false);
   const [error, setError] = useState('');
-  const submitInFlightRef = useRef(false);
 
   const detectedBase = useMemo(() => detectApiBaseFromLocation(), []);
   const languageOptions = useMemo(
@@ -161,7 +132,7 @@ export function LoginPage() {
           setAutoLoginSuccess(true);
           // 延迟跳转，让用户看到成功动画
           setTimeout(() => {
-            const redirect = buildPostLoginRedirect((location.state as RedirectState | null)?.from);
+            const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
             navigate(redirect, { replace: true });
           }, 1500);
         } else {
@@ -170,9 +141,8 @@ export function LoginPage() {
           setRememberPassword(storedRememberPassword || Boolean(storedKey));
         }
       } finally {
-        if (!autoLoginSuccess) {
-          setAutoLoading(false);
-        }
+        // 自动登录成功时 showSplash 仍由 autoLoginSuccess 维持，可无条件结束 loading
+        setAutoLoading(false);
       }
     };
 
@@ -181,17 +151,12 @@ export function LoginPage() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (loading || submitInFlightRef.current) {
-      return;
-    }
-
     if (!managementKey.trim()) {
       setError(t('login.error_required'));
       return;
     }
 
     const baseToUse = apiBase ? normalizeApiBase(apiBase) : detectedBase;
-    submitInFlightRef.current = true;
     setLoading(true);
     setError('');
     try {
@@ -201,23 +166,18 @@ export function LoginPage() {
         rememberPassword,
       });
       showNotification(t('common.connected_status'), 'success');
-      navigate(buildPostLoginRedirect((location.state as RedirectState | null)?.from), {
-        replace: true,
-      });
+      navigate('/', { replace: true });
     } catch (err: unknown) {
       const message = getLocalizedErrorMessage(err, t);
       setError(message);
       showNotification(`${t('notification.login_failed')}: ${message}`, 'error');
     } finally {
-      submitInFlightRef.current = false;
       setLoading(false);
     }
   }, [
     apiBase,
     detectedBase,
     login,
-    loading,
-    location.state,
     managementKey,
     navigate,
     rememberPassword,
@@ -236,7 +196,7 @@ export function LoginPage() {
   );
 
   if (isAuthenticated && !autoLoading && !autoLoginSuccess) {
-    const redirect = buildLoginRedirect((location.state as RedirectState | null)?.from);
+    const redirect = (location.state as RedirectState | null)?.from?.pathname || '/';
     return <Navigate to={redirect} replace />;
   }
 
@@ -251,20 +211,6 @@ export function LoginPage() {
           <span className={styles.brandWord}>CLI</span>
           <span className={styles.brandWord}>PROXY</span>
           <span className={styles.brandWord}>API</span>
-          <div className={styles.brandHud}>
-            <div className={styles.brandHudItem}>
-              <span className={styles.brandHudLabel}>EDGE</span>
-              <span className={styles.brandHudValue}>CONTROL</span>
-            </div>
-            <div className={styles.brandHudItem}>
-              <span className={styles.brandHudLabel}>AUTH</span>
-              <span className={styles.brandHudValue}>LOCKED</span>
-            </div>
-            <div className={styles.brandHudItem}>
-              <span className={styles.brandHudLabel}>BASE</span>
-              <span className={styles.brandHudCode}>{detectedBase}</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -289,11 +235,6 @@ export function LoginPage() {
             {/* 登录表单卡片 */}
             <div className={styles.loginCard}>
               <div className={styles.loginHeader}>
-                <div className={styles.loginEyebrow}>
-                  <span className={styles.accessDot} aria-hidden="true" />
-                  <span>CONTROL ACCESS</span>
-                  <span className={styles.accessMode}>LOCAL</span>
-                </div>
                 <div className={styles.titleRow}>
                   <div className={styles.title}>{t('title.login')}</div>
                   <Select
@@ -309,16 +250,8 @@ export function LoginPage() {
               </div>
 
               <div className={styles.connectionBox}>
-                <div className={styles.connectionBoxHeader}>
-                  <div className={styles.label}>{t('login.connection_current')}</div>
-                  <div className={styles.connectionStatus}>
-                    <span className={styles.connectionDot} aria-hidden="true" />
-                    <span>READY</span>
-                  </div>
-                </div>
-                <div className={`${styles.value} ${styles.endpointValue}`}>
-                  {apiBase || detectedBase}
-                </div>
+                <div className={styles.label}>{t('login.connection_current')}</div>
+                <div className={styles.value}>{apiBase || detectedBase}</div>
                 <div className={styles.hint}>{t('login.connection_auto_hint')}</div>
               </div>
 
@@ -344,11 +277,11 @@ export function LoginPage() {
 
               <Input
                 autoFocus
-                name="cpa-management-key"
-                autoComplete="current-password"
                 label={t('login.management_key_label')}
                 placeholder={t('login.management_key_placeholder')}
                 type={showKey ? 'text' : 'password'}
+                name="cpa-management-key"
+                autoComplete="current-password"
                 value={managementKey}
                 onChange={(e) => setManagementKey(e.target.value)}
                 onKeyDown={handleSubmitKeyDown}

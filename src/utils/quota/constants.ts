@@ -73,6 +73,9 @@ export const ANTIGRAVITY_REQUEST_HEADERS = {
   'User-Agent': 'antigravity/1.11.5 windows/amd64',
 };
 
+export const ANTIGRAVITY_CODE_ASSIST_URL =
+  'https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist';
+
 export const ANTIGRAVITY_QUOTA_GROUPS: AntigravityQuotaGroupDefinition[] = [
   {
     id: 'claude-gpt',

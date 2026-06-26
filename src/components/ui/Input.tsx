@@ -7,29 +7,37 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   rightElement?: ReactNode;
 }
 
-export function Input({ label, hint, error, rightElement, className = '', id, ...rest }: InputProps) {
+export function Input({
+  label,
+  hint,
+  error,
+  rightElement,
+  className = '',
+  id,
+  ...rest
+}: InputProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const hintId = hint ? `${inputId}-hint` : undefined;
   const errorId = error ? `${inputId}-error` : undefined;
-  const describedBy = [rest['aria-describedby'], errorId, hintId].filter(Boolean).join(' ') || undefined;
-  const inputClassName = ['input', rightElement ? 'input-with-action' : '', className]
-    .filter(Boolean)
-    .join(' ');
+  const describedBy =
+    [rest['aria-describedby'], errorId, hintId].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className="form-group">
       {label && <label htmlFor={inputId}>{label}</label>}
-      <div className="input-shell">
+      <div style={{ position: 'relative' }}>
         <input
           id={inputId}
-          className={inputClassName}
+          className={`input ${className}`.trim()}
           aria-invalid={Boolean(error) || rest['aria-invalid']}
           aria-describedby={describedBy}
           {...rest}
         />
         {rightElement && (
-          <div className="input-actions">
+          <div
+            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}
+          >
             {rightElement}
           </div>
         )}

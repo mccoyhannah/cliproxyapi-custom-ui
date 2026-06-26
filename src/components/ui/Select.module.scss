@@ -16,12 +16,12 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  height: var(--control-height);
+  height: 40px;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent);
+  border: 1px solid var(--border-color);
   border-radius: $radius-md;
-  background-color: var(--surface-control);
-  box-shadow: var(--shadow-control);
+  background-color: var(--bg-primary);
+  box-shadow: var(--shadow);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
@@ -32,19 +32,28 @@
 
   &:hover {
     border-color: var(--border-hover);
-    background-color: var(--surface-control-hover);
   }
 
-  &:focus,
-  &:focus-visible {
+  &:focus {
     outline: none;
-    box-shadow: var(--shadow-control), var(--focus-ring);
+    box-shadow:
+      var(--shadow),
+      0 0 0 3px rgba($primary-color, 0.18);
   }
 
   &[aria-expanded='true'] {
     border-color: var(--primary-color);
-    box-shadow: var(--shadow-control), var(--focus-ring);
+    box-shadow:
+      var(--shadow),
+      0 0 0 3px rgba($primary-color, 0.18);
   }
+}
+
+.triggerSm {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  box-shadow: none;
 }
 
 .triggerText {
@@ -70,9 +79,9 @@
 
 .dropdown {
   position: fixed;
-  background: var(--surface-card);
-  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
-  border-radius: $radius-md;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
   padding: 6px;
   box-shadow: var(--shadow-lg);
   display: flex;
@@ -94,20 +103,22 @@
   text-align: left;
   font-size: 13px;
   font-weight: 500;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
   flex-shrink: 0;
 
   &:hover {
-    background: var(--surface-control-hover);
+    background: var(--bg-secondary);
   }
 }
 
 .optionActive {
-  border-color: color-mix(in srgb, var(--primary-color) 46%, var(--border-color));
-  background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-primary));
+  border-color: rgba($primary-color, 0.5);
+  background: rgba($primary-color, 0.1);
   font-weight: 600;
 }
 
 .optionHighlighted {
-  background: var(--surface-control-hover);
+  background: var(--bg-secondary);
 }

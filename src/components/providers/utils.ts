@@ -100,6 +100,28 @@ export const buildClaudeMessagesEndpoint = (baseUrl: string): string => {
   return `${trimmed}/v1/messages`;
 };
 
+export const buildCodexResponsesEndpoint = (baseUrl: string): string => {
+  const trimmed = normalizeOpenAIBaseUrl(baseUrl);
+  if (!trimmed) return '';
+  if (trimmed.endsWith('/responses')) {
+    return trimmed;
+  }
+  return `${trimmed}/responses`;
+};
+
+export const buildGeminiGenerateContentEndpoint = (baseUrl: string, model: string): string => {
+  const trimmed = normalizeOpenAIBaseUrl(baseUrl || 'https://generativelanguage.googleapis.com/v1beta');
+  const modelName = String(model || '').trim();
+  if (!trimmed || !modelName) return '';
+  if (trimmed.includes(':generateContent')) {
+    return trimmed;
+  }
+  const base = trimmed.endsWith(`/models/${modelName}`)
+    ? trimmed
+    : `${trimmed}/models/${encodeURIComponent(modelName)}`;
+  return `${base}:generateContent`;
+};
+
 export type ProviderRecentUsageMap = Map<string, Map<string, RecentRequestUsageEntry>>;
 
 const EMPTY_RECENT_USAGE_ENTRY: RecentRequestUsageEntry = {

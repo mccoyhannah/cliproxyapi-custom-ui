@@ -1,11 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { IconKey, IconBot, IconFileText, IconSatellite } from '@/components/ui/icons';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { AUTH_FILES_FOCUS_CARDS_PATH } from '@/router/authFilesFocus';
+import {
+  IconKey,
+  IconBot,
+  IconFileText,
+  IconSatellite,
+  IconSidebarQuickStart,
+} from '@/components/ui/icons';
 import { useAuthStore, useConfigStore, useModelsStore } from '@/stores';
-import { apiKeysApi, providersApi, authFilesApi } from '@/services/api';
+import { authFilesApi } from '@/services/api';
+import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
+import { hasApiKeyFunConfig } from '@/features/providers/sponsor';
+import { formatDateValue } from '@/utils/format';
 import styles from './DashboardPage.module.scss';
 
 interface QuickStat {
@@ -15,13 +22,6 @@ interface QuickStat {
   path: string;
   loading?: boolean;
   sublabel?: string;
-}
-
-interface ProviderStats {
-  gemini: number | null;
-  codex: number | null;
-  claude: number | null;
-  openai: number | null;
 }
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
@@ -41,38 +41,18 @@ export function DashboardPage() {
   const serverBuildDate = useAuthStore((state) => state.serverBuildDate);
   const apiBase = useAuthStore((state) => state.apiBase);
   const config = useConfigStore((state) => state.config);
+  const fetchConfig = useConfigStore((state) => state.fetchConfig);
 
   const models = useModelsStore((state) => state.models);
   const modelsLoading = useModelsStore((state) => state.loading);
   const fetchModelsFromStore = useModelsStore((state) => state.fetchModels);
 
-  const [stats, setStats] = useState<{
-    apiKeys: number | null;
-    authFiles: number | null;
-  }>({
-    apiKeys: null,
-    authFiles: null,
-  });
-
-  const [providerStats, setProviderStats] = useState<ProviderStats>({
-    gemini: null,
-    codex: null,
-    claude: null,
-    openai: null,
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [statsError, setStatsError] = useState('');
+  const [authFilesCount, setAuthFilesCount] = useState<number | null>(null);
+  const [authFilesLoading, setAuthFilesLoading] = useState(false);
 
   // Time-of-day state for dynamic greeting
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(getTimeOfDay);
   const [currentTime, setCurrentTime] = useState(() => new Date());
-
-  const apiKeysCache = useRef<string[]>([]);
-
-  useEffect(() => {
-    apiKeysCache.current = [];
-  }, [apiBase, config?.apiKeys]);
 
   // Update time every 60 seconds
   useEffect(() => {
@@ -83,53 +63,7 @@ export function DashboardPage() {
     return () => clearInterval(id);
   }, []);
 
-  const normalizeApiKeyList = (input: unknown): string[] => {
-    if (!Array.isArray(input)) return [];
-    const seen = new Set<string>();
-    const keys: string[] = [];
-
-    input.forEach((item) => {
-      const record =
-        item !== null && typeof item === 'object' && !Array.isArray(item)
-          ? (item as Record<string, unknown>)
-          : null;
-      const value =
-        typeof item === 'string'
-          ? item
-          : record
-            ? (record['api-key'] ?? record['apiKey'] ?? record.key ?? record.Key)
-            : '';
-      const trimmed = String(value ?? '').trim();
-      if (!trimmed || seen.has(trimmed)) return;
-      seen.add(trimmed);
-      keys.push(trimmed);
-    });
-
-    return keys;
-  };
-
-  const resolveApiKeysForModels = useCallback(async () => {
-    if (apiKeysCache.current.length) {
-      return apiKeysCache.current;
-    }
-
-    const configKeys = normalizeApiKeyList(config?.apiKeys);
-    if (configKeys.length) {
-      apiKeysCache.current = configKeys;
-      return configKeys;
-    }
-
-    try {
-      const list = await apiKeysApi.list();
-      const normalized = normalizeApiKeyList(list);
-      if (normalized.length) {
-        apiKeysCache.current = normalized;
-      }
-      return normalized;
-    } catch {
-      return [];
-    }
-  }, [config?.apiKeys]);
+  const resolveApiKeysForModels = useApiKeysForModels();
 
   const fetchModels = useCallback(async () => {
     if (connectionStatus !== 'connected' || !apiBase) {
@@ -146,100 +80,80 @@ export function DashboardPage() {
   }, [connectionStatus, apiBase, resolveApiKeysForModels, fetchModelsFromStore]);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true);
-      setStatsError('');
+    if (connectionStatus !== 'connected') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAuthFiles = async () => {
+      setAuthFilesLoading(true);
       try {
-        const [keysRes, filesRes, geminiRes, codexRes, claudeRes, openaiRes] =
-          await Promise.allSettled([
-            apiKeysApi.list(),
-            authFilesApi.list(),
-            providersApi.getGeminiKeys(),
-            providersApi.getCodexConfigs(),
-            providersApi.getClaudeConfigs(),
-            providersApi.getOpenAIProviders(),
-          ]);
-
-        setStats({
-          apiKeys: keysRes.status === 'fulfilled' ? keysRes.value.length : null,
-          authFiles: filesRes.status === 'fulfilled' ? filesRes.value.files.length : null,
-        });
-
-        setProviderStats({
-          gemini: geminiRes.status === 'fulfilled' ? geminiRes.value.length : null,
-          codex: codexRes.status === 'fulfilled' ? codexRes.value.length : null,
-          claude: claudeRes.status === 'fulfilled' ? claudeRes.value.length : null,
-          openai: openaiRes.status === 'fulfilled' ? openaiRes.value.length : null,
-        });
-
-        const allStatsFailed = [keysRes, filesRes, geminiRes, codexRes, claudeRes, openaiRes].every(
-          (result) => result.status === 'rejected'
-        );
-        if (allStatsFailed) {
-          setStatsError(t('notification.refresh_failed'));
-        }
+        const res = await authFilesApi.list();
+        if (!cancelled) setAuthFilesCount(res.files.length);
+      } catch {
+        if (!cancelled) setAuthFilesCount(null);
       } finally {
-        setLoading(false);
+        setAuthFilesLoading(false);
       }
     };
 
-    if (connectionStatus === 'connected') {
-      fetchStats();
-      fetchModels();
-    } else {
-      setLoading(false);
-      setStatsError('');
-    }
-  }, [connectionStatus, fetchModels, t]);
+    // 提供商/密钥统计直接来自 config store；这里只需保证配置已加载并取认证文件数。
+    fetchConfig().catch(() => undefined);
+    fetchModels();
+    void loadAuthFiles();
 
-  // Calculate total provider keys only when all provider stats are available.
-  const providerStatsReady =
-    providerStats.gemini !== null &&
-    providerStats.codex !== null &&
-    providerStats.claude !== null &&
-    providerStats.openai !== null;
-  const hasProviderStats =
-    providerStats.gemini !== null ||
-    providerStats.codex !== null ||
-    providerStats.claude !== null ||
-    providerStats.openai !== null;
-  const totalProviderKeys = providerStatsReady
-    ? (providerStats.gemini ?? 0) +
-      (providerStats.codex ?? 0) +
-      (providerStats.claude ?? 0) +
-      (providerStats.openai ?? 0)
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionStatus, fetchConfig, fetchModels]);
+
+  const configLoading = !config;
+  const providerStats = config
+    ? {
+        gemini: config.geminiApiKeys?.length ?? 0,
+        codex: config.codexApiKeys?.length ?? 0,
+        claude: config.claudeApiKeys?.length ?? 0,
+        vertex: config.vertexApiKeys?.length ?? 0,
+        openai: config.openaiCompatibility?.length ?? 0,
+      }
+    : null;
+  const totalProviderKeys = providerStats
+    ? Object.values(providerStats).reduce((sum, count) => sum + count, 0)
     : 0;
+  const isApiKeyFunConfigured = hasApiKeyFunConfig(config);
 
   const quickStats: QuickStat[] = [
     {
       label: t('dashboard.management_keys'),
-      value: stats.apiKeys ?? '-',
+      value: config ? (config.apiKeys?.length ?? 0) : '-',
       icon: <IconKey size={24} />,
       path: '/config',
-      loading: loading && stats.apiKeys === null,
+      loading: configLoading,
       sublabel: t('nav.config_management'),
     },
     {
       label: t('nav.ai_providers'),
-      value: loading ? '-' : providerStatsReady ? totalProviderKeys : '-',
+      value: providerStats ? totalProviderKeys : '-',
       icon: <IconBot size={24} />,
       path: '/ai-providers',
-      loading: loading,
-      sublabel: hasProviderStats
+      loading: configLoading,
+      sublabel: providerStats
         ? t('dashboard.provider_keys_detail', {
-            gemini: providerStats.gemini ?? '-',
-            codex: providerStats.codex ?? '-',
-            claude: providerStats.claude ?? '-',
-            openai: providerStats.openai ?? '-',
+            gemini: providerStats.gemini,
+            codex: providerStats.codex,
+            claude: providerStats.claude,
+            vertex: providerStats.vertex,
+            openai: providerStats.openai,
           })
         : undefined,
     },
     {
       label: t('nav.auth_files'),
-      value: stats.authFiles ?? '-',
+      value: authFilesCount ?? '-',
       icon: <IconFileText size={24} />,
-      path: AUTH_FILES_FOCUS_CARDS_PATH,
-      loading: loading && stats.authFiles === null,
+      path: '/auth-files',
+      loading: authFilesLoading && authFilesCount === null,
       sublabel: t('dashboard.oauth_credentials'),
     },
     {
@@ -250,6 +164,17 @@ export function DashboardPage() {
       loading: modelsLoading,
       sublabel: t('dashboard.available_models_desc'),
     },
+    ...(!isApiKeyFunConfigured
+      ? [
+          {
+            label: t('dashboard.quick_start_card'),
+            value: t('dashboard.quick_start_entry'),
+            icon: <IconSidebarQuickStart size={24} />,
+            path: '/quick-start',
+            sublabel: t('dashboard.quick_start_entry_desc'),
+          },
+        ]
+      : []),
   ];
 
   const routingStrategyRaw = config?.routingStrategy?.trim() || '';
@@ -283,27 +208,16 @@ export function DashboardPage() {
     hour: '2-digit',
     minute: '2-digit',
   });
-
-  const normalizedServerVersion = serverVersion?.trim().replace(/^[vV]+/, '') || '';
-  const connectionLabel = t(
-    connectionStatus === 'connected'
-      ? 'common.connected'
-      : connectionStatus === 'connecting'
-        ? 'common.connecting'
-        : 'common.disconnected'
-  );
-  const connectionToneClass =
-    connectionStatus === 'connected'
-      ? styles.connectionConnected
-      : connectionStatus === 'connecting'
-        ? styles.connectionConnecting
-        : styles.connectionDisconnected;
-  const formattedBuildDate = serverBuildDate
-    ? new Date(serverBuildDate).toLocaleDateString(i18n.language)
-    : '-';
+  const serverBuildDateDisplay = formatDateValue(serverBuildDate, i18n.language);
 
   return (
     <div className={styles.dashboard}>
+      {/* Decorative background orbs */}
+      <div className={styles.backgroundOrbs} aria-hidden="true">
+        <div className={styles.orb1} />
+        <div className={styles.orb2} />
+      </div>
+
       {/* Hero welcome section */}
       <section className={styles.hero}>
         <span className={styles.heroWatermark} aria-hidden="true">
@@ -313,29 +227,13 @@ export function DashboardPage() {
           <span className={styles.heroGreeting}>{t(greetingKey)}</span>
           <h1 className={styles.heroTitle}>{t('dashboard.welcome_back')}</h1>
           <p className={styles.heroCaring}>{t(caringKey)}</p>
-          <div className={styles.heroSignalGrid}>
-            <div className={styles.heroSignal}>
-              <span className={styles.signalLabel}>API BASE</span>
-              <code className={styles.signalValue}>{apiBase || '-'}</code>
-            </div>
-            <div className={styles.heroSignal}>
-              <span className={styles.signalLabel}>VERSION</span>
-              <code className={styles.signalValue}>
-                {normalizedServerVersion ? `v${normalizedServerVersion}` : '-'}
-              </code>
-            </div>
-            <div className={styles.heroSignal}>
-              <span className={styles.signalLabel}>ROUTING</span>
-              <code className={styles.signalValue}>{routingStrategyDisplay}</code>
-            </div>
-          </div>
         </div>
         <div className={styles.heroMeta}>
           <div className={styles.dateTimeBlock}>
             <span className={styles.time}>{formattedTime}</span>
             <span className={styles.date}>{formattedDate}</span>
           </div>
-          <div className={`${styles.connectionPill} ${connectionToneClass}`}>
+          <div className={styles.connectionPill}>
             <span
               className={`${styles.statusDot} ${
                 connectionStatus === 'connected'
@@ -345,24 +243,23 @@ export function DashboardPage() {
                     : styles.disconnected
               }`}
             />
-            <span className={styles.connectionStateText}>{connectionLabel}</span>
-            {normalizedServerVersion && (
-              <span className={styles.versionText}>v{normalizedServerVersion}</span>
-            )}
+            <span className={styles.pillText}>
+              {serverVersion
+                ? `v${serverVersion.trim().replace(/^[vV]+/, '')}`
+                : t(
+                    connectionStatus === 'connected'
+                      ? 'common.connected'
+                      : connectionStatus === 'connecting'
+                        ? 'common.connecting'
+                        : 'common.disconnected'
+                  )}
+            </span>
           </div>
-          {serverBuildDate && <span className={styles.buildDate}>{formattedBuildDate}</span>}
+          {serverBuildDateDisplay && (
+            <span className={styles.buildDate}>{serverBuildDateDisplay}</span>
+          )}
         </div>
       </section>
-
-      {statsError && (
-        <EmptyState
-          variant="error"
-          compact
-          className={styles.dashboardState}
-          title={t('common.error')}
-          description={statsError}
-        />
-      )}
 
       {/* Bento stats grid */}
       <section className={styles.statsSection}>
@@ -374,23 +271,14 @@ export function DashboardPage() {
               to={stat.path}
               className={`${styles.bentoCard} ${index === 0 ? styles.bentoLarge : ''}`}
               style={{ animationDelay: `${index * 80}ms` }}
-              aria-busy={stat.loading || undefined}
             >
               <div className={styles.bentoIcon}>{stat.icon}</div>
               <div className={styles.bentoContent}>
-                <span className={styles.bentoValue}>
-                  {stat.loading ? (
-                    <span className={styles.valueSkeleton} aria-hidden="true" />
-                  ) : (
-                    stat.value
-                  )}
-                </span>
+                <span className={styles.bentoValue}>{stat.loading ? '...' : stat.value}</span>
                 <span className={styles.bentoLabel}>{stat.label}</span>
-                {stat.loading ? (
-                  <span className={styles.sublabelSkeleton} aria-hidden="true" />
-                ) : stat.sublabel ? (
+                {stat.sublabel && !stat.loading && (
                   <span className={styles.bentoSublabel}>{stat.sublabel}</span>
-                ) : null}
+                )}
               </div>
             </Link>
           ))}

@@ -5,7 +5,6 @@ export const STATUS_GROUPS = ['2xx', '3xx', '4xx', '5xx'] as const;
 export type StatusGroup = (typeof STATUS_GROUPS)[number];
 
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-export const LOG_LEVELS: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
 
 export type LogState = {
   buffer: string[];
@@ -20,11 +19,11 @@ export type ParsedLogLine = {
   requestId?: string;
   statusCode?: number;
   latency?: string;
+  payloadSizeBytes?: number;
+  payloadSizeLevel?: 'large' | 'huge';
   ip?: string;
   method?: HttpMethod;
   path?: string;
-  payloadSizeBytes?: number;
-  payloadSizeLevel?: 'large' | 'huge';
   message: string;
 };
 

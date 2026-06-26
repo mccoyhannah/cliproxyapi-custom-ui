@@ -1,22 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
-import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
+import { Sheet } from '@/components/ui/Sheet';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
-  IconCode,
   IconGithub,
+  IconPlug,
+  IconPlus,
   IconRefreshCw,
   IconSearch,
   IconSettings,
+  IconSidebarStore,
   IconTrash2,
 } from '@/components/ui/icons';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { pluginsApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
+import { getErrorMessage, isRecord } from '@/utils/helpers';
 import type {
   PluginConfigField,
   PluginConfigObject,
@@ -24,21 +28,15 @@ import type {
   PluginListResponse,
 } from '@/types';
 import {
-  buildPluginResourceRoute,
-  buildRepositoryURL,
   getPluginTitle,
   notifyPluginResourcesChanged,
   resolvePluginAssetURL,
 } from './pluginResources';
-import {
-  getErrorMessage,
-  getErrorStatus,
-  hasRestartRequiredError,
-  isRecord,
-} from './pluginErrors';
+import { waitForPluginState } from './pluginPolling';
 import styles from './PluginsPage.module.scss';
 
-type PluginDraftValue = string | boolean;
+type PluginDraftValue = string | boolean | string[];
+type PluginRuntimeWaitStatus = 'ready' | 'globalDisabled' | 'timeout';
 
 interface PluginConfigDraft {
   enabled: boolean;
@@ -47,65 +45,73 @@ interface PluginConfigDraft {
   errors: Record<string, string>;
 }
 
-const PLUGIN_ENABLE_REFRESH_DELAY_MS = 1600;
-
-const wait = (ms: number) =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-
 function PluginCardLogo({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
+  const showImage = Boolean(src) && !failed;
 
-  return src && !failed ? (
+  return showImage ? (
     <img src={src} alt="" onError={() => setFailed(true)} />
   ) : (
-    <IconCode size={18} />
+    <IconPlug size={18} />
   );
 }
 
+const hasStatus = (error: unknown, status: number) => isRecord(error) && error.status === status;
+
+const hasRestartRequired = (value: unknown) => isRecord(value) && value.restart_required === true;
+
+const hasRestartRequiredError = (error: unknown) =>
+  isRecord(error) && (hasRestartRequired(error.details) || hasRestartRequired(error.data));
+
 const normalizeFieldType = (field: PluginConfigField) => field.type.trim().toLowerCase();
 
-const stringifyDraftValue = (field: PluginConfigField, value: unknown): PluginDraftValue => {
-  const fieldType = normalizeFieldType(field);
-  if (fieldType === 'boolean') return value === true;
-  if (fieldType === 'array') {
-    return Array.isArray(value)
-      ? value
-          .map((item) =>
-            typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean'
-              ? String(item)
-              : JSON.stringify(item)
-          )
-          .join('\n')
-      : '';
+const stringifyArrayItem = (value: unknown): string => {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
   }
-  if (fieldType === 'object') {
-    if (value === undefined || value === null) return '';
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return String(value);
+};
+
+const getFieldDraftValue = (field: PluginConfigField, value: unknown): PluginDraftValue => {
+  const type = normalizeFieldType(field);
+  if (type === 'boolean') return value === true;
+  if (type === 'array') {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.map((item) => stringifyArrayItem(item)) : [''];
     }
+    if (value !== undefined && value !== null) return [stringifyArrayItem(value)];
+    return [''];
   }
-  return value === undefined || value === null ? '' : String(value);
+  if (value === undefined || value === null) return '';
+  if (type === 'object') {
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value);
 };
 
 const buildDraft = (
   plugin: PluginListEntry,
   currentConfig: PluginConfigObject
 ): PluginConfigDraft => {
-  const values: Record<string, PluginDraftValue> = {};
+  const enabled =
+    typeof currentConfig.enabled === 'boolean' ? currentConfig.enabled : plugin.enabled;
+  const priority =
+    typeof currentConfig.priority === 'number' || typeof currentConfig.priority === 'string'
+      ? String(currentConfig.priority)
+      : '0';
+  const values: PluginConfigDraft['values'] = {};
+
   plugin.configFields.forEach((field) => {
-    values[field.name] = stringifyDraftValue(field, currentConfig[field.name]);
+    values[field.name] = getFieldDraftValue(field, currentConfig[field.name]);
   });
 
   return {
-    enabled: typeof currentConfig.enabled === 'boolean' ? currentConfig.enabled : plugin.enabled,
-    priority:
-      typeof currentConfig.priority === 'number' || typeof currentConfig.priority === 'string'
-        ? String(currentConfig.priority)
-        : '0',
+    enabled,
+    priority,
     values,
     errors: {},
   };
@@ -115,8 +121,8 @@ const parseJSONField = (
   text: string,
   fieldType: string,
   fieldName: string,
-  errors: Record<string, string>,
-  t: (key: string) => string
+  t: (key: string, options?: Record<string, unknown>) => string,
+  errors: Record<string, string>
 ) => {
   try {
     const parsed = JSON.parse(text);
@@ -139,7 +145,7 @@ const buildConfigPayload = (
   draft: PluginConfigDraft,
   fields: PluginConfigField[],
   currentConfig: PluginConfigObject,
-  t: (key: string) => string
+  t: (key: string, options?: Record<string, unknown>) => string
 ) => {
   const errors: Record<string, string> = {};
   const nextConfig: PluginConfigObject = { ...currentConfig };
@@ -160,6 +166,16 @@ const buildConfigPayload = (
 
     if (fieldType === 'boolean') {
       nextConfig[field.name] = value === true;
+      return;
+    }
+
+    if (fieldType === 'array') {
+      const items = Array.isArray(value) ? value.map((item) => item.trim()).filter(Boolean) : [];
+      if (items.length === 0) {
+        delete nextConfig[field.name];
+      } else {
+        nextConfig[field.name] = items;
+      }
       return;
     }
 
@@ -197,20 +213,10 @@ const buildConfigPayload = (
       return;
     }
 
-    if (fieldType === 'array') {
-      const parsed = text.startsWith('[')
-        ? parseJSONField(text, fieldType, field.name, errors, t)
-        : text
-            .split(/\r?\n/)
-            .map((item) => item.trim())
-            .filter(Boolean);
-      if (!errors[field.name]) nextConfig[field.name] = parsed;
-      return;
-    }
-
     if (fieldType === 'object') {
-      const parsed = parseJSONField(text, fieldType, field.name, errors, t);
-      if (!errors[field.name]) nextConfig[field.name] = parsed;
+      const parsed = parseJSONField(text, fieldType, field.name, t, errors);
+      if (errors[field.name]) return;
+      nextConfig[field.name] = parsed;
       return;
     }
 
@@ -222,6 +228,7 @@ const buildConfigPayload = (
 
 export function PluginsPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const apiBase = useAuthStore((state) => state.apiBase);
   const clearConfigCache = useConfigStore((state) => state.clearCache);
@@ -256,7 +263,7 @@ export function PluginsPage() {
       setData(plugins);
     } catch (err: unknown) {
       setError(
-        getErrorStatus(err) === 404
+        hasStatus(err, 404)
           ? t('plugin_management.unsupported_backend')
           : getErrorMessage(err, t('plugin_management.load_failed'))
       );
@@ -265,12 +272,20 @@ export function PluginsPage() {
     }
   }, [connected, t]);
 
-  const loadPluginsAfterMutation = useCallback(
-    async (waitForRegistration: boolean) => {
-      if (waitForRegistration) await wait(PLUGIN_ENABLE_REFRESH_DELAY_MS);
-      await loadPlugins();
+  const waitForPluginRuntimeState = useCallback(
+    async (id: string, enabled: boolean): Promise<PluginRuntimeWaitStatus> => {
+      const result = await waitForPluginState(id, (item, response) =>
+        enabled
+          ? !response.pluginsEnabled || (item.registered && item.effectiveEnabled)
+          : !item.effectiveEnabled
+      );
+      setData(result.response);
+      if (enabled && !result.response.pluginsEnabled) {
+        return 'globalDisabled';
+      }
+      return result.timedOut ? 'timeout' : 'ready';
     },
-    [loadPlugins]
+    []
   );
 
   useHeaderRefresh(loadPlugins, connected);
@@ -316,7 +331,7 @@ export function PluginsPage() {
     [apiBase]
   );
 
-  const openConfigModal = async (plugin: PluginListEntry) => {
+  const openConfigSheet = async (plugin: PluginListEntry) => {
     if (openingConfigID || mutatingID || deletingID) return;
 
     const requestSeq = configRequestSeq.current + 1;
@@ -329,15 +344,17 @@ export function PluginsPage() {
     try {
       const currentConfig = await pluginsApi.getConfig(plugin.id);
       if (configRequestSeq.current !== requestSeq) return;
+
       setEditingConfig(currentConfig);
       setDraft(buildDraft(plugin, currentConfig));
     } catch (err: unknown) {
       if (configRequestSeq.current !== requestSeq) return;
+
       setEditingPlugin(null);
       setEditingConfig({});
       setDraft(null);
       showNotification(
-        getErrorStatus(err) === 404
+        hasStatus(err, 404)
           ? t('plugin_management.config_not_found')
           : `${t('plugin_management.config_load_failed')}: ${getErrorMessage(
               err,
@@ -346,11 +363,13 @@ export function PluginsPage() {
         'error'
       );
     } finally {
-      if (configRequestSeq.current === requestSeq) setOpeningConfigID('');
+      if (configRequestSeq.current === requestSeq) {
+        setOpeningConfigID('');
+      }
     }
   };
 
-  const closeConfigModal = () => {
+  const closeConfigSheet = () => {
     if (mutatingID || openingConfigID || deletingID) return;
     setEditingPlugin(null);
     setEditingConfig({});
@@ -367,9 +386,20 @@ export function PluginsPage() {
     try {
       await pluginsApi.updateEnabled(plugin.id, enabled);
       clearConfigCache();
-      await loadPluginsAfterMutation(enabled);
-      notifyPluginResourcesChanged();
-      showNotification(t('plugin_management.toggle_success'), 'success');
+      const status = await waitForPluginRuntimeState(plugin.id, enabled);
+      if (status === 'ready') {
+        notifyPluginResourcesChanged();
+        showNotification(t('plugin_management.toggle_success'), 'success');
+      } else {
+        showNotification(
+          t(
+            status === 'globalDisabled'
+              ? 'plugin_management.global_disabled_hint'
+              : 'plugin_management.runtime_pending'
+          ),
+          'warning'
+        );
+      }
     } catch (err: unknown) {
       showNotification(
         `${t('plugin_management.toggle_failed')}: ${getErrorMessage(
@@ -385,8 +415,8 @@ export function PluginsPage() {
 
   const handleDeletePlugin = (plugin: PluginListEntry) => {
     if (!connected || mutatingID || openingConfigID || deletingID) return;
-    const name = getPluginTitle(plugin);
 
+    const name = getPluginTitle(plugin);
     showConfirmation({
       title: t('plugin_management.delete_confirm_title'),
       message: t('plugin_management.delete_confirm_message', { name, id: plugin.id }),
@@ -398,8 +428,12 @@ export function PluginsPage() {
         try {
           const result = await pluginsApi.deletePlugin(plugin.id);
           clearConfigCache();
-          if (editingPlugin?.id === plugin.id) closeConfigModal();
-          await loadPluginsAfterMutation(false);
+          if (editingPlugin?.id === plugin.id) {
+            setEditingPlugin(null);
+            setEditingConfig({});
+            setDraft(null);
+          }
+          await loadPlugins();
           notifyPluginResourcesChanged();
           showNotification(t('plugin_management.delete_success'), 'success');
           if (result.restartRequired) {
@@ -441,10 +475,29 @@ export function PluginsPage() {
     try {
       await pluginsApi.putConfig(editingPlugin.id, nextConfig);
       clearConfigCache();
-      await loadPluginsAfterMutation(nextConfig.enabled === true && editingPlugin.enabled !== true);
-      notifyPluginResourcesChanged();
-      closeConfigModal();
-      showNotification(t('plugin_management.save_success'), 'success');
+      const enabledChanged =
+        typeof nextConfig.enabled === 'boolean' && nextConfig.enabled !== editingPlugin.enabled;
+      const status = enabledChanged
+        ? await waitForPluginRuntimeState(editingPlugin.id, nextConfig.enabled === true)
+        : await loadPlugins().then((): PluginRuntimeWaitStatus => 'ready');
+      if (status === 'ready') {
+        notifyPluginResourcesChanged();
+      }
+      setEditingPlugin(null);
+      setEditingConfig({});
+      setDraft(null);
+      if (status === 'ready') {
+        showNotification(t('plugin_management.save_success'), 'success');
+      } else {
+        showNotification(
+          t(
+            status === 'globalDisabled'
+              ? 'plugin_management.global_disabled_hint'
+              : 'plugin_management.runtime_pending'
+          ),
+          'warning'
+        );
+      }
     } catch (err: unknown) {
       showNotification(
         `${t('plugin_management.save_failed')}: ${getErrorMessage(
@@ -473,6 +526,27 @@ export function PluginsPage() {
       ...current,
       values: { ...current.values, [fieldName]: value },
       errors: { ...current.errors, [fieldName]: '' },
+    }));
+  };
+
+  const updateArrayField = (fieldName: string, updater: (items: string[]) => string[]) => {
+    updateDraft((current) => {
+      const currentValue = current.values[fieldName];
+      const items = Array.isArray(currentValue) ? currentValue : [''];
+      return {
+        ...current,
+        values: { ...current.values, [fieldName]: updater(items) },
+        errors: { ...current.errors, [fieldName]: '' },
+      };
+    });
+  };
+
+  const handlePriorityChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    updateDraft((current) => ({
+      ...current,
+      priority: value,
+      errors: { ...current.errors, priority: '' },
     }));
   };
 
@@ -524,59 +598,122 @@ export function PluginsPage() {
       );
     }
 
-    const multiline = fieldType === 'array' || fieldType === 'object';
-    return (
-      <div key={field.name} className={styles.formField}>
-        <label htmlFor={`plugin-field-${field.name}`}>{field.name}</label>
-        {multiline ? (
+    if (fieldType === 'array') {
+      const items = Array.isArray(value) && value.length > 0 ? value : [''];
+      return (
+        <div key={field.name} className={styles.formField}>
+          <div className={styles.fieldLabel}>{field.name}</div>
+          <div className={styles.arrayEditor}>
+            {items.map((item, index) => (
+              <div key={`${field.name}-${index}`} className={styles.arrayItemRow}>
+                <input
+                  className={styles.arrayInput}
+                  aria-label={`${field.name} ${index + 1}`}
+                  value={item}
+                  onChange={(event) =>
+                    updateArrayField(field.name, (currentItems) =>
+                      currentItems.map((currentItem, currentIndex) =>
+                        currentIndex === index ? event.target.value : currentItem
+                      )
+                    )
+                  }
+                  placeholder={t('plugin_management.array_item_placeholder')}
+                />
+                <div className={styles.arrayActions}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={styles.iconButton}
+                    onClick={() =>
+                      updateArrayField(field.name, (currentItems) => [
+                        ...currentItems.slice(0, index + 1),
+                        '',
+                        ...currentItems.slice(index + 1),
+                      ])
+                    }
+                    title={t('plugin_management.add_array_item')}
+                    aria-label={t('plugin_management.add_array_item')}
+                  >
+                    <IconPlus size={16} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={styles.iconButton}
+                    onClick={() =>
+                      updateArrayField(field.name, (currentItems) =>
+                        currentItems.length <= 1
+                          ? ['']
+                          : currentItems.filter((_, currentIndex) => currentIndex !== index)
+                      )
+                    }
+                    title={t('plugin_management.remove_array_item')}
+                    aria-label={t('plugin_management.remove_array_item')}
+                  >
+                    <IconTrash2 size={16} />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {field.description ? <div className={styles.fieldHint}>{field.description}</div> : null}
+          {errorText ? <div className={styles.fieldError}>{errorText}</div> : null}
+        </div>
+      );
+    }
+
+    if (fieldType === 'object') {
+      return (
+        <div key={field.name} className={styles.formField}>
+          <label htmlFor={`plugin-field-${field.name}`}>{field.name}</label>
           <textarea
             id={`plugin-field-${field.name}`}
             className={styles.textarea}
             value={textValue}
             onChange={handleFieldTextChange(field.name)}
+            placeholder="{}"
             spellCheck={false}
           />
-        ) : (
-          <Input
-            id={`plugin-field-${field.name}`}
-            value={textValue}
-            onChange={handleFieldTextChange(field.name)}
-          />
-        )}
-        {field.description ? <div className={styles.fieldHint}>{field.description}</div> : null}
-        {errorText ? <div className={styles.fieldError}>{errorText}</div> : null}
-      </div>
+          {field.description ? <div className={styles.fieldHint}>{field.description}</div> : null}
+          {errorText ? <div className={styles.fieldError}>{errorText}</div> : null}
+        </div>
+      );
+    }
+
+    return (
+      <Input
+        key={field.name}
+        id={`plugin-field-${field.name}`}
+        label={field.name}
+        value={textValue}
+        onChange={handleFieldTextChange(field.name)}
+        inputMode={fieldType === 'integer' || fieldType === 'number' ? 'decimal' : undefined}
+        hint={field.description || undefined}
+        error={errorText || undefined}
+      />
     );
   };
 
-  const configModalTitle = editingPlugin
-    ? t('plugin_management.config_title', { name: getPluginTitle(editingPlugin) })
-    : t('plugin_management.edit_config');
+  const savingConfig = Boolean(editingPlugin && mutatingID === editingPlugin.id);
 
   return (
     <div className={styles.page}>
+      {/* ── Page Header ── */}
       <div className={styles.pageHeader}>
-        <div>
-          <h1 className={styles.title}>{t('plugin_management.title')}</h1>
-          <p className={styles.description}>{t('plugin_management.description')}</p>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={loadPlugins}
-          disabled={!connected || loading}
-          loading={loading}
-          leftIcon={<IconRefreshCw size={16} />}
-        >
-          {t('plugin_management.refresh')}
-        </Button>
+        <h1 className={styles.title}>{t('plugin_management.title')}</h1>
+        <p className={styles.description}>{t('plugin_management.description')}</p>
       </div>
 
+      {/* ── Alerts ── */}
       {error ? <div className={styles.errorBox}>{error}</div> : null}
+
       {data && !data.pluginsEnabled ? (
         <div className={styles.warningBox}>{t('plugin_management.global_disabled_hint')}</div>
       ) : null}
 
+      {/* ── Status Bar ── */}
       {data ? (
         <div className={styles.statusBar}>
           <div className={styles.statusPill}>
@@ -592,25 +729,38 @@ export function PluginsPage() {
                 : t('plugin_management.global_disabled')}
             </span>
           </div>
+
           <span className={styles.statusDivider} />
+
           <div className={styles.statusPill}>
             <span className={styles.statusLabel}>{t('plugin_management.plugins_dir')}</span>
-            <span className={`${styles.statusValue} ${styles.statusPathValue}`}>
+            <span
+              className={`${styles.statusValue} ${styles.statusPathValue}`}
+              title={data.pluginsDir || 'plugins'}
+            >
               {data.pluginsDir || 'plugins'}
             </span>
           </div>
+
           <span className={styles.statusDivider} />
+
           <div className={styles.statusPill}>
             <span className={styles.statusLabel}>{t('plugin_management.discovered')}</span>
             <span className={styles.statusValue}>{pluginStats.discovered}</span>
           </div>
+
+          <span className={styles.statusDivider} />
+
           <div className={styles.statusPill}>
             <span className={styles.statusLabel}>{t('plugin_management.effective')}</span>
-            <span className={styles.statusValue}>{pluginStats.effective}</span>
+            <span className={styles.statusValue}>
+              {pluginStats.effective}/{pluginStats.registered}
+            </span>
           </div>
         </div>
       ) : null}
 
+      {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
         <Input
           type="search"
@@ -620,11 +770,26 @@ export function PluginsPage() {
           aria-label={t('plugin_management.search_label')}
           rightElement={<IconSearch size={16} />}
         />
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={loadPlugins}
+          disabled={!connected || loading || Boolean(mutatingID || deletingID)}
+          loading={loading}
+        >
+          <IconRefreshCw size={16} />
+          {t('plugin_management.refresh')}
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => navigate('/plugin-store')}>
+          <IconSidebarStore size={16} />
+          {t('plugin_store.title')}
+        </Button>
       </div>
 
+      {/* ── Plugin List ── */}
       {loading ? (
         <div className={styles.pluginList}>
-          {Array.from({ length: 5 }, (_, index) => (
+          {Array.from({ length: 4 }, (_, index) => (
             <div key={index} className={styles.skeletonRow}>
               <div className={styles.skeletonAvatar} />
               <div className={styles.skeletonText}>
@@ -635,115 +800,126 @@ export function PluginsPage() {
           ))}
         </div>
       ) : visiblePlugins.length === 0 ? (
-        !error ? (
-          <EmptyState
-            title={t('plugin_management.no_plugins')}
-            description={t('plugin_management.no_plugins_desc')}
-            action={
-              <Button variant="secondary" size="sm" onClick={loadPlugins} disabled={!connected}>
-                {t('plugin_management.refresh')}
-              </Button>
-            }
-          />
-        ) : null
+        <EmptyState
+          title={t('plugin_management.no_plugins')}
+          description={t('plugin_management.no_plugins_desc')}
+          action={
+            <Button variant="secondary" size="sm" onClick={loadPlugins} disabled={!connected}>
+              <IconRefreshCw size={16} />
+              {t('plugin_management.refresh')}
+            </Button>
+          }
+        />
       ) : (
         <div className={styles.pluginList}>
           {visiblePlugins.map((plugin) => {
-            const title = getPluginTitle(plugin);
             const logo = resolvePluginAsset(plugin.logo || plugin.metadata?.logo || '');
-            const repositoryURL = buildRepositoryURL(plugin.metadata?.githubRepository ?? '');
-            const isMutating = mutatingID === plugin.id;
-            const isOpeningConfig = openingConfigID === plugin.id;
+            const github = plugin.metadata?.githubRepository.trim();
+            const openingConfig = openingConfigID === plugin.id;
+            const deletingPlugin = deletingID === plugin.id;
+            const actionBusy = Boolean(mutatingID || openingConfigID || deletingID);
+            const version = plugin.metadata?.version;
+            const author = plugin.metadata?.author;
 
             return (
               <article key={plugin.id} className={styles.pluginRow}>
+                {/* Logo */}
                 <div className={styles.logoBox} aria-hidden="true">
                   <PluginCardLogo src={logo} />
                 </div>
+
+                {/* Info */}
                 <div className={styles.pluginInfo}>
                   <div className={styles.pluginName}>
-                    <h2>{title}</h2>
-                    <span
-                      className={
-                        plugin.effectiveEnabled ? styles.badgeSuccess : styles.badgeMuted
-                      }
-                    >
-                      {plugin.effectiveEnabled
-                        ? t('plugin_management.status_effective')
-                        : t('plugin_management.status_inactive')}
-                    </span>
-                  </div>
-                  <div className={styles.pluginId}>{plugin.id}</div>
-                  <div className={styles.pluginMeta}>
-                    {plugin.metadata?.version ? (
-                      <span className={styles.metaItem}>
-                        <strong>{t('plugin_management.version_label')}</strong>
-                        {plugin.metadata.version}
+                    <h2>{getPluginTitle(plugin)}</h2>
+                    <div className={styles.badgeRow}>
+                      <span
+                        className={
+                          plugin.effectiveEnabled ? styles.badgeSuccess : styles.badgeMuted
+                        }
+                      >
+                        {plugin.effectiveEnabled
+                          ? t('plugin_management.status_effective')
+                          : t('plugin_management.status_inactive')}
                       </span>
-                    ) : null}
-                    {plugin.metadata?.author ? (
-                      <span className={styles.metaItem}>
-                        <strong>{t('plugin_management.author_label')}</strong>
-                        {plugin.metadata.author}
+                      <span className={plugin.registered ? styles.badge : styles.badgeWarning}>
+                        {plugin.registered
+                          ? t('plugin_management.registered')
+                          : t('plugin_management.not_registered')}
                       </span>
-                    ) : null}
-                    {plugin.path ? (
-                      <span className={`${styles.metaItem} ${styles.metaPath}`}>
-                        <strong>{t('plugin_management.path_label')}</strong>
-                        {plugin.path}
+                      <span className={plugin.configured ? styles.badge : styles.badgeMuted}>
+                        {plugin.configured
+                          ? t('plugin_management.configured')
+                          : t('plugin_management.not_configured')}
                       </span>
-                    ) : null}
+                      {plugin.supportsOAuth ? (
+                        <span className={styles.badge}>{t('plugin_management.oauth')}</span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className={styles.badgeRow}>
-                    <span className={plugin.configured ? styles.badgeSuccess : styles.badgeMuted}>
-                      {plugin.configured
-                        ? t('plugin_management.configured')
-                        : t('plugin_management.not_configured')}
-                    </span>
-                    <span className={plugin.registered ? styles.badgeSuccess : styles.badgeWarning}>
-                      {plugin.registered
-                        ? t('plugin_management.registered')
-                        : t('plugin_management.not_registered')}
-                    </span>
-                    {plugin.supportsOAuth ? (
-                      <span className={styles.badge}>{t('plugin_management.oauth')}</span>
-                    ) : null}
-                  </div>
-                  {plugin.menus.length > 0 ? (
-                    <div className={styles.resourceLinks}>
-                      {plugin.menus.map((menu, index) => (
-                        <a
-                          key={`${plugin.id}-${index}`}
-                          href={`#${buildPluginResourceRoute(plugin.id, index)}`}
-                          className={styles.resourceLink}
+
+                  <span className={styles.pluginId}>{plugin.id}</span>
+
+                  {version || author || plugin.path ? (
+                    <div className={styles.pluginMeta}>
+                      {version ? (
+                        <span className={styles.metaItem}>
+                          <strong>{version}</strong>
+                        </span>
+                      ) : null}
+                      {version && author ? (
+                        <span className={styles.metaDot} aria-hidden="true" />
+                      ) : null}
+                      {author ? <span className={styles.metaItem}>{author}</span> : null}
+                      {(version || author) && plugin.path ? (
+                        <span className={styles.metaDot} aria-hidden="true" />
+                      ) : null}
+                      {plugin.path ? (
+                        <span
+                          className={`${styles.metaItem} ${styles.metaPath}`}
+                          title={plugin.path}
                         >
-                          {menu.menu || menu.path || t('plugin_management.open_resource')}
-                        </a>
-                      ))}
+                          {plugin.path}
+                        </span>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
+
+                {/* Actions */}
                 <div className={styles.rowActions}>
                   <ToggleSwitch
                     checked={plugin.enabled}
-                    disabled={!connected || Boolean(mutatingID || deletingID)}
                     onChange={(enabled) => handleTogglePlugin(plugin, enabled)}
-                    ariaLabel={title}
+                    disabled={!connected || actionBusy}
+                    ariaLabel={t('plugin_management.enabled')}
                   />
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => openConfigModal(plugin)}
-                    disabled={!connected || Boolean(mutatingID || deletingID || openingConfigID)}
-                    loading={isOpeningConfig}
-                    leftIcon={<IconSettings size={14} />}
+                    onClick={() => openConfigSheet(plugin)}
+                    disabled={!connected || actionBusy}
+                    loading={openingConfig}
                   >
+                    <IconSettings size={14} />
                     {t('plugin_management.edit_config')}
                   </Button>
-                  {repositoryURL ? (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDeletePlugin(plugin)}
+                    disabled={!connected || actionBusy}
+                    loading={deletingPlugin}
+                    title={t('plugin_management.delete_plugin')}
+                    aria-label={t('plugin_management.delete_plugin')}
+                  >
+                    <IconTrash2 size={14} />
+                    {t('plugin_management.delete_plugin')}
+                  </Button>
+                  {github ? (
                     <a
                       className={styles.iconLink}
-                      href={repositoryURL}
+                      href={github}
                       target="_blank"
                       rel="noreferrer"
                       title={t('plugin_management.open_repository')}
@@ -752,18 +928,6 @@ export function PluginsPage() {
                       <IconGithub size={14} />
                     </a>
                   ) : null}
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    iconOnly
-                    onClick={() => handleDeletePlugin(plugin)}
-                    disabled={!connected || Boolean(mutatingID || deletingID || openingConfigID)}
-                    loading={isMutating && deletingID === plugin.id}
-                    title={t('plugin_management.delete_plugin')}
-                    aria-label={t('plugin_management.delete_plugin')}
-                  >
-                    <IconTrash2 size={14} />
-                  </Button>
                 </div>
               </article>
             );
@@ -771,26 +935,30 @@ export function PluginsPage() {
         </div>
       )}
 
-      <Modal
-        open={Boolean(editingPlugin)}
-        onClose={closeConfigModal}
-        closeDisabled={Boolean(mutatingID || openingConfigID)}
-        title={configModalTitle}
-        width={620}
+      {/* ── Config Sheet ── */}
+      <Sheet
+        open={Boolean(editingPlugin && draft)}
+        onClose={closeConfigSheet}
+        size="lg"
+        title={
+          editingPlugin
+            ? t('plugin_management.config_title', { name: getPluginTitle(editingPlugin) })
+            : t('plugin_management.edit_config')
+        }
+        description={editingPlugin?.id}
+        closeDisabled={savingConfig}
         footer={
-          <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={closeConfigModal} disabled={Boolean(mutatingID)}>
+          <div className={styles.sheetFooter}>
+            <Button variant="secondary" onClick={closeConfigSheet} disabled={savingConfig}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSaveConfig} loading={Boolean(mutatingID)}>
+            <Button onClick={handleSaveConfig} loading={savingConfig}>
               {t('common.save')}
             </Button>
           </div>
         }
       >
-        {!draft || !editingPlugin ? (
-          <div className={styles.loadingText}>{t('common.loading')}</div>
-        ) : (
+        {draft && editingPlugin ? (
           <div className={styles.configForm}>
             <section className={styles.formSection}>
               <h3>{t('plugin_management.base_settings')}</h3>
@@ -803,38 +971,30 @@ export function PluginsPage() {
                 </div>
                 <ToggleSwitch
                   checked={draft.enabled}
-                  onChange={(enabled) =>
-                    updateDraft((current) => ({ ...current, enabled }))
-                  }
+                  onChange={(enabled) => updateDraft((current) => ({ ...current, enabled }))}
                   ariaLabel={t('plugin_management.enabled')}
                 />
               </div>
               <Input
                 label={t('plugin_management.priority')}
                 value={draft.priority}
-                onChange={(event) =>
-                  updateDraft((current) => ({
-                    ...current,
-                    priority: event.target.value,
-                    errors: { ...current.errors, priority: '' },
-                  }))
-                }
-                error={draft.errors.priority}
+                onChange={handlePriorityChange}
+                inputMode="numeric"
+                error={draft.errors.priority || undefined}
               />
             </section>
+
             <section className={styles.formSection}>
               <h3>{t('plugin_management.config_fields')}</h3>
-              {editingPlugin.configFields.length === 0 ? (
-                <div className={styles.emptyConfig}>
-                  {t('plugin_management.no_config_fields')}
-                </div>
-              ) : (
+              {editingPlugin.configFields.length > 0 ? (
                 editingPlugin.configFields.map((field) => renderFieldEditor(field))
+              ) : (
+                <div className={styles.emptyConfig}>{t('plugin_management.no_config_fields')}</div>
               )}
             </section>
           </div>
-        )}
-      </Modal>
+        ) : null}
+      </Sheet>
     </div>
   );
 }

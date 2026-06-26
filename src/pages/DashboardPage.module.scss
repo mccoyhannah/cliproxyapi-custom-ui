@@ -12,6 +12,57 @@
   position: relative;
 }
 
+// ─── Decorative Background Orbs ─────────────────────────
+
+.backgroundOrbs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  opacity: 0.42;
+  filter: blur(16px);
+}
+
+.orb1 {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary-color) 6%, transparent),
+    transparent 70%
+  );
+  top: -140px;
+  right: -80px;
+  animation: orbFloat 22s ease-in-out infinite alternate;
+}
+
+.orb2 {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--success-color) 4%, transparent),
+    transparent 70%
+  );
+  bottom: 18%;
+  left: -100px;
+  animation: orbFloat 28s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes orbFloat {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(30px, -20px) scale(1.1);
+  }
+}
+
 // ─── Hero Welcome Section ───────────────────────────────
 
 .hero {
@@ -231,10 +282,11 @@
 
 .bentoGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  gap: $spacing-md;
 
-  @media (max-width: 1100px) {
+  @media (max-width: 900px) {
     grid-template-columns: repeat(2, 1fr);
   }
 
@@ -247,7 +299,6 @@
   display: flex;
   flex-direction: column;
   gap: $spacing-md;
-  min-height: 158px;
   padding: $spacing-lg;
   background: linear-gradient(
     145deg,
@@ -278,9 +329,10 @@
   }
 }
 
-// First card keeps a subtle accent without breaking the operational grid.
+// First card spans 2 rows — the "hero stat"
 .bentoLarge {
-  justify-content: flex-start;
+  grid-row: 1 / 3;
+  justify-content: center;
   background: linear-gradient(
     160deg,
     color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary)),
@@ -288,15 +340,17 @@
   );
 
   .bentoValue {
-    font-size: 32px;
+    font-size: 44px;
   }
 
   .bentoIcon {
-    width: 44px;
-    height: 44px;
+    width: 56px;
+    height: 56px;
   }
 
   @media (max-width: 900px) {
+    grid-row: auto;
+
     .bentoValue {
       font-size: 32px;
     }
@@ -370,18 +424,15 @@
 .configPill {
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  min-width: 0;
-  min-height: 36px;
-  padding: 0;
+  gap: $spacing-sm;
+  padding: 6px 14px;
   background: color-mix(in srgb, var(--bg-primary) 68%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-color) 68%, transparent);
-  border-radius: $radius-md;
+  border-radius: $radius-full;
   --glass-blur: 10px;
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   font-size: 13px;
-  overflow: hidden;
   transition: border-color $transition-fast;
 
   &:hover {
@@ -395,23 +446,11 @@
 }
 
 .configPillLabel {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  padding: 0 10px;
-  border-right: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 58%, transparent);
   color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .configPillValue {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  justify-content: center;
-  min-width: 0;
-  padding: 0 11px;
   font-weight: 600;
   color: var(--text-primary);
 
@@ -425,11 +464,6 @@
 }
 
 .configPillMono {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  min-width: 0;
-  padding: 0 11px;
   font-size: 12px;
   font-family: $font-mono;
   color: var(--text-secondary);
@@ -441,11 +475,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: stretch;
-  min-width: 0;
-  padding: 0 11px;
-  border-radius: 0;
-  border: 0;
+  padding: 2px 8px;
+  border-radius: $radius-full;
+  border: 1px solid var(--border-color);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.2;
@@ -531,1077 +563,5 @@
   }
   50% {
     opacity: 0.5;
-  }
-}
-
-// Operations-console polish.
-.dashboard {
-  max-width: 1080px;
-  gap: clamp($spacing-lg, 2.4vw, $spacing-xl);
-}
-
-.hero {
-  align-items: center;
-  min-height: 178px;
-  padding: 34px $spacing-xl;
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--ops-surface-1) 94%, transparent),
-      color-mix(in srgb, var(--ops-surface-2) 82%, transparent)
-    ),
-    linear-gradient(90deg, color-mix(in srgb, var(--ops-accent) 7%, transparent), transparent 42%);
-  border-color: color-mix(in srgb, var(--ops-border-subtle) 78%, transparent);
-  box-shadow: var(--ops-panel-shadow);
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-top: 3px solid color-mix(in srgb, var(--ops-accent) 56%, transparent);
-    pointer-events: none;
-  }
-}
-
-.heroWatermark {
-  right: $spacing-xl;
-  left: auto;
-  max-width: 58%;
-  overflow: hidden;
-  font-size: 96px;
-  opacity: 0.035;
-}
-
-.heroGreeting {
-  color: var(--ops-accent-strong);
-  font-family: $font-mono;
-  font-size: 12px;
-}
-
-.heroTitle {
-  font-size: 42px;
-  color: var(--ops-ink);
-}
-
-.heroCaring {
-  max-width: 560px;
-  color: var(--ops-ink-muted);
-}
-
-.dateTimeBlock {
-  padding: 10px 12px;
-  border: 1px solid var(--ops-border-subtle);
-  border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--ops-surface-1) 78%, transparent);
-}
-
-.connectionPill {
-  border-color: color-mix(in srgb, var(--ops-success) 28%, var(--ops-border-subtle));
-  background: color-mix(in srgb, var(--ops-success) 9%, var(--ops-surface-1));
-}
-
-.statusDot.connected {
-  background: var(--ops-success);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ops-success) 14%, transparent);
-}
-
-.sectionHeading {
-  color: var(--ops-ink-muted);
-  font-family: $font-mono;
-  font-size: 11px;
-}
-
-.bentoGrid {
-  gap: 14px;
-}
-
-.bentoCard {
-  position: relative;
-  min-height: 168px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.4), rgb(255 255 255 / 0)), var(--ops-surface-1);
-  border-color: var(--ops-border-subtle);
-  box-shadow: var(--ops-panel-shadow);
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 16px;
-    bottom: 16px;
-    left: 0;
-    width: 3px;
-    border-radius: $radius-full;
-    background: color-mix(in srgb, var(--ops-accent) 42%, transparent);
-  }
-}
-
-.bentoLarge {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--ops-accent) 10%, transparent), transparent 48%),
-    linear-gradient(
-      155deg,
-      color-mix(in srgb, var(--ops-accent) 10%, var(--ops-surface-1)),
-      var(--ops-surface-1)
-    );
-
-  .bentoValue {
-    font-size: 50px;
-  }
-}
-
-.bentoIcon {
-  background: color-mix(in srgb, var(--ops-accent) 12%, var(--ops-surface-2));
-  color: var(--ops-accent-strong);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ops-accent) 18%, transparent);
-}
-
-.bentoLabel {
-  color: var(--ops-ink-muted);
-  font-weight: 650;
-}
-
-.bentoSublabel {
-  color: var(--text-tertiary);
-  opacity: 1;
-}
-
-.configPill {
-  min-height: 34px;
-  background: var(--ops-surface-1);
-  border-color: var(--ops-border-subtle);
-  box-shadow: var(--ops-control-shadow);
-
-  &:hover {
-    background: var(--ops-surface-2);
-    border-color: var(--ops-border-strong);
-  }
-}
-
-.configPillValue.on {
-  color: var(--ops-success);
-}
-
-.configBadgeRoundRobin {
-  color: var(--ops-accent-strong);
-  border-color: color-mix(in srgb, var(--ops-accent) 32%, transparent);
-  background: var(--ops-accent-soft);
-}
-
-.viewMoreLink {
-  color: var(--ops-accent-strong);
-  font-weight: 700;
-}
-
-@media (max-width: $breakpoint-mobile) {
-  .dashboard {
-    gap: $spacing-lg;
-  }
-
-  .hero {
-    min-height: auto;
-    padding: $spacing-lg;
-  }
-
-  .heroWatermark {
-    display: none;
-  }
-
-  .heroTitle {
-    font-size: 32px;
-  }
-
-  .bentoLarge .bentoValue {
-    font-size: 38px;
-  }
-
-  .heroMeta {
-    width: 100%;
-  }
-
-  .dateTimeBlock {
-    align-items: flex-start;
-  }
-
-  .bentoCard {
-    min-height: 132px;
-    padding: $spacing-lg;
-  }
-
-  .configPill {
-    width: 100%;
-    justify-content: space-between;
-    border-radius: $radius-md;
-  }
-}
-
-// Second-round cold operations console slice.
-.dashboard {
-  --cold-accent: #38bdf8;
-  --cold-accent-strong: #0284c7;
-  --cold-accent-soft: rgb(56 189 248 / 0.11);
-  --cold-mint: #5eead4;
-  --cold-warning: #f59e0b;
-  --cold-danger: #f87171;
-  --cold-ink: color-mix(in srgb, var(--ops-ink) 88%, #05324b);
-  --cold-muted: color-mix(in srgb, var(--ops-ink-muted) 88%, #25637d);
-  --cold-surface: color-mix(in srgb, var(--ops-surface-1) 84%, #e7f4fb);
-  --cold-surface-2: color-mix(in srgb, var(--ops-surface-2) 82%, #eaf7fb);
-  --cold-border: color-mix(in srgb, var(--ops-border-subtle) 72%, var(--cold-accent));
-  width: 100%;
-  max-width: min(1120px, 100%);
-  overflow-x: hidden;
-  isolation: isolate;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -28px -18px;
-    z-index: -1;
-    border-radius: $radius-lg;
-    background:
-      linear-gradient(90deg, rgb(56 189 248 / 0.05) 1px, transparent 1px),
-      linear-gradient(180deg, rgb(56 189 248 / 0.04) 1px, transparent 1px);
-    background-size: 44px 44px;
-    pointer-events: none;
-  }
-}
-
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(190px, auto);
-  gap: $spacing-xl;
-  border-radius: $radius-lg;
-  background:
-    linear-gradient(90deg, rgb(56 189 248 / 0.12), transparent 46%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.54), rgb(255 255 255 / 0.08)), var(--cold-surface);
-  border-color: var(--cold-border);
-  box-shadow:
-    0 30px 82px -58px rgb(2 28 44 / 0.62),
-    inset 0 1px 0 rgb(255 255 255 / 0.58);
-
-  &::before {
-    border-top-color: color-mix(in srgb, var(--cold-accent) 72%, transparent);
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: auto $spacing-xl $spacing-lg;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgb(56 189 248 / 0.26), transparent);
-    pointer-events: none;
-  }
-}
-
-.heroContent,
-.heroMeta {
-  min-width: 0;
-}
-
-.heroWatermark {
-  color: var(--cold-accent-strong);
-  font-family: $font-mono;
-  opacity: 0.055;
-}
-
-.heroGreeting {
-  color: var(--cold-accent-strong);
-}
-
-.heroTitle {
-  color: var(--cold-ink);
-  overflow-wrap: anywhere;
-}
-
-.heroCaring {
-  color: var(--cold-muted);
-}
-
-.heroSignalGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: $spacing-sm;
-  width: min(100%, 720px);
-  margin-top: $spacing-md;
-}
-
-.heroSignal {
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--cold-accent) 24%, var(--ops-border-subtle));
-  border-radius: $radius-md;
-  background: color-mix(in srgb, var(--cold-accent) 7%, var(--ops-surface-1));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.42);
-}
-
-.signalLabel,
-.signalValue {
-  display: block;
-  min-width: 0;
-}
-
-.signalLabel {
-  color: var(--cold-muted);
-  font-family: $font-mono;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.signalValue {
-  margin-top: 6px;
-  color: var(--cold-ink);
-  font-family: $font-mono;
-  font-size: 12px;
-  font-weight: 750;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.heroMeta {
-  justify-self: end;
-  align-self: stretch;
-  justify-content: center;
-}
-
-.dateTimeBlock {
-  border-color: color-mix(in srgb, var(--cold-accent) 24%, var(--ops-border-subtle));
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.34), rgb(255 255 255 / 0.06)), var(--cold-surface-2);
-}
-
-.time,
-.buildDate,
-.versionText {
-  font-family: $font-mono;
-}
-
-.time {
-  color: var(--cold-ink);
-}
-
-.date,
-.buildDate {
-  color: var(--cold-muted);
-}
-
-.connectionPill {
-  min-height: 32px;
-  border-radius: $radius-md;
-  font-family: $font-mono;
-  font-weight: 800;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.36);
-}
-
-.connectionConnected {
-  border-color: rgb(20 184 166 / 0.28);
-  background: rgb(20 184 166 / 0.1);
-  color: #0f766e;
-}
-
-.connectionConnecting {
-  border-color: rgb(245 158 11 / 0.3);
-  background: rgb(245 158 11 / 0.1);
-  color: #9a5a00;
-}
-
-.connectionDisconnected {
-  border-color: rgb(248 113 113 / 0.3);
-  background: rgb(248 113 113 / 0.1);
-  color: #b42323;
-}
-
-.connectionStateText,
-.versionText {
-  min-width: 0;
-}
-
-.connectionStateText {
-  overflow-wrap: anywhere;
-}
-
-.versionText {
-  padding-left: 8px;
-  margin-left: 2px;
-  border-left: 1px solid currentColor;
-  opacity: 0.84;
-}
-
-.sectionHeading {
-  color: var(--cold-muted);
-}
-
-.bentoGrid {
-  min-width: 0;
-}
-
-.bentoCard {
-  min-width: 0;
-  overflow: hidden;
-  border-color: var(--cold-border);
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.46), rgb(255 255 255 / 0.08)), var(--cold-surface);
-  box-shadow:
-    0 24px 70px -54px rgb(2 28 44 / 0.56),
-    inset 0 1px 0 rgb(255 255 255 / 0.56);
-
-  &::before {
-    background: linear-gradient(180deg, var(--cold-accent), var(--cold-mint));
-  }
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--cold-accent) 42%, var(--ops-border-strong));
-  }
-}
-
-.bentoLarge {
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--cold-accent) 12%, transparent),
-      transparent 52%
-    ),
-    linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.08)), var(--cold-surface);
-}
-
-.bentoIcon {
-  background: color-mix(in srgb, var(--cold-accent) 12%, var(--ops-surface-2));
-  color: var(--cold-accent-strong);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cold-accent) 22%, transparent);
-}
-
-.bentoCard:hover .bentoIcon {
-  background: color-mix(in srgb, var(--cold-accent) 18%, var(--ops-surface-2));
-}
-
-.bentoContent {
-  min-width: 0;
-}
-
-.bentoValue {
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  color: var(--cold-ink);
-  overflow-wrap: anywhere;
-}
-
-.bentoLabel {
-  color: var(--cold-muted);
-}
-
-.bentoSublabel {
-  overflow-wrap: anywhere;
-}
-
-.valueSkeleton,
-.sublabelSkeleton {
-  display: inline-block;
-  max-width: 100%;
-  border-radius: $radius-sm;
-  background:
-    linear-gradient(90deg, transparent, rgb(255 255 255 / 0.46), transparent),
-    color-mix(in srgb, var(--cold-accent) 13%, var(--ops-surface-3));
-  background-size:
-    180% 100%,
-    auto;
-  animation: skeletonScan 1.25s ease-in-out infinite;
-}
-
-.valueSkeleton {
-  width: 76px;
-  height: 34px;
-}
-
-.sublabelSkeleton {
-  width: min(190px, 72%);
-  height: 12px;
-  margin-top: 6px;
-}
-
-.bentoLarge .valueSkeleton {
-  width: 104px;
-  height: 54px;
-}
-
-.configPill {
-  min-width: 0;
-  border-radius: $radius-md;
-  border-color: var(--cold-border);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent),
-    color-mix(in srgb, var(--cold-surface) 94%, var(--ops-surface-2));
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 13%, transparent),
-    0 10px 22px -22px color-mix(in srgb, var(--cold-accent) 34%, transparent);
-}
-
-.configPillLabel {
-  min-height: 34px;
-  color: var(--cold-muted);
-  background: color-mix(in srgb, var(--ops-surface-2) 76%, transparent);
-  border-right-color: color-mix(in srgb, var(--cold-border) 76%, transparent);
-}
-
-.configPillValue,
-.configPillMono,
-.configBadge {
-  display: inline-flex;
-  align-items: center;
-  align-self: stretch;
-  min-height: 34px;
-  padding: 0 11px;
-  font-family: $font-mono;
-  font-size: 12px;
-  font-weight: 780;
-  font-variant-numeric: tabular-nums;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
-    color-mix(in srgb, var(--ops-surface-1) 82%, var(--ops-surface-2));
-}
-
-.configPillValue.on,
-.configPillValue.off {
-  gap: 6px;
-
-  &::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex: 0 0 auto;
-  }
-}
-
-.configPillValue.on {
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 14%, transparent), transparent),
-    color-mix(in srgb, var(--ops-success) 10%, var(--ops-surface-1));
-  color: color-mix(in srgb, var(--ops-success) 78%, var(--text-primary));
-
-  &::before {
-    background: var(--cold-mint);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ops-success) 14%, transparent);
-  }
-}
-
-.configPillValue.off {
-  background: color-mix(in srgb, #64748b 8%, var(--ops-surface-1));
-  color: var(--cold-muted);
-
-  &::before {
-    background: #94a3b8;
-  }
-}
-
-.configPillMono {
-  color: var(--cold-ink);
-  overflow-wrap: anywhere;
-  justify-content: flex-start;
-}
-
-.configBadge {
-  gap: 6px;
-  border-radius: 0;
-  font-family: $font-mono;
-  border-left: 0;
-
-  &::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    flex: 0 0 auto;
-  }
-}
-
-.configBadgeRoundRobin {
-  color: var(--cold-accent-strong);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, #fff 12%, transparent), transparent),
-    color-mix(in srgb, var(--cold-accent) 12%, var(--ops-surface-1));
-}
-
-.configBadgeFillFirst {
-  color: color-mix(in srgb, var(--ops-success) 78%, var(--text-primary));
-  background: color-mix(in srgb, var(--ops-success) 10%, var(--ops-surface-1));
-}
-
-.configBadgeUnknown {
-  color: var(--cold-muted);
-  background: color-mix(in srgb, #64748b 8%, var(--ops-surface-1));
-}
-
-.viewMoreLink {
-  color: var(--cold-accent-strong);
-}
-
-@keyframes skeletonScan {
-  0% {
-    background-position:
-      140% 0,
-      0 0;
-  }
-  100% {
-    background-position:
-      -60% 0,
-      0 0;
-  }
-}
-
-@media (max-width: $breakpoint-tablet) {
-  .hero {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .heroMeta {
-    justify-self: stretch;
-    align-items: flex-start;
-    flex-direction: row;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .heroSignalGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: $breakpoint-mobile) {
-  .dashboard {
-    max-width: 100%;
-
-    &::before {
-      inset: -20px -12px;
-      background-size: 36px 36px;
-    }
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: $spacing-lg;
-  }
-
-  .heroSignalGrid,
-  .bentoGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .heroMeta {
-    width: 100%;
-    align-items: stretch;
-  }
-
-  .dateTimeBlock,
-  .connectionPill {
-    width: 100%;
-  }
-
-  .connectionPill {
-    justify-content: flex-start;
-  }
-
-  .bentoValue {
-    min-height: 34px;
-  }
-
-  .bentoLarge .valueSkeleton {
-    width: 86px;
-    height: 42px;
-  }
-
-  .configPill {
-    min-width: 0;
-  }
-}
-
-// Worker 3 page-level polish: quiet grid, separators and consistent state surface.
-.dashboardState:global(.empty-state) {
-  min-height: 118px;
-  border: 1px solid color-mix(in srgb, var(--danger-color) 30%, var(--border-color));
-  border-left: 3px solid var(--danger-color);
-  border-radius: $radius-lg;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--danger-color) 8%, transparent),
-      transparent 48%
-    ),
-    var(--ops-surface-1);
-  box-shadow: var(--ops-control-shadow);
-}
-
-.dashboardState :global(.empty-content) {
-  min-width: 0;
-}
-
-.dashboardState :global(.empty-icon) {
-  border-color: color-mix(in srgb, var(--danger-color) 28%, var(--border-color));
-  background: color-mix(in srgb, var(--danger-color) 9%, var(--ops-surface-1));
-  color: var(--danger-color);
-}
-
-.heroSignal:nth-child(2) {
-  border-color: color-mix(in srgb, var(--ops-success) 22%, var(--ops-border-subtle));
-  background: color-mix(in srgb, var(--ops-success) 5%, var(--ops-surface-1));
-}
-
-.heroSignal:nth-child(3) {
-  border-color: color-mix(in srgb, var(--ops-warning) 22%, var(--ops-border-subtle));
-  background: color-mix(in srgb, var(--ops-warning) 5%, var(--ops-surface-1));
-}
-
-.bentoCard:nth-child(2)::before {
-  background: linear-gradient(
-    180deg,
-    var(--ops-success),
-    color-mix(in srgb, var(--ops-success) 45%, transparent)
-  );
-}
-
-.bentoCard:nth-child(3)::before {
-  background: linear-gradient(
-    180deg,
-    var(--ops-warning),
-    color-mix(in srgb, var(--ops-warning) 45%, transparent)
-  );
-}
-
-.bentoCard:nth-child(4)::before {
-  background: linear-gradient(
-    180deg,
-    var(--ops-info),
-    color-mix(in srgb, var(--ops-info) 45%, transparent)
-  );
-}
-
-@media (max-width: $breakpoint-mobile) {
-  .dashboardState:global(.empty-state) {
-    min-height: 104px;
-  }
-}
-
-// Final developer-console convergence: neutral data surfaces and restrained accents.
-.dashboard {
-  --cold-accent: #64748b;
-  --cold-accent-strong: #334155;
-  --cold-accent-soft: rgb(100 116 139 / 0.1);
-  --cold-mint: #64748b;
-  --cold-warning: var(--ops-warning);
-  --cold-danger: var(--ops-danger);
-  --cold-ink: var(--text-primary);
-  --cold-muted: var(--text-secondary);
-  --cold-surface: var(--surface-card);
-  --cold-surface-2: var(--surface-panel);
-  --cold-border: var(--border-base);
-  max-width: min(1120px, 100%);
-
-  &::before {
-    inset: -22px -16px;
-    border-radius: var(--radius-card);
-    background:
-      linear-gradient(90deg, color-mix(in srgb, var(--border-base) 36%, transparent) 1px, transparent 1px),
-      linear-gradient(180deg, color-mix(in srgb, var(--border-base) 30%, transparent) 1px, transparent 1px);
-    background-size: 48px 48px;
-    opacity: 0.42;
-  }
-}
-
-.hero {
-  min-height: 164px;
-  padding: 28px;
-  border: 1px solid var(--border-base);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
-  box-shadow: var(--shadow);
-
-  &::before {
-    border-top: 2px solid color-mix(in srgb, var(--primary-color) 52%, var(--border-base));
-  }
-
-  &::after {
-    display: none;
-  }
-}
-
-.heroWatermark {
-  color: var(--text-primary);
-  opacity: 0.026;
-}
-
-.heroGreeting,
-.sectionHeading,
-.signalLabel,
-.signalValue,
-.time,
-.buildDate,
-.versionText,
-.bentoValue,
-.configPillValue,
-.configPillMono,
-.configBadge {
-  font-family: $font-mono;
-  font-variant-numeric: tabular-nums;
-}
-
-.heroGreeting {
-  color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.heroTitle {
-  color: var(--text-primary);
-  font-size: clamp(32px, 4.2vw, 42px);
-}
-
-.heroCaring,
-.bentoLabel,
-.bentoSublabel,
-.signalLabel,
-.date,
-.buildDate {
-  color: var(--text-secondary);
-}
-
-.heroSignalGrid {
-  gap: 10px;
-}
-
-.heroSignal,
-.dateTimeBlock {
-  border: 1px solid var(--border-base);
-  border-radius: var(--radius-md);
-  background: var(--surface-panel);
-  box-shadow: none;
-}
-
-.heroSignal {
-  padding: 10px 12px;
-}
-
-.signalLabel {
-  color: var(--text-tertiary);
-  font-size: 10px;
-}
-
-.signalValue {
-  color: var(--text-primary);
-  font-size: 12px;
-}
-
-.dateTimeBlock {
-  min-width: 180px;
-  padding: 10px 12px;
-}
-
-.time {
-  color: var(--text-primary);
-  font-size: 21px;
-}
-
-.connectionPill {
-  min-height: 32px;
-  border-radius: var(--radius-md);
-  box-shadow: none;
-}
-
-.connectionConnected {
-  border-color: var(--status-success-border);
-  background: var(--status-success-bg);
-  color: var(--status-success-text);
-}
-
-.connectionConnecting {
-  border-color: var(--status-warning-border);
-  background: var(--status-warning-bg);
-  color: var(--status-warning-text);
-}
-
-.connectionDisconnected {
-  border-color: var(--status-error-border);
-  background: var(--status-error-bg);
-  color: var(--status-error-text);
-}
-
-.sectionHeading {
-  margin-bottom: 10px;
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-.bentoGrid {
-  gap: 12px;
-}
-
-.bentoCard {
-  min-height: 148px;
-  padding: 20px;
-  border: 1px solid var(--border-base);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
-  box-shadow: var(--shadow);
-
-  &::before {
-    top: 14px;
-    bottom: 14px;
-    width: 2px;
-    background: color-mix(in srgb, var(--primary-color) 54%, var(--border-base));
-  }
-
-  &:hover {
-    border-color: var(--border-hover);
-    background: var(--surface-card-hover);
-    box-shadow: var(--shadow-card);
-    transform: translateY(-1px);
-  }
-}
-
-.bentoLarge {
-  background:
-    linear-gradient(90deg, color-mix(in srgb, var(--primary-color) 8%, transparent), transparent 48%),
-    var(--surface-card);
-
-  .bentoValue {
-    font-size: 48px;
-  }
-}
-
-.bentoIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-  color: var(--text-secondary);
-  box-shadow: inset 0 0 0 1px var(--border-secondary);
-}
-
-.bentoCard:hover .bentoIcon {
-  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
-  color: var(--primary-color);
-}
-
-.bentoValue {
-  min-height: 34px;
-  color: var(--text-primary);
-  font-size: 28px;
-  font-weight: 780;
-}
-
-.bentoLabel {
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.valueSkeleton,
-.sublabelSkeleton {
-  background:
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--bg-surface) 68%, transparent), transparent),
-    color-mix(in srgb, var(--text-primary) 7%, var(--surface-panel));
-}
-
-.dashboardState:global(.empty-state) {
-  border-color: var(--status-error-border);
-  border-left: 2px solid var(--danger-color);
-  border-radius: var(--radius-card);
-  background: var(--surface-card);
-  box-shadow: var(--shadow);
-}
-
-.heroSignal:nth-child(2),
-.heroSignal:nth-child(3) {
-  border-color: var(--border-base);
-  background: var(--surface-panel);
-}
-
-.bentoCard:nth-child(2)::before {
-  background: color-mix(in srgb, var(--ops-success) 58%, var(--border-base));
-}
-
-.bentoCard:nth-child(3)::before {
-  background: color-mix(in srgb, var(--ops-warning) 58%, var(--border-base));
-}
-
-.bentoCard:nth-child(4)::before {
-  background: color-mix(in srgb, var(--ops-info) 58%, var(--border-base));
-}
-
-.configPill {
-  min-height: 34px;
-  border: 1px solid var(--border-base);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
-  box-shadow: none;
-
-  &:hover {
-    background: var(--surface-card-hover);
-    border-color: var(--border-hover);
-  }
-}
-
-.configPillLabel {
-  min-height: 34px;
-  border-right-color: var(--border-base);
-  background: var(--surface-panel);
-  color: var(--text-secondary);
-}
-
-.configPillValue,
-.configPillMono,
-.configBadge {
-  min-height: 34px;
-  background: var(--surface-card);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.configPillValue.on {
-  background: var(--status-success-bg);
-  color: var(--status-success-text);
-}
-
-.configPillValue.off,
-.configBadgeUnknown {
-  background: var(--status-neutral-bg);
-  color: var(--status-neutral-text);
-}
-
-.configBadgeRoundRobin {
-  background: var(--status-info-bg);
-  color: var(--status-info-text);
-}
-
-.configBadgeFillFirst {
-  background: var(--status-success-bg);
-  color: var(--status-success-text);
-}
-
-.viewMoreLink {
-  color: var(--primary-color);
-  font-weight: 650;
-}
-
-@media (max-width: $breakpoint-mobile) {
-  .dashboard::before {
-    opacity: 0.28;
-  }
-
-  .hero {
-    padding: 20px;
-  }
-
-  .dateTimeBlock {
-    min-width: 0;
-  }
-
-  .bentoCard {
-    min-height: 128px;
-    padding: 18px;
-  }
-
-  .bentoLarge .bentoValue {
-    font-size: 38px;
   }
 }

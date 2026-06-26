@@ -1,5 +1,142 @@
 import type { ProviderBrand } from './types';
-import type { ProviderDescriptor } from './types';
+
+export interface ProviderDescriptor {
+  id: ProviderBrand;
+  supportsName: boolean;
+  supportsApiKey: boolean;
+  supportsDisabled: boolean;
+  supportsBaseUrl: boolean;
+  baseUrlRequired: boolean;
+  supportsProxyUrl: boolean;
+  supportsPrefix: boolean;
+  supportsModels: boolean;
+  supportsHeaders: boolean;
+  supportsExcludedModels: boolean;
+  supportsPriority: boolean;
+  supportsTestModel: boolean;
+  supportsWebsockets: boolean;
+  supportsCloak: boolean;
+  supportsApiKeyEntries: boolean;
+  /** Sheet 默认宽度 */
+  sheetSize: 'md' | 'lg' | 'xl';
+}
+
+export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
+  gemini: {
+    id: 'gemini',
+    supportsName: false,
+    supportsApiKey: true,
+    supportsDisabled: true,
+    supportsBaseUrl: true,
+    baseUrlRequired: false,
+    supportsProxyUrl: true,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: true,
+    supportsPriority: true,
+    supportsTestModel: true,
+    supportsWebsockets: false,
+    supportsCloak: false,
+    supportsApiKeyEntries: false,
+    sheetSize: 'md',
+  },
+  codex: {
+    id: 'codex',
+    supportsName: false,
+    supportsApiKey: true,
+    supportsDisabled: true,
+    supportsBaseUrl: true,
+    baseUrlRequired: true,
+    supportsProxyUrl: true,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: true,
+    supportsPriority: true,
+    supportsTestModel: true,
+    supportsWebsockets: true,
+    supportsCloak: false,
+    supportsApiKeyEntries: false,
+    sheetSize: 'md',
+  },
+  claude: {
+    id: 'claude',
+    supportsName: false,
+    supportsApiKey: true,
+    supportsDisabled: true,
+    supportsBaseUrl: true,
+    baseUrlRequired: false,
+    supportsProxyUrl: true,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: true,
+    supportsPriority: true,
+    supportsTestModel: true,
+    supportsWebsockets: false,
+    supportsCloak: true,
+    supportsApiKeyEntries: false,
+    sheetSize: 'md',
+  },
+  vertex: {
+    id: 'vertex',
+    supportsName: false,
+    supportsApiKey: true,
+    supportsDisabled: true,
+    supportsBaseUrl: true,
+    baseUrlRequired: false,
+    supportsProxyUrl: true,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: true,
+    supportsPriority: true,
+    supportsTestModel: false,
+    supportsWebsockets: false,
+    supportsCloak: false,
+    supportsApiKeyEntries: false,
+    sheetSize: 'md',
+  },
+  openaiCompatibility: {
+    id: 'openaiCompatibility',
+    supportsName: true,
+    supportsApiKey: false,
+    supportsDisabled: true,
+    supportsBaseUrl: true,
+    baseUrlRequired: true,
+    supportsProxyUrl: false,
+    supportsPrefix: true,
+    supportsModels: true,
+    supportsHeaders: true,
+    supportsExcludedModels: false,
+    supportsPriority: true,
+    supportsTestModel: true,
+    supportsWebsockets: false,
+    supportsCloak: false,
+    supportsApiKeyEntries: true,
+    sheetSize: 'lg',
+  },
+  apikeyFun: {
+    id: 'apikeyFun',
+    supportsName: false,
+    supportsApiKey: true,
+    supportsDisabled: true,
+    supportsBaseUrl: false,
+    baseUrlRequired: false,
+    supportsProxyUrl: true,
+    supportsPrefix: true,
+    supportsModels: false,
+    supportsHeaders: false,
+    supportsExcludedModels: false,
+    supportsPriority: true,
+    supportsTestModel: false,
+    supportsWebsockets: false,
+    supportsCloak: false,
+    supportsApiKeyEntries: false,
+    sheetSize: 'md',
+  },
+};
 
 export const PROVIDER_BRAND_ORDER: ProviderBrand[] = [
   'gemini',
@@ -7,47 +144,5 @@ export const PROVIDER_BRAND_ORDER: ProviderBrand[] = [
   'claude',
   'vertex',
   'openaiCompatibility',
+  'apikeyFun',
 ];
-
-export const PROVIDER_DESCRIPTORS: Record<ProviderBrand, ProviderDescriptor> = {
-  gemini: {
-    id: 'gemini',
-    label: 'Gemini',
-    description: 'Gemini API key resources',
-    supportsModelDiscovery: true,
-    supportsConnectivityTest: false,
-    supportsDisableCooling: true,
-  },
-  codex: {
-    id: 'codex',
-    label: 'Codex',
-    description: 'Codex Responses API resources',
-    supportsModelDiscovery: true,
-    supportsConnectivityTest: true,
-    supportsDisableCooling: true,
-  },
-  claude: {
-    id: 'claude',
-    label: 'Claude',
-    description: 'Claude Messages API resources',
-    supportsModelDiscovery: true,
-    supportsConnectivityTest: false,
-    supportsDisableCooling: true,
-  },
-  vertex: {
-    id: 'vertex',
-    label: 'Vertex',
-    description: 'Vertex AI resources',
-    supportsModelDiscovery: false,
-    supportsConnectivityTest: false,
-    supportsDisableCooling: false,
-  },
-  openaiCompatibility: {
-    id: 'openaiCompatibility',
-    label: 'OpenAI Compatible',
-    description: 'OpenAI-compatible upstream resources',
-    supportsModelDiscovery: true,
-    supportsConnectivityTest: false,
-    supportsDisableCooling: true,
-  },
-};

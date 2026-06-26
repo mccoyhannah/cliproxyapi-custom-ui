@@ -1,18 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import {
-  IconGithub,
-  IconBookOpen,
-  IconExternalLink,
-  IconCode,
-  IconRefreshCw,
-  IconBot,
-} from '@/components/ui/icons';
-import { useCliProxyBackendRestart } from '@/hooks/useCliProxyBackendRestart';
+import { IconGithub, IconBookOpen, IconExternalLink, IconCode } from '@/components/ui/icons';
 import {
   useAuthStore,
   useConfigStore,
@@ -20,9 +12,9 @@ import {
   useModelsStore,
   useThemeStore,
 } from '@/stores';
-import { configApi } from '@/services/api';
-import { apiKeysApi } from '@/services/api/apiKeys';
-import { CLI_PROXY_BACKEND_CONTROL_WAKE_URL } from '@/services/api/cliProxyBackendControl';
+import { configApi, versionApi } from '@/services/api';
+import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
+import { formatDateTimeValue } from '@/utils/format';
 import { classifyModels } from '@/utils/models';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
@@ -35,6 +27,7 @@ import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconGlm from '@/assets/icons/glm.svg';
 import iconGrok from '@/assets/icons/grok.svg';
+import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconDeepseek from '@/assets/icons/deepseek.svg';
 import iconMinimax from '@/assets/icons/minimax.svg';
 import styles from './SystemPage.module.scss';
@@ -46,22 +39,35 @@ const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: strin
   qwen: iconQwen,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
   glm: iconGlm,
-  grok: iconGrok,
+  grok: { light: iconGrok, dark: iconGrokDark },
   deepseek: iconDeepseek,
   minimax: iconMinimax,
 };
 
-const isBackendControlOfflineMessage = (message: string): boolean => {
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes('failed to fetch') ||
-    normalized.includes('fetch failed') ||
-    normalized.includes('networkerror') ||
-    normalized.includes('network request failed') ||
-    normalized.includes('load failed') ||
-    normalized.includes('connection refused') ||
-    normalized.includes('err_connection_refused')
-  );
+const parseVersionSegments = (version?: string | null) => {
+  if (!version) return null;
+  const cleaned = version.trim().replace(/^v/i, '');
+  if (!cleaned) return null;
+  const parts = cleaned
+    .split(/[^0-9]+/)
+    .filter(Boolean)
+    .map((segment) => Number.parseInt(segment, 10))
+    .filter(Number.isFinite);
+  return parts.length ? parts : null;
+};
+
+const compareVersions = (latest?: string | null, current?: string | null) => {
+  const latestParts = parseVersionSegments(latest);
+  const currentParts = parseVersionSegments(current);
+  if (!latestParts || !currentParts) return null;
+  const length = Math.max(latestParts.length, currentParts.length);
+  for (let i = 0; i < length; i++) {
+    const l = latestParts[i] || 0;
+    const c = currentParts[i] || 0;
+    if (l > c) return 1;
+    if (l < c) return -1;
+  }
+  return 0;
 };
 
 export function SystemPage() {
@@ -73,16 +79,6 @@ export function SystemPage() {
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
   const updateConfigValue = useConfigStore((state) => state.updateConfigValue);
-  const {
-    status: backendControlStatus,
-    error: backendControlError,
-    loading: backendControlLoading,
-    waking: backendControlWaking,
-    restarting: backendRestarting,
-    loadStatus: loadBackendControlStatus,
-    wake: wakeBackendControl,
-    restartBackend,
-  } = useCliProxyBackendRestart();
 
   const models = useModelsStore((state) => state.models);
   const modelsLoading = useModelsStore((state) => state.loading);
@@ -97,8 +93,8 @@ export function SystemPage() {
   const [requestLogDraft, setRequestLogDraft] = useState(false);
   const [requestLogTouched, setRequestLogTouched] = useState(false);
   const [requestLogSaving, setRequestLogSaving] = useState(false);
+  const [checkingVersion, setCheckingVersion] = useState(false);
 
-  const apiKeysCache = useRef<string[]>([]);
   const versionTapCount = useRef(0);
   const versionTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,30 +109,8 @@ export function SystemPage() {
 
   const appVersion = __APP_VERSION__ || t('system_info.version_unknown');
   const apiVersion = auth.serverVersion || t('system_info.version_unknown');
-  const buildTime = auth.serverBuildDate
-    ? new Date(auth.serverBuildDate).toLocaleString(i18n.language)
-    : t('system_info.version_unknown');
-  const backendControlOnline = Boolean(backendControlStatus);
-  const backendRunning = backendControlStatus?.backendRunning === true;
-  const showWakeBackendControlButton = !backendControlOnline;
-  const backendControlBusy = backendControlLoading || backendControlWaking || backendRestarting;
-  const backendControlErrorText = backendControlError
-    ? isBackendControlOfflineMessage(backendControlError)
-      ? t('backend_control.offline_fetch_error')
-      : backendControlError
-    : '';
-  const backendControlStatusText = backendRestarting
-    ? t('backend_control.status_restarting')
-    : backendControlWaking
-      ? t('backend_control.status_waking')
-      : backendControlOnline
-        ? t('backend_control.status_online')
-        : t('backend_control.status_offline');
-  const backendStatusText = backendRestarting
-    ? t('backend_control.status_restarting')
-    : backendRunning
-      ? t('backend_control.backend_running')
-      : t('backend_control.backend_offline');
+  const buildTime =
+    formatDateTimeValue(auth.serverBuildDate, i18n.language) || t('system_info.version_unknown');
 
   const getIconForCategory = (categoryId: string): string | null => {
     const iconEntry = MODEL_CATEGORY_ICONS[categoryId];
@@ -145,54 +119,7 @@ export function SystemPage() {
     return resolvedTheme === 'dark' ? iconEntry.dark : iconEntry.light;
   };
 
-  const normalizeApiKeyList = (input: unknown): string[] => {
-    if (!Array.isArray(input)) return [];
-    const seen = new Set<string>();
-    const keys: string[] = [];
-
-    input.forEach((item) => {
-      const record =
-        item !== null && typeof item === 'object' && !Array.isArray(item)
-          ? (item as Record<string, unknown>)
-          : null;
-      const value =
-        typeof item === 'string'
-          ? item
-          : record
-            ? (record['api-key'] ?? record['apiKey'] ?? record.key ?? record.Key)
-            : '';
-      const trimmed = String(value ?? '').trim();
-      if (!trimmed || seen.has(trimmed)) return;
-      seen.add(trimmed);
-      keys.push(trimmed);
-    });
-
-    return keys;
-  };
-
-  const resolveApiKeysForModels = useCallback(async () => {
-    if (apiKeysCache.current.length) {
-      return apiKeysCache.current;
-    }
-
-    const configKeys = normalizeApiKeyList(config?.apiKeys);
-    if (configKeys.length) {
-      apiKeysCache.current = configKeys;
-      return configKeys;
-    }
-
-    try {
-      const list = await apiKeysApi.list();
-      const normalized = normalizeApiKeyList(list);
-      if (normalized.length) {
-        apiKeysCache.current = normalized;
-      }
-      return normalized;
-    } catch (err) {
-      console.warn('Auto loading API keys for models failed:', err);
-      return [];
-    }
-  }, [config?.apiKeys]);
+  const resolveApiKeysForModels = useApiKeysForModels();
 
   const fetchModels = async ({ forceRefresh = false }: { forceRefresh?: boolean } = {}) => {
     if (auth.connectionStatus !== 'connected') {
@@ -208,13 +135,9 @@ export function SystemPage() {
       return;
     }
 
-    if (forceRefresh) {
-      apiKeysCache.current = [];
-    }
-
     setModelStatus({ type: 'muted', message: t('system_info.models_loading') });
     try {
-      const apiKeys = await resolveApiKeysForModels();
+      const apiKeys = await resolveApiKeysForModels({ force: forceRefresh });
       const primaryKey = apiKeys[0];
       const list = await fetchModelsFromStore(auth.apiBase, primaryKey, forceRefresh);
       const hasModels = list.length > 0;
@@ -247,30 +170,6 @@ export function SystemPage() {
       },
     });
   };
-
-  const handleBackendRestart = useCallback(() => {
-    showConfirmation({
-      title: t('backend_control.restart_title'),
-      message: t('backend_control.restart_confirm'),
-      variant: 'secondary',
-      confirmText: t('backend_control.restart_button'),
-      cancelText: t('common.cancel'),
-      onConfirm: async () => {
-        await restartBackend();
-      },
-    });
-  }, [restartBackend, showConfirmation, t]);
-
-  const handleBackendControlWake = useCallback(
-    (event: MouseEvent<HTMLAnchorElement>) => {
-      if (backendControlBusy) {
-        event.preventDefault();
-        return;
-      }
-      void wakeBackendControl({ force: true, notify: true, launch: false });
-    },
-    [backendControlBusy, wakeBackendControl]
-  );
 
   const openRequestLogModal = useCallback(() => {
     setRequestLogTouched(false);
@@ -331,6 +230,39 @@ export function SystemPage() {
     }
   };
 
+  const handleVersionCheck = useCallback(async () => {
+    setCheckingVersion(true);
+    try {
+      const data = await versionApi.checkLatest();
+      const latestRaw = data?.['latest-version'] ?? data?.latest_version ?? data?.latest ?? '';
+      const latest = typeof latestRaw === 'string' ? latestRaw : String(latestRaw ?? '');
+      const comparison = compareVersions(latest, auth.serverVersion);
+
+      if (!latest) {
+        showNotification(t('system_info.version_check_error'), 'error');
+        return;
+      }
+
+      if (comparison === null) {
+        showNotification(t('system_info.version_current_missing'), 'warning');
+        return;
+      }
+
+      if (comparison > 0) {
+        showNotification(t('system_info.version_update_available', { version: latest }), 'warning');
+      } else {
+        showNotification(t('system_info.version_is_latest'), 'success');
+      }
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+      const suffix = message ? `: ${message}` : '';
+      showNotification(`${t('system_info.version_check_error')}${suffix}`, 'error');
+    } finally {
+      setCheckingVersion(false);
+    }
+  }, [auth.serverVersion, showNotification, t]);
+
   useEffect(() => {
     fetchConfig().catch(() => {
       // ignore
@@ -381,6 +313,18 @@ export function SystemPage() {
             <div className={styles.infoTile}>
               <div className={styles.tileHeader}>
                 <div className={styles.tileLabel}>{t('footer.api_version')}</div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={styles.tileAction}
+                  onClick={() => void handleVersionCheck()}
+                  loading={checkingVersion}
+                  title={t('system_info.version_check_button')}
+                  aria-label={t('system_info.version_check_button')}
+                >
+                  {t('system_info.version_check_button')}
+                </Button>
               </div>
               <div className={styles.tileValue}>{apiVersion}</div>
             </div>
@@ -394,121 +338,6 @@ export function SystemPage() {
               <div className={styles.tileLabel}>{t('connection.status')}</div>
               <div className={styles.tileValue}>{t(`common.${auth.connectionStatus}_status`)}</div>
               <div className={styles.tileSub}>{auth.apiBase || '-'}</div>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          title={t('backend_control.card_title')}
-          extra={
-            <div className={styles.maintenanceActions}>
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={<IconRefreshCw size={15} />}
-                onClick={() => void loadBackendControlStatus()}
-                loading={backendControlLoading}
-                disabled={backendControlBusy}
-              >
-                {t('common.refresh')}
-              </Button>
-              {showWakeBackendControlButton && (
-                <a
-                  className="btn btn-secondary btn-sm"
-                  href={CLI_PROXY_BACKEND_CONTROL_WAKE_URL}
-                  onClick={handleBackendControlWake}
-                  aria-label={t('backend_control.wake_button_aria')}
-                  aria-busy={backendControlWaking || undefined}
-                  aria-disabled={backendControlBusy || undefined}
-                >
-                  {backendControlWaking ? (
-                    <span className="loading-spinner" aria-hidden="true" />
-                  ) : (
-                    <span className="btn-icon">
-                      <IconBot size={15} />
-                    </span>
-                  )}
-                  <span className="btn-label">
-                    {backendControlWaking
-                      ? t('backend_control.status_waking')
-                      : t('backend_control.wake_button')}
-                  </span>
-                </a>
-              )}
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={<IconRefreshCw size={15} />}
-                onClick={handleBackendRestart}
-                loading={backendRestarting}
-                disabled={
-                  auth.connectionStatus !== 'connected' ||
-                  backendRestarting ||
-                  backendControlWaking
-                }
-              >
-                {t('backend_control.restart_button')}
-              </Button>
-            </div>
-          }
-        >
-          <p className={styles.sectionDescription}>{t('backend_control.card_desc')}</p>
-          {backendControlErrorText && <div className="error-box">{backendControlErrorText}</div>}
-          <div className={styles.maintenanceGrid}>
-            <div className={styles.maintenanceTile}>
-              <span className={styles.maintenanceLabel}>
-                {t('backend_control.helper_status')}
-              </span>
-              <strong
-                className={`${styles.maintenanceValue} ${
-                  backendControlOnline ? styles.statusGood : styles.statusMuted
-                }`}
-              >
-                {backendControlStatusText}
-              </strong>
-              <span className={styles.maintenanceMeta}>
-                {backendControlStatus
-                  ? `127.0.0.1:${backendControlStatus.port}`
-                  : t('backend_control.wake_hint_offline')}
-              </span>
-            </div>
-            <div className={styles.maintenanceTile}>
-              <span className={styles.maintenanceLabel}>
-                {t('backend_control.backend_status')}
-              </span>
-              <strong
-                className={`${styles.maintenanceValue} ${
-                  backendRunning ? styles.statusGood : styles.statusMuted
-                }`}
-              >
-                {backendStatusText}
-              </strong>
-              <span className={styles.maintenanceMeta}>127.0.0.1:8317</span>
-            </div>
-            <div className={styles.maintenanceTile}>
-              <span className={styles.maintenanceLabel}>{t('backend_control.backend_pid')}</span>
-              <strong className={styles.maintenanceValue}>
-                {backendControlStatus?.backendPid ?? '-'}
-              </strong>
-              <span className={styles.maintenanceMeta}>
-                {backendControlStatus?.backendStartedAt
-                  ? new Date(backendControlStatus.backendStartedAt).toLocaleString(i18n.language)
-                  : t('system_info.version_unknown')}
-              </span>
-            </div>
-            <div className={styles.maintenanceTile}>
-              <span className={styles.maintenanceLabel}>{t('backend_control.backend_path')}</span>
-              <strong
-                className={`${styles.maintenanceValue} ${styles.maintenancePath}`}
-                title={backendControlStatus?.backendPath ?? ''}
-              >
-                {backendControlStatus?.backendPath ?? '-'}
-              </strong>
-              <span className={styles.maintenanceMeta}>
-                {backendControlStatus?.backendPathMatches
-                  ? t('backend_control.path_verified')
-                  : t('backend_control.path_unverified')}
-              </span>
             </div>
           </div>
         </Card>

@@ -59,6 +59,10 @@ import {
 import { AuthFileCard } from '@/features/authFiles/components/AuthFileCard';
 import { AuthFileModelsModal } from '@/features/authFiles/components/AuthFileModelsModal';
 import { AuthFilesPrefixProxyEditorModal } from '@/features/authFiles/components/AuthFilesPrefixProxyEditorModal';
+import {
+  AuthFilesStatusFilterCard,
+  type AuthFilesStatusFilterOption,
+} from '@/features/authFiles/components/AuthFilesStatusFilterCard';
 import { OAuthExcludedCard } from '@/features/authFiles/components/OAuthExcludedCard';
 import { OAuthModelAliasCard } from '@/features/authFiles/components/OAuthModelAliasCard';
 import { useAuthFilesData } from '@/features/authFiles/hooks/useAuthFilesData';
@@ -168,6 +172,8 @@ const ACCOUNT_MEMO_LINK_LIMIT = 8;
 const ACCOUNT_MEMO_AUTH_TIME_HISTORY_VISIBLE_LIMIT = 8;
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
 const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
+
+type AuthFilesStatusFilterMode = 'all' | 'enabled' | 'disabled' | 'problem';
 
 const formatCodexOAuthShortcutRemaining = (remainingMs: number) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -4433,6 +4439,56 @@ export function AuthFilesPage() {
   ).length;
   const problemFileCount = files.filter(hasAuthFileStatusMessage).length;
   const runtimeOnlyFileCount = files.length - manageableFileCount;
+  const statusFilterMode: AuthFilesStatusFilterMode = problemOnly
+    ? 'problem'
+    : disabledOnly
+      ? 'disabled'
+      : enabledOnly
+        ? 'enabled'
+        : 'all';
+  const statusFilterOptions: AuthFilesStatusFilterOption[] = [
+    {
+      value: 'all',
+      label: t('auth_files.status_filter_all', {
+        count: files.length,
+        defaultValue: `全部 ${files.length}`,
+      }),
+    },
+    {
+      value: 'enabled',
+      label: t('auth_files.status_filter_enabled', {
+        count: enabledFileCount,
+        defaultValue: `启用 ${enabledFileCount}`,
+      }),
+    },
+    {
+      value: 'disabled',
+      label: t('auth_files.status_filter_disabled', {
+        count: disabledFileCount,
+        defaultValue: `停用 ${disabledFileCount}`,
+      }),
+    },
+    {
+      value: 'problem',
+      label: t('auth_files.status_filter_problem', {
+        count: problemFileCount,
+        defaultValue: `需关注 ${problemFileCount}`,
+      }),
+    },
+  ];
+  const handleStatusFilterModeChange = useCallback(
+    (mode: string) => {
+      const nextMode = (
+        mode === 'enabled' || mode === 'disabled' || mode === 'problem' ? mode : 'all'
+      ) as AuthFilesStatusFilterMode;
+      setProblemOnly(nextMode === 'problem');
+      setEnabledOnly(nextMode === 'enabled');
+      setDisabledOnly(nextMode === 'disabled');
+      setPage(1);
+      refocusFileCardsAfterListViewChange();
+    },
+    [refocusFileCardsAfterListViewChange]
+  );
   const currentProviderLabel =
     filter === 'all'
       ? t('auth_files.summary_provider_all', { defaultValue: '全部渠道' })
@@ -5256,6 +5312,16 @@ export function AuthFilesPage() {
             </details>
 
             <div className={styles.filterControlsPanel}>
+              <div className={styles.statusFilterPanel}>
+                <AuthFilesStatusFilterCard
+                  label={t('auth_files.status_filter_label', { defaultValue: '状态筛选' })}
+                  minLabel={t('auth_files.status_filter_min', { defaultValue: '全部凭证' })}
+                  maxLabel={t('auth_files.status_filter_max', { defaultValue: '需关注' })}
+                  value={statusFilterMode}
+                  options={statusFilterOptions}
+                  onChange={handleStatusFilterModeChange}
+                />
+              </div>
               <div className={styles.filterControls}>
                 <div className={styles.filterItem}>
                   <label>{t('auth_files.search_label')}</label>

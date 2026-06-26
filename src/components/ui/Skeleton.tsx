@@ -1,10 +1,13 @@
-import type { HTMLAttributes } from 'react';
+import type { CSSProperties, HTMLAttributes } from 'react';
 
 export type SkeletonVariant = 'text' | 'card' | 'metric' | 'table' | 'auth-card' | 'config-panel';
 
 interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   variant?: SkeletonVariant;
   rows?: number;
+  width?: number | string;
+  height?: number | string;
+  rounded?: number | string;
 }
 
 const DEFAULT_ROWS: Record<SkeletonVariant, number> = {
@@ -16,13 +19,28 @@ const DEFAULT_ROWS: Record<SkeletonVariant, number> = {
   'config-panel': 5,
 };
 
-export function Skeleton({ variant = 'text', rows, className = '', ...rest }: SkeletonProps) {
+export function Skeleton({
+  variant = 'text',
+  rows,
+  width,
+  height,
+  rounded,
+  className = '',
+  style,
+  ...rest
+}: SkeletonProps) {
   const classes = ['skeleton', `skeleton-${variant}`, className].filter(Boolean).join(' ');
   const count = Math.max(1, Math.floor(rows ?? DEFAULT_ROWS[variant]));
+  const mergedStyle: CSSProperties = {
+    ...style,
+    width: width ?? style?.width,
+    height: height ?? style?.height,
+    borderRadius: rounded ?? style?.borderRadius,
+  };
 
   if (variant === 'table') {
     return (
-      <div className={classes} aria-hidden="true" {...rest}>
+      <div className={classes} style={mergedStyle} aria-hidden="true" {...rest}>
         {Array.from({ length: count }).map((_, index) => (
           <div className="skeleton-table-row" key={index}>
             <span />
@@ -35,7 +53,7 @@ export function Skeleton({ variant = 'text', rows, className = '', ...rest }: Sk
   }
 
   return (
-    <div className={classes} aria-hidden="true" {...rest}>
+    <div className={classes} style={mergedStyle} aria-hidden="true" {...rest}>
       {Array.from({ length: count }).map((_, index) => (
         <span className="skeleton-line" key={index} />
       ))}
