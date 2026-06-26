@@ -1,3 +1,5 @@
+@use '../../styles/variables' as *;
+
 .page {
   display: flex;
   width: 100%;
@@ -5,7 +7,7 @@
   min-width: 0;
   min-height: 0;
   flex: 1 1 auto;
-  background: #ffffff;
+  background: #fff;
 }
 
 .frame {
@@ -16,7 +18,7 @@
   min-width: 0;
   min-height: 0;
   border: 0;
-  background: #ffffff;
+  background: #fff;
 }
 
 .stateShell {

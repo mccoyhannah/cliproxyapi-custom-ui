@@ -7,18 +7,19 @@ const LOG_LEVEL_REGEX = /^\[?(trace|debug|info|warn|warning|error|fatal)\s*\]?(?
 const LOG_SOURCE_REGEX = /^\[([^\]]+)\]/;
 const LOG_LATENCY_REGEX =
   /\b(?:\d+(?:\.\d+)?\s*(?:µs|us|ms|s|m))(?:\s*\d+(?:\.\d+)?\s*(?:µs|us|ms|s|m))*\b/i;
-const PAYLOAD_SIZE_PATTERNS: RegExp[] = [
-  /\b(?:payload|body|request_body|request body|prompt|context)[_\s-]*(?:size|bytes|length)[:=\s]+(\d{4,})\b/i,
-  /\b(\d{4,})\s*(?:bytes|byte)\b/i,
-  /\b(\d+(?:\.\d+)?)\s*(KB|MB)\b/i,
-];
 const LOG_IPV4_REGEX = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const LOG_IPV6_REGEX = /\b(?:[a-f0-9]{0,4}:){2,7}[a-f0-9]{0,4}\b/i;
 const LOG_REQUEST_ID_REGEX = /^([a-f0-9]{8}|--------)$/i;
-const LOG_NAMED_REQUEST_ID_REGEX = /\brequest[_-]?id=([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\b/i;
 const LOG_TIME_OF_DAY_REGEX = /^\d{1,2}:\d{2}:\d{2}(?:\.\d{1,3})?$/;
 const GIN_TIMESTAMP_SEGMENT_REGEX =
   /^\[GIN\]\s+(\d{4})\/(\d{2})\/(\d{2})\s*-\s*(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s*$/;
+const CONTENT_LENGTH_PATTERNS: RegExp[] = [
+  /\bcontent-length\b(?:["'\s:=]|\[|\])+([0-9][\d,]*)/i,
+  /\bcontent_length\b(?:["'\s:=]|\[|\])+([0-9][\d,]*)/i,
+  /\brequest(?:[_\s-]?body)?[_\s-]?(?:bytes|length|size)\b(?:["'\s:=]|\[|\])+([0-9][\d,]*)/i,
+];
+const LARGE_PAYLOAD_BYTES = 1024 * 1024;
+const HUGE_PAYLOAD_BYTES = 3 * 1024 * 1024;
 
 const HTTP_STATUS_PATTERNS: RegExp[] = [
   /\|\s*([1-5]\d{2})\s*\|/,
@@ -71,15 +72,11 @@ const extractLatency = (text: string): string | undefined => {
 };
 
 const extractPayloadSizeBytes = (text: string): number | undefined => {
-  for (const pattern of PAYLOAD_SIZE_PATTERNS) {
+  for (const pattern of CONTENT_LENGTH_PATTERNS) {
     const match = text.match(pattern);
     if (!match) continue;
-    const value = Number(match[1]);
-    if (!Number.isFinite(value)) continue;
-    const unit = match[2]?.toUpperCase();
-    if (unit === 'MB') return Math.round(value * 1024 * 1024);
-    if (unit === 'KB') return Math.round(value * 1024);
-    return Math.round(value);
+    const parsed = Number.parseInt(match[1].replace(/,/g, ''), 10);
+    if (Number.isFinite(parsed) && parsed >= LARGE_PAYLOAD_BYTES) return parsed;
   }
   return undefined;
 };
@@ -105,14 +102,6 @@ const inferLogLevel = (line: string): LogLevel | undefined => {
   if (/\bdebug\b/.test(lowered)) return 'debug';
   if (/\btrace\b/.test(lowered)) return 'trace';
   return undefined;
-};
-
-const extractNamedRequestId = (text: string): string | undefined => {
-  const match = text.match(LOG_NAMED_REQUEST_ID_REGEX);
-  if (!match) return undefined;
-  const id = match[1];
-  if (/^-+$/.test(id)) return undefined;
-  return id;
 };
 
 const extractHttpMethodAndPath = (text: string): { method?: HttpMethod; path?: string } => {
@@ -162,10 +151,16 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
 
   let statusCode: number | undefined;
   let latency: string | undefined;
-  let payloadSizeBytes: number | undefined;
   let ip: string | undefined;
   let method: HttpMethod | undefined;
   let path: string | undefined;
+  const payloadSizeBytes = extractPayloadSizeBytes(raw);
+  const payloadSizeLevel =
+    payloadSizeBytes === undefined
+      ? undefined
+      : payloadSizeBytes >= HUGE_PAYLOAD_BYTES
+        ? 'huge'
+        : 'large';
   let message = remaining;
 
   if (remaining.includes('|')) {
@@ -192,24 +187,16 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
       }
     }
 
-    // request id
-    const requestIdIndex = segments.findIndex(
-      (segment) => LOG_REQUEST_ID_REGEX.test(segment) || Boolean(extractNamedRequestId(segment))
-    );
+    // request id (8-char hex or dashes)
+    const requestIdIndex = segments.findIndex((segment) => LOG_REQUEST_ID_REGEX.test(segment));
     if (requestIdIndex >= 0) {
-      const namedId = extractNamedRequestId(segments[requestIdIndex]);
-      if (namedId) {
-        requestId = namedId;
-        consumed.add(requestIdIndex);
-      } else {
-        const match = segments[requestIdIndex].match(LOG_REQUEST_ID_REGEX);
-        if (match) {
-          const id = match[1];
-          if (!/^-+$/.test(id)) {
-            requestId = id;
-          }
-          consumed.add(requestIdIndex);
+      const match = segments[requestIdIndex].match(LOG_REQUEST_ID_REGEX);
+      if (match) {
+        const id = match[1];
+        if (!/^-+$/.test(id)) {
+          requestId = id;
         }
+        consumed.add(requestIdIndex);
       }
     }
 
@@ -246,14 +233,6 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
       }
     }
 
-    const payloadSizeIndex = segments.findIndex((segment) =>
-      Boolean(extractPayloadSizeBytes(segment))
-    );
-    if (payloadSizeIndex >= 0) {
-      payloadSizeBytes = extractPayloadSizeBytes(segments[payloadSizeIndex]);
-      consumed.add(payloadSizeIndex);
-    }
-
     // method + path
     const methodIndex = segments.findIndex((segment) => {
       const { method: parsedMethod } = extractHttpMethodAndPath(segment);
@@ -283,17 +262,11 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
     const extracted = extractLatency(remaining);
     if (extracted) latency = extracted;
 
-    payloadSizeBytes = extractPayloadSizeBytes(remaining);
-
     ip = extractIp(remaining);
 
     const parsed = extractHttpMethodAndPath(remaining);
     method = parsed.method;
     path = parsed.path;
-
-    if (!requestId) {
-      requestId = extractNamedRequestId(remaining);
-    }
   }
 
   if (!level) level = inferLogLevel(raw);
@@ -317,12 +290,12 @@ export const parseLogLine = (raw: string): ParsedLogLine => {
     requestId,
     statusCode,
     latency,
-    payloadSizeBytes,
-    payloadSizeLevel:
-      payloadSizeBytes === undefined ? undefined : payloadSizeBytes >= 1024 * 1024 ? 'huge' : 'large',
     ip,
     method,
     path,
+    payloadSizeBytes,
+    payloadSizeLevel,
     message,
   };
 };
+

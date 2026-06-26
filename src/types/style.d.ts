@@ -5,3 +5,4 @@ declare module '*.module.scss' {
 
 // Global constants injected by Vite at build time
 declare const __APP_VERSION__: string;
+declare const __CUSTOM_UI_BUILD_ID__: string;

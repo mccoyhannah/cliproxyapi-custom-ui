@@ -19,3 +19,4 @@ export function downloadBlob({ filename, blob, revokeDelayMs = 1000 }: DownloadB
     link.remove();
   }, revokeDelayMs);
 }
+

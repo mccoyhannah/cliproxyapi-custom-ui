@@ -1,4 +1,13 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import type { ReactCodeMirrorRef } from '@uiw/react-codemirror';
@@ -15,17 +24,21 @@ import {
 } from '@/components/ui/icons';
 import { VisualConfigEditor } from '@/components/config/VisualConfigEditor';
 import { DiffModal } from '@/components/config/DiffModal';
+import { useCliProxyBackendRestart } from '@/hooks/useCliProxyBackendRestart';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useActionBarHeightVar } from '@/hooks/useActionBarHeightVar';
-import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
 import { useNotificationStore, useAuthStore, useThemeStore, useConfigStore } from '@/stores';
 import { configFileApi } from '@/services/api/configFile';
 import styles from './ConfigPage.module.scss';
 
 type ConfigEditorTab = 'visual' | 'source';
+type SourceYamlError = {
+  message: string;
+  line?: number;
+  col?: number;
+};
 
-const LazyConfigSourceEditor = lazy(() => import('@/components/config/ConfigSourceEditor'));
+const LazyYamlEditor = lazy(() => import('@/components/config/YamlEditor'));
 
 function readCommercialModeFromYaml(yamlContent: string): boolean {
   try {
@@ -46,6 +59,26 @@ function normalizeYamlForVisualDiff(yamlContent: string): string {
   }
 }
 
+function getSourceYamlError(yamlContent: string): SourceYamlError | null {
+  let sourceDocument: ReturnType<typeof parseDocument>;
+  try {
+    sourceDocument = parseDocument(yamlContent);
+  } catch (err: unknown) {
+    return {
+      message: err instanceof Error ? err.message : 'Invalid YAML',
+    };
+  }
+
+  const error = sourceDocument.errors[0];
+  if (!error) return null;
+  const firstLinePos = error.linePos?.[0];
+  return {
+    message: error.message,
+    line: firstLinePos?.line,
+    col: firstLinePos?.col,
+  };
+}
+
 export function ConfigPage() {
   const { t } = useTranslation();
   const pageTransitionLayer = usePageTransitionLayer();
@@ -55,6 +88,11 @@ export function ConfigPage() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const isMobile = useMediaQuery('(max-width: 768px)');
+  const {
+    restarting: backendRestarting,
+    waking: backendControlWaking,
+    restartBackend,
+  } = useCliProxyBackendRestart({ autoLoadStatus: false });
 
   const {
     visualValues,
@@ -99,21 +137,21 @@ export function ConfigPage() {
   const hasVisualValidationErrors =
     activeTab === 'visual' &&
     (Object.values(visualValidationErrors).some(Boolean) || visualHasPayloadValidationErrors);
-  const unsavedChangesDialog = useMemo(
-    () => ({
-      title: t('common.unsaved_changes_title'),
-      message: t('common.unsaved_changes_message'),
-      confirmText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-    }),
-    [t]
+  const sourceYamlError = useMemo(
+    () => (activeTab === 'source' ? getSourceYamlError(content) : null),
+    [activeTab, content]
   );
-
-  useUnsavedChangesGuard({
-    enabled: isCurrentLayer,
-    shouldBlock: isDirty,
-    dialog: unsavedChangesDialog,
-  });
+  const sourceYamlErrorDetail = sourceYamlError
+    ? sourceYamlError.line && sourceYamlError.col
+      ? t('config_management.source_yaml_invalid_with_position', {
+          defaultValue: 'Line {{line}}, column {{col}}: {{message}}',
+          line: sourceYamlError.line,
+          col: sourceYamlError.col,
+          message: sourceYamlError.message,
+        })
+      : sourceYamlError.message
+    : '';
+  const hasSourceYamlError = activeTab === 'source' && !!sourceYamlError;
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -185,6 +223,8 @@ export function ConfigPage() {
       showNotification(t('config_management.save_success'), 'success');
       if (commercialModeChanged) {
         showNotification(t('notification.commercial_mode_restart_required'), 'warning');
+      } else {
+        showNotification(t('backend_control.config_saved_restart_hint'), 'info');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '';
@@ -194,16 +234,26 @@ export function ConfigPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (activeTab === 'visual' && visualParseError) {
       showNotification(t('config_management.visual_mode_save_blocked'), 'error');
+      return;
+    }
+
+    if (hasSourceYamlError) {
+      showNotification(
+        t('config_management.source_yaml_invalid', {
+          defaultValue: '请先修复 YAML 语法错误再保存：{{message}}',
+          message: sourceYamlErrorDetail,
+        }),
+        'error'
+      );
       return;
     }
 
     setSaving(true);
     try {
       const latestServerYaml = await configFileApi.fetchConfigYaml();
-
       const visualBaseYaml = dirty ? content : latestServerYaml;
 
       if (activeTab !== 'source') {
@@ -236,8 +286,8 @@ export function ConfigPage() {
         }
       }
 
-      // In source mode, save exactly what the user edited. In visual mode, preserve the
-      // local source draft when it has unsaved edits so source-only backend fields are not dropped.
+      // In visual mode, preserve the local source draft when it has unsaved edits so
+      // source-only backend fields are not dropped.
       const nextMergedYaml =
         activeTab === 'source' ? content : applyVisualChangesToYaml(visualBaseYaml);
 
@@ -268,7 +318,37 @@ export function ConfigPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    activeTab,
+    applyVisualChangesToYaml,
+    content,
+    dirty,
+    hasSourceYamlError,
+    loadVisualValuesFromYaml,
+    showNotification,
+    sourceYamlErrorDetail,
+    t,
+    visualParseError,
+  ]);
+
+  useEffect(() => {
+    if (activeTab !== 'source' || !isCurrentLayer) return;
+
+    const handleSourceSaveShortcut = (event: KeyboardEvent) => {
+      const isSaveShortcut =
+        (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's';
+      if (!isSaveShortcut) return;
+
+      event.preventDefault();
+      if (loading || saving || disableControls || diffModalOpen) return;
+      void handleSave();
+    };
+
+    window.addEventListener('keydown', handleSourceSaveShortcut, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleSourceSaveShortcut, { capture: true });
+    };
+  }, [activeTab, diffModalOpen, disableControls, handleSave, isCurrentLayer, loading, saving]);
 
   const handleChange = useCallback((value: string) => {
     setContent(value);
@@ -419,11 +499,29 @@ export function ConfigPage() {
   }, [lastSearchedQuery, performSearch]);
 
   // Keep bottom floating actions from covering page content by syncing its height to a CSS variable.
-  useActionBarHeightVar(
-    floatingActionsRef,
-    '--config-action-bar-height',
-    shouldRenderFloatingActions
-  );
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined' || !shouldRenderFloatingActions) return;
+
+    const actionsEl = floatingActionsRef.current;
+    if (!actionsEl) return;
+
+    const updatePadding = () => {
+      const height = actionsEl.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--config-action-bar-height', `${height}px`);
+    };
+
+    updatePadding();
+    window.addEventListener('resize', updatePadding);
+
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePadding);
+    ro?.observe(actionsEl);
+
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', updatePadding);
+      document.documentElement.style.removeProperty('--config-action-bar-height');
+    };
+  }, [shouldRenderFloatingActions]);
 
   // Status text
   const getStatusText = () => {
@@ -431,6 +529,10 @@ export function ConfigPage() {
     if (loading) return t('config_management.status_loading');
     if (error) return t('config_management.status_load_failed');
     if (hasVisualModeError) return t('config_management.visual_mode_unavailable');
+    if (hasSourceYamlError)
+      return t('config_management.source_yaml_invalid_status', {
+        defaultValue: 'YAML syntax error',
+      });
     if (hasVisualValidationErrors)
       return t('config_management.visual.validation.validation_blocked');
     if (saving) return t('config_management.status_saving');
@@ -439,7 +541,8 @@ export function ConfigPage() {
   };
 
   const getStatusClass = () => {
-    if (error || hasVisualModeError || hasVisualValidationErrors) return styles.error;
+    if (error || hasVisualModeError || hasSourceYamlError || hasVisualValidationErrors)
+      return styles.error;
     if (isDirty) return styles.modified;
     if (!loading && !saving) return styles.saved;
     return '';
@@ -453,6 +556,8 @@ export function ConfigPage() {
     if (error) return t('config_management.status_load_failed_short', { defaultValue: 'Failed' });
     if (hasVisualModeError)
       return t('config_management.visual_mode_unavailable_short', { defaultValue: 'YAML issue' });
+    if (hasSourceYamlError)
+      return t('config_management.source_yaml_invalid_short', { defaultValue: 'YAML error' });
     if (hasVisualValidationErrors)
       return t('config_management.visual.validation_blocked_short', { defaultValue: 'Fix errors' });
     if (saving) return t('config_management.status_saving_short', { defaultValue: 'Saving' });
@@ -477,6 +582,19 @@ export function ConfigPage() {
       },
     });
   }, [isDirty, loadConfig, showConfirmation, t]);
+
+  const handleBackendRestart = useCallback(() => {
+    showConfirmation({
+      title: t('backend_control.restart_title'),
+      message: t('backend_control.restart_confirm'),
+      confirmText: t('backend_control.restart_button'),
+      cancelText: t('common.cancel'),
+      variant: 'secondary',
+      onConfirm: async () => {
+        await restartBackend();
+      },
+    });
+  }, [restartBackend, showConfirmation, t]);
 
   const floatingActions = (
     <div className={styles.floatingActionContainer} ref={floatingActionsRef}>
@@ -509,23 +627,44 @@ export function ConfigPage() {
             !isDirty ||
             diffModalOpen ||
             hasVisualModeError ||
+            hasSourceYamlError ||
             hasVisualValidationErrors
           }
-          title={t('config_management.save')}
-          aria-label={t('config_management.save')}
+          title={hasSourceYamlError ? sourceYamlErrorDetail : t('config_management.save')}
+          aria-label={hasSourceYamlError ? sourceYamlErrorDetail : t('config_management.save')}
+          aria-busy={saving || undefined}
         >
-          <IconCheck size={16} />
+          {saving ? (
+            <span className="loading-spinner" aria-hidden="true" />
+          ) : (
+            <IconCheck size={16} />
+          )}
           {isDirty && <span className={styles.dirtyDot} aria-hidden="true" />}
         </button>
       </div>
     </div>
   );
 
+  const pageEyebrow =
+    activeTab === 'visual'
+      ? t('config_management.tabs.visual', { defaultValue: '可视化编辑' })
+      : t('config_management.tabs.source', { defaultValue: '源文件编辑' });
+  const pageDescription =
+    activeTab === 'visual'
+      ? t('config_management.visual.notice')
+      : t('config_management.description');
+
   return (
     <div className={styles.container}>
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderCopy}>
+          <span className={styles.pageEyebrow}>{pageEyebrow}</span>
           <h1 className={styles.pageTitle}>{t('config_management.title')}</h1>
+          <p className={styles.description}>{pageDescription}</p>
+        </div>
+
+        <div className={styles.pageMeta}>
+          <div className={`${styles.statusBadge} ${getStatusClass()}`}>{getStatusText()}</div>
           <div className={styles.tabBar}>
             <button
               type="button"
@@ -543,6 +682,20 @@ export function ConfigPage() {
             >
               {t('config_management.tabs.source', { defaultValue: '源代码编辑' })}
             </button>
+          </div>
+          <div className={styles.pageActions}>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<IconRefreshCw size={15} />}
+              onClick={handleBackendRestart}
+              disabled={disableControls || saving || backendRestarting || backendControlWaking}
+              loading={backendRestarting || backendControlWaking}
+              title={t('backend_control.restart_button')}
+              aria-label={t('backend_control.restart_button')}
+            >
+              {t('backend_control.restart_button')}
+            </Button>
           </div>
         </div>
       </div>
@@ -566,6 +719,15 @@ export function ConfigPage() {
             />
           ) : (
             <div className={styles.sourceWorkspace}>
+              {sourceYamlError && (
+                <div className="error-box" role="alert">
+                  {t('config_management.source_yaml_invalid', {
+                    defaultValue: '请先修复 YAML 语法错误再保存：{{message}}',
+                    message: sourceYamlErrorDetail,
+                  })}
+                </div>
+              )}
+
               <div className={styles.sourceToolbar}>
                 <div className={styles.searchInputWrapper}>
                   <Input
@@ -630,13 +792,16 @@ export function ConfigPage() {
 
               <div className={styles.editorWrapper}>
                 <Suspense fallback={null}>
-                  <LazyConfigSourceEditor
+                  <LazyYamlEditor
                     editorRef={editorRef}
                     value={content}
                     onChange={handleChange}
                     theme={resolvedTheme}
                     editable={!disableControls && !loading}
                     placeholder={t('config_management.editor_placeholder')}
+                    diagnosticSourceLabel={t('config_management.yaml_diagnostic_source', {
+                      defaultValue: 'YAML',
+                    })}
                   />
                 </Suspense>
               </div>

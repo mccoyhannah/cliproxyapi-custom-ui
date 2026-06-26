@@ -9,11 +9,11 @@ export type AuthFileType =
   | 'qwen'
   | 'kimi'
   | 'gemini'
+  | 'gemini-cli'
   | 'aistudio'
   | 'claude'
   | 'codex'
   | 'antigravity'
-  | 'xai'
   | 'iflow'
   | 'vertex'
   | 'empty'
@@ -27,6 +27,8 @@ export interface AuthFileItem {
   authIndex?: string | number | null;
   runtimeOnly?: boolean | string;
   disabled?: boolean;
+  priority?: number | string;
+  expired?: string | number | boolean | null;
   unavailable?: boolean;
   status?: string;
   statusMessage?: string;

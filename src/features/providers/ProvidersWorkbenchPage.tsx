@@ -1,483 +1,520 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
-import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SensitiveValueField } from '@/components/ui/SensitiveValueField';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useAuthStore, useNotificationStore } from '@/stores';
-import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
 import {
-  getOpenAIProviderRecentWindowStats,
-  getProviderRecentWindowStats,
-  type ProviderRecentUsageMap,
-} from '@/components/providers/utils';
-import type { OpenAIProviderConfig } from '@/types';
-import { ProviderHeaderCard } from './components/ProviderHeaderCard';
-import { ProviderCategoryList } from './components/ProviderCategoryList';
-import { ProviderResourcePanel } from './components/ProviderResourcePanel';
-import type { ProviderPanelControls } from './components/ProviderResourcePanel';
-import { SponsorQuickStartPanel } from './components/SponsorQuickStartPanel';
-import { ProviderSheet, type ProviderSheetHandle } from './sheets/ProviderSheet';
-import { APIKEY_FUN_DISPLAY_NAME } from './sponsor';
+  IconCheck,
+  IconCircleAlert,
+  IconRefreshCw,
+  IconSearch,
+  IconSlidersHorizontal,
+} from '@/components/ui/icons';
+import { providersApi } from '@/services/api';
+import type { ProviderBrand } from '@/types';
+import type { ModelInfo } from '@/utils/models';
+import { PROVIDER_BRAND_ORDER } from './descriptors';
+import type { ProviderGroup, ProviderResource } from './types';
 import { useProviderWorkbench } from './useProviderWorkbench';
-import {
-  getProviderFilterState,
-  readProvidersWorkbenchUiState,
-  writeProvidersWorkbenchUiState,
-  type ProviderFilterState,
-  type ProvidersWorkbenchUiState,
-} from './uiState';
-import type { ProviderBrand, ProviderResource, ProviderSortBy, SortDir } from './types';
 import styles from './ProvidersWorkbenchPage.module.scss';
 
-type SheetMode = 'detail' | 'create' | 'edit';
+type TestState = 'idle' | 'loading' | 'success' | 'error';
 
-interface SheetState {
-  open: boolean;
-  brand: ProviderBrand;
-  mode: SheetMode;
-  resource: ProviderResource | null;
+interface AsyncPanelState {
+  state: TestState;
+  message: string;
 }
 
-interface ProvidersWorkbenchPageProps {
-  fixedBrand?: ProviderBrand;
-}
+const EMPTY_PROVIDER_GROUPS: ProviderGroup[] = [];
 
-const formatDateTime = (iso: string, locale?: string) => {
+const getErrorMessage = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  return 'Request failed';
+};
+
+const pickDefaultModel = (resource: ProviderResource): string =>
+  resource.models[0] ?? (resource.brand === 'codex' ? 'gpt-5' : '');
+
+const formatTime = (iso: string, locale: string): string => {
   try {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return iso;
     return new Intl.DateTimeFormat(locale, {
       dateStyle: 'medium',
       timeStyle: 'short',
-    }).format(date);
+    }).format(new Date(iso));
   } catch {
     return iso;
   }
 };
 
-const matchesFilter = (r: ProviderResource, normalized: string): boolean => {
-  if (!normalized) return true;
-  const haystack = [
-    r.identifier,
-    r.name,
-    r.authIndex,
-    r.apiKeyPreview,
-    r.apiKey,
-    r.baseUrl,
-    r.proxyUrl,
-    r.prefix,
-  ]
-    .filter(Boolean)
-    .map((v) => String(v).toLowerCase());
-  return haystack.some((v) => v.includes(normalized));
-};
-
-const getResourceSortName = (resource: ProviderResource): string =>
-  (resource.name ?? resource.identifier ?? resource.apiKeyPreview ?? '').toLowerCase();
-
-const getResourceRecentSuccess = (
-  resource: ProviderResource,
-  usageByProvider: ProviderRecentUsageMap
-): number => {
-  if (resource.brand === 'apikeyFun') {
-    return 0;
-  }
-  if (resource.brand === 'openaiCompatibility') {
-    return getOpenAIProviderRecentWindowStats(resource.raw as OpenAIProviderConfig, usageByProvider)
-      .success;
-  }
-  return getProviderRecentWindowStats(
-    usageByProvider,
-    resource.brand,
-    resource.apiKey ?? undefined,
-    resource.baseUrl ?? undefined
-  ).success;
-};
-
-export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPageProps = {}) {
+export function ProvidersWorkbenchPage() {
   const { t, i18n } = useTranslation();
-  const connectionStatus = useAuthStore((s) => s.connectionStatus);
-  const { showNotification, showConfirmation } = useNotificationStore();
-
-  const pageTransitionLayer = usePageTransitionLayer();
-  const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
-
   const workbench = useProviderWorkbench();
-  const [uiState, setUiState] = useState<ProvidersWorkbenchUiState>(readProvidersWorkbenchUiState);
-  const [sheetState, setSheetState] = useState<SheetState>({
-    open: false,
-    brand: 'gemini',
-    mode: 'detail',
-    resource: null,
-  });
-  const sheetRef = useRef<ProviderSheetHandle>(null);
-
-  const connected = connectionStatus === 'connected';
-  const { usageByProvider, refreshRecentRequests } = useProviderRecentRequests({
-    enabled: connected,
+  const [activeBrand, setActiveBrand] = useState<ProviderBrand>('codex');
+  const [filter, setFilter] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [discovery, setDiscovery] = useState<AsyncPanelState>({ state: 'idle', message: '' });
+  const [connectivity, setConnectivity] = useState<AsyncPanelState>({
+    state: 'idle',
+    message: '',
   });
 
-  const handleRefresh = useCallback(async () => {
-    await Promise.allSettled([workbench.refetch(), refreshRecentRequests().catch(() => undefined)]);
-  }, [refreshRecentRequests, workbench]);
-
-  useHeaderRefresh(handleRefresh, isCurrentLayer);
-
-  const disableMutations = connectionStatus !== 'connected' || workbench.mutating;
-
-  const persistUiState = useCallback(
-    (updater: (prev: ProvidersWorkbenchUiState) => ProvidersWorkbenchUiState) => {
-      setUiState((prev) => {
-        const next = updater(prev);
-        writeProvidersWorkbenchUiState(next);
-        return next;
-      });
-    },
-    []
-  );
-
-  const setActiveBrand = useCallback(
-    (brand: ProviderBrand) => {
-      persistUiState((prev) =>
-        prev.activeBrand === brand ? prev : { ...prev, activeBrand: brand }
-      );
-    },
-    [persistUiState]
-  );
-
-  const allGroups = useMemo(() => workbench.snapshot?.groups ?? [], [workbench.snapshot]);
-  const groups = useMemo(
-    () =>
-      fixedBrand
-        ? allGroups.filter((group) => group.id === fixedBrand)
-        : allGroups.filter((group) => group.id !== 'apikeyFun'),
-    [allGroups, fixedBrand]
-  );
-  const firstVisibleBrand = groups[0]?.id ?? fixedBrand ?? 'gemini';
-  const activeBrand =
-    fixedBrand ??
-    (groups.some((group) => group.id === uiState.activeBrand)
-      ? uiState.activeBrand
-      : firstVisibleBrand);
-  const activeFilterState = getProviderFilterState(uiState, activeBrand);
-  const filter = activeFilterState.filter;
-  const providerSortBy = activeFilterState.sortBy;
-  const providerSortDir = activeFilterState.sortDir;
-  const activeGroup = groups.find((g) => g.id === activeBrand) ?? groups[0] ?? null;
-
-  const updateActiveFilterState = useCallback(
-    (patch: Partial<ProviderFilterState>) => {
-      persistUiState((prev) => {
-        const current = getProviderFilterState(prev, activeBrand);
-        return {
-          ...prev,
-          filtersByBrand: {
-            ...prev.filtersByBrand,
-            [activeBrand]: {
-              ...current,
-              ...patch,
-            },
-          },
-        };
-      });
-    },
-    [activeBrand, persistUiState]
-  );
+  const groups = workbench.snapshot?.groups ?? EMPTY_PROVIDER_GROUPS;
+  const activeGroup =
+    groups.find((group) => group.id === activeBrand) ?? groups[0] ?? null;
 
   const filteredResources = useMemo(() => {
     if (!activeGroup) return [];
     const normalized = filter.trim().toLowerCase();
-    return activeGroup.resources.filter((r) => matchesFilter(r, normalized));
+    if (!normalized) return activeGroup.resources;
+    return activeGroup.resources.filter((resource) => {
+      const haystack = [
+        resource.name,
+        resource.identifier,
+        resource.authIndex,
+        resource.apiKeyPreview,
+        resource.baseUrl,
+        resource.prefix,
+        ...resource.models,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalized);
+    });
   }, [activeGroup, filter]);
 
-  const availableModels = useMemo(() => {
-    if (!activeGroup) return [];
-    const seen = new Set<string>();
-    activeGroup.resources.forEach((r) => {
-      r.models.forEach((name) => seen.add(name));
-    });
-    return Array.from(seen).sort();
-  }, [activeGroup]);
-
-  const selectedModels = useMemo(() => {
-    if (availableModels.length === 0) return new Set<string>();
-    const availableModelSet = new Set(availableModels);
-    return new Set(activeFilterState.selectedModels.filter((name) => availableModelSet.has(name)));
-  }, [activeFilterState.selectedModels, availableModels]);
-
-  const visibleResources = useMemo(() => {
-    let arr = filteredResources;
-    if (selectedModels.size > 0) {
-      arr = arr.filter((r) => r.models.some((name) => selectedModels.has(name)));
-    }
-
-    const sorted = [...arr].sort((a, b) => {
-      let diff = 0;
-      if (providerSortBy === 'name') {
-        diff = getResourceSortName(a).localeCompare(getResourceSortName(b));
-      } else if (providerSortBy === 'priority') {
-        diff = a.priority - b.priority;
-      } else {
-        diff =
-          getResourceRecentSuccess(a, usageByProvider) -
-          getResourceRecentSuccess(b, usageByProvider);
-      }
-      if (diff === 0) {
-        diff = a.originalIndex - b.originalIndex;
-      }
-      return providerSortDir === 'asc' ? diff : -diff;
-    });
-
-    return sorted;
-  }, [filteredResources, providerSortBy, providerSortDir, selectedModels, usageByProvider]);
-
-  const toolbarControls = useMemo<ProviderPanelControls | undefined>(() => {
-    if (!activeGroup) return undefined;
-    return {
-      sortBy: providerSortBy,
-      sortDir: providerSortDir,
-      onSortBy: (value: ProviderSortBy) => updateActiveFilterState({ sortBy: value }),
-      onSortDir: (value: SortDir) => updateActiveFilterState({ sortDir: value }),
-      availableModels,
-      selectedModels,
-      onSelectedModelsChange: (next) =>
-        updateActiveFilterState({
-          selectedModels: Array.from(next).sort((a, b) => a.localeCompare(b)),
-        }),
-    };
-  }, [
-    activeGroup,
-    availableModels,
-    providerSortBy,
-    providerSortDir,
-    selectedModels,
-    updateActiveFilterState,
-  ]);
-
-  const totalResources = useMemo(
-    () =>
-      groups.reduce((sum, g) => sum + g.resources.filter((r) => !r.flags.isPlaceholder).length, 0),
-    [groups]
-  );
-
-  const totalActive = useMemo(
-    () =>
-      groups.reduce(
-        (sum, g) => sum + g.resources.filter((r) => !r.disabled && !r.flags.isPlaceholder).length,
-        0
-      ),
-    [groups]
-  );
-
-  const providerFamilies = useMemo(
-    () => groups.filter((g) => g.resources.some((r) => !r.flags.isPlaceholder)).length,
-    [groups]
-  );
-  const quickStartResource = useMemo(
-    () =>
-      fixedBrand === 'apikeyFun' && activeGroup
-        ? (activeGroup.resources.find((r) => !r.flags.isPlaceholder) ?? null)
-        : null,
-    [activeGroup, fixedBrand]
-  );
-
-  const updatedAtLabel = workbench.snapshot
-    ? formatDateTime(workbench.snapshot.fetchedAt, i18n.language)
-    : t('providersPage.modelCatalog.notLoaded');
-  const headerTitle =
-    fixedBrand === 'apikeyFun'
-      ? quickStartResource
-        ? APIKEY_FUN_DISPLAY_NAME
-        : t('nav.quick_start')
-      : undefined;
-
-  const openCreate = useCallback(() => {
-    const brand = activeBrand;
-    setSheetState({ open: true, brand, mode: 'create', resource: null });
-  }, [activeBrand]);
-
-  const openView = useCallback((resource: ProviderResource) => {
-    setSheetState({
-      open: true,
-      brand: resource.brand,
-      mode: 'detail',
-      resource,
-    });
-  }, []);
-
-  const openEdit = useCallback((resource: ProviderResource) => {
-    setSheetState({
-      open: true,
-      brand: resource.brand,
-      mode: 'edit',
-      resource,
-    });
-  }, []);
-
-  const closeSheet = useCallback(() => {
-    setSheetState((s) => ({ ...s, open: false }));
-  }, []);
-
-  const handleDelete = useCallback(
-    (resource: ProviderResource) => {
-      const name = resource.name ?? resource.apiKeyPreview ?? resource.identifier ?? '';
-      showConfirmation({
-        title: t('providersPage.delete.title'),
-        message: t('providersPage.delete.confirm', { name }),
-        variant: 'danger',
-        confirmText: t('providersPage.actions.delete'),
-        onConfirm: async () => {
-          try {
-            await workbench.deleteProvider(resource);
-            showNotification(t('providersPage.toast.deleted'), 'success');
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            showNotification(`${t('notification.delete_failed')}: ${msg}`, 'error');
-          }
-        },
-      });
-    },
-    [showConfirmation, showNotification, t, workbench]
-  );
-
-  const handleToggleDisabled = useCallback(
-    async (resource: ProviderResource, disabled: boolean) => {
-      try {
-        await workbench.toggleDisabled(resource, disabled);
-        showNotification(
-          disabled ? t('providersPage.toast.disabled') : t('providersPage.toast.enabled'),
-          'success'
-        );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        showNotification(`${t('providersPage.toast.toggleFailed')}: ${msg}`, 'error');
-      }
-    },
-    [showNotification, t, workbench]
-  );
-
-  const handleCreated = useCallback(() => {
-    showNotification(t('providersPage.toast.created'), 'success');
-    closeSheet();
-  }, [closeSheet, showNotification, t]);
-
-  const handleUpdated = useCallback(() => {
-    showNotification(t('providersPage.toast.updated'), 'success');
-    closeSheet();
-  }, [closeSheet, showNotification, t]);
-
-  // 加载状态
-  if (!workbench.snapshot && workbench.isPending) {
+  const selectedResource = useMemo(() => {
+    if (!activeGroup) return null;
     return (
-      <div className={styles.page}>
-        <Skeleton height={120} />
-        <div className={styles.layout}>
-          <Skeleton height={420} />
-          <Skeleton height={420} />
-        </div>
-      </div>
+      activeGroup.resources.find((resource) => resource.id === selectedId) ??
+      filteredResources[0] ??
+      activeGroup.resources[0] ??
+      null
     );
-  }
+  }, [activeGroup, filteredResources, selectedId]);
 
-  if (!activeGroup) {
+  const totals = useMemo(() => {
+    const resources = groups.flatMap((group) => group.resources);
+    return {
+      resources: resources.length,
+      active: resources.filter((resource) => !resource.disabled).length,
+      families: groups.filter((group) => group.resources.length > 0).length,
+    };
+  }, [groups]);
+
+  const refresh = useCallback(() => {
+    setModels([]);
+    setDiscovery({ state: 'idle', message: '' });
+    setConnectivity({ state: 'idle', message: '' });
+    void workbench.refetch();
+  }, [workbench]);
+
+  const discoverModels = useCallback(async () => {
+    if (!selectedResource) return;
+    setDiscovery({ state: 'loading', message: '' });
+    setModels([]);
+    try {
+      const next = await providersApi.discoverModels({
+        brand: selectedResource.brand,
+        baseUrl: selectedResource.baseUrl,
+        apiKey: selectedResource.apiKey,
+        authIndex: selectedResource.authIndex,
+        headers: selectedResource.raw.headers,
+      });
+      setModels(next);
+      setDiscovery({
+        state: 'success',
+        message: t('provider_workbench.models_loaded', {
+          count: next.length,
+          defaultValue: 'Loaded {{count}} models',
+        }),
+      });
+    } catch (err) {
+      setDiscovery({ state: 'error', message: getErrorMessage(err) });
+    }
+  }, [selectedResource, t]);
+
+  const testCodex = useCallback(async () => {
+    if (!selectedResource || selectedResource.brand !== 'codex') return;
+    setConnectivity({ state: 'loading', message: '' });
+    try {
+      await providersApi.testConnectivity({
+        brand: 'codex',
+        baseUrl: selectedResource.baseUrl,
+        apiKey: selectedResource.apiKey,
+        authIndex: selectedResource.authIndex,
+        headers: selectedResource.raw.headers,
+        model: pickDefaultModel(selectedResource),
+      });
+      setConnectivity({
+        state: 'success',
+        message: t('provider_workbench.codex_test_success', {
+          defaultValue: 'Codex connectivity test passed',
+        }),
+      });
+    } catch (err) {
+      setConnectivity({ state: 'error', message: getErrorMessage(err) });
+    }
+  }, [selectedResource, t]);
+
+  const toggleDisableCooling = useCallback(async () => {
+    if (!selectedResource) return;
+    const nextValue = !selectedResource.disableCooling;
+    try {
+      await workbench.setDisableCooling(selectedResource, nextValue);
+    } catch (err) {
+      setConnectivity({ state: 'error', message: getErrorMessage(err) });
+    }
+  }, [selectedResource, workbench]);
+
+  if (workbench.isPending && !workbench.snapshot) {
     return (
       <div className={styles.page}>
-        <ProviderHeaderCard
-          title={headerTitle}
-          totalActive={0}
-          totalResources={0}
-          providerFamilies={0}
-          updatedAtLabel={updatedAtLabel}
-          isFetching={workbench.isFetching}
-          onRefresh={() => void handleRefresh()}
-          onNew={() => {}}
-          isNewDisabled
-          showNewAction={!fixedBrand}
-          showSummary={fixedBrand !== 'apikeyFun'}
-        />
+        <Skeleton style={{ minHeight: 112 }} />
+        <Skeleton style={{ minHeight: 360 }} />
       </div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <ProviderHeaderCard
-        title={headerTitle}
-        totalActive={totalActive}
-        totalResources={totalResources}
-        providerFamilies={providerFamilies}
-        updatedAtLabel={updatedAtLabel}
-        isFetching={workbench.isFetching}
-        isNewDisabled={disableMutations}
-        showNewAction={!fixedBrand}
-        showSummary={fixedBrand !== 'apikeyFun'}
-        newLabel={t('providersPage.actions.new')}
-        variant={fixedBrand === 'apikeyFun' ? 'quickStart' : undefined}
-        onRefresh={() => void handleRefresh()}
-        onNew={openCreate}
-      />
+      <header className={styles.header}>
+        <div className={styles.titleBlock}>
+          <p className={styles.eyebrow}>
+            {t('provider_workbench.eyebrow', { defaultValue: 'Beta' })}
+          </p>
+          <h1 className={styles.title}>
+            {t('provider_workbench.title', { defaultValue: 'Provider Workbench' })}
+          </h1>
+          <p className={styles.description}>
+            {t('provider_workbench.description', {
+              defaultValue:
+                'Inspect provider resources, discover models, and run targeted Codex connectivity checks without replacing the existing provider pages.',
+            })}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={refresh}
+          loading={workbench.isFetching}
+          leftIcon={<IconRefreshCw size={16} />}
+        >
+          {t('common.refresh')}
+        </Button>
+      </header>
 
-      <div className={`${styles.layout} ${fixedBrand ? styles.layoutSingle : ''}`.trim()}>
-        {!fixedBrand ? (
-          <ProviderCategoryList
-            groups={groups}
-            activeBrand={activeGroup.id}
-            onSelect={(brand) => {
-              const isSwitching = sheetState.open && sheetState.brand !== brand;
-              const proceed =
-                isSwitching && sheetRef.current
-                  ? sheetRef.current.confirmDiscardIfDirty()
-                  : Promise.resolve(true);
-              void proceed.then((ok) => {
-                if (!ok) return;
-                setActiveBrand(brand);
-                if (isSwitching) {
-                  closeSheet();
-                }
-              });
-            }}
-          />
-        ) : null}
-        {fixedBrand === 'apikeyFun' ? (
-          <SponsorQuickStartPanel
-            resource={quickStartResource}
-            workbench={workbench}
-            mutationDisabled={disableMutations}
-          />
-        ) : (
-          <ProviderResourcePanel
-            group={activeGroup}
-            filter={filter}
-            onFilterChange={(value) => updateActiveFilterState({ filter: value })}
-            filteredResources={visibleResources}
-            selectedId={sheetState.open ? (sheetState.resource?.id ?? null) : null}
-            disableMutations={disableMutations}
-            usageByProvider={usageByProvider}
-            toolbarControls={toolbarControls}
-            onView={openView}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onToggleDisabled={handleToggleDisabled}
-            onCreate={openCreate}
-          />
+      <div className={styles.metaBar}>
+        <Badge variant="info" icon={<IconSlidersHorizontal size={14} />}>
+          {t('provider_workbench.resource_count', {
+            count: totals.resources,
+            defaultValue: '{{count}} resources',
+          })}
+        </Badge>
+        <Badge variant="success" icon={<IconCheck size={14} />}>
+          {t('provider_workbench.active_count', {
+            count: totals.active,
+            defaultValue: '{{count}} active',
+          })}
+        </Badge>
+        <Badge variant="neutral">
+          {t('provider_workbench.family_count', {
+            count: totals.families,
+            defaultValue: '{{count}} families',
+          })}
+        </Badge>
+        {workbench.snapshot && (
+          <Badge variant="neutral" mono>
+            {formatTime(workbench.snapshot.fetchedAt, i18n.language)}
+          </Badge>
         )}
       </div>
 
-      {!fixedBrand ? (
-        <ProviderSheet
-          ref={sheetRef}
-          state={sheetState}
-          onClose={closeSheet}
-          onSwitchToEdit={() => {
-            setSheetState((s) => (s.resource ? { ...s, mode: 'edit' } : s));
-          }}
-          workbench={workbench}
-          onCreated={handleCreated}
-          onUpdated={handleUpdated}
-          mutationDisabled={disableMutations}
-          usageByProvider={usageByProvider}
-        />
-      ) : null}
+      {workbench.errorMessage && (
+        <div className={`${styles.message} ${styles.messageError}`} role="alert">
+          {workbench.errorMessage}
+        </div>
+      )}
+
+      <div className={styles.layout}>
+        <nav className={styles.brandList} aria-label="Provider families">
+          {PROVIDER_BRAND_ORDER.map((brand) => {
+            const group = groups.find((item) => item.id === brand);
+            const descriptor = group?.descriptor;
+            const active = activeBrand === brand;
+            return (
+              <button
+                key={brand}
+                type="button"
+                className={`${styles.brandButton} ${active ? styles.brandButtonActive : ''}`}
+                onClick={() => {
+                  setActiveBrand(brand);
+                  setSelectedId('');
+                  setModels([]);
+                  setDiscovery({ state: 'idle', message: '' });
+                  setConnectivity({ state: 'idle', message: '' });
+                }}
+              >
+                <span>
+                  <span className={styles.brandName}>{descriptor?.label ?? brand}</span>
+                  <span className={styles.brandDesc}>{descriptor?.description ?? brand}</span>
+                </span>
+                <Badge size="sm" appearance="outline">
+                  {group?.resources.length ?? 0}
+                </Badge>
+              </button>
+            );
+          })}
+        </nav>
+
+        <main className={styles.mainColumn}>
+          <section className={styles.resourcePanel}>
+            <div className={styles.toolbar}>
+              <input
+                className={styles.searchInput}
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                placeholder={t('provider_workbench.search', {
+                  defaultValue: 'Search providers',
+                })}
+                aria-label={t('provider_workbench.search', {
+                  defaultValue: 'Search providers',
+                })}
+              />
+              <Badge variant={activeGroup?.descriptor.supportsModelDiscovery ? 'info' : 'neutral'}>
+                {activeGroup?.descriptor.supportsModelDiscovery
+                  ? t('provider_workbench.discovery_supported', {
+                      defaultValue: 'Model discovery',
+                    })
+                  : t('provider_workbench.discovery_not_supported', {
+                      defaultValue: 'Discovery unavailable',
+                    })}
+              </Badge>
+            </div>
+
+            {filteredResources.length ? (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>{t('common.status')}</th>
+                      <th>{t('provider_workbench.resource', { defaultValue: 'Resource' })}</th>
+                      <th>{t('common.base_url')}</th>
+                      <th>{t('common.prefix')}</th>
+                      <th>{t('provider_workbench.models', { defaultValue: 'Models' })}</th>
+                      <th>{t('provider_workbench.cooling', { defaultValue: 'Cooling' })}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredResources.map((resource) => (
+                      <tr key={resource.id}>
+                        <td>
+                          <Badge
+                            variant={resource.disabled ? 'warning' : 'success'}
+                            appearance="outline"
+                          >
+                            {resource.disabled
+                              ? t('ai_providers.config_disabled_badge')
+                              : t('common.connected_status')}
+                          </Badge>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.resourceButton}
+                            onClick={() => {
+                              setSelectedId(resource.id);
+                              setModels([]);
+                              setDiscovery({ state: 'idle', message: '' });
+                              setConnectivity({ state: 'idle', message: '' });
+                            }}
+                          >
+                            {resource.name}
+                          </button>
+                          {resource.apiKeyPreview && (
+                            <div className={styles.mono}>{resource.apiKeyPreview}</div>
+                          )}
+                        </td>
+                        <td className={styles.mono}>{resource.baseUrl || t('common.not_set')}</td>
+                        <td>{resource.prefix || t('common.not_set')}</td>
+                        <td>{resource.models.length}</td>
+                        <td>
+                          {resource.disableCooling
+                            ? t('provider_workbench.disable_cooling_on', {
+                                defaultValue: 'Disabled',
+                              })
+                            : t('provider_workbench.disable_cooling_off', {
+                                defaultValue: 'Normal',
+                              })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className={styles.empty}>
+                <EmptyState
+                  icon={<IconSearch size={32} />}
+                  title={t('provider_workbench.empty_title', {
+                    defaultValue: 'No provider resources',
+                  })}
+                  description={t('provider_workbench.empty_desc', {
+                    defaultValue: 'Refresh or adjust the search filter.',
+                  })}
+                />
+              </div>
+            )}
+          </section>
+
+          {selectedResource && (
+            <section className={styles.detailPanel}>
+              <div className={styles.detailSection}>
+                <h2 className={styles.sectionTitle}>
+                  {t('provider_workbench.resource_detail', {
+                    defaultValue: 'Resource detail',
+                  })}
+                </h2>
+                <div className={styles.detailGrid}>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>{t('common.base_url')}</span>
+                    <span className={`${styles.fieldValue} ${styles.mono}`}>
+                      {selectedResource.baseUrl || t('common.not_set')}
+                    </span>
+                  </div>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>Auth index</span>
+                    <span className={styles.fieldValue}>
+                      {selectedResource.authIndex || t('common.not_set')}
+                    </span>
+                  </div>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>{t('common.priority')}</span>
+                    <span className={styles.fieldValue}>{selectedResource.priority}</span>
+                  </div>
+                  <div className={styles.field}>
+                    <span className={styles.fieldLabel}>Headers</span>
+                    <span className={styles.fieldValue}>{selectedResource.headerCount}</span>
+                  </div>
+                </div>
+
+                {selectedResource.apiKey && (
+                  <SensitiveValueField
+                    label={t('common.api_key')}
+                    value={selectedResource.apiKey}
+                    revealLabel={t('provider_workbench.reveal_secret', {
+                      defaultValue: 'Reveal secret',
+                    })}
+                    hideLabel={t('provider_workbench.hide_secret', {
+                      defaultValue: 'Hide secret',
+                    })}
+                    copyLabel={t('common.copy')}
+                    copiedLabel={t('common.success')}
+                    emptyLabel={t('common.not_set')}
+                  />
+                )}
+
+                <div className={styles.modelList}>
+                  {selectedResource.models.slice(0, 16).map((model) => (
+                    <Badge key={model} appearance="outline" mono>
+                      {model}
+                    </Badge>
+                  ))}
+                  {selectedResource.models.length > 16 && (
+                    <Badge appearance="outline">+{selectedResource.models.length - 16}</Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.detailSection}>
+                <h2 className={styles.sectionTitle}>
+                  {t('provider_workbench.actions', { defaultValue: 'Actions' })}
+                </h2>
+                <div className={styles.actions}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void discoverModels()}
+                    loading={discovery.state === 'loading'}
+                    disabled={!activeGroup?.descriptor.supportsModelDiscovery}
+                  >
+                    {t('provider_workbench.discover_models', {
+                      defaultValue: 'Discover models',
+                    })}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void testCodex()}
+                    loading={connectivity.state === 'loading'}
+                    disabled={selectedResource.brand !== 'codex'}
+                  >
+                    {t('provider_workbench.test_codex', {
+                      defaultValue: 'Test Codex',
+                    })}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={selectedResource.disableCooling ? 'warning' : 'secondary'}
+                    size="sm"
+                    onClick={() => void toggleDisableCooling()}
+                    loading={workbench.mutatingResourceId === selectedResource.id}
+                    disabled={!activeGroup?.descriptor.supportsDisableCooling}
+                  >
+                    {selectedResource.disableCooling
+                      ? t('provider_workbench.enable_cooling', {
+                          defaultValue: 'Restore cooling',
+                        })
+                      : t('provider_workbench.disable_cooling', {
+                          defaultValue: 'Disable cooling',
+                        })}
+                  </Button>
+                </div>
+
+                {discovery.message && (
+                  <div
+                    className={`${styles.message} ${
+                      discovery.state === 'error' ? styles.messageError : ''
+                    }`}
+                    role={discovery.state === 'error' ? 'alert' : 'status'}
+                  >
+                    {discovery.state === 'error' && <IconCircleAlert size={15} />} {discovery.message}
+                  </div>
+                )}
+
+                {models.length > 0 && (
+                  <div className={styles.discoveryList}>
+                    {models.map((model) => (
+                      <Badge key={model.name} appearance="outline" mono>
+                        {model.alias ? `${model.name} -> ${model.alias}` : model.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+
+                {connectivity.message && (
+                  <div
+                    className={`${styles.message} ${
+                      connectivity.state === 'error' ? styles.messageError : ''
+                    }`}
+                    role={connectivity.state === 'error' ? 'alert' : 'status'}
+                  >
+                    {connectivity.state === 'error' && <IconCircleAlert size={15} />}{' '}
+                    {connectivity.message}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

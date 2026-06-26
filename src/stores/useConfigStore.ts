@@ -45,12 +45,14 @@ const SECTION_KEYS: RawConfigSection[] = [
   'force-model-prefix',
   'routing/strategy',
   'api-keys',
+  'ampcode',
   'gemini-api-key',
   'codex-api-key',
   'claude-api-key',
   'vertex-api-key',
   'openai-compatibility',
   'oauth-excluded-models',
+  'plugins'
 ];
 
 const extractSectionValue = (config: Config | null, section?: RawConfigSection) => {
@@ -78,6 +80,8 @@ const extractSectionValue = (config: Config | null, section?: RawConfigSection) 
       return config.routingStrategy;
     case 'api-keys':
       return config.apiKeys;
+    case 'ampcode':
+      return config.ampcode;
     case 'gemini-api-key':
       return config.geminiApiKeys;
     case 'codex-api-key':
@@ -90,6 +94,8 @@ const extractSectionValue = (config: Config | null, section?: RawConfigSection) 
       return config.openaiCompatibility;
     case 'oauth-excluded-models':
       return config.oauthExcludedModels;
+    case 'plugins':
+      return config.plugins;
     default:
       if (!section) return undefined;
       return config.raw?.[section];
@@ -156,21 +162,17 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       set({
         config: data,
         cache: newCache,
-        loading: false,
+        loading: false
       });
 
       return section ? extractSectionValue(data, section) : data;
     } catch (error: unknown) {
       const message =
-        error instanceof Error
-          ? error.message
-          : typeof error === 'string'
-            ? error
-            : 'Failed to fetch config';
+        error instanceof Error ? error.message : typeof error === 'string' ? error : 'Failed to fetch config';
       if (requestId === configRequestToken) {
         set({
           error: message || 'Failed to fetch config',
-          loading: false,
+          loading: false
         });
       }
       throw error;
@@ -221,6 +223,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
         case 'api-keys':
           nextConfig.apiKeys = value as Config['apiKeys'];
           break;
+        case 'ampcode':
+          nextConfig.ampcode = value as Config['ampcode'];
+          break;
         case 'gemini-api-key':
           nextConfig.geminiApiKeys = value as Config['geminiApiKeys'];
           break;
@@ -238,6 +243,10 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
           break;
         case 'oauth-excluded-models':
           nextConfig.oauthExcludedModels = value as Config['oauthExcludedModels'];
+          break;
+        case 'plugins':
+          nextConfig.plugins = value as Config['plugins'];
+          nextConfig.supportsPlugin = true;
           break;
         default:
           break;
@@ -285,5 +294,5 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     if (!cached) return false;
 
     return Date.now() - cached.timestamp < CACHE_EXPIRY_MS;
-  },
+  }
 }));

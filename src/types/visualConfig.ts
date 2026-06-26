@@ -1,5 +1,4 @@
 export type PayloadParamValueType = 'string' | 'number' | 'boolean' | 'json';
-export type DisableImageGenerationMode = 'false' | 'true' | 'chat';
 export type PayloadParamValidationErrorCode =
   | 'payload_invalid_number'
   | 'payload_invalid_boolean'
@@ -7,13 +6,10 @@ export type PayloadParamValidationErrorCode =
 
 export type VisualConfigFieldPath =
   | 'port'
-  | 'errorLogsMaxFiles'
   | 'logsMaxTotalSizeMb'
-  | 'redisUsageQueueRetentionSeconds'
   | 'requestRetry'
   | 'maxRetryCredentials'
   | 'maxRetryInterval'
-  | 'authAutoRefreshWorkers'
   | 'streaming.keepaliveSeconds'
   | 'streaming.bootstrapRetries'
   | 'streaming.nonstreamKeepaliveInterval';
@@ -31,22 +27,10 @@ export type PayloadParamEntry = {
   value: string;
 };
 
-export type PayloadHeaderEntry = {
-  id: string;
-  name: string;
-  value: string;
-};
-
 export type PayloadModelEntry = {
   id: string;
   name: string;
   protocol?: string;
-  fromProtocol?: string;
-  headers?: PayloadHeaderEntry[];
-  match?: PayloadParamEntry[];
-  notMatch?: PayloadParamEntry[];
-  exist?: string[];
-  notExist?: string[];
 };
 
 export type PayloadRule = {
@@ -76,48 +60,28 @@ export type VisualConfigValues = {
   rmAllowRemote: boolean;
   rmSecretKey: string;
   rmDisableControlPanel: boolean;
-  rmDisableAutoUpdatePanel: boolean;
   rmPanelRepo: string;
   authDir: string;
   apiKeysText: string;
-  pluginsEnabled: boolean;
-  pluginStoreSources: string[];
   debug: boolean;
   commercialMode: boolean;
   loggingToFile: boolean;
   logsMaxTotalSizeMb: string;
-  errorLogsMaxFiles: string;
-  usageStatisticsEnabled: boolean;
-  redisUsageQueueRetentionSeconds: string;
   proxyUrl: string;
   forceModelPrefix: boolean;
-  passthroughHeaders: boolean;
   requestRetry: string;
   maxRetryCredentials: string;
   maxRetryInterval: string;
-  disableCooling: boolean;
-  disableImageGeneration: DisableImageGenerationMode;
-  gptImage2BaseModel: string;
-  authAutoRefreshWorkers: string;
   quotaSwitchProject: boolean;
   quotaSwitchPreviewModel: boolean;
   quotaAntigravityCredits: boolean;
+  pluginsEnabled: boolean;
+  pluginsDir: string;
+  pluginsStoreSourcesText: string;
   routingStrategy: 'round-robin' | 'fill-first';
   routingSessionAffinity: boolean;
   routingSessionAffinityTTL: string;
   wsAuth: boolean;
-  antigravitySignatureCacheEnabled: boolean;
-  antigravitySignatureBypassStrict: boolean;
-  claudeHeaderUserAgent: string;
-  claudeHeaderPackageVersion: string;
-  claudeHeaderRuntimeVersion: string;
-  claudeHeaderOs: string;
-  claudeHeaderArch: string;
-  claudeHeaderTimeout: string;
-  claudeHeaderStabilizeDeviceProfile: boolean;
-  codexHeaderUserAgent: string;
-  codexHeaderBetaFeatures: string;
-  codexIdentityConfuse: boolean;
   payloadDefaultRules: PayloadRule[];
   payloadDefaultRawRules: PayloadRule[];
   payloadOverrideRules: PayloadRule[];
@@ -140,48 +104,28 @@ export const DEFAULT_VISUAL_VALUES: VisualConfigValues = {
   rmAllowRemote: false,
   rmSecretKey: '',
   rmDisableControlPanel: false,
-  rmDisableAutoUpdatePanel: false,
   rmPanelRepo: '',
   authDir: '',
   apiKeysText: '',
-  pluginsEnabled: false,
-  pluginStoreSources: [],
   debug: false,
   commercialMode: false,
   loggingToFile: false,
   logsMaxTotalSizeMb: '',
-  errorLogsMaxFiles: '',
-  usageStatisticsEnabled: false,
-  redisUsageQueueRetentionSeconds: '',
   proxyUrl: '',
   forceModelPrefix: false,
-  passthroughHeaders: false,
   requestRetry: '',
   maxRetryCredentials: '',
   maxRetryInterval: '',
-  disableCooling: false,
-  disableImageGeneration: 'false',
-  gptImage2BaseModel: '',
-  authAutoRefreshWorkers: '',
   quotaSwitchProject: true,
   quotaSwitchPreviewModel: true,
   quotaAntigravityCredits: false,
+  pluginsEnabled: false,
+  pluginsDir: '',
+  pluginsStoreSourcesText: '',
   routingStrategy: 'round-robin',
   routingSessionAffinity: false,
   routingSessionAffinityTTL: '',
   wsAuth: false,
-  antigravitySignatureCacheEnabled: true,
-  antigravitySignatureBypassStrict: false,
-  claudeHeaderUserAgent: '',
-  claudeHeaderPackageVersion: '',
-  claudeHeaderRuntimeVersion: '',
-  claudeHeaderOs: '',
-  claudeHeaderArch: '',
-  claudeHeaderTimeout: '',
-  claudeHeaderStabilizeDeviceProfile: false,
-  codexHeaderUserAgent: '',
-  codexHeaderBetaFeatures: '',
-  codexIdentityConfuse: false,
   payloadDefaultRules: [],
   payloadDefaultRawRules: [],
   payloadOverrideRules: [],

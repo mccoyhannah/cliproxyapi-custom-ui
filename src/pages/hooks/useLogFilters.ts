@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import type { HttpMethod, ParsedLogLine, StatusGroup } from './logTypes';
+import type { HttpMethod, LogLevel, ParsedLogLine, StatusGroup } from './logTypes';
 import { resolveStatusGroup } from './logTypes';
 
 const PATH_FILTER_LIMIT = 12;
@@ -11,16 +11,20 @@ interface UseLogFiltersOptions {
 
 interface UseLogFiltersReturn {
   methodFilters: HttpMethod[];
+  levelFilters: LogLevel[];
   statusFilters: StatusGroup[];
   pathFilters: string[];
   methodFilterSet: Set<HttpMethod>;
+  levelFilterSet: Set<LogLevel>;
   statusFilterSet: Set<StatusGroup>;
   pathFilterSet: Set<string>;
   hasStructuredFilters: boolean;
   methodCounts: Partial<Record<HttpMethod, number>>;
+  levelCounts: Partial<Record<LogLevel, number>>;
   statusCounts: Partial<Record<StatusGroup, number>>;
   pathOptions: Array<{ path: string; count: number }>;
   toggleMethodFilter: (method: HttpMethod) => void;
+  toggleLevelFilter: (level: LogLevel) => void;
   toggleStatusFilter: (group: StatusGroup) => void;
   togglePathFilter: (path: string) => void;
   clearStructuredFilters: () => void;
@@ -33,6 +37,10 @@ export function useLogFilters(options: UseLogFiltersOptions): UseLogFiltersRetur
     'logsPage.methodFilters',
     []
   );
+  const [levelFilters, setLevelFilters] = useLocalStorage<LogLevel[]>(
+    'logsPage.levelFilters',
+    []
+  );
   const [statusFilters, setStatusFilters] = useLocalStorage<StatusGroup[]>(
     'logsPage.statusFilters',
     []
@@ -40,16 +48,29 @@ export function useLogFilters(options: UseLogFiltersOptions): UseLogFiltersRetur
   const [pathFilters, setPathFilters] = useLocalStorage<string[]>('logsPage.pathFilters', []);
 
   const methodFilterSet = useMemo(() => new Set(methodFilters), [methodFilters]);
+  const levelFilterSet = useMemo(() => new Set(levelFilters), [levelFilters]);
   const statusFilterSet = useMemo(() => new Set(statusFilters), [statusFilters]);
   const pathFilterSet = useMemo(() => new Set(pathFilters), [pathFilters]);
   const hasStructuredFilters =
-    methodFilters.length > 0 || statusFilters.length > 0 || pathFilters.length > 0;
+    methodFilters.length > 0 ||
+    levelFilters.length > 0 ||
+    statusFilters.length > 0 ||
+    pathFilters.length > 0;
 
   const methodCounts = useMemo(() => {
     const counts: Partial<Record<HttpMethod, number>> = {};
     parsedLines.forEach((line) => {
       if (!line.method) return;
       counts[line.method] = (counts[line.method] ?? 0) + 1;
+    });
+    return counts;
+  }, [parsedLines]);
+
+  const levelCounts = useMemo(() => {
+    const counts: Partial<Record<LogLevel, number>> = {};
+    parsedLines.forEach((line) => {
+      if (!line.level) return;
+      counts[line.level] = (counts[line.level] ?? 0) + 1;
     });
     return counts;
   }, [parsedLines]);
@@ -93,6 +114,12 @@ export function useLogFilters(options: UseLogFiltersOptions): UseLogFiltersRetur
     );
   };
 
+  const toggleLevelFilter = (level: LogLevel) => {
+    setLevelFilters((prev) =>
+      prev.includes(level) ? prev.filter((item) => item !== level) : [...prev, level]
+    );
+  };
+
   const toggleStatusFilter = (group: StatusGroup) => {
     setStatusFilters((prev) =>
       prev.includes(group) ? prev.filter((item) => item !== group) : [...prev, group]
@@ -107,22 +134,27 @@ export function useLogFilters(options: UseLogFiltersOptions): UseLogFiltersRetur
 
   const clearStructuredFilters = () => {
     setMethodFilters([]);
+    setLevelFilters([]);
     setStatusFilters([]);
     setPathFilters([]);
   };
 
   return {
     methodFilters,
+    levelFilters,
     statusFilters,
     pathFilters,
     methodFilterSet,
+    levelFilterSet,
     statusFilterSet,
     pathFilterSet,
     hasStructuredFilters,
     methodCounts,
+    levelCounts,
     statusCounts,
     pathOptions,
     toggleMethodFilter,
+    toggleLevelFilter,
     toggleStatusFilter,
     togglePathFilter,
     clearStructuredFilters,

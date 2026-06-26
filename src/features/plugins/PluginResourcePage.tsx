@@ -5,16 +5,14 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { pluginsApi } from '@/services/api';
 import { useAuthStore } from '@/stores';
-import { getErrorMessage, isRecord } from '@/utils/helpers';
 import type { PluginListResponse } from '@/types';
+import { getErrorMessage, getErrorStatus } from './pluginErrors';
 import {
   collectPluginResourceEntries,
   PLUGIN_RESOURCES_REFRESH_EVENT,
   resolvePluginAssetURL,
 } from './pluginResources';
 import styles from './PluginResourcePage.module.scss';
-
-const hasStatus = (error: unknown, status: number) => isRecord(error) && error.status === status;
 
 const safeDecodeURIComponent = (value = '') => {
   try {
@@ -57,7 +55,7 @@ export function PluginResourcePage() {
       setData(plugins);
     } catch (err: unknown) {
       setError(
-        hasStatus(err, 404)
+        getErrorStatus(err) === 404
           ? t('plugin_management.unsupported_backend')
           : getErrorMessage(err, t('plugin_resource.load_failed'))
       );
@@ -74,7 +72,6 @@ export function PluginResourcePage() {
 
   useEffect(() => {
     window.addEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadResource);
-
     return () => {
       window.removeEventListener(PLUGIN_RESOURCES_REFRESH_EVENT, loadResource);
     };

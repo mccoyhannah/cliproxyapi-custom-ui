@@ -1,38 +1,59 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 
+type CardTone = 'default' | 'success' | 'error' | 'warning' | 'info' | 'neutral';
+type CardDensity = 'normal' | 'compact';
+
 interface CardProps {
   title?: ReactNode;
   extra?: ReactNode;
+  footer?: ReactNode;
   className?: string;
   headerClassName?: string;
-  density?: 'compact' | 'normal' | string;
+  bodyClassName?: string;
+  tone?: CardTone;
+  density?: CardDensity;
+  interactive?: boolean;
 }
 
 export function Card({
   title,
   extra,
+  footer,
   children,
   className,
   headerClassName,
-  density,
+  bodyClassName,
+  tone = 'default',
+  density = 'normal',
+  interactive = false,
 }: PropsWithChildren<CardProps>) {
-  const rootClassName = [
+  const classes = [
     'card',
-    density ? `card-${density}` : '',
-    className ?? '',
+    tone !== 'default' ? `card-${tone}` : '',
+    density === 'compact' ? 'card-compact' : '',
+    interactive ? 'card-interactive' : '',
+    className,
   ]
     .filter(Boolean)
     .join(' ');
 
+  const headerClasses = ['card-header', headerClassName].filter(Boolean).join(' ');
+  const content = bodyClassName ? (
+    <div className={`card-body ${bodyClassName}`}>{children}</div>
+  ) : (
+    children
+  );
+
   return (
-    <div className={rootClassName}>
+    <div className={classes}>
       {(title || extra) && (
-        <div className={headerClassName ? `card-header ${headerClassName}` : 'card-header'}>
+        <div className={headerClasses}>
           <div className="title">{title}</div>
           {extra}
         </div>
       )}
-      {children}
+      {content}
+      {footer && <div className="card-footer">{footer}</div>}
     </div>
   );
 }

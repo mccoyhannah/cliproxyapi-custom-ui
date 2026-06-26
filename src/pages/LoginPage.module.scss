@@ -5,6 +5,10 @@
   min-height: 100vh;
   display: flex;
   background: var(--bg-secondary);
+
+  @media (max-width: $breakpoint-mobile) {
+    overflow-x: hidden;
+  }
 }
 
 // 左侧品牌展示区
@@ -54,7 +58,7 @@
   font-size: 14vw;
   font-weight: 900;
   color: rgba(255, 255, 255, 0.9);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 0.85;
   text-transform: uppercase;
   font-family:
@@ -84,6 +88,9 @@
 // 右侧功能交互区
 .formPanel {
   flex: 1;
+  min-width: 0;
+  max-width: 100vw;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -91,10 +98,13 @@
   padding: $spacing-2xl;
   background: var(--bg-secondary);
   position: relative;
+  overflow-x: hidden;
 
   @media (max-width: $breakpoint-mobile) {
-    padding: $spacing-lg;
+    width: 100%;
+    padding: $spacing-xl 20px;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 }
 
@@ -102,10 +112,18 @@
 .formContent {
   width: 100%;
   max-width: 420px;
+  min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: $spacing-xl;
+
+  @media (max-width: $breakpoint-mobile) {
+    width: 100%;
+    max-width: min(300px, calc(100vw - 40px));
+    gap: $spacing-lg;
+  }
 }
 
 // Logo
@@ -121,6 +139,8 @@
 // 登录表单卡片
 .loginCard {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: $radius-lg;
@@ -130,8 +150,13 @@
   flex-direction: column;
   gap: $spacing-lg;
 
+  :global(.form-group) {
+    width: 100%;
+    min-width: 0;
+  }
+
   @media (max-width: $breakpoint-mobile) {
-    padding: $spacing-lg;
+    padding: 0;
     box-shadow: none;
     border: none;
     background: transparent;
@@ -144,6 +169,7 @@
   flex-direction: column;
   gap: $spacing-sm;
   text-align: center;
+  min-width: 0;
 }
 
 // 标题行
@@ -160,6 +186,13 @@
   font-size: 22px;
   font-weight: 800;
   color: var(--text-primary);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+
+  @media (max-width: $breakpoint-mobile) {
+    font-size: 20px;
+    line-height: 1.25;
+  }
 }
 
 // 副标题
@@ -176,6 +209,8 @@
 
 // 连接信息框
 .connectionBox {
+  width: 100%;
+  box-sizing: border-box;
   background: var(--bg-secondary);
   border: 1px dashed var(--border-color);
   border-radius: $radius-md;
@@ -292,7 +327,7 @@
   font-weight: 800;
   color: var(--text-primary);
   margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
 
 // 启动动画副标题
@@ -321,4 +356,459 @@
   background: var(--primary-color);
   border-radius: $radius-full;
   animation: splashLoading 1.2s ease-in-out infinite;
+}
+
+// Operations-console polish.
+.container {
+  background:
+    radial-gradient(
+      circle at 72% 18%,
+      color-mix(in srgb, var(--ops-accent) 7%, transparent),
+      transparent 28%
+    ),
+    var(--bg-secondary);
+}
+
+.brandPanel {
+  align-items: stretch;
+  background:
+    radial-gradient(
+      circle at 18% 18%,
+      color-mix(in srgb, var(--ops-accent) 22%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(145deg, var(--ops-brand-panel), var(--ops-brand-panel-alt));
+
+  &::before {
+    content: 'LOCAL OPS CONSOLE';
+    position: absolute;
+    top: $spacing-2xl;
+    left: $spacing-2xl;
+    color: color-mix(in srgb, var(--ops-accent) 78%, #ffffff);
+    font-family: $font-mono;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: $spacing-xl;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    border-radius: 18px;
+    pointer-events: none;
+  }
+}
+
+.brandContent {
+  justify-content: center;
+  align-items: flex-start;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: $spacing-2xl;
+}
+
+.brandWord {
+  font-family: $font-mono;
+  font-size: 96px;
+  line-height: 0.94;
+  color: rgb(255 255 255 / 0.86);
+  text-align: left;
+  text-shadow: 0 18px 48px rgb(0 0 0 / 0.36);
+
+  &:nth-child(2) {
+    color: color-mix(in srgb, var(--ops-accent) 40%, #ffffff);
+  }
+
+  &:nth-child(3) {
+    color: rgb(255 255 255 / 0.52);
+  }
+}
+
+@media (max-width: $breakpoint-tablet) {
+  .brandWord {
+    font-size: 72px;
+  }
+}
+
+.formPanel {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.22), transparent), var(--bg-secondary);
+}
+
+.logo,
+.splashLogo {
+  border-radius: 14px;
+  border: 1px solid var(--ops-border-subtle);
+  box-shadow: 0 18px 38px -24px color-mix(in srgb, var(--ops-accent) 80%, transparent);
+}
+
+.loginCard {
+  border-color: var(--ops-border-subtle);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0)), var(--ops-surface-1);
+  box-shadow: var(--ops-panel-shadow);
+}
+
+.title {
+  color: var(--ops-ink);
+}
+
+.subtitle {
+  color: var(--ops-ink-muted);
+}
+
+.connectionBox {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--ops-accent) 9%, transparent), transparent),
+    var(--ops-surface-2);
+  border-color: color-mix(in srgb, var(--ops-accent) 22%, var(--ops-border-subtle));
+
+  .value {
+    font-family: $font-mono;
+    font-size: 13px;
+  }
+}
+
+.errorBox {
+  background: color-mix(in srgb, var(--ops-danger) 10%, var(--ops-surface-1));
+  border-color: color-mix(in srgb, var(--ops-danger) 34%, var(--ops-border-subtle));
+  color: var(--ops-danger);
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .container {
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ops-brand-panel) 94%, var(--ops-accent)) 0 86px,
+      var(--bg-secondary) 86px
+    );
+  }
+
+  .formContent {
+    max-width: min(330px, calc(100vw - 40px));
+  }
+
+  .loginCard {
+    padding: $spacing-lg;
+    border: 1px solid var(--ops-border-subtle);
+    background: var(--ops-surface-1);
+    box-shadow: var(--ops-panel-shadow);
+  }
+}
+
+// Second-round cold operations console slice.
+.container {
+  --cold-accent: #38bdf8;
+  --cold-accent-strong: #0284c7;
+  --cold-accent-soft: rgb(56 189 248 / 0.1);
+  --cold-mint: #5eead4;
+  --cold-panel: #07111f;
+  --cold-panel-2: #0b1828;
+  --cold-surface: color-mix(in srgb, var(--ops-surface-1) 84%, #e7f4fb);
+  --cold-surface-2: color-mix(in srgb, var(--ops-surface-2) 82%, #eaf7fb);
+  --cold-border: color-mix(in srgb, var(--ops-border-subtle) 74%, var(--cold-accent));
+  overflow-x: hidden;
+  background:
+    linear-gradient(90deg, rgb(2 132 199 / 0.055) 1px, transparent 1px),
+    linear-gradient(180deg, rgb(2 132 199 / 0.045) 1px, transparent 1px),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--bg-secondary) 72%, #e6f6ff),
+      var(--bg-secondary)
+    );
+  background-size:
+    56px 56px,
+    56px 56px,
+    auto;
+}
+
+.brandPanel {
+  background:
+    linear-gradient(90deg, rgb(94 234 212 / 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgb(56 189 248 / 0.08) 1px, transparent 1px),
+    linear-gradient(150deg, var(--cold-panel), var(--cold-panel-2) 58%, #0d2430);
+  background-size:
+    48px 48px,
+    48px 48px,
+    auto;
+
+  &::before {
+    content: 'CONTROL PLANE / NODE 01';
+    color: color-mix(in srgb, var(--cold-accent) 84%, #ffffff);
+  }
+
+  &::after {
+    inset: $spacing-lg;
+    border-radius: $radius-lg;
+    border-color: rgb(148 210 255 / 0.16);
+    background:
+      linear-gradient(
+        90deg,
+        transparent 0 28%,
+        rgb(56 189 248 / 0.08) 28% 28.5%,
+        transparent 28.5%
+      ),
+      linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 34%);
+  }
+}
+
+.brandContent {
+  gap: 22px;
+}
+
+.brandWord {
+  color: rgb(224 247 255 / 0.9);
+  background: linear-gradient(180deg, #f4fbff 0%, #a8e8ff 58%, #75cfff 100%);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 22px 34px rgb(0 0 0 / 0.3));
+
+  &:nth-child(2) {
+    background: linear-gradient(180deg, #dff8ff, #86e6f7 64%, #5eead4);
+    background-clip: text;
+  }
+
+  &:nth-child(3) {
+    background: linear-gradient(180deg, #b9d7e5, #7899ad);
+    background-clip: text;
+  }
+}
+
+.brandHud {
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}
+
+.brandHudItem {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgb(148 210 255 / 0.18);
+  border-radius: $radius-md;
+  background: rgb(7 17 31 / 0.58);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+.brandHudLabel,
+.brandHudValue,
+.brandHudCode {
+  display: block;
+  min-width: 0;
+}
+
+.brandHudLabel {
+  color: rgb(191 219 254 / 0.74);
+  font-family: $font-mono;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.brandHudValue,
+.brandHudCode {
+  margin-top: 5px;
+  color: #ecfeff;
+  font-family: $font-mono;
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.brandHudCode {
+  color: color-mix(in srgb, var(--cold-mint) 78%, #ffffff);
+}
+
+.formPanel {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.2), transparent 42%),
+    linear-gradient(90deg, rgb(56 189 248 / 0.08), transparent 44%), var(--cold-surface-2);
+}
+
+.formContent {
+  max-width: 450px;
+}
+
+.logo,
+.splashLogo {
+  border-radius: $radius-lg;
+  border-color: color-mix(in srgb, var(--cold-accent) 38%, var(--ops-border-subtle));
+  box-shadow:
+    0 0 0 4px rgb(56 189 248 / 0.08),
+    0 24px 42px -28px rgb(2 132 199 / 0.8);
+}
+
+.loginCard {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--cold-border);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.56), rgb(255 255 255 / 0.1)), var(--cold-surface);
+  box-shadow:
+    0 28px 80px -54px rgb(2 28 44 / 0.58),
+    inset 0 1px 0 rgb(255 255 255 / 0.62);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cold-accent), var(--cold-mint), transparent);
+  }
+}
+
+.loginEyebrow {
+  display: inline-flex;
+  align-self: center;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--cold-accent) 28%, var(--ops-border-subtle));
+  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--cold-accent) 8%, var(--ops-surface-1));
+  color: var(--cold-accent-strong);
+  font-family: $font-mono;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.accessDot,
+.connectionDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cold-mint);
+  box-shadow: 0 0 0 4px rgb(94 234 212 / 0.13);
+  flex: 0 0 auto;
+}
+
+.accessMode {
+  color: var(--ops-ink-muted);
+}
+
+.title {
+  color: color-mix(in srgb, var(--ops-ink) 88%, #05324b);
+}
+
+.subtitle {
+  max-width: 330px;
+  align-self: center;
+  line-height: 1.45;
+}
+
+.connectionBox {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--cold-accent) 14%, transparent),
+      transparent 72%
+    ),
+    var(--cold-surface-2);
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--cold-accent) 28%, var(--ops-border-subtle));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.52);
+}
+
+.connectionBoxHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+  min-width: 0;
+}
+
+.connectionStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 3px 8px;
+  border-radius: $radius-md;
+  border: 1px solid rgb(20 184 166 / 0.22);
+  background: rgb(20 184 166 / 0.09);
+  color: #0f766e;
+  font-family: $font-mono;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.endpointValue {
+  padding: 8px 10px;
+  border-radius: $radius-sm;
+  background: rgb(2 132 199 / 0.06);
+  color: color-mix(in srgb, var(--ops-ink) 86%, #075985);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.errorBox {
+  border-style: solid;
+}
+
+.splashContent {
+  min-width: min(360px, 100%);
+  padding: $spacing-xl;
+  border: 1px solid var(--cold-border);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.52), rgb(255 255 255 / 0.12)), var(--cold-surface);
+  box-shadow: 0 26px 72px -52px rgb(2 28 44 / 0.62);
+}
+
+.splashTitle,
+.splashSubtitle {
+  text-align: center;
+}
+
+.splashLoader {
+  background: rgb(2 132 199 / 0.14);
+}
+
+.splashLoaderBar {
+  background: linear-gradient(90deg, var(--cold-accent), var(--cold-mint));
+}
+
+@media (max-width: $breakpoint-tablet) {
+  .brandHud {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: $breakpoint-mobile) {
+  .container {
+    background:
+      linear-gradient(90deg, rgb(56 189 248 / 0.055) 1px, transparent 1px),
+      linear-gradient(180deg, rgb(56 189 248 / 0.045) 1px, transparent 1px),
+      linear-gradient(180deg, #eaf7fb 0 92px, var(--bg-secondary) 92px);
+    background-size:
+      42px 42px,
+      42px 42px,
+      auto;
+  }
+
+  .formPanel {
+    padding: $spacing-xl 16px;
+  }
+
+  .formContent {
+    max-width: min(342px, calc(100vw - 32px));
+  }
+
+  .loginCard,
+  .splashContent {
+    padding: $spacing-lg;
+  }
+
+  .connectionBoxHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .loginEyebrow {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }

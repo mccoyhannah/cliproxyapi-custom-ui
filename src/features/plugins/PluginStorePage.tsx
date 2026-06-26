@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import {
-  IconAlertTriangle,
+  IconCircleAlert,
+  IconCode,
   IconDownload,
   IconExternalLink,
   IconGithub,
-  IconPlug,
   IconRefreshCw,
   IconSearch,
   IconSettings,
@@ -18,52 +18,45 @@ import {
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { pluginStoreApi } from '@/services/api';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
-import { getErrorMessage, isRecord } from '@/utils/helpers';
 import type { PluginStoreEntry, PluginStoreResponse } from '@/types';
+import { PluginInstallGateModal } from './components/PluginInstallGateModal';
 import {
   buildRepositoryURL,
+  getPluginRepositorySlug,
   isDefaultPluginStoreSource,
   isOfficialPlugin,
-  notifyPluginResourcesChanged,
   resolvePluginAssetURL,
 } from './pluginResources';
-import { PluginInstallGateModal } from './components/PluginInstallGateModal';
-import { waitForPluginStoreState } from './pluginPolling';
+import { getErrorMessage, getErrorStatus } from './pluginErrors';
 import styles from './PluginStorePage.module.scss';
 
 type StoreStatusFilter = 'all' | 'installed' | 'notInstalled' | 'updates';
-
-interface StoreLoadError {
-  kind: 'unsupported' | 'registry' | 'generic';
-  message: string;
-}
-
-const getErrorStatus = (error: unknown): number | undefined =>
-  isRecord(error) && typeof error.status === 'number' ? error.status : undefined;
-
-const getErrorDetailMessage = (error: unknown): string => {
-  if (!isRecord(error) || !isRecord(error.details)) return '';
-  const message = error.details.message;
-  return typeof message === 'string' ? message.trim() : '';
-};
-
-const DESCRIPTION_COLLAPSED_LINES = 2;
-
-const getStoreEntryTitle = (entry: PluginStoreEntry) => entry.name || entry.id;
-const getStoreEntryKey = (entry: PluginStoreEntry) => entry.storeId || entry.id;
-const getDescriptionDOMID = (entryKey: string) =>
-  `plugin-store-desc-${encodeURIComponent(entryKey)}`;
+type StoreError = { kind: 'unsupported' | 'registry' | 'generic'; message: string } | null;
 
 function StoreCardLogo({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
-  const showImage = Boolean(src) && !failed;
 
-  return showImage ? (
+  return src && !failed ? (
     <img src={src} alt="" onError={() => setFailed(true)} />
   ) : (
-    <IconPlug size={18} />
+    <IconCode size={18} />
   );
 }
+
+const getStoreEntryKey = (entry: PluginStoreEntry) =>
+  entry.storeId || (entry.sourceId ? `${entry.sourceId}/${entry.id}` : entry.id);
+
+const getStoreEntryTitle = (entry: PluginStoreEntry) => entry.name || entry.id;
+
+const getSourceText = (
+  entry: PluginStoreEntry,
+  t: (key: string, options?: Record<string, unknown>) => string
+) => {
+  const sourceName = isDefaultPluginStoreSource(entry)
+    ? t('plugin_store.cli_proxy_api_source')
+    : entry.sourceName;
+  return sourceName ? t('plugin_store.source_name', { source: sourceName }) : '';
+};
 
 export function PluginStorePage() {
   const { t } = useTranslation();
@@ -75,19 +68,14 @@ export function PluginStorePage() {
   const showConfirmation = useNotificationStore((state) => state.showConfirmation);
 
   const [data, setData] = useState<PluginStoreResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<StoreLoadError | null>(null);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<StoreStatusFilter>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<StoreError>(null);
   const [installingKey, setInstallingKey] = useState('');
   const [restartRequiredKeys, setRestartRequiredKeys] = useState<string[]>([]);
-  const [expandedDescriptionKeys, setExpandedDescriptionKeys] = useState<string[]>([]);
-  const [overflowingDescriptionKeys, setOverflowingDescriptionKeys] = useState<string[]>([]);
-  const descriptionRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
-
-  // Multi-step install gauntlet, shown only for non-official (third-party) plugins.
-  const [gateOpen, setGateOpen] = useState(false);
   const [gateEntry, setGateEntry] = useState<PluginStoreEntry | null>(null);
+  const [gateOpen, setGateOpen] = useState(false);
   const [gateIsUpdate, setGateIsUpdate] = useState(false);
 
   const connected = connectionStatus === 'connected';
@@ -109,12 +97,9 @@ export function PluginStorePage() {
       if (status === 404) {
         setError({ kind: 'unsupported', message: t('plugin_store.unsupported_backend') });
       } else if (status === 502) {
-        const detail = getErrorDetailMessage(err);
         setError({
           kind: 'registry',
-          message: detail
-            ? `${t('plugin_store.registry_failed')}: ${detail}`
-            : t('plugin_store.registry_failed'),
+          message: getErrorMessage(err, t('plugin_store.registry_failed')),
         });
       } else {
         setError({
@@ -178,11 +163,7 @@ export function PluginStorePage() {
   const statusFilters: Array<{ key: StoreStatusFilter; label: string; count: number }> = [
     { key: 'all', label: t('plugin_store.filter_all'), count: stats.total },
     { key: 'installed', label: t('plugin_store.filter_installed'), count: stats.installed },
-    {
-      key: 'notInstalled',
-      label: t('plugin_store.filter_not_installed'),
-      count: stats.notInstalled,
-    },
+    { key: 'notInstalled', label: t('plugin_store.filter_not_installed'), count: stats.notInstalled },
     { key: 'updates', label: t('plugin_store.filter_updates'), count: stats.updates },
   ];
 
@@ -193,68 +174,6 @@ export function PluginStorePage() {
 
   const hasActiveFilters = Boolean(filter.trim()) || statusFilter !== 'all';
 
-  const expandedDescriptionKeySet = useMemo(
-    () => new Set(expandedDescriptionKeys),
-    [expandedDescriptionKeys]
-  );
-  const overflowingDescriptionKeySet = useMemo(
-    () => new Set(overflowingDescriptionKeys),
-    [overflowingDescriptionKeys]
-  );
-
-  const registerDescriptionRef = useCallback((id: string, node: HTMLParagraphElement | null) => {
-    if (node) {
-      descriptionRefs.current[id] = node;
-    } else {
-      delete descriptionRefs.current[id];
-    }
-  }, []);
-
-  const measureDescriptionOverflow = useCallback(() => {
-    const nextIDs = Object.entries(descriptionRefs.current)
-      .filter(([, node]) => {
-        if (!node) return false;
-        const computed = window.getComputedStyle(node);
-        const lineHeight = Number.parseFloat(computed.lineHeight);
-        if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-          return node.scrollHeight > node.clientHeight + 1;
-        }
-        return node.scrollHeight > lineHeight * DESCRIPTION_COLLAPSED_LINES + 1;
-      })
-      .map(([id]) => id);
-
-    setOverflowingDescriptionKeys((current) => {
-      if (current.length === nextIDs.length && current.every((id) => nextIDs.includes(id))) {
-        return current;
-      }
-      return nextIDs;
-    });
-  }, []);
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(measureDescriptionOverflow);
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
-  }, [measureDescriptionOverflow, visiblePlugins]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      window.requestAnimationFrame(measureDescriptionOverflow);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [measureDescriptionOverflow]);
-
-  const toggleDescription = useCallback((id: string) => {
-    setExpandedDescriptionKeys((current) =>
-      current.includes(id) ? current.filter((currentID) => currentID !== id) : [...current, id]
-    );
-  }, []);
-
   const runInstall = useCallback(
     async (entry: PluginStoreEntry, isUpdate: boolean) => {
       const entryKey = getStoreEntryKey(entry);
@@ -262,66 +181,18 @@ export function PluginStorePage() {
       setInstallingKey(entryKey);
       try {
         const result = await pluginStoreApi.install(entry.id, entry.sourceId || undefined);
-        clearConfigCache();
-        const sourceId = result.sourceId || entry.sourceId;
-        const installedState = await waitForPluginStoreState(
-          entry.id,
-          sourceId,
-          (plugin) => plugin.installed && plugin.configured
-        );
-        setData(installedState.response);
-        if (
-          installedState.timedOut ||
-          !installedState.plugin?.installed ||
-          !installedState.plugin.configured
-        ) {
-          showNotification(t('plugin_store.status_pending'), 'warning');
-          return;
-        }
-
-        if (result.restartRequired) {
-          setRestartRequiredKeys((current) =>
-            current.includes(entryKey) ? current : [...current, entryKey]
-          );
-          showNotification(
-            isUpdate ? t('plugin_store.update_success') : t('plugin_store.install_success'),
-            'success'
-          );
-          showNotification(t('plugin_store.restart_required_notice'), 'warning');
-          return;
-        }
-
-        if (!installedState.response.pluginsEnabled) {
-          showNotification(
-            isUpdate ? t('plugin_store.update_success') : t('plugin_store.install_success'),
-            'success'
-          );
-          showNotification(t('plugin_store.global_disabled_hint'), 'warning');
-          return;
-        }
-
-        if (installedState.plugin.enabled) {
-          const registeredState = await waitForPluginStoreState(
-            entry.id,
-            sourceId,
-            (plugin) => plugin.registered && plugin.effectiveEnabled
-          );
-          setData(registeredState.response);
-          if (
-            registeredState.timedOut ||
-            !registeredState.plugin?.registered ||
-            !registeredState.plugin.effectiveEnabled
-          ) {
-            showNotification(t('plugin_store.registration_pending'), 'warning');
-            return;
-          }
-          notifyPluginResourcesChanged();
-        }
-
         showNotification(
           isUpdate ? t('plugin_store.update_success') : t('plugin_store.install_success'),
           'success'
         );
+        if (result.restartRequired) {
+          setRestartRequiredKeys((current) =>
+            current.includes(entryKey) ? current : [...current, entryKey]
+          );
+          showNotification(t('plugin_store.restart_required_notice'), 'warning');
+        }
+        clearConfigCache();
+        await loadStore();
       } catch (err: unknown) {
         showNotification(`${t(failedKey)}: ${getErrorMessage(err, t(failedKey))}`, 'error');
         throw err;
@@ -329,13 +200,12 @@ export function PluginStorePage() {
         setInstallingKey('');
       }
     },
-    [clearConfigCache, showNotification, t]
+    [clearConfigCache, loadStore, showNotification, t]
   );
 
   const handleInstall = (entry: PluginStoreEntry) => {
     const isUpdate = entry.installed && entry.updateAvailable;
 
-    // Third-party plugins must clear the multi-step confirmation gauntlet first.
     if (!isOfficialPlugin(entry)) {
       setGateEntry(entry);
       setGateIsUpdate(isUpdate);
@@ -343,7 +213,6 @@ export function PluginStorePage() {
       return;
     }
 
-    // Official router-for-me plugins keep the lightweight single-step confirm.
     const title = getStoreEntryTitle(entry);
     const target = entry.version ? `${title} v${entry.version}` : title;
     showConfirmation({
@@ -365,8 +234,6 @@ export function PluginStorePage() {
     setGateOpen(false);
   }, [gateEntry, gateIsUpdate, runInstall]);
 
-  const handleGateClose = useCallback(() => setGateOpen(false), []);
-
   const renderCard = (entry: PluginStoreEntry) => {
     const entryKey = getStoreEntryKey(entry);
     const logo = resolvePluginAssetURL(entry.logo, apiBase);
@@ -382,16 +249,11 @@ export function PluginStorePage() {
           : entry.version
             ? `v${entry.version}`
             : '';
-    const sourceName = isDefaultPluginStoreSource(entry)
-      ? t('plugin_store.cli_proxy_api_source')
-      : entry.sourceName;
-    const sourceText = sourceName ? t('plugin_store.source_name', { source: sourceName }) : '';
+    const sourceText = getSourceText(entry, t);
+    const repoSlug = getPluginRepositorySlug(entry.repository);
     const metaItems = [versionText, sourceText, entry.author, entry.license].filter(Boolean);
     const isInstalling = installingKey === entryKey;
     const hasPendingInstall = Boolean(installingKey);
-    const isDescriptionExpanded = expandedDescriptionKeySet.has(entryKey);
-    const isDescriptionOverflowing = overflowingDescriptionKeySet.has(entryKey);
-    const descriptionID = getDescriptionDOMID(entryKey);
 
     return (
       <article key={entryKey} className={styles.card}>
@@ -406,7 +268,7 @@ export function PluginStorePage() {
           <div className={styles.cardBadges}>
             {!isOfficial ? (
               <span className={styles.badgeUntrusted}>
-                <IconAlertTriangle size={11} />
+                <IconCircleAlert size={11} />
                 {t('plugin_store.badge_untrusted')}
               </span>
             ) : null}
@@ -421,34 +283,7 @@ export function PluginStorePage() {
           </div>
         </div>
 
-        {entry.description ? (
-          <div className={styles.cardDescBlock}>
-            <p
-              id={descriptionID}
-              ref={(node) => registerDescriptionRef(entryKey, node)}
-              className={`${styles.cardDesc} ${
-                isDescriptionExpanded ? styles.cardDescExpanded : ''
-              }`}
-            >
-              {entry.description}
-            </p>
-            {isDescriptionOverflowing ? (
-              <button
-                type="button"
-                className={styles.cardDescToggle}
-                onClick={() => toggleDescription(entryKey)}
-                aria-expanded={isDescriptionExpanded}
-                aria-controls={descriptionID}
-              >
-                {t(
-                  isDescriptionExpanded
-                    ? 'plugin_store.description_show_less'
-                    : 'plugin_store.description_show_more'
-                )}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+        {entry.description ? <p className={styles.cardDesc}>{entry.description}</p> : null}
 
         {metaItems.length > 0 ? (
           <div className={styles.cardMeta}>
@@ -460,6 +295,8 @@ export function PluginStorePage() {
             ))}
           </div>
         ) : null}
+
+        {repoSlug ? <div className={styles.repoSlug}>{repoSlug}</div> : null}
 
         {entry.tags.length > 0 ? (
           <div className={styles.tagRow}>
@@ -479,8 +316,8 @@ export function PluginStorePage() {
                 onClick={() => handleInstall(entry)}
                 disabled={!connected || (hasPendingInstall && !isInstalling)}
                 loading={isInstalling}
+                leftIcon={<IconDownload size={14} />}
               >
-                <IconDownload size={14} />
                 {t('plugin_store.install')}
               </Button>
             ) : (
@@ -491,13 +328,17 @@ export function PluginStorePage() {
                     onClick={() => handleInstall(entry)}
                     disabled={!connected || (hasPendingInstall && !isInstalling)}
                     loading={isInstalling}
+                    leftIcon={<IconRefreshCw size={14} />}
                   >
-                    <IconRefreshCw size={14} />
                     {t('plugin_store.update')}
                   </Button>
                 ) : null}
-                <Button variant="secondary" size="sm" onClick={() => navigate('/plugins')}>
-                  <IconSettings size={14} />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate('/plugins')}
+                  leftIcon={<IconSettings size={14} />}
+                >
                   {t('plugin_store.manage')}
                 </Button>
               </>
@@ -536,13 +377,23 @@ export function PluginStorePage() {
 
   return (
     <div className={styles.page}>
-      {/* ── Page Header ── */}
       <div className={styles.pageHeader}>
-        <h1 className={styles.title}>{t('plugin_store.title')}</h1>
-        <p className={styles.description}>{t('plugin_store.description')}</p>
+        <div>
+          <h1 className={styles.title}>{t('plugin_store.title')}</h1>
+          <p className={styles.description}>{t('plugin_store.description')}</p>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={loadStore}
+          disabled={!connected || loading}
+          loading={loading}
+          leftIcon={<IconRefreshCw size={16} />}
+        >
+          {t('plugin_store.refresh')}
+        </Button>
       </div>
 
-      {/* ── Security Banner ── */}
       <div className={styles.securityBanner} role="note">
         <IconShield size={20} />
         <div className={styles.securityBannerText}>
@@ -551,7 +402,6 @@ export function PluginStorePage() {
         </div>
       </div>
 
-      {/* ── Alerts ── */}
       {error ? (
         <div className={styles.errorBox}>
           <span>{error.message}</span>
@@ -573,7 +423,6 @@ export function PluginStorePage() {
         </div>
       ) : null}
 
-      {/* ── Status Bar ── */}
       {data ? (
         <div className={styles.statusBar}>
           <div className={styles.statusPill}>
@@ -589,21 +438,14 @@ export function PluginStorePage() {
                 : t('plugin_store.global_disabled')}
             </span>
           </div>
-
           <span className={styles.statusDivider} />
-
           <div className={styles.statusPill}>
             <span className={styles.statusLabel}>{t('plugin_store.plugins_dir')}</span>
-            <span
-              className={`${styles.statusValue} ${styles.statusPathValue}`}
-              title={data.pluginsDir || 'plugins'}
-            >
+            <span className={`${styles.statusValue} ${styles.statusPathValue}`}>
               {data.pluginsDir || 'plugins'}
             </span>
           </div>
-
           <span className={styles.statusDivider} />
-
           <div className={styles.statusPill}>
             <span className={styles.statusLabel}>{t('plugin_store.stat_available')}</span>
             <span className={styles.statusValue}>{stats.total}</span>
@@ -611,7 +453,6 @@ export function PluginStorePage() {
         </div>
       ) : null}
 
-      {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
         <Input
           type="search"
@@ -621,19 +462,8 @@ export function PluginStorePage() {
           aria-label={t('plugin_store.search_label')}
           rightElement={<IconSearch size={16} />}
         />
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={loadStore}
-          disabled={!connected || loading}
-          loading={loading}
-        >
-          <IconRefreshCw size={16} />
-          {t('plugin_store.refresh')}
-        </Button>
       </div>
 
-      {/* ── Status Filter Chips ── */}
       <div className={styles.filterChips} role="group" aria-label={t('plugin_store.filter_label')}>
         {statusFilters.map((item) => (
           <button
@@ -651,7 +481,6 @@ export function PluginStorePage() {
         ))}
       </div>
 
-      {/* ── Plugin Cards ── */}
       {loading ? (
         <div className={styles.cardGrid}>
           {Array.from({ length: 6 }, (_, index) => (
@@ -675,7 +504,6 @@ export function PluginStorePage() {
               description={t('plugin_store.no_plugins_desc')}
               action={
                 <Button variant="secondary" size="sm" onClick={loadStore} disabled={!connected}>
-                  <IconRefreshCw size={16} />
                   {t('plugin_store.refresh')}
                 </Button>
               }
@@ -710,7 +538,7 @@ export function PluginStorePage() {
         entry={gateEntry}
         isUpdate={gateIsUpdate}
         installing={gateEntry ? installingKey === getStoreEntryKey(gateEntry) : false}
-        onClose={handleGateClose}
+        onClose={() => setGateOpen(false)}
         onConfirm={handleGateConfirm}
       />
     </div>

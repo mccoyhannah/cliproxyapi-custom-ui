@@ -72,6 +72,13 @@ class ObfuscatedStorageService {
   }
 
   /**
+   * 清空所有数据
+   */
+  clear(): void {
+    localStorage.clear();
+  }
+
+  /**
    * 迁移旧的明文缓存为加密格式
    */
   migratePlaintextKeys(keys: string[]): void {
@@ -80,7 +87,7 @@ class ObfuscatedStorageService {
       if (!raw) return;
 
       // 如果已经是加密格式，跳过
-      if (isObfuscated(raw)) {
+      if (raw.startsWith('enc::v1::')) {
         return;
       }
 
@@ -99,6 +106,15 @@ class ObfuscatedStorageService {
       }
     });
   }
+
+  /**
+   * 检查键是否存在
+   */
+  hasItem(key: string): boolean {
+    return localStorage.getItem(key) !== null;
+  }
 }
 
 export const obfuscatedStorage = new ObfuscatedStorageService();
+// Backward-compatible alias (historically named "secureStorage").
+export const secureStorage = obfuscatedStorage;

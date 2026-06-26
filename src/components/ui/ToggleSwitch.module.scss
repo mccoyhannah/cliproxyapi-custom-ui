@@ -2,6 +2,8 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  width: 100%;
+  min-width: 0;
   gap: $spacing-sm;
   cursor: pointer;
 }
@@ -24,18 +26,24 @@
 }
 
 .track {
+  flex: 0 0 44px;
   width: 44px;
   height: 24px;
-  background: var(--border-color);
+  background: color-mix(in srgb, var(--border-color) 86%, var(--bg-tertiary));
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
   border-radius: $radius-full;
   position: relative;
-  transition: background $transition-fast;
+  transition:
+    background $transition-fast,
+    border-color $transition-fast,
+    box-shadow $transition-fast;
+  box-sizing: border-box;
 }
 
 .thumb {
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 2px;
+  left: 2px;
   width: 18px;
   height: 18px;
   background: #fff;
@@ -46,13 +54,21 @@
 
 .root input:checked + .track {
   background: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .root input:checked + .track .thumb {
   transform: translateX(20px);
 }
 
+.root input:focus-visible + .track {
+  box-shadow: var(--focus-ring);
+}
+
 .label {
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--text-primary);
   font-weight: 600;
+  font-size: 13px;
 }

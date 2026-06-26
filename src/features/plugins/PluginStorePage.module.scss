@@ -1,8 +1,6 @@
 @use '../../styles/variables' as *;
 @use '../../styles/mixins' as *;
 
-// ─── Page Container ─────────────────────────────────────
-
 .page {
   display: flex;
   flex-direction: column;
@@ -10,12 +8,15 @@
   width: 100%;
 }
 
-// ─── Header ─────────────────────────────────────────────
-
 .pageHeader {
   display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-md;
+
+  @include mobile {
+    flex-direction: column;
+  }
 }
 
 .title {
@@ -23,72 +24,30 @@
   color: var(--text-primary);
   font-size: 28px;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .description {
-  margin: 0;
+  margin: 6px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.5;
 }
-
-// ─── Alert Boxes ────────────────────────────────────────
-
-.errorBox,
-.warningBox {
-  padding: $spacing-md;
-  border-radius: $radius-md;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.errorBox {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $spacing-md;
-  border: 1px solid var(--danger-color);
-  background: rgba($error-color, 0.1);
-  color: var(--danger-color);
-
-  span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  :global(.btn) {
-    flex-shrink: 0;
-  }
-
-  @include mobile {
-    flex-direction: column;
-    align-items: stretch;
-  }
-}
-
-.warningBox {
-  border: 1px solid color-mix(in srgb, var(--warning-color, #c65746) 42%, var(--border-color));
-  background: color-mix(in srgb, var(--warning-color, #c65746) 9%, var(--bg-secondary));
-  color: var(--text-primary);
-}
-
-// ─── Security Banner (third-party plugin risk) ──────────
 
 .securityBanner {
   display: flex;
   align-items: flex-start;
   gap: $spacing-sm;
   padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, $warning-color 45%, var(--border-color));
   border-radius: $radius-md;
-  border: 1px solid color-mix(in srgb, var(--quota-medium-color, #e0aa14) 45%, var(--border-color));
-  background: color-mix(in srgb, var(--quota-medium-color, #e0aa14) 14%, var(--bg-secondary));
+  background: color-mix(in srgb, $warning-color 14%, var(--bg-secondary));
   color: var(--text-primary);
 
   > svg {
     flex-shrink: 0;
     margin-top: 1px;
-    color: var(--quota-medium-color, #e0aa14);
+    color: $warning-color;
   }
 }
 
@@ -104,21 +63,53 @@
 
   p {
     margin: 2px 0 0;
+    color: var(--text-secondary);
     font-size: 13px;
     line-height: 1.5;
-    color: var(--text-secondary);
   }
 }
 
-// ─── Status Bar ─────────────────────────────────────────
+.errorBox,
+.warningBox {
+  padding: $spacing-md;
+  border-radius: $radius-md;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.errorBox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-md;
+  border: 1px solid var(--danger-color);
+  background: color-mix(in srgb, $error-color 10%, transparent);
+  color: var(--danger-color);
+
+  span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  @include mobile {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.warningBox {
+  border: 1px solid color-mix(in srgb, $warning-color 42%, var(--border-color));
+  background: color-mix(in srgb, $warning-color 9%, var(--bg-secondary));
+  color: var(--text-primary);
+}
 
 .statusBar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
   flex-wrap: wrap;
 }
@@ -130,11 +121,11 @@
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  border-radius: $radius-full;
   border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  border-radius: $radius-full;
   background: color-mix(in srgb, var(--bg-primary) 56%, transparent);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 650;
   white-space: nowrap;
 }
 
@@ -147,7 +138,7 @@
 
 .statusDotOn {
   background: $success-color;
-  box-shadow: 0 0 6px rgba($success-color, 0.5);
+  box-shadow: 0 0 6px color-mix(in srgb, $success-color 50%, transparent);
 }
 
 .statusDotOff {
@@ -183,8 +174,6 @@
   }
 }
 
-// ─── Toolbar ────────────────────────────────────────────
-
 .toolbar {
   display: flex;
   align-items: center;
@@ -199,24 +188,7 @@
   :global(.input) {
     padding-right: 36px;
   }
-
-  :global(.btn > span) {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  @include mobile {
-    flex-direction: column;
-    align-items: stretch;
-
-    :global(.form-group) {
-      max-width: none;
-    }
-  }
 }
-
-// ─── Status Filter Chips ────────────────────────────────
 
 .filterChips {
   display: flex;
@@ -235,7 +207,7 @@
   background: var(--bg-primary);
   color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.4;
   cursor: pointer;
   transition:
@@ -268,8 +240,6 @@
   font-weight: 700;
 }
 
-// ─── Card Grid ──────────────────────────────────────────
-
 .cardGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -280,12 +250,11 @@
   }
 }
 
-// ─── Plugin Card ────────────────────────────────────────
-
 .card {
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
+  min-width: 0;
   padding: $spacing-md;
   border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
   border-radius: $radius-lg;
@@ -313,8 +282,8 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  border-radius: 10px;
   background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
   color: var(--text-secondary);
   flex-shrink: 0;
@@ -328,10 +297,10 @@
 
 .cardTitleBlock {
   display: flex;
+  min-width: 0;
   flex: 1;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
 }
 
 .cardTitle {
@@ -343,7 +312,8 @@
   @include text-ellipsis;
 }
 
-.cardId {
+.cardId,
+.repoSlug {
   color: var(--text-tertiary);
   font-family: $font-mono;
   font-size: 12px;
@@ -352,9 +322,9 @@
 
 .cardBadges {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 5px;
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 
@@ -368,32 +338,31 @@
   border-radius: 6px;
   padding: 2px 8px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.25;
 }
 
 .badge {
-  background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
   color: var(--text-secondary);
 }
 
 .badgeSuccess {
-  background: rgba($success-color, 0.1);
-  border: 1px solid rgba($success-color, 0.2);
+  border: 1px solid color-mix(in srgb, $success-color 24%, transparent);
+  background: color-mix(in srgb, $success-color 10%, transparent);
   color: var(--success-color);
 }
 
-.badgeWarning {
-  background: rgba($warning-color, 0.1);
-  border: 1px solid rgba($warning-color, 0.2);
+.badgeWarning,
+.badgeUntrusted {
+  border: 1px solid color-mix(in srgb, $warning-color 35%, transparent);
+  background: color-mix(in srgb, $warning-color 12%, transparent);
   color: var(--warning-color);
 }
 
 .badgeUntrusted {
   gap: 4px;
-  background: rgba($warning-color, 0.12);
-  border: 1px solid rgba($warning-color, 0.4);
   color: var(--danger-color);
 
   svg {
@@ -404,49 +373,12 @@
 .cardDesc {
   display: -webkit-box;
   margin: 0;
+  overflow: hidden;
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.5;
-  overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.cardDescBlock {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cardDescExpanded {
-  display: block;
-  overflow: visible;
-  -webkit-line-clamp: initial;
-}
-
-.cardDescToggle {
-  align-self: flex-start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--primary-color);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.4;
-
-  &:hover {
-    color: var(--primary-hover);
-    text-decoration: underline;
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--primary-color) 45%, transparent);
-    outline-offset: 3px;
-    border-radius: 4px;
-  }
+  -webkit-line-clamp: 3;
 }
 
 .cardMeta {
@@ -468,7 +400,7 @@
 
   strong {
     color: var(--text-secondary);
-    font-weight: 600;
+    font-weight: 650;
   }
 }
 
@@ -490,12 +422,12 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
   border-radius: $radius-full;
   background: color-mix(in srgb, var(--bg-secondary) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
   color: var(--text-tertiary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.4;
 }
 
@@ -508,23 +440,15 @@
   padding-top: $spacing-sm;
 }
 
-.cardActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: $spacing-sm;
-
-  :global(.btn > span) {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-}
-
+.cardActions,
 .cardLinks {
   display: flex;
   align-items: center;
   gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.cardLinks {
   flex-shrink: 0;
 }
 
@@ -532,7 +456,6 @@
   display: inline-flex;
   width: 30px;
   min-height: 30px;
-  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border-color);
@@ -552,8 +475,6 @@
   }
 }
 
-// ─── Skeleton ───────────────────────────────────────────
-
 .skeletonCard {
   display: flex;
   flex-direction: column;
@@ -570,9 +491,9 @@
   gap: $spacing-md;
 }
 
-.skeletonAvatar {
-  width: 40px;
-  height: 40px;
+.skeletonAvatar,
+.skeletonLine,
+.skeletonBody {
   border-radius: 10px;
   background: linear-gradient(
     90deg,
@@ -582,31 +503,24 @@
   );
   background-size: 400% 100%;
   animation: skeletonPulse 1.35s ease-in-out infinite;
+}
+
+.skeletonAvatar {
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
 }
 
 .skeletonText {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 8px;
-  flex: 1;
 }
 
 .skeletonLine {
+  width: 45%;
   height: 14px;
-  border-radius: 4px;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--bg-secondary) 86%, transparent) 25%,
-    color-mix(in srgb, var(--bg-hover) 70%, transparent) 37%,
-    color-mix(in srgb, var(--bg-secondary) 86%, transparent) 63%
-  );
-  background-size: 400% 100%;
-  animation: skeletonPulse 1.35s ease-in-out infinite;
-
-  &:first-child {
-    width: 45%;
-  }
 
   &:last-child {
     width: 70%;
@@ -617,17 +531,7 @@
 .skeletonBody {
   height: 56px;
   border-radius: $radius-md;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--bg-secondary) 86%, transparent) 25%,
-    color-mix(in srgb, var(--bg-hover) 70%, transparent) 37%,
-    color-mix(in srgb, var(--bg-secondary) 86%, transparent) 63%
-  );
-  background-size: 400% 100%;
-  animation: skeletonPulse 1.35s ease-in-out infinite;
 }
-
-// ─── Animation ──────────────────────────────────────────
 
 @keyframes skeletonPulse {
   0% {
@@ -635,13 +539,5 @@
   }
   100% {
     background-position: 0 0;
-  }
-}
-
-// ─── Mobile Overrides ───────────────────────────────────
-
-@include mobile {
-  .page {
-    gap: $spacing-md;
   }
 }

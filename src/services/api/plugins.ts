@@ -1,22 +1,20 @@
 import { apiClient } from './client';
-import { isRecord } from '@/utils/helpers';
-import {
-  isManagementOAuthProviderKey,
-  normalizeManagementOAuthProviderKey,
-} from '@/utils/providerKeys';
 import type {
   PluginConfigField,
   PluginConfigObject,
   PluginDeleteResult,
   PluginListEntry,
   PluginListResponse,
-  PluginMetadata,
   PluginMenu,
+  PluginMetadata,
   PluginStoreEntry,
   PluginStoreInstallResult,
   PluginStoreResponse,
   PluginStoreSource,
 } from '@/types';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const asString = (value: unknown): string => {
   if (value === undefined || value === null) return '';
@@ -25,21 +23,19 @@ const asString = (value: unknown): string => {
 
 const asBoolean = (value: unknown): boolean => value === true;
 
-const normalizePluginOAuthProvider = (value: unknown): string | undefined => {
-  const provider = normalizeManagementOAuthProviderKey(asString(value));
-  return isManagementOAuthProviderKey(provider) ? provider : undefined;
-};
-
-const hasOwn = (source: Record<string, unknown>, key: string): boolean =>
-  Object.prototype.hasOwnProperty.call(source, key);
+const pick = (source: Record<string, unknown>, snakeKey: string, camelKey: string) =>
+  source[snakeKey] ?? source[camelKey];
 
 const normalizeConfigField = (value: unknown): PluginConfigField | null => {
   if (!isRecord(value)) return null;
   const name = asString(value.name).trim();
   if (!name) return null;
-  const enumValues = Array.isArray(value.enum_values)
-    ? value.enum_values.map((item) => asString(item)).filter(Boolean)
+
+  const enumValuesSource = pick(value, 'enum_values', 'enumValues');
+  const enumValues = Array.isArray(enumValuesSource)
+    ? enumValuesSource.map((item) => asString(item).trim()).filter(Boolean)
     : [];
+
   return {
     name,
     type: asString(value.type).trim() || 'string',
@@ -58,9 +54,11 @@ const normalizeMetadata = (value: unknown): PluginMetadata | null => {
   const name = asString(value.name).trim();
   const version = asString(value.version).trim();
   const author = asString(value.author).trim();
-  const githubRepository = asString(value.github_repository).trim();
+  const githubRepository = asString(
+    pick(value, 'github_repository', 'githubRepository')
+  ).trim();
   const logo = asString(value.logo).trim();
-  const configFields = normalizeConfigFields(value.config_fields);
+  const configFields = normalizeConfigFields(pick(value, 'config_fields', 'configFields'));
 
   if (!name && !version && !author && !githubRepository && !logo && configFields.length === 0) {
     return null;
@@ -81,6 +79,7 @@ const normalizeMenu = (value: unknown): PluginMenu | null => {
   const path = asString(value.path).trim();
   const menu = asString(value.menu).trim();
   if (!path && !menu) return null;
+
   return {
     path,
     menu,
@@ -99,13 +98,7 @@ const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
   if (!id) return null;
 
   const metadata = normalizeMetadata(value.metadata);
-  const configFields = normalizeConfigFields(value.config_fields);
-  const supportsOAuth = asBoolean(value.supports_oauth);
-  const oauthProvider = normalizePluginOAuthProvider(value.oauth_provider);
-  const legacyOAuthProvider =
-    supportsOAuth && !hasOwn(value, 'oauth_provider')
-      ? normalizePluginOAuthProvider(id)
-      : undefined;
+  const configFields = normalizeConfigFields(pick(value, 'config_fields', 'configFields'));
 
   return {
     id,
@@ -113,11 +106,10 @@ const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
     configured: asBoolean(value.configured),
     registered: asBoolean(value.registered),
     enabled: value.enabled !== false,
-    effectiveEnabled: asBoolean(value.effective_enabled),
-    supportsOAuth,
-    oauthProvider: oauthProvider ?? legacyOAuthProvider,
+    effectiveEnabled: asBoolean(pick(value, 'effective_enabled', 'effectiveEnabled')),
+    supportsOAuth: asBoolean(pick(value, 'supports_oauth', 'supportsOAuth')),
     logo: asString(value.logo || metadata?.logo).trim(),
-    configFields: configFields.length > 0 ? configFields : (metadata?.configFields ?? []),
+    configFields: configFields.length > 0 ? configFields : metadata?.configFields ?? [],
     menus: normalizeMenus(value.menus),
     metadata,
   };
@@ -126,14 +118,12 @@ const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
 const normalizePluginList = (value: unknown): PluginListResponse => {
   const source = isRecord(value) ? value : {};
   const plugins = Array.isArray(source.plugins)
-    ? (source.plugins
-        .map((item) => normalizePluginEntry(item))
-        .filter(Boolean) as PluginListEntry[])
+    ? (source.plugins.map((item) => normalizePluginEntry(item)).filter(Boolean) as PluginListEntry[])
     : [];
 
   return {
-    pluginsEnabled: asBoolean(source.plugins_enabled),
-    pluginsDir: asString(source.plugins_dir).trim() || 'plugins',
+    pluginsEnabled: asBoolean(pick(source, 'plugins_enabled', 'pluginsEnabled')),
+    pluginsDir: asString(pick(source, 'plugins_dir', 'pluginsDir')).trim() || 'plugins',
     plugins,
   };
 };
@@ -143,13 +133,14 @@ const normalizePluginConfig = (value: unknown): PluginConfigObject =>
 
 const normalizeDeleteResult = (value: unknown): PluginDeleteResult => {
   const source = isRecord(value) ? value : {};
+
   return {
     status: asString(source.status).trim(),
     id: asString(source.id).trim(),
     path: asString(source.path).trim(),
-    fileDeleted: asBoolean(source.file_deleted),
-    configuredRemoved: asBoolean(source.configured_removed),
-    restartRequired: asBoolean(source.restart_required),
+    fileDeleted: asBoolean(pick(source, 'file_deleted', 'fileDeleted')),
+    configuredRemoved: asBoolean(pick(source, 'configured_removed', 'configuredRemoved')),
+    restartRequired: asBoolean(pick(source, 'restart_required', 'restartRequired')),
   };
 };
 
@@ -157,9 +148,10 @@ const normalizeStoreEntry = (value: unknown): PluginStoreEntry | null => {
   if (!isRecord(value)) return null;
   const id = asString(value.id).trim();
   if (!id) return null;
-  const sourceId = asString(value.source_id).trim();
-  const storeId = asString(value.store_id).trim() || (sourceId ? `${sourceId}/${id}` : id);
 
+  const sourceId = asString(pick(value, 'source_id', 'sourceId')).trim();
+  const storeId =
+    asString(pick(value, 'store_id', 'storeId')).trim() || (sourceId ? `${sourceId}/${id}` : id);
   const tags = Array.isArray(value.tags)
     ? value.tags.map((item) => asString(item).trim()).filter(Boolean)
     : [];
@@ -167,8 +159,8 @@ const normalizeStoreEntry = (value: unknown): PluginStoreEntry | null => {
   return {
     storeId,
     sourceId,
-    sourceName: asString(value.source_name).trim(),
-    sourceUrl: asString(value.source_url).trim(),
+    sourceName: asString(pick(value, 'source_name', 'sourceName')).trim(),
+    sourceUrl: asString(pick(value, 'source_url', 'sourceUrl')).trim(),
     id,
     name: asString(value.name).trim(),
     description: asString(value.description).trim(),
@@ -180,13 +172,13 @@ const normalizeStoreEntry = (value: unknown): PluginStoreEntry | null => {
     license: asString(value.license).trim(),
     tags,
     installed: asBoolean(value.installed),
-    installedVersion: asString(value.installed_version).trim(),
+    installedVersion: asString(pick(value, 'installed_version', 'installedVersion')).trim(),
     path: asString(value.path).trim(),
     configured: asBoolean(value.configured),
     registered: asBoolean(value.registered),
     enabled: asBoolean(value.enabled),
-    effectiveEnabled: asBoolean(value.effective_enabled),
-    updateAvailable: asBoolean(value.update_available),
+    effectiveEnabled: asBoolean(pick(value, 'effective_enabled', 'effectiveEnabled')),
+    updateAvailable: asBoolean(pick(value, 'update_available', 'updateAvailable')),
   };
 };
 
@@ -195,6 +187,7 @@ const normalizeStoreSource = (value: unknown): PluginStoreSource | null => {
   const id = asString(value.id).trim();
   const url = asString(value.url).trim();
   if (!id && !url) return null;
+
   return {
     id,
     name: asString(value.name).trim(),
@@ -205,19 +198,15 @@ const normalizeStoreSource = (value: unknown): PluginStoreSource | null => {
 const normalizeStoreList = (value: unknown): PluginStoreResponse => {
   const source = isRecord(value) ? value : {};
   const plugins = Array.isArray(source.plugins)
-    ? (source.plugins
-        .map((item) => normalizeStoreEntry(item))
-        .filter(Boolean) as PluginStoreEntry[])
+    ? (source.plugins.map((item) => normalizeStoreEntry(item)).filter(Boolean) as PluginStoreEntry[])
     : [];
   const sources = Array.isArray(source.sources)
-    ? (source.sources
-        .map((item) => normalizeStoreSource(item))
-        .filter(Boolean) as PluginStoreSource[])
+    ? (source.sources.map((item) => normalizeStoreSource(item)).filter(Boolean) as PluginStoreSource[])
     : [];
 
   return {
-    pluginsEnabled: asBoolean(source.plugins_enabled),
-    pluginsDir: asString(source.plugins_dir).trim() || 'plugins',
+    pluginsEnabled: asBoolean(pick(source, 'plugins_enabled', 'pluginsEnabled')),
+    pluginsDir: asString(pick(source, 'plugins_dir', 'pluginsDir')).trim() || 'plugins',
     sources,
     plugins,
   };
@@ -225,16 +214,17 @@ const normalizeStoreList = (value: unknown): PluginStoreResponse => {
 
 const normalizeInstallResult = (value: unknown): PluginStoreInstallResult => {
   const source = isRecord(value) ? value : {};
+
   return {
     status: asString(source.status).trim(),
-    sourceId: asString(source.source_id).trim(),
-    sourceName: asString(source.source_name).trim(),
-    sourceUrl: asString(source.source_url).trim(),
+    sourceId: asString(pick(source, 'source_id', 'sourceId')).trim(),
+    sourceName: asString(pick(source, 'source_name', 'sourceName')).trim(),
+    sourceUrl: asString(pick(source, 'source_url', 'sourceUrl')).trim(),
     id: asString(source.id).trim(),
     version: asString(source.version).trim(),
     path: asString(source.path).trim(),
-    pluginsEnabled: asBoolean(source.plugins_enabled),
-    restartRequired: asBoolean(source.restart_required),
+    pluginsEnabled: asBoolean(pick(source, 'plugins_enabled', 'pluginsEnabled')),
+    restartRequired: asBoolean(pick(source, 'restart_required', 'restartRequired')),
   };
 };
 

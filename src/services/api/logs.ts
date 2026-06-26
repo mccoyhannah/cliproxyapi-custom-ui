@@ -129,6 +129,7 @@ export const logsApi = {
     const data = await apiClient.get('/logs', {
       params,
       timeout: LOGS_TIMEOUT_MS,
+      meta: { silent: true },
     });
     return normalizeLogsResponse(data);
   },
@@ -136,7 +137,7 @@ export const logsApi = {
   clearLogs: () => apiClient.delete('/logs'),
 
   fetchErrorLogs: (): Promise<ErrorLogsResponse> =>
-    apiClient.get('/request-error-logs', { timeout: LOGS_TIMEOUT_MS }),
+    apiClient.get('/request-error-logs', { timeout: LOGS_TIMEOUT_MS, meta: { silent: true } }),
 
   downloadErrorLog: (filename: string) =>
     apiClient.getRaw(`/request-error-logs/${encodeURIComponent(filename)}`, {

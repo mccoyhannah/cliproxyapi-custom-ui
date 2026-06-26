@@ -15,26 +15,18 @@
   height: 24px;
 }
 
-.cardTitleIconFallback {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-}
-
 .pageTitle {
   font-size: 28px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 $spacing-xl 0;
+  line-height: 1.15;
+  margin: 0 0 20px 0;
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  gap: $spacing-xl;
+  gap: $spacing-lg;
 }
 
 .cardContent {
@@ -158,6 +150,71 @@
   flex-wrap: wrap;
   align-items: center;
   gap: $spacing-sm;
+}
+
+.authStatusLine {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-full;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.authStatusDot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: $radius-full;
+  background: currentColor;
+  opacity: 0.72;
+}
+
+.authStatusText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authCountdown {
+  flex: 0 0 auto;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-color);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.authStatusWaiting {
+  border-color: color-mix(in srgb, var(--primary-color) 28%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary));
+  color: var(--primary-color);
+}
+
+.authStatusWarning,
+.authStatusExpired {
+  border-color: rgba($warning-color, 0.36);
+  background: rgba($warning-color, 0.08);
+  color: $warning-color;
+}
+
+.authStatusSuccess {
+  border-color: rgba($success-color, 0.36);
+  background: rgba($success-color, 0.08);
+  color: $success-color;
+}
+
+.authStatusError {
+  border-color: rgba($error-color, 0.36);
+  background: rgba($error-color, 0.08);
+  color: $error-color;
 }
 
 .geminiProjectField {
