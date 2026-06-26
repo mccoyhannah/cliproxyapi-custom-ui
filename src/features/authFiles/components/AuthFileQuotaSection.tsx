@@ -99,7 +99,21 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       : null;
   const compactAccessTokenOnly = compact && quotaType === 'codex' && authTokenSnapshot?.hasRefreshToken === false;
   const compactCodexPlanType =
-    compact && quotaType === 'codex' ? normalizePlanType(resolveCodexPlanType(file)) : null;
+    (compact || summaryOnly) && quotaType === 'codex'
+      ? normalizePlanType(resolveCodexPlanType(file))
+      : null;
+  const compactCodexPlanLabel =
+    compactCodexPlanType === 'pro'
+      ? t('codex_quota.plan_pro')
+      : compactCodexPlanType && ['prolite', 'pro-lite', 'pro_lite'].includes(compactCodexPlanType)
+        ? t('codex_quota.plan_prolite')
+        : compactCodexPlanType === 'plus'
+          ? t('codex_quota.plan_plus')
+          : compactCodexPlanType === 'team'
+            ? t('codex_quota.plan_team')
+            : compactCodexPlanType === 'free'
+              ? t('codex_quota.plan_free')
+              : null;
   const compactCanSetManualExpiry =
     compact &&
     quotaType === 'codex' &&
@@ -148,13 +162,6 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       );
     }
 
-    if (
-      !compactAccessTokenOnly &&
-      !manualExpiry &&
-      !compactCodexExpiry &&
-      !compactCanSetManualExpiry
-    ) return null;
-
     const expiryMs = compactAccessTokenOnly
       ? authTokenSnapshot?.accessTokenExpiresAtMs
       : (manualExpiry?.expiresAtMs ?? compactCodexExpiry?.subscriptionActiveUntilMs);
@@ -191,28 +198,49 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
             compactCodexExpiry?.subscriptionActiveUntilMs,
             compactCodexExpiry?.subscriptionActiveUntil
           ));
+    const showFallbackExpiry =
+      compactAccessTokenOnly || manualExpiry || compactCodexExpiry || compactCanSetManualExpiry;
+    const quotaPendingLabel =
+      quotaStatus === 'loading'
+        ? t('auth_files.codex_quota_loading_short', { defaultValue: '额度刷新中' })
+        : t('auth_files.codex_quota_pending_short', { defaultValue: '待刷新额度' });
 
     return (
       <div
         className={`${styles.quotaSection} ${styles.quotaSectionCompact} ${styles.quotaSectionReady}`}
       >
         <div className={`${styles.codexInfoGrid} ${styles.codexInfoGridCompact}`}>
-          {(compactAccessTokenOnly || manualExpiry || compactCodexExpiry || compactCanSetManualExpiry) && (
-            <div className={`${styles.codexInfoItem} ${styles.codexInfoItemCompact}`}>
-              <span className={styles.codexPlanLabel}>
-                {expiryLabel}
-              </span>
+          <div className={styles.codexCompactIdentityLine}>
+            {compactCodexPlanLabel && (
               <span
-                className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
+                className={`${styles.codexCompactChip} ${styles.codexCompactPlanChip}`}
+                title={`${t('codex_quota.plan_label')} ${compactCodexPlanLabel}`}
+              >
+                <span className={styles.codexCompactPlanLabel}>{t('codex_quota.plan_label')}</span>
+                <strong>{compactCodexPlanLabel}</strong>
+              </span>
+            )}
+            {showFallbackExpiry && (
+              <span
+                className={`${styles.codexCompactChip} ${styles.codexSubscriptionValue} ${styles.codexSubscriptionExpiryChip} ${expiryClass}`}
                 title={expiryTitle}
                 onClick={compactAccessTokenOnly ? undefined : onManualExpiryEdit}
                 role={!compactAccessTokenOnly && onManualExpiryEdit ? 'button' : undefined}
                 tabIndex={!compactAccessTokenOnly && onManualExpiryEdit ? 0 : undefined}
               >
-                {expiryValue}
+                <span className={styles.codexSubscriptionLabel}>{expiryLabel}</span>
+                <strong className={styles.codexSubscriptionDate}>{expiryValue}</strong>
               </span>
-            </div>
-          )}
+            )}
+            <span
+              className={`${styles.codexCompactChip} ${styles.codexCompactQuotaChip} ${styles.codexCompactQuotaUnknown}`}
+              title={t('auth_files.quota_refresh_global_hint', {
+                defaultValue: '使用顶部“刷新额度”按钮获取最新额度。',
+              })}
+            >
+              {quotaPendingLabel}
+            </span>
+          </div>
         </div>
       </div>
     );

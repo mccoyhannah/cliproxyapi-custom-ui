@@ -1978,13 +1978,14 @@ export function AuthFilesPage() {
     if (!isCurrentLayer) return;
     const preserveExisting = loadedFilesOnceRef.current || filesLengthRef.current > 0;
     loadedFilesOnceRef.current = true;
+    const focusLocationRequestsQuotaRefresh = isAuthFilesCardsFocusLocation({
+      pathname: location.pathname,
+      search: location.search,
+    });
     const shouldRunInitialQuotaRefresh =
-      isAuthFilesCardsFocusLocation({
-        pathname: location.pathname,
-        search: location.search,
-      }) &&
       !initialQuotaRefreshConsumedRef.current &&
-      consumeAuthFilesInitialQuotaRefresh();
+      (!preserveExisting ||
+        (focusLocationRequestsQuotaRefresh && consumeAuthFilesInitialQuotaRefresh()));
 
     if (shouldRunInitialQuotaRefresh) {
       initialQuotaRefreshConsumedRef.current = true;
@@ -3883,6 +3884,10 @@ export function AuthFilesPage() {
     scheduleFileCardsScroll('auto');
   }, [scheduleFileCardsScroll]);
 
+  const handleJumpToFileCards = useCallback(() => {
+    scheduleFileCardsScroll('smooth');
+  }, [scheduleFileCardsScroll]);
+
   const handleListPageChange = useCallback(
     (nextPage: number) => {
       const boundedPage = Math.min(totalPages, Math.max(1, nextPage));
@@ -4687,6 +4692,17 @@ export function AuthFilesPage() {
         title={titleNode}
         extra={
           <div className={styles.headerActions}>
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<IconEye size={15} />}
+              onClick={handleJumpToFileCards}
+              title={t('auth_files.jump_to_observation_title', {
+                defaultValue: '跳到下方认证文件卡片观察位',
+              })}
+            >
+              {t('auth_files.jump_to_observation', { defaultValue: '跳到观察位' })}
+            </Button>
             <Button variant="secondary" size="sm" onClick={handleHeaderRefresh} disabled={loading}>
               {t('common.refresh')}
             </Button>
