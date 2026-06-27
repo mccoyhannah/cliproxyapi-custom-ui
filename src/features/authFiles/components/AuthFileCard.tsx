@@ -531,48 +531,63 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       : null;
   const currentCodexPlanType =
     resolvedQuotaType === 'codex' ? normalizePlanType(codexQuotaPlanType) : null;
+  const fileCodexPlanType =
+    resolvedQuotaType === 'codex' ? normalizePlanType(resolveCodexPlanType(file)) : null;
   const effectiveCodexPlanType =
     resolvedQuotaType === 'codex'
-      ? currentCodexPlanType ?? normalizePlanType(resolveCodexPlanType(file))
+      ? currentCodexPlanType ?? fileCodexPlanType
       : null;
+  const accessTokenOnly =
+    resolvedQuotaType === 'codex' && authTokenSnapshot?.hasRefreshToken === false;
+  const manualExpiry = accessTokenOnly ? null : buildManualExpiryRenderInfo(manualExpiryMs);
+  const hasStoredCodexSubscription =
+    resolvedQuotaType === 'codex' &&
+    !accessTokenOnly &&
+    codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
+    Boolean(codexSubscriptionSnapshot.subscriptionActiveUntil);
+  const shouldAssumePlusHeaderPlan =
+    resolvedQuotaType === 'codex' &&
+    !effectiveCodexPlanType &&
+    Boolean(accessTokenOnly || manualExpiry || hasStoredCodexSubscription);
+  const headerCodexPlanType =
+    effectiveCodexPlanType ?? (shouldAssumePlusHeaderPlan ? 'plus' : null);
   const headerCodexPlanLabel = (() => {
-    if (resolvedQuotaType !== 'codex' || !effectiveCodexPlanType) return null;
-    if (effectiveCodexPlanType === 'pro') {
+    if (resolvedQuotaType !== 'codex' || !headerCodexPlanType) return null;
+    if (headerCodexPlanType === 'pro') {
       return t('codex_quota.plan_pro', { defaultValue: 'Pro 20x' });
     }
     if (
-      PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType) &&
-      effectiveCodexPlanType !== 'pro'
+      PREMIUM_CODEX_PLAN_TYPES.has(headerCodexPlanType) &&
+      headerCodexPlanType !== 'pro'
     ) {
       return t('codex_quota.plan_prolite', { defaultValue: 'Pro 5x' });
     }
-    if (effectiveCodexPlanType === 'plus') {
+    if (headerCodexPlanType === 'plus') {
       return t('codex_quota.plan_plus', { defaultValue: 'Plus' });
     }
-    if (effectiveCodexPlanType === 'team') {
+    if (headerCodexPlanType === 'team') {
       return t('codex_quota.plan_team', { defaultValue: '团队版' });
     }
-    if (effectiveCodexPlanType === 'free') {
+    if (headerCodexPlanType === 'free') {
       return t('codex_quota.plan_free', { defaultValue: '免费版' });
     }
     return t('codex_quota.plan_unknown', { defaultValue: '未记录' });
   })();
   const headerCodexPlanToneClass =
-    effectiveCodexPlanType === 'team'
+    headerCodexPlanType === 'team'
       ? styles.planHeaderBadgeTeam
-      : effectiveCodexPlanType === 'plus'
+      : headerCodexPlanType === 'plus'
         ? styles.planHeaderBadgePlus
-        : effectiveCodexPlanType === 'free'
+        : headerCodexPlanType === 'free'
           ? styles.planHeaderBadgeFree
-          : PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType ?? '')
+          : PREMIUM_CODEX_PLAN_TYPES.has(headerCodexPlanType ?? '')
             ? styles.planHeaderBadgePremium
             : styles.planHeaderBadgeMuted;
   const codexPlanCanHaveSubscriptionExpiry =
     resolvedQuotaType === 'codex' &&
-    Boolean(effectiveCodexPlanType) &&
-    effectiveCodexPlanType !== 'free';
-  const accessTokenOnly =
-    resolvedQuotaType === 'codex' && authTokenSnapshot?.hasRefreshToken === false;
+    (effectiveCodexPlanType
+      ? effectiveCodexPlanType !== 'free'
+      : Boolean(accessTokenOnly || manualExpiry || hasStoredCodexSubscription));
   const accessTokenExpiryUnknownLabel = t('auth_files.access_token_expiry_unknown', {
     defaultValue: '无法识别',
   });
@@ -827,16 +842,15 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
           : '';
   const [referenceTimeMs] = useState(() => Date.now());
   const visibleCodexSubscription =
-    resolvedQuotaType === 'codex' &&
-    !accessTokenOnly &&
-    codexPlanCanHaveSubscriptionExpiry &&
-    codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
-    codexSubscriptionSnapshot.subscriptionActiveUntil
+    hasStoredCodexSubscription && codexPlanCanHaveSubscriptionExpiry
       ? codexSubscriptionSnapshot
       : null;
-  const manualExpiry = accessTokenOnly ? null : buildManualExpiryRenderInfo(manualExpiryMs);
   const showManualExpirySetup =
-    !accessTokenOnly && codexPlanCanHaveSubscriptionExpiry && !manualExpiry && !visibleCodexSubscription;
+    !accessTokenOnly &&
+    Boolean(effectiveCodexPlanType) &&
+    codexPlanCanHaveSubscriptionExpiry &&
+    !manualExpiry &&
+    !visibleCodexSubscription;
   const subscriptionWarningMs = 7 * 24 * 60 * 60 * 1000;
   const subscriptionExpiryMs =
     accessTokenOnly

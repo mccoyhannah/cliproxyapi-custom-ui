@@ -1092,8 +1092,15 @@ const renderCodexItems = (
       );
     };
     const getCompactWindowLabel = (window: CodexQuotaWindow) => {
-      if (window.id === 'five-hour') return t('auth_files.codex_quota_five_hour_short');
-      if (window.id === 'weekly') return t('auth_files.codex_quota_weekly_short');
+      if (window.id.includes('five-hour')) {
+        return t('auth_files.codex_quota_five_hour_short', { defaultValue: '5小时' });
+      }
+      if (window.id.includes('monthly')) {
+        return t('auth_files.codex_quota_monthly_short', { defaultValue: '本月' });
+      }
+      if (window.id.includes('weekly')) {
+        return t('auth_files.codex_quota_weekly_short', { defaultValue: '本周' });
+      }
       return window.labelKey
         ? t(window.labelKey, window.labelParams as Record<string, string | number>)
         : window.label;

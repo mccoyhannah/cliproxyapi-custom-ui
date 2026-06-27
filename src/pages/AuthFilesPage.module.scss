@@ -2350,10 +2350,10 @@
 
 .codexCompactQuotaLine {
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 3px 4px;
+  gap: 5px;
+  padding: 4px 5px;
   border: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
-  border-radius: 7px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 24%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
   overflow: visible;
@@ -2553,12 +2553,19 @@ button.codexCompactChip {
 }
 
 .codexCompactQuotaChip {
-  flex: 0 0 auto;
-  justify-content: flex-start;
-  gap: 5px;
-  min-width: 88px;
-  min-height: 21px;
-  padding: 1px 6px 1px 5px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 6px;
+  flex: 0 0 112px;
+  justify-content: stretch;
+  align-items: center;
+  gap: 4px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  min-height: 31px;
+  padding: 4px 8px 5px;
+  border-radius: 8px;
   --codex-quota-accent: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-primary));
   --quota-remaining: 0%;
   color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-primary));
@@ -2588,25 +2595,29 @@ button.codexCompactChip {
 }
 
 .codexCompactQuotaMetric {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: minmax(36px, 1fr) auto;
   align-items: baseline;
-  gap: 3px;
-  flex: 0 0 auto;
+  gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
 .codexCompactQuotaWindow {
-  flex: 0 0 auto;
+  min-width: 0;
   color: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-secondary));
-  font-size: 10px;
-  font-weight: 760;
+  font-size: 10.5px;
+  font-weight: 800;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .codexCompactQuotaPercent {
-  flex: 0 0 auto;
+  justify-self: end;
   color: var(--codex-quota-accent);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 880;
   line-height: 1;
   letter-spacing: 0;
@@ -2615,12 +2626,11 @@ button.codexCompactChip {
 
 .codexCompactQuotaMeter {
   position: relative;
-  display: inline-flex;
+  display: block;
   align-items: center;
-  flex: 1 1 30px;
-  width: 34px;
-  min-width: 28px;
-  height: 10px;
+  width: 100%;
+  min-width: 0;
+  height: 6px;
 }
 
 .codexCompactQuotaMeterTrack {
@@ -2628,10 +2638,10 @@ button.codexCompactChip {
   left: 0;
   right: 0;
   top: 50%;
-  height: 3px;
+  height: 4px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--bg-primary) 40%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, #fff 16%, transparent), transparent),
     color-mix(in srgb, var(--border-color) 62%, transparent);
   transform: translateY(-50%);
   overflow: hidden;
@@ -2643,7 +2653,7 @@ button.codexCompactChip {
   top: 50%;
   width: var(--quota-remaining);
   max-width: 100%;
-  height: 3px;
+  height: 4px;
   border-radius: 999px;
   background: linear-gradient(
     90deg,
@@ -2656,10 +2666,10 @@ button.codexCompactChip {
 
 .codexCompactQuotaMeterDot {
   position: absolute;
-  left: var(--quota-remaining);
+  left: clamp(3px, var(--quota-remaining), calc(100% - 3px));
   top: 50%;
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border: 1px solid color-mix(in srgb, var(--bg-primary) 78%, transparent);
   border-radius: 999px;
   background: var(--codex-quota-accent);
@@ -2879,9 +2889,9 @@ button.codexSubscriptionValue {
 }
 
 :global([data-theme='dark']) .planHeaderBadgePlus {
-  border-color: rgba(148, 163, 184, 0.2);
-  background: rgba(148, 163, 184, 0.06);
-  color: color-mix(in srgb, #cbd5e1 72%, var(--text-secondary));
+  border-color: rgba(96, 165, 250, 0.3);
+  background: rgba(59, 130, 246, 0.1);
+  color: #93c5fd;
 }
 
 :global([data-theme='dark']) .planHeaderBadgeTeam {
@@ -3285,14 +3295,17 @@ button.codexSubscriptionValue {
   }
 
   .codexCompactQuotaChip {
-    min-width: 82px;
-    max-width: 92px;
-    padding-inline: 5px 6px;
+    flex-basis: 104px;
+    width: 104px;
+    min-width: 104px;
+    max-width: 104px;
+    min-height: 30px;
+    padding: 4px 7px 5px;
   }
 
   .codexCompactQuotaMeter {
-    width: 28px;
-    min-width: 24px;
+    width: 100%;
+    min-width: 0;
   }
 
   .codexCompactPlanChip {
@@ -3612,9 +3625,11 @@ button.subscriptionHeaderBadge {
 }
 
 .planHeaderBadgePlus {
-  color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-primary));
-  border-color: color-mix(in srgb, var(--border-color) 78%, transparent);
-  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 72%, transparent);
+  color: color-mix(in srgb, #2563eb 72%, var(--text-primary));
+  border-color: color-mix(in srgb, #60a5fa 34%, var(--border-color));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fff 18%, transparent), transparent),
+    color-mix(in srgb, #3b82f6 8%, var(--bg-primary));
 }
 
 .planHeaderBadgeTeam {
