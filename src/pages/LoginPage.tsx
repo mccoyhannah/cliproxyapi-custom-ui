@@ -6,10 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { IconEye, IconEyeOff } from '@/components/ui/icons';
-import {
-  AUTH_FILES_FOCUS_CARDS_PATH,
-  requestAuthFilesInitialQuotaRefresh,
-} from '@/router/authFilesFocus';
+import { AUTH_FILES_FOCUS_CARDS_PATH } from '@/router/authFilesFocus';
 import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
 import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection';
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
@@ -41,14 +38,6 @@ function buildLoginRedirect(from?: RedirectLocation): string {
   }
 
   return `${pathname}${search}${hash}`;
-}
-
-function buildPostLoginRedirect(from?: RedirectLocation): string {
-  const redirect = buildLoginRedirect(from);
-  if (redirect === AUTH_FILES_FOCUS_CARDS_PATH) {
-    requestAuthFilesInitialQuotaRefresh();
-  }
-  return redirect;
 }
 
 function getLocalizedErrorMessage(error: unknown, t: (key: string) => string): string {
@@ -161,7 +150,7 @@ export function LoginPage() {
           setAutoLoginSuccess(true);
           // 延迟跳转，让用户看到成功动画
           setTimeout(() => {
-            const redirect = buildPostLoginRedirect((location.state as RedirectState | null)?.from);
+            const redirect = buildLoginRedirect((location.state as RedirectState | null)?.from);
             navigate(redirect, { replace: true });
           }, 1500);
         } else {
@@ -201,7 +190,7 @@ export function LoginPage() {
         rememberPassword,
       });
       showNotification(t('common.connected_status'), 'success');
-      navigate(buildPostLoginRedirect((location.state as RedirectState | null)?.from), {
+      navigate(buildLoginRedirect((location.state as RedirectState | null)?.from), {
         replace: true,
       });
     } catch (err: unknown) {
