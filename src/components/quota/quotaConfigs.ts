@@ -1114,20 +1114,38 @@ const renderCodexItems = (
       const remaining = clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
       const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
       const label = getCompactWindowLabel(window);
+      const title = `${window.label} · ${percentLabel} · ${window.resetLabel}`;
       pushChip(
         quotaNodes,
         `window-${window.id}`,
         h(
           Fragment,
           null,
-          h('span', { className: styleMap.codexCompactQuotaWindow }, label),
-          h('strong', { className: styleMap.codexCompactQuotaPercent }, percentLabel)
+          h(
+            'span',
+            { className: styleMap.codexCompactQuotaMetric },
+            h('span', { className: styleMap.codexCompactQuotaWindow }, label),
+            h('strong', { className: styleMap.codexCompactQuotaPercent }, percentLabel)
+          ),
+          h(
+            'span',
+            {
+              className: styleMap.codexCompactQuotaMeter,
+              style: {
+                '--quota-remaining': remaining === null ? '0%' : `${remaining}%`,
+              } as React.CSSProperties,
+              'aria-hidden': true,
+            },
+            h('span', { className: styleMap.codexCompactQuotaMeterTrack }),
+            h('span', { className: styleMap.codexCompactQuotaMeterFill }),
+            h('span', { className: styleMap.codexCompactQuotaMeterDot })
+          )
         ),
         [
           styleMap.codexCompactQuotaChip,
           getCompactQuotaToneClass(remaining),
         ].filter(Boolean).join(' '),
-        `${window.label} · ${percentLabel} · ${window.resetLabel}`
+        title
       );
     });
 

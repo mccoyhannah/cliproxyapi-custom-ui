@@ -2349,7 +2349,7 @@
 }
 
 .codexCompactQuotaLine {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 4px;
   padding: 3px 4px;
   border: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
@@ -2555,11 +2555,12 @@ button.codexCompactChip {
 .codexCompactQuotaChip {
   flex: 0 0 auto;
   justify-content: flex-start;
-  gap: 3px;
-  min-width: 56px;
+  gap: 5px;
+  min-width: 88px;
   min-height: 21px;
   padding: 1px 6px 1px 5px;
   --codex-quota-accent: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-primary));
+  --quota-remaining: 0%;
   color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-primary));
   border-color: color-mix(in srgb, var(--border-color) 64%, transparent);
   background: color-mix(
@@ -2568,16 +2569,30 @@ button.codexCompactChip {
     var(--bg-primary)
   );
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    box-shadow $transition-fast;
 
   &::before {
-    content: '';
-    width: 5px;
-    height: 5px;
-    border-radius: 999px;
-    background: var(--codex-quota-accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--codex-quota-accent) 12%, transparent);
-    flex: 0 0 auto;
+    content: none;
   }
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--codex-quota-accent) 34%, var(--border-color));
+    background: color-mix(in srgb, var(--codex-quota-accent) 6%, var(--bg-primary));
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--codex-quota-accent) 8%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+  }
+}
+
+.codexCompactQuotaMetric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .codexCompactQuotaWindow {
@@ -2590,12 +2605,66 @@ button.codexCompactChip {
 
 .codexCompactQuotaPercent {
   flex: 0 0 auto;
-  padding-left: 4px;
-  border-left: 1px solid color-mix(in srgb, var(--text-tertiary) 18%, transparent);
   color: var(--codex-quota-accent);
   font-size: 11px;
   font-weight: 880;
   line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.codexCompactQuotaMeter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 30px;
+  width: 34px;
+  min-width: 28px;
+  height: 10px;
+}
+
+.codexCompactQuotaMeterTrack {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--bg-primary) 40%, transparent), transparent),
+    color-mix(in srgb, var(--border-color) 62%, transparent);
+  transform: translateY(-50%);
+  overflow: hidden;
+}
+
+.codexCompactQuotaMeterFill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--quota-remaining);
+  max-width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--codex-quota-accent) 64%, var(--bg-primary)),
+    var(--codex-quota-accent)
+  );
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--codex-quota-accent) 10%, transparent);
+  transform: translateY(-50%);
+}
+
+.codexCompactQuotaMeterDot {
+  position: absolute;
+  left: var(--quota-remaining);
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border: 1px solid color-mix(in srgb, var(--bg-primary) 78%, transparent);
+  border-radius: 999px;
+  background: var(--codex-quota-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--codex-quota-accent) 10%, transparent);
+  transform: translate(-50%, -50%);
 }
 
 .codexCompactQuotaHealthy {
@@ -2633,6 +2702,14 @@ button.codexCompactChip {
   color: var(--text-tertiary);
   border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
   background: color-mix(in srgb, var(--bg-secondary) 30%, transparent);
+
+  .codexCompactQuotaMeterFill {
+    opacity: 0;
+  }
+
+  .codexCompactQuotaMeterDot {
+    opacity: 0.42;
+  }
 }
 
 .codexValueMuted {
@@ -3208,8 +3285,14 @@ button.codexSubscriptionValue {
   }
 
   .codexCompactQuotaChip {
-    max-width: 74px;
-    padding-inline: 6px 7px;
+    min-width: 82px;
+    max-width: 92px;
+    padding-inline: 5px 6px;
+  }
+
+  .codexCompactQuotaMeter {
+    width: 28px;
+    min-width: 24px;
   }
 
   .codexCompactPlanChip {
