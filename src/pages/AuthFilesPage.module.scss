@@ -3012,8 +3012,8 @@ button.codexSubscriptionValue {
 }
 
 .fileCardCompactPlanPlus {
-  --compact-plan-card-accent: #d97706;
-  --compact-plan-card-wash: rgba(217, 119, 6, 0.08);
+  --compact-plan-card-accent: #3b82f6;
+  --compact-plan-card-wash: rgba(59, 130, 246, 0.045);
 }
 
 .fileCardCompactPlanFree {
@@ -3032,7 +3032,7 @@ button.codexSubscriptionValue {
 .fileCard.fileCardCompactPlanPremium {
   border-color: color-mix(
     in srgb,
-    var(--compact-plan-card-accent, var(--primary-color)) 34%,
+    var(--compact-plan-card-accent, var(--primary-color)) 24%,
     var(--border-color)
   );
   background:
@@ -3049,13 +3049,13 @@ button.codexSubscriptionValue {
       var(--compact-plan-card-accent, var(--primary-color)),
       color-mix(in srgb, var(--compact-plan-card-accent, var(--primary-color)) 36%, transparent)
     );
-    opacity: 0.92;
+    opacity: 0.66;
   }
 
   &:hover {
     border-color: color-mix(
       in srgb,
-      var(--compact-plan-card-accent, var(--primary-color)) 46%,
+      var(--compact-plan-card-accent, var(--primary-color)) 34%,
       var(--border-color)
     );
   }

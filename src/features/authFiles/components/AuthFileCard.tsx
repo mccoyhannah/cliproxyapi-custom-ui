@@ -1215,7 +1215,20 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       : hasVisibleStatusWarning
         ? styles.stateBadgeWarning
         : styles.stateBadgeActive;
+  const cardPlanToneClass =
+    hasCredentialInvalidStatus || file.disabled || isRuntimeOnly
+      ? ''
+      : headerCodexPlanType === 'team'
+        ? styles.fileCardCompactPlanTeam
+        : headerCodexPlanType === 'plus'
+          ? styles.fileCardCompactPlanPlus
+          : headerCodexPlanType === 'free'
+            ? styles.fileCardCompactPlanFree
+            : PREMIUM_CODEX_PLAN_TYPES.has(headerCodexPlanType ?? '')
+              ? styles.fileCardCompactPlanPremium
+              : '';
   const cardToneClass = [
+    cardPlanToneClass,
     isRuntimeOnly ? styles.fileCardVirtual : '',
     hasVisibleQuotaError ? styles.fileCardQuotaError : '',
   ]
