@@ -255,6 +255,17 @@ const formatStatusDuration = (durationMs: number): string => {
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 };
 
+const toHeaderDateLabel = (value: string): string => {
+  const normalized = value
+    .trim()
+    .replace(/\u200e|\u200f/g, '')
+    .replace(/,/g, ' ')
+    .replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  const [datePart] = normalized.split(' ');
+  return datePart || normalized;
+};
+
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
@@ -935,9 +946,64 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   };
   const authFileStatusBadgeClass =
     visibleAuthFileStatusProblem?.category === 'credential_invalid'
-      ? styles.stateBadgeQuotaError
+      ? `${styles.stateBadgeQuotaError} ${styles.credentialInvalidHeaderBadge}`
       : styles.stateBadgeWarning;
+  const hasCredentialInvalidStatus =
+    visibleAuthFileStatusProblem?.category === 'credential_invalid' ||
+    visibleQuotaStatusProblem?.category === 'credential_invalid' ||
+    quotaCredentialError;
+  const showHeaderCodexPlan = Boolean(headerCodexPlanLabel) && !hasCredentialInvalidStatus;
+  const headerSubscriptionDateLabel = accessTokenOnly
+    ? formatCodexSubscriptionShortDate(
+        authTokenSnapshot?.accessTokenExpiresAtMs,
+        authTokenSnapshot?.accessTokenExpiresAt
+      ) || accessTokenExpiryUnknownLabel
+    : (manualExpiry?.label ??
+      formatCodexSubscriptionShortDate(
+        visibleCodexSubscription?.subscriptionActiveUntilMs,
+        visibleCodexSubscription?.subscriptionActiveUntil
+      ));
+  const compactHeaderSubscriptionDateLabel = toHeaderDateLabel(headerSubscriptionDateLabel);
+  const headerSubscriptionLabel = showManualExpirySetup
+    ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
+    : accessTokenOnly
+      ? accessTokenExpired
+        ? t('auth_files.access_token_expired_header_badge', {
+            date: compactHeaderSubscriptionDateLabel,
+            defaultValue: 'Access 已过期 {{date}}',
+          })
+        : t('auth_files.access_token_expiry_header_badge', {
+            date: compactHeaderSubscriptionDateLabel,
+            defaultValue: 'Access 有效至 {{date}}',
+          })
+      : subscriptionExpired
+        ? t('auth_files.subscription_expired_header_badge', {
+            date: compactHeaderSubscriptionDateLabel,
+            defaultValue: '已过期 {{date}}',
+          })
+        : subscriptionExpiringSoon
+          ? t('auth_files.subscription_expiring_soon_header_badge', {
+              date: compactHeaderSubscriptionDateLabel,
+              defaultValue: '临期 {{date}}',
+            })
+          : t('auth_files.subscription_valid_until_header_badge', {
+              date: compactHeaderSubscriptionDateLabel,
+              defaultValue: '有效至 {{date}}',
+            });
+  const headerSubscriptionToneClass = showManualExpirySetup
+    ? styles.subscriptionHeaderUnset
+    : subscriptionExpired || accessTokenExpired
+      ? styles.subscriptionHeaderExpired
+      : subscriptionExpiringSoon
+        ? styles.subscriptionHeaderWarning
+        : styles.subscriptionHeaderHealthy;
+  const showHeaderSubscriptionMeta =
+    !hasCredentialInvalidStatus &&
+    Boolean(accessTokenOnly || manualExpiry || visibleCodexSubscription || showManualExpirySetup);
+  const headerSubscriptionEditable = !accessTokenOnly && !disableControls && !isRuntimeOnly;
   const showSubscriptionMeta =
+    !hasCredentialInvalidStatus &&
+    !showHeaderSubscriptionMeta &&
     Boolean(accessTokenOnly || manualExpiry || visibleCodexSubscription || showManualExpirySetup) &&
     !showQuotaLayout;
 
@@ -1193,7 +1259,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 >
                   {typeLabel}
                 </span>
-                {headerCodexPlanLabel && (
+                {showHeaderCodexPlan && (
                   <span
                     className={`${styles.planHeaderBadge} ${headerCodexPlanToneClass}`}
                     title={`${t('codex_quota.plan_label', { defaultValue: '套餐' })} ${headerCodexPlanLabel}`}
@@ -1201,6 +1267,24 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                     {headerCodexPlanLabel}
                   </span>
                 )}
+                {showHeaderSubscriptionMeta &&
+                  (headerSubscriptionEditable ? (
+                    <button
+                      type="button"
+                      className={`${styles.subscriptionHeaderBadge} ${headerSubscriptionToneClass}`}
+                      title={subscriptionExpiryLabel || undefined}
+                      onClick={() => onManualExpiryEdit(file)}
+                    >
+                      <span>{headerSubscriptionLabel}</span>
+                    </button>
+                  ) : (
+                    <span
+                      className={`${styles.subscriptionHeaderBadge} ${headerSubscriptionToneClass}`}
+                      title={subscriptionExpiryLabel || undefined}
+                    >
+                      <span>{headerSubscriptionLabel}</span>
+                    </span>
+                  ))}
                 {!isRuntimeOnly && (
                   <button
                     type="button"
@@ -1258,7 +1342,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                             visibleQuotaStatusProblem &&
                             visibleQuotaStatusProblem.category !== 'credential_invalid'
                               ? styles.stateBadgeWarning
-                              : styles.stateBadgeQuotaError
+                              : `${styles.stateBadgeQuotaError} ${styles.credentialInvalidHeaderBadge}`
                           }`}
                           tabIndex={0}
                         >

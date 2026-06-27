@@ -1131,59 +1131,6 @@ const renderCodexItems = (
       );
     });
 
-    if (hasSubscriptionExpiry || canSetManualSubscriptionExpiry) {
-      const expiryLabelKey = accessTokenOnly
-        ? 'auth_files.access_token_expiry_short_label'
-        : 'auth_files.subscription_expiry_short_label';
-      const expiryValue = accessTokenOnly
-        ? formatCodexSubscriptionShortDate(
-            effectiveSubscriptionActiveUntilMs,
-            effectiveSubscriptionActiveUntil
-          ) || t('auth_files.access_token_expiry_unknown', { defaultValue: '无法识别' })
-        : manualExpiry?.label ??
-          formatCodexSubscriptionShortDate(
-            effectiveSubscriptionActiveUntilMs,
-            effectiveSubscriptionActiveUntil
-          );
-
-      pushChip(
-        identityNodes,
-        'subscription-expiry',
-        h(
-          Fragment,
-          null,
-          h(
-            'span',
-            { className: styleMap.codexSubscriptionLabel },
-            t(expiryLabelKey, { defaultValue: accessTokenOnly ? 'Access 到期' : '到期' })
-          ),
-          h(
-            'strong',
-            { className: styleMap.codexSubscriptionDate },
-            canSetManualSubscriptionExpiry
-              ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
-              : expiryValue
-          )
-        ),
-        [
-          styleMap.codexSubscriptionValue,
-          styleMap.codexSubscriptionExpiryChip,
-          subscriptionStatusClass,
-        ].filter(Boolean).join(' '),
-        canSetManualSubscriptionExpiry
-          ? t('auth_files.manual_expiry_setup_title', {
-              defaultValue: '为该付费套餐手动设置有效期',
-            })
-          : accessTokenOnly
-            ? (effectiveSubscriptionActiveUntil ??
-              t('auth_files.access_token_expiry_unknown_title', {
-                defaultValue: '没有 refresh_token，且无法识别 access_token 到期时间',
-              }))
-            : effectiveSubscriptionActiveUntil,
-        accessTokenOnly ? undefined : helpers.onManualExpiryEdit
-      );
-    }
-
     if (identityNodes.length === 0 && quotaNodes.length === 0) return null;
 
     return h(

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -12,9 +12,6 @@ import { useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import type { ManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
 import {
-  formatCodexSubscriptionShortDate,
-  normalizePlanType,
-  resolveCodexPlanType,
   type CodexAuthTokenSnapshot,
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
@@ -59,7 +56,6 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     onManualExpiryEdit,
   } = props;
   const { t } = useTranslation();
-  const [referenceTimeMs] = useState(() => Date.now());
 
   const quota = useQuotaStore((state) => {
     if (quotaType === 'antigravity') return state.antigravityQuota[file.name] as QuotaState;
@@ -88,26 +84,6 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         : quotaStatus === 'success'
           ? styles.quotaSectionReady
           : styles.quotaSectionIdle;
-  const compactCodexExpiry =
-    compact &&
-    quotaType === 'codex' &&
-    authTokenSnapshot?.hasRefreshToken !== false &&
-    normalizePlanType(resolveCodexPlanType(file)) !== 'free' &&
-    codexSubscriptionSnapshot?.subscriptionStatus === 'found' &&
-    codexSubscriptionSnapshot.subscriptionActiveUntil
-      ? codexSubscriptionSnapshot
-      : null;
-  const compactAccessTokenOnly = compact && quotaType === 'codex' && authTokenSnapshot?.hasRefreshToken === false;
-  const compactCodexPlanType =
-    compact && quotaType === 'codex' ? normalizePlanType(resolveCodexPlanType(file)) : null;
-  const compactCanSetManualExpiry =
-    compact &&
-    quotaType === 'codex' &&
-    !compactAccessTokenOnly &&
-    Boolean(compactCodexPlanType) &&
-    compactCodexPlanType !== 'free' &&
-    !manualExpiry &&
-    !compactCodexExpiry;
 
   if ((compact || summaryOnly) && quotaType === 'codex') {
     if (quotaStatus === 'error') {
@@ -148,74 +124,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
       );
     }
 
-    if (
-      !compactAccessTokenOnly &&
-      !manualExpiry &&
-      !compactCodexExpiry &&
-      !compactCanSetManualExpiry
-    ) return null;
-
-    const expiryMs = compactAccessTokenOnly
-      ? authTokenSnapshot?.accessTokenExpiresAtMs
-      : (manualExpiry?.expiresAtMs ?? compactCodexExpiry?.subscriptionActiveUntilMs);
-    const warningMs = 7 * 24 * 60 * 60 * 1000;
-    const expiryClass = compactCanSetManualExpiry
-      ? styles.codexSubscriptionUnset
-      : compactAccessTokenOnly && (expiryMs === null || expiryMs === undefined)
-        ? styles.codexSubscriptionWarning
-      : expiryMs !== null && expiryMs !== undefined && expiryMs <= referenceTimeMs
-        ? styles.codexSubscriptionExpired
-        : expiryMs !== null && expiryMs !== undefined && expiryMs - referenceTimeMs <= warningMs
-          ? styles.codexSubscriptionWarning
-          : styles.codexSubscriptionHealthy;
-    const expiryTitle = compactAccessTokenOnly
-      ? authTokenSnapshot?.accessTokenExpiresAt ??
-        t('auth_files.access_token_expiry_unknown_title', {
-          defaultValue: '没有 refresh_token，且无法识别 access_token 到期时间',
-        })
-      : (manualExpiry?.title ??
-        compactCodexExpiry?.subscriptionActiveUntil ??
-        t('auth_files.manual_expiry_setup_title', {
-          defaultValue: '为该付费套餐手动设置有效期',
-        }));
-    const expiryLabel = compactAccessTokenOnly
-      ? t('auth_files.access_token_expiry_short_label', { defaultValue: 'Access 到期' })
-      : t('auth_files.subscription_expiry_short_label');
-    const expiryValue = compactAccessTokenOnly
-      ? formatCodexSubscriptionShortDate(expiryMs, authTokenSnapshot?.accessTokenExpiresAt) ||
-        t('auth_files.access_token_expiry_unknown', { defaultValue: '无法识别' })
-      : compactCanSetManualExpiry
-        ? t('auth_files.manual_expiry_setup_chip', { defaultValue: '设置有效期' })
-        : (manualExpiry?.label ??
-          formatCodexSubscriptionShortDate(
-            compactCodexExpiry?.subscriptionActiveUntilMs,
-            compactCodexExpiry?.subscriptionActiveUntil
-          ));
-
-    return (
-      <div
-        className={`${styles.quotaSection} ${styles.quotaSectionCompact} ${styles.quotaSectionReady}`}
-      >
-        <div className={`${styles.codexInfoGrid} ${styles.codexInfoGridCompact}`}>
-          {(compactAccessTokenOnly || manualExpiry || compactCodexExpiry || compactCanSetManualExpiry) && (
-            <div className={`${styles.codexInfoItem} ${styles.codexInfoItemCompact}`}>
-              <span className={styles.codexPlanLabel}>
-                {expiryLabel}
-              </span>
-              <span
-                className={`${styles.codexPlanDateValue} ${styles.codexSubscriptionValue} ${expiryClass}`}
-                title={expiryTitle}
-                onClick={compactAccessTokenOnly ? undefined : onManualExpiryEdit}
-                role={!compactAccessTokenOnly && onManualExpiryEdit ? 'button' : undefined}
-                tabIndex={!compactAccessTokenOnly && onManualExpiryEdit ? 0 : undefined}
-              >
-                {expiryValue}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (compact) return null;
