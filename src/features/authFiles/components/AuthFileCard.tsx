@@ -524,16 +524,38 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     resolvedQuotaType === 'codex'
       ? currentCodexPlanType ?? normalizePlanType(resolveCodexPlanType(file))
       : null;
-  const compactPlanToneClass =
-    compact && effectiveCodexPlanType === 'team'
-      ? styles.fileCardCompactPlanTeam
-      : compact && effectiveCodexPlanType === 'plus'
-        ? styles.fileCardCompactPlanPlus
-        : compact && effectiveCodexPlanType === 'free'
-          ? styles.fileCardCompactPlanFree
-          : compact && PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType ?? '')
-            ? styles.fileCardCompactPlanPremium
-            : '';
+  const headerCodexPlanLabel = (() => {
+    if (resolvedQuotaType !== 'codex' || !effectiveCodexPlanType) return null;
+    if (effectiveCodexPlanType === 'pro') {
+      return t('codex_quota.plan_pro', { defaultValue: 'Pro 20x' });
+    }
+    if (
+      PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType) &&
+      effectiveCodexPlanType !== 'pro'
+    ) {
+      return t('codex_quota.plan_prolite', { defaultValue: 'Pro 5x' });
+    }
+    if (effectiveCodexPlanType === 'plus') {
+      return t('codex_quota.plan_plus', { defaultValue: 'Plus' });
+    }
+    if (effectiveCodexPlanType === 'team') {
+      return t('codex_quota.plan_team', { defaultValue: '团队版' });
+    }
+    if (effectiveCodexPlanType === 'free') {
+      return t('codex_quota.plan_free', { defaultValue: '免费版' });
+    }
+    return t('codex_quota.plan_unknown', { defaultValue: '未记录' });
+  })();
+  const headerCodexPlanToneClass =
+    effectiveCodexPlanType === 'team'
+      ? styles.planHeaderBadgeTeam
+      : effectiveCodexPlanType === 'plus'
+        ? styles.planHeaderBadgePlus
+        : effectiveCodexPlanType === 'free'
+          ? styles.planHeaderBadgeFree
+          : PREMIUM_CODEX_PLAN_TYPES.has(effectiveCodexPlanType ?? '')
+            ? styles.planHeaderBadgePremium
+            : styles.planHeaderBadgeMuted;
   const codexPlanCanHaveSubscriptionExpiry =
     resolvedQuotaType === 'codex' &&
     Boolean(effectiveCodexPlanType) &&
@@ -1122,7 +1144,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
 
   return (
     <div
-      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${compactPlanToneClass} ${cardToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
+      className={`${styles.fileCard} ${compact ? styles.fileCardCompact : ''} ${cardToneClass} ${selected ? styles.fileCardSelected : ''} ${file.disabled ? styles.fileCardDisabled : ''}`}
     >
       {isRuntimeOnly && (
         <div className={styles.runtimeLockRibbon}>
@@ -1171,6 +1193,14 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 >
                   {typeLabel}
                 </span>
+                {headerCodexPlanLabel && (
+                  <span
+                    className={`${styles.planHeaderBadge} ${headerCodexPlanToneClass}`}
+                    title={`${t('codex_quota.plan_label', { defaultValue: '套餐' })} ${headerCodexPlanLabel}`}
+                  >
+                    {headerCodexPlanLabel}
+                  </span>
+                )}
                 {!isRuntimeOnly && (
                   <button
                     type="button"

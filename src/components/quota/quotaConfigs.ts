@@ -1108,21 +1108,6 @@ const renderCodexItems = (
       return styleMap.codexCompactQuotaHealthy;
     };
 
-    if (planLabel) {
-      pushChip(
-        identityNodes,
-        'plan',
-        h(
-          Fragment,
-          null,
-          h('span', { className: styleMap.codexCompactPlanLabel }, t('codex_quota.plan_label')),
-          h('strong', null, planDisplayValue)
-        ),
-        [styleMap.codexCompactPlanChip, planToneClass].filter(Boolean).join(' '),
-        `${t('codex_quota.plan_label')} ${planDisplayValue}`
-      );
-    }
-
     windows.slice(0, 2).forEach((window) => {
       const used = window.usedPercent;
       const clampedUsed = used === null ? null : Math.max(0, Math.min(100, used));
@@ -1226,7 +1211,7 @@ const renderCodexItems = (
             h(
               'span',
               { className: styleMap.codexCompactQuotaGroupLabel },
-              t('auth_files.quota_group_label', { defaultValue: '限额' })
+              t('auth_files.quota_group_label', { defaultValue: '额度' })
             ),
             ...quotaNodes
           )

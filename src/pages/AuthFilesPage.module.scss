@@ -2318,7 +2318,7 @@
   flex-direction: column;
   align-items: flex-start;
   flex-wrap: nowrap;
-  gap: 3px;
+  gap: 4px;
   width: fit-content;
   max-width: 100%;
   min-width: 0;
@@ -2342,17 +2342,20 @@
 
 .codexCompactIdentityLine {
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 3px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.1;
 }
 
 .codexCompactQuotaLine {
   flex-wrap: nowrap;
   gap: 4px;
-  padding: 2px 4px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 38%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 30%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 9%, transparent);
+  padding: 3px 4px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 46%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 24%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
   overflow: visible;
 }
 
@@ -2361,10 +2364,10 @@
   align-items: center;
   flex: 0 0 auto;
   height: 17px;
-  padding: 0 2px;
+  padding: 0 1px;
   color: var(--text-tertiary);
   font-size: 9px;
-  font-weight: 820;
+  font-weight: 760;
   line-height: 1;
   white-space: nowrap;
 }
@@ -2552,72 +2555,84 @@ button.codexCompactChip {
 .codexCompactQuotaChip {
   flex: 0 0 auto;
   justify-content: flex-start;
-  gap: 5px;
+  gap: 3px;
   min-width: 56px;
-  min-height: 22px;
-  padding: 1px 7px 1px 6px;
-  color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-primary));
+  min-height: 21px;
+  padding: 1px 6px 1px 5px;
+  --codex-quota-accent: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-primary));
+  color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--border-color) 64%, transparent);
   background: color-mix(
     in srgb,
-    var(--surface-control, var(--bg-secondary)) 86%,
+    var(--surface-control, var(--bg-secondary)) 72%,
     var(--bg-primary)
   );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+
+  &::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--codex-quota-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--codex-quota-accent) 12%, transparent);
+    flex: 0 0 auto;
+  }
 }
 
 .codexCompactQuotaWindow {
   flex: 0 0 auto;
-  color: color-mix(in srgb, currentColor 70%, var(--text-secondary));
+  color: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-secondary));
   font-size: 10px;
-  font-weight: 780;
+  font-weight: 760;
   line-height: 1;
 }
 
 .codexCompactQuotaPercent {
   flex: 0 0 auto;
-  padding-left: 5px;
-  border-left: 1px solid color-mix(in srgb, currentColor 22%, transparent);
-  color: currentColor;
+  padding-left: 4px;
+  border-left: 1px solid color-mix(in srgb, var(--text-tertiary) 18%, transparent);
+  color: var(--codex-quota-accent);
   font-size: 11px;
   font-weight: 880;
   line-height: 1;
 }
 
 .codexCompactQuotaHealthy {
-  color: color-mix(in srgb, var(--success-color) 78%, var(--text-primary));
-  border-color: color-mix(in srgb, var(--success-color) 34%, var(--border-color));
-  background: color-mix(in srgb, var(--success-color) 10%, var(--bg-primary));
+  --codex-quota-accent: color-mix(in srgb, var(--success-color) 82%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--success-color) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--success-color) 5%, var(--bg-primary));
 }
 
 .codexCompactQuotaNormal {
-  color: color-mix(in srgb, #475569 78%, var(--text-primary));
-  border-color: color-mix(in srgb, #64748b 36%, var(--border-color));
-  background: color-mix(in srgb, #64748b 10%, var(--bg-primary));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #fff 18%, transparent);
+  --codex-quota-accent: color-mix(in srgb, #64748b 82%, var(--text-primary));
+  border-color: color-mix(in srgb, #64748b 24%, var(--border-color));
+  background: color-mix(in srgb, #64748b 5%, var(--bg-primary));
 }
 
 .codexCompactQuotaWarning {
-  color: var(--warning-text);
-  border-color: color-mix(in srgb, var(--warning-border) 74%, var(--border-color));
-  background: color-mix(in srgb, var(--warning-bg) 72%, var(--bg-primary));
+  --codex-quota-accent: var(--warning-text);
+  border-color: color-mix(in srgb, var(--warning-border) 48%, var(--border-color));
+  background: color-mix(in srgb, var(--warning-bg) 36%, var(--bg-primary));
 }
 
 .codexCompactQuotaCritical {
-  color: color-mix(in srgb, var(--danger-color) 88%, var(--text-primary));
-  border-color: color-mix(in srgb, var(--danger-color) 42%, var(--border-color));
-  background: color-mix(in srgb, var(--danger-color) 10%, var(--bg-primary));
+  --codex-quota-accent: color-mix(in srgb, var(--danger-color) 88%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--danger-color) 32%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 7%, var(--bg-primary));
 }
 
 .codexCompactQuotaEmpty {
-  color: var(--danger-color);
-  border-color: color-mix(in srgb, var(--danger-color) 58%, var(--border-color));
-  background: color-mix(in srgb, var(--danger-color) 16%, var(--bg-primary));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger-color) 10%, transparent);
+  --codex-quota-accent: var(--danger-color);
+  border-color: color-mix(in srgb, var(--danger-color) 44%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 9%, var(--bg-primary));
 }
 
 .codexCompactQuotaUnknown {
+  --codex-quota-accent: var(--text-tertiary);
   color: var(--text-tertiary);
-  border-color: color-mix(in srgb, var(--border-color) 68%, transparent);
-  background: transparent;
+  border-color: color-mix(in srgb, var(--border-color) 58%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 30%, transparent);
 }
 
 .codexValueMuted {
@@ -2689,6 +2704,60 @@ button.codexSubscriptionValue {
   white-space: nowrap;
 }
 
+.codexCompactIdentityLine .codexSubscriptionValue {
+  min-height: 18px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-tertiary);
+  box-shadow: none;
+  font-weight: 690;
+}
+
+.codexCompactIdentityLine .codexSubscriptionExpiryChip {
+  gap: 3px;
+}
+
+.codexCompactIdentityLine .codexSubscriptionLabel {
+  color: color-mix(in srgb, var(--text-tertiary) 86%, var(--text-secondary));
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.codexCompactIdentityLine .codexSubscriptionDate {
+  color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-tertiary));
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.codexCompactIdentityLine .codexSubscriptionWarning,
+.codexCompactIdentityLine .codexSubscriptionExpired,
+.codexCompactIdentityLine .codexSubscriptionUnset {
+  min-height: 18px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+}
+
+.codexCompactIdentityLine .codexSubscriptionWarning {
+  color: var(--warning-text);
+  background: color-mix(in srgb, var(--warning-bg) 30%, transparent);
+  border-color: color-mix(in srgb, var(--warning-border) 46%, transparent);
+}
+
+.codexCompactIdentityLine .codexSubscriptionExpired {
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 7%, transparent);
+  border-color: color-mix(in srgb, var(--danger-color) 34%, transparent);
+}
+
+.codexCompactIdentityLine .codexSubscriptionUnset {
+  color: color-mix(in srgb, var(--primary-color) 70%, var(--text-secondary));
+  background: color-mix(in srgb, var(--primary-color) 7%, transparent);
+  border-color: color-mix(in srgb, var(--primary-color) 28%, transparent);
+}
+
 .codexSubscriptionHealthy {
   color: #2563eb;
   border-color: color-mix(in srgb, #2563eb 32%, var(--border-color));
@@ -2724,6 +2793,30 @@ button.codexSubscriptionValue {
   color: #93c5fd;
   border-color: rgba(147, 197, 253, 0.34);
   background: rgba(59, 130, 246, 0.12);
+}
+
+:global([data-theme='dark']) .planHeaderBadge {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(148, 163, 184, 0.08);
+  color: color-mix(in srgb, #cbd5e1 78%, var(--text-secondary));
+}
+
+:global([data-theme='dark']) .planHeaderBadgePlus {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(148, 163, 184, 0.06);
+  color: color-mix(in srgb, #cbd5e1 72%, var(--text-secondary));
+}
+
+:global([data-theme='dark']) .planHeaderBadgeTeam {
+  color: #8de7f2;
+  border-color: rgba(103, 232, 249, 0.24);
+  background: rgba(8, 145, 178, 0.09);
+}
+
+:global([data-theme='dark']) .planHeaderBadgePremium {
+  color: #f7d981;
+  border-color: rgba(226, 180, 50, 0.24);
+  background: rgba(226, 180, 50, 0.08);
 }
 
 .premiumPlanValue {
@@ -3289,6 +3382,57 @@ button.codexSubscriptionValue {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.planHeaderBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 19px;
+  padding: 2px 6px 2px 5px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-tertiary) 62%, var(--bg-primary));
+  color: color-mix(in srgb, var(--text-secondary) 82%, var(--text-primary));
+  font-size: 10px;
+  font-weight: 740;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+
+  &::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    margin-right: 4px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.48;
+  }
+}
+
+.planHeaderBadgePlus {
+  color: color-mix(in srgb, var(--text-secondary) 84%, var(--text-primary));
+  border-color: color-mix(in srgb, var(--border-color) 78%, transparent);
+  background: color-mix(in srgb, var(--surface-control, var(--bg-secondary)) 72%, transparent);
+}
+
+.planHeaderBadgeTeam {
+  color: color-mix(in srgb, #0891b2 72%, var(--text-primary));
+  border-color: color-mix(in srgb, #0891b2 24%, var(--border-color));
+  background: color-mix(in srgb, #0891b2 7%, var(--bg-primary));
+}
+
+.planHeaderBadgePremium {
+  color: color-mix(in srgb, #9a6a05 76%, var(--text-primary));
+  border-color: color-mix(in srgb, #d9a516 24%, var(--border-color));
+  background: color-mix(in srgb, #d9a516 7%, var(--bg-primary));
+}
+
+.planHeaderBadgeFree,
+.planHeaderBadgeMuted {
+  color: var(--text-tertiary);
+  border-color: color-mix(in srgb, var(--border-color) 66%, transparent);
+  background: transparent;
 }
 
 .typeBadge {
