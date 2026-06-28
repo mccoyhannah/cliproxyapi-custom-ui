@@ -3012,12 +3012,12 @@ button.codexSubscriptionValue {
 }
 
 .fileCardCompactPlanPlus {
-  --compact-plan-card-accent: #2563eb;
-  --compact-plan-card-wash: rgba(37, 99, 235, 0.078);
-  --compact-plan-card-border-strength: 36%;
-  --compact-plan-card-hover-border-strength: 48%;
-  --compact-plan-card-rail-opacity: 0.88;
-  --compact-plan-card-rail-width: 4px;
+  --compact-plan-card-accent: #60a5fa;
+  --compact-plan-card-wash: rgba(96, 165, 250, 0.026);
+  --compact-plan-card-border-strength: 22%;
+  --compact-plan-card-hover-border-strength: 30%;
+  --compact-plan-card-rail-opacity: 0.48;
+  --compact-plan-card-rail-width: 3px;
 }
 
 .fileCardCompactPlanFree {
@@ -3076,20 +3076,20 @@ button.codexSubscriptionValue {
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--compact-plan-card-accent) 9%, transparent),
-      transparent 88px
+      color-mix(in srgb, var(--compact-plan-card-accent) 2.6%, transparent),
+      transparent 68px
     ),
-    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent 128px),
+    linear-gradient(180deg, color-mix(in srgb, #fff 9%, transparent), transparent 124px),
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--compact-plan-card-accent) 5%, transparent),
+      color-mix(in srgb, var(--compact-plan-card-accent) 1.4%, transparent),
       transparent 58%
     ),
     var(--surface-card);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--compact-plan-card-accent) 7%, transparent),
-    0 14px 34px -34px color-mix(in srgb, var(--compact-plan-card-accent) 44%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--compact-plan-card-accent) 1.8%, transparent),
+    0 12px 28px -36px color-mix(in srgb, var(--compact-plan-card-accent) 14%, transparent);
 
   &::before {
     inset: 0 auto 0 0;
@@ -3097,10 +3097,10 @@ button.codexSubscriptionValue {
     height: auto;
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--compact-plan-card-accent) 92%, #60a5fa),
-      color-mix(in srgb, var(--compact-plan-card-accent) 42%, transparent)
+      color-mix(in srgb, var(--compact-plan-card-accent) 64%, #bfdbfe),
+      color-mix(in srgb, var(--compact-plan-card-accent) 16%, transparent)
     );
-    opacity: var(--compact-plan-card-rail-opacity, 0.88);
+    opacity: var(--compact-plan-card-rail-opacity, 0.48);
   }
 
   &:hover {
@@ -3112,13 +3112,13 @@ button.codexSubscriptionValue {
     background:
       linear-gradient(
         90deg,
-        color-mix(in srgb, var(--compact-plan-card-accent) 11%, transparent),
-        transparent 92px
+        color-mix(in srgb, var(--compact-plan-card-accent) 3.4%, transparent),
+        transparent 72px
       ),
-      linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent 132px),
+      linear-gradient(180deg, color-mix(in srgb, #fff 10%, transparent), transparent 128px),
       linear-gradient(
         135deg,
-        color-mix(in srgb, var(--compact-plan-card-accent) 6%, transparent),
+        color-mix(in srgb, var(--compact-plan-card-accent) 1.8%, transparent),
         transparent 58%
       ),
       var(--surface-card-hover);
