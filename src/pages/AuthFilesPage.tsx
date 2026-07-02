@@ -131,8 +131,10 @@ import {
   AUTH_FILES_FOCUS_CARDS_GRID_ATTR,
   AUTH_FILES_FOCUS_CARDS_HEADER_ATTR,
   consumeAuthFilesInitialQuotaRefresh,
+  getAuthFilesCardsFocusEventDetail,
   getAuthFilesCardsScrollTop,
   isAuthFilesCardsFocusLocation,
+  shouldFocusAuthFilesCards,
 } from '@/router/authFilesFocus';
 import {
   normalizeRecentRequestAuthIndex,
@@ -1032,6 +1034,9 @@ export function AuthFilesPage() {
   const [priorityRotationSidecarError, setPriorityRotationSidecarError] = useState('');
   const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
+  const [fileCardsFocusPinned, setFileCardsFocusPinned] = useState(() =>
+    shouldFocusAuthFilesCards(location)
+  );
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const fileListHeaderRef = useRef<HTMLDivElement>(null);
   const fileGridRef = useRef<HTMLDivElement>(null);
@@ -1982,9 +1987,10 @@ export function AuthFilesPage() {
     const preserveExisting = loadedFilesOnceRef.current || filesLengthRef.current > 0;
     loadedFilesOnceRef.current = true;
     const shouldRunInitialQuotaRefresh =
-      isAuthFilesCardsFocusLocation({
+      shouldFocusAuthFilesCards({
         pathname: location.pathname,
         search: location.search,
+        state: location.state,
       }) &&
       !initialQuotaRefreshConsumedRef.current &&
       consumeAuthFilesInitialQuotaRefresh();
@@ -2007,6 +2013,7 @@ export function AuthFilesPage() {
     loadModelAlias,
     location.pathname,
     location.search,
+    location.state,
     refreshAuthFilesAndCodexQuota,
   ]);
 
@@ -3883,8 +3890,9 @@ export function AuthFilesPage() {
   );
 
   const refocusFileCardsAfterListViewChange = useCallback(() => {
+    if (!fileCardsFocusPinned) return;
     scheduleFileCardsScroll('auto');
-  }, [scheduleFileCardsScroll]);
+  }, [fileCardsFocusPinned, scheduleFileCardsScroll]);
 
   const handleListPageChange = useCallback(
     (nextPage: number) => {
@@ -3905,13 +3913,15 @@ export function AuthFilesPage() {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
 
-    if (!isAuthFilesCardsFocusLocation(location)) {
+    if (!shouldFocusAuthFilesCards(location)) {
       focusedFileListOnOpenRef.current = { search: '', header: false, grid: false };
       return;
     }
-    if (focusedFileListOnOpenRef.current.search !== location.search) {
-      focusedFileListOnOpenRef.current = { search: location.search, header: false, grid: false };
+    const focusIdentity = `${location.key}:${location.search}`;
+    if (focusedFileListOnOpenRef.current.search !== focusIdentity) {
+      focusedFileListOnOpenRef.current = { search: focusIdentity, header: false, grid: false };
     }
+    setFileCardsFocusPinned(true);
 
     const target = fileListHeaderRef.current;
     if (!target) return;
@@ -3933,12 +3943,22 @@ export function AuthFilesPage() {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
 
-    const handleFocusCards = () => {
-      scheduleFileCardsScroll('auto');
+    const handleFocusCards = (event: Event) => {
+      const detail = getAuthFilesCardsFocusEventDetail(event);
+      if (detail?.pinned === false) {
+        setFileCardsFocusPinned(false);
+        return;
+      }
+      if (detail?.pinned === true) {
+        setFileCardsFocusPinned(true);
+        window.requestAnimationFrame(() => scrollToFileCards(detail.behavior ?? 'smooth'));
+        return;
+      }
+      scheduleFileCardsScroll(detail?.behavior ?? 'auto');
     };
     window.addEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
     return () => window.removeEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
-  }, [isCurrentLayer, scheduleFileCardsScroll]);
+  }, [isCurrentLayer, scheduleFileCardsScroll, scrollToFileCards]);
 
   useEffect(() => {
     setBatchActionBarVisible(selectionCount > 0);
@@ -4454,7 +4474,8 @@ export function AuthFilesPage() {
           total: sorted.length,
           defaultValue: `本页 ${pageItems.length} / 筛选 ${sorted.length}`,
         });
-  const shouldRenderFileListFocusBuffer = isAuthFilesCardsFocusLocation(location);
+  const shouldRenderFileListFocusBuffer =
+    fileCardsFocusPinned || isAuthFilesCardsFocusLocation(location);
   const summaryChipItems = [
     {
       key: 'total',

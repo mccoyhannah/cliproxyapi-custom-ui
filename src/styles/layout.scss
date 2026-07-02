@@ -1084,6 +1084,15 @@
   }
 }
 
+.main-header .header-actions .btn[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--ops-accent) 42%, var(--border-base));
+  background: color-mix(in srgb, var(--ops-accent-soft) 72%, var(--floating-surface));
+  color: var(--ops-accent-strong);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--ops-accent) 16%, transparent),
+    var(--shadow-control);
+}
+
 .sidebar {
   padding: 12px 10px;
   gap: 10px;

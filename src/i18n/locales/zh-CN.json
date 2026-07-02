@@ -106,8 +106,8 @@
     "check_connection": "检查连接",
     "refresh_all": "刷新全部",
     "logout": "登出",
-    "auth_files_quick_jump": "回到卡片区",
-    "auth_files_quick_jump_unpin": "解除卡片区固定"
+    "auth_files_quick_jump": "固定观察位",
+    "auth_files_quick_jump_unpin": "解除观察位固定"
   },
   "connection": {
     "title": "连接信息",

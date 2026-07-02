@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { IconInfo } from '@/components/ui/icons';
 import { SecondaryScreenShell } from '@/components/common/SecondaryScreenShell';
 import { useEdgeSwipeBack } from '@/hooks/useEdgeSwipeBack';
-import { AUTH_FILES_FOCUS_CARDS_PATH } from '@/router/authFilesFocus';
+import { AUTH_FILES_PATH, createAuthFilesCardsFocusState } from '@/router/authFilesFocus';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { authFilesApi } from '@/services/api';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
@@ -119,7 +119,7 @@ export function AuthFilesOAuthExcludedEditPage() {
       navigate(-1);
       return;
     }
-    navigate(AUTH_FILES_FOCUS_CARDS_PATH, { replace: true });
+    navigate(AUTH_FILES_PATH, { replace: true, state: createAuthFilesCardsFocusState() });
   }, [location.state, navigate]);
 
   const swipeRef = useEdgeSwipeBack({ onBack: handleBack });

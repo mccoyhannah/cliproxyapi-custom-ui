@@ -106,8 +106,8 @@
     "check_connection": "檢查連線",
     "refresh_all": "全部重新整理",
     "logout": "登出",
-    "auth_files_quick_jump": "回到卡片區",
-    "auth_files_quick_jump_unpin": "解除卡片區固定"
+    "auth_files_quick_jump": "固定觀察位",
+    "auth_files_quick_jump_unpin": "解除觀察位固定"
   },
   "connection": {
     "title": "連線資訊",

@@ -194,8 +194,8 @@ export function HeaderActions({
     ? `v${serverVersion.trim().replace(/^[vV]+/, '')}`
     : t('common.unknown', { defaultValue: 'Unknown' });
   const authFilesQuickJumpLabel = authFilesQuickJumpPinned
-    ? t('header.auth_files_quick_jump_unpin', { defaultValue: '解除卡片区固定' })
-    : t('header.auth_files_quick_jump', { defaultValue: '回到卡片区' });
+    ? t('header.auth_files_quick_jump_unpin', { defaultValue: '解除观察位固定' })
+    : t('header.auth_files_quick_jump', { defaultValue: '固定观察位' });
 
   useEffect(() => {
     if (!openMenu) return;

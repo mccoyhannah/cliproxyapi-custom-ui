@@ -3,12 +3,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PageTransition } from '@/components/common/PageTransition';
 import {
-  AUTH_FILES_FOCUS_CARDS_VALUE,
-  AUTH_FILES_FOCUS_CARDS_EVENT,
-  AUTH_FILES_FOCUS_CARDS_PATH,
+  AUTH_FILES_PATH,
   AUTH_FILES_FOCUS_QUERY_KEY,
-  isAuthFilesCardsFocusLocation,
+  createAuthFilesCardsFocusState,
+  dispatchAuthFilesCardsFocusEvent,
   resolveAuthFilesCardsEnterScrollTop,
+  shouldFocusAuthFilesCards,
 } from '@/router/authFilesFocus';
 import { MainRoutes } from '@/router/MainRoutes';
 import { getRouteOrder, getTransitionVariant } from '@/router/navMeta';
@@ -46,14 +46,17 @@ export function MainLayout() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [authFilesQuickJumpPinnedOverride, setAuthFilesQuickJumpPinnedOverride] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
   const mobileToggleRestoreRef = useRef<HTMLElement | null>(null);
 
   const isLogsPage = location.pathname.startsWith('/logs');
-  const authFilesQuickJumpPinned = isAuthFilesCardsFocusLocation(location);
   const showAuthFilesQuickJump =
-    location.pathname === '/auth-files' || location.pathname.startsWith('/auth-files/');
+    location.pathname === AUTH_FILES_PATH || location.pathname.startsWith(`${AUTH_FILES_PATH}/`);
+  const authFilesCardsFocusRequested = shouldFocusAuthFilesCards(location);
+  const authFilesQuickJumpPinned =
+    showAuthFilesQuickJump && (authFilesCardsFocusRequested || authFilesQuickJumpPinnedOverride);
 
   // 将顶部悬浮控制区高度写入 CSS 变量，供移动端粘性元素和浮层避让。
   useLayoutEffect(() => {
@@ -171,21 +174,26 @@ export function MainLayout() {
 
   const handleAuthFilesQuickJump = useCallback(() => {
     if (authFilesQuickJumpPinned) {
+      setAuthFilesQuickJumpPinnedOverride(false);
+      dispatchAuthFilesCardsFocusEvent({ pinned: false });
+
       const params = new URLSearchParams(location.search);
+      if (!params.has(AUTH_FILES_FOCUS_QUERY_KEY)) return;
+
       params.delete(AUTH_FILES_FOCUS_QUERY_KEY);
       const nextSearch = params.toString();
       navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, { replace: true });
       return;
     }
 
-    if (location.pathname === '/auth-files') {
-      const params = new URLSearchParams(location.search);
-      params.set(AUTH_FILES_FOCUS_QUERY_KEY, AUTH_FILES_FOCUS_CARDS_VALUE);
-      navigate(`${location.pathname}?${params.toString()}`);
-      window.dispatchEvent(new Event(AUTH_FILES_FOCUS_CARDS_EVENT));
+    setAuthFilesQuickJumpPinnedOverride(true);
+
+    if (location.pathname === AUTH_FILES_PATH) {
+      dispatchAuthFilesCardsFocusEvent({ pinned: true, behavior: 'smooth' });
       return;
     }
-    navigate(AUTH_FILES_FOCUS_CARDS_PATH);
+
+    navigate(AUTH_FILES_PATH, { state: createAuthFilesCardsFocusState() });
   }, [authFilesQuickJumpPinned, location.pathname, location.search, navigate]);
 
   const resolveRouteOrder = useCallback(

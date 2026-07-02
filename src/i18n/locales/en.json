@@ -106,7 +106,7 @@
     "check_connection": "Check Connection",
     "refresh_all": "Refresh All",
     "logout": "Logout",
-    "auth_files_quick_jump": "Back to cards",
+    "auth_files_quick_jump": "Pin cards view",
     "auth_files_quick_jump_unpin": "Unpin cards view"
   },
   "connection": {
