@@ -3,8 +3,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PageTransition } from '@/components/common/PageTransition';
 import {
+  AUTH_FILES_FOCUS_CARDS_VALUE,
   AUTH_FILES_FOCUS_CARDS_EVENT,
   AUTH_FILES_FOCUS_CARDS_PATH,
+  AUTH_FILES_FOCUS_QUERY_KEY,
+  isAuthFilesCardsFocusLocation,
   resolveAuthFilesCardsEnterScrollTop,
 } from '@/router/authFilesFocus';
 import { MainRoutes } from '@/router/MainRoutes';
@@ -48,6 +51,7 @@ export function MainLayout() {
   const mobileToggleRestoreRef = useRef<HTMLElement | null>(null);
 
   const isLogsPage = location.pathname.startsWith('/logs');
+  const authFilesQuickJumpPinned = isAuthFilesCardsFocusLocation(location);
   const showAuthFilesQuickJump =
     location.pathname === '/auth-files' || location.pathname.startsWith('/auth-files/');
 
@@ -166,12 +170,23 @@ export function MainLayout() {
   };
 
   const handleAuthFilesQuickJump = useCallback(() => {
+    if (authFilesQuickJumpPinned) {
+      const params = new URLSearchParams(location.search);
+      params.delete(AUTH_FILES_FOCUS_QUERY_KEY);
+      const nextSearch = params.toString();
+      navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, { replace: true });
+      return;
+    }
+
     if (location.pathname === '/auth-files') {
+      const params = new URLSearchParams(location.search);
+      params.set(AUTH_FILES_FOCUS_QUERY_KEY, AUTH_FILES_FOCUS_CARDS_VALUE);
+      navigate(`${location.pathname}?${params.toString()}`);
       window.dispatchEvent(new Event(AUTH_FILES_FOCUS_CARDS_EVENT));
       return;
     }
     navigate(AUTH_FILES_FOCUS_CARDS_PATH);
-  }, [location.pathname, navigate]);
+  }, [authFilesQuickJumpPinned, location.pathname, location.search, navigate]);
 
   const resolveRouteOrder = useCallback(
     (pathname: string) =>
@@ -197,6 +212,7 @@ export function MainLayout() {
           onRefreshAll={handleRefreshAll}
           onAuthFilesQuickJump={handleAuthFilesQuickJump}
           showAuthFilesQuickJump={showAuthFilesQuickJump}
+          authFilesQuickJumpPinned={authFilesQuickJumpPinned}
           onLanguageSelect={setLanguage}
           onThemeSelect={setTheme}
           onLogout={logout}

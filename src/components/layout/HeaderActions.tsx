@@ -21,6 +21,7 @@ interface HeaderActionsProps {
   onRefreshAll: () => void | Promise<void>;
   onAuthFilesQuickJump?: () => void;
   showAuthFilesQuickJump?: boolean;
+  authFilesQuickJumpPinned?: boolean;
   onLanguageSelect: (language: string) => void;
   onThemeSelect: (theme: Theme) => void;
   onLogout: () => void;
@@ -159,6 +160,7 @@ export function HeaderActions({
   onRefreshAll,
   onAuthFilesQuickJump,
   showAuthFilesQuickJump = false,
+  authFilesQuickJumpPinned = false,
   onLanguageSelect,
   onThemeSelect,
   onLogout,
@@ -191,6 +193,9 @@ export function HeaderActions({
   const versionLabel = serverVersion
     ? `v${serverVersion.trim().replace(/^[vV]+/, '')}`
     : t('common.unknown', { defaultValue: 'Unknown' });
+  const authFilesQuickJumpLabel = authFilesQuickJumpPinned
+    ? t('header.auth_files_quick_jump_unpin', { defaultValue: '解除卡片区固定' })
+    : t('header.auth_files_quick_jump', { defaultValue: '回到卡片区' });
 
   useEffect(() => {
     if (!openMenu) return;
@@ -287,12 +292,13 @@ export function HeaderActions({
         </div>
         {showAuthFilesQuickJump && onAuthFilesQuickJump && (
           <Button
-            variant="ghost"
+            variant={authFilesQuickJumpPinned ? 'secondary' : 'ghost'}
             size="sm"
             iconOnly
             onClick={onAuthFilesQuickJump}
-            title={t('header.auth_files_quick_jump', { defaultValue: '回到卡片区' })}
-            aria-label={t('header.auth_files_quick_jump', { defaultValue: '回到卡片区' })}
+            title={authFilesQuickJumpLabel}
+            aria-label={authFilesQuickJumpLabel}
+            aria-pressed={authFilesQuickJumpPinned}
           >
             {headerIcons.cards}
           </Button>

@@ -106,7 +106,8 @@
     "check_connection": "Проверить подключение",
     "refresh_all": "Обновить всё",
     "logout": "Выйти",
-    "auth_files_quick_jump": "К карточкам"
+    "auth_files_quick_jump": "К карточкам",
+    "auth_files_quick_jump_unpin": "Открепить карточки"
   },
   "connection": {
     "title": "Информация о подключении",

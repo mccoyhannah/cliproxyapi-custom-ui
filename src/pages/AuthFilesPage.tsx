@@ -1069,6 +1069,7 @@ export function AuthFilesPage() {
     noteUpdating,
     fileInputRef,
     loadFiles,
+    rememberDisplayNamesForFiles,
     uploadAuthFiles,
     handleUploadClick,
     handleFileChange,
@@ -1248,7 +1249,13 @@ export function AuthFilesPage() {
 
           if (result.status === 'ok') {
             finishCodexOAuthAttempt();
-            void loadFiles({ preserveExisting: true, silent: true });
+            void loadFiles({
+              preserveExisting: true,
+              silent: true,
+              restoreRememberedDisplayNames: 'overwrite',
+              restoreDisplayNameFilter: (file) =>
+                CODEX_CONFIG.filterFn(file) && !isRuntimeOnlyAuthFile(file),
+            });
             showNotification(
               t('auth_files.codex_oauth_success', { defaultValue: 'Codex 认证成功。' }),
               'success'
@@ -1435,6 +1442,7 @@ export function AuthFilesPage() {
     const openRequestId = codexOAuthOpenRequestIdRef.current + 1;
     codexOAuthOpenRequestIdRef.current = openRequestId;
     setCodexOAuthLastUrl('');
+    rememberDisplayNamesForFiles(filesRef.current.filter((file) => CODEX_CONFIG.filterFn(file)));
     let authWindow: Window | null = null;
     if (typeof window !== 'undefined') {
       authWindow = window.open('about:blank', '_blank');
@@ -1530,6 +1538,7 @@ export function AuthFilesPage() {
     clearCodexOAuthPollTimer,
     codexOAuthOpening,
     disableControls,
+    rememberDisplayNamesForFiles,
     showNotification,
     startCodexOAuthPolling,
     t,

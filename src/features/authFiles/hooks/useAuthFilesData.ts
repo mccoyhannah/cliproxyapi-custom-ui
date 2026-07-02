@@ -80,9 +80,13 @@ type ApiErrorLike = Error & {
   status?: number;
 };
 
+type RestoreAuthFileDisplayNameMode = 'missing' | 'overwrite';
+
 export type LoadAuthFilesOptions = {
   silent?: boolean;
   preserveExisting?: boolean;
+  restoreRememberedDisplayNames?: RestoreAuthFileDisplayNameMode;
+  restoreDisplayNameFilter?: (file: AuthFileItem) => boolean;
 };
 
 export type LoadAuthFilesResult = AuthFileItem[] | null;
@@ -105,6 +109,7 @@ export type UseAuthFilesDataResult = {
   noteUpdating: Record<string, boolean>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   loadFiles: (options?: LoadAuthFilesOptions) => Promise<LoadAuthFilesResult>;
+  rememberDisplayNamesForFiles: (filesToRemember: AuthFileItem[]) => void;
   uploadAuthFiles: (filesToUpload: File[]) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
@@ -351,6 +356,70 @@ const rememberExistingDisplayNamesForUpload = async (
   );
 };
 
+type RestoreRememberedAuthFileDisplayNamesOptions = {
+  files: AuthFileItem[];
+  mode: RestoreAuthFileDisplayNameMode;
+  shouldRestore?: (file: AuthFileItem) => boolean;
+  lookupByName?: Map<string, AuthFileDisplayNameLookup>;
+};
+
+type RestoreRememberedAuthFileDisplayNamesResult = {
+  files: AuthFileItem[];
+  restoredCount: number;
+  failedCount: number;
+  skippedExistingCount: number;
+};
+
+const restoreRememberedAuthFileDisplayNames = async ({
+  files,
+  mode,
+  shouldRestore,
+  lookupByName,
+}: RestoreRememberedAuthFileDisplayNamesOptions): Promise<RestoreRememberedAuthFileDisplayNamesResult> => {
+  let nextFiles = files;
+  let restoredCount = 0;
+  let failedCount = 0;
+  let skippedExistingCount = 0;
+
+  for (const file of files) {
+    if (shouldRestore && !shouldRestore(file)) continue;
+
+    const lookup = lookupByName?.get(file.name);
+    const existingNote = readAuthFileNote(file);
+    if (existingNote && mode === 'missing') {
+      skippedExistingCount++;
+      rememberAuthFileDisplayName(file, existingNote, lookup);
+      continue;
+    }
+
+    const rememberedNote = getRememberedAuthFileDisplayName(file, lookup);
+    if (!rememberedNote) continue;
+
+    if (existingNote === rememberedNote) {
+      rememberAuthFileDisplayName(file, rememberedNote, lookup);
+      continue;
+    }
+
+    try {
+      await authFilesApi.patchFields(file.name, { note: rememberedNote });
+      restoredCount++;
+      nextFiles = nextFiles.map((item) =>
+        item.name === file.name ? { ...item, note: rememberedNote } : item
+      );
+      rememberAuthFileDisplayName({ ...file, note: rememberedNote }, rememberedNote, lookup);
+    } catch {
+      failedCount++;
+    }
+  }
+
+  return {
+    files: nextFiles,
+    restoredCount,
+    failedCount,
+    skippedExistingCount,
+  };
+};
+
 export function useAuthFilesData(): UseAuthFilesDataResult {
   const { t } = useTranslation();
   const { showNotification, showConfirmation } = useNotificationStore();
@@ -504,37 +573,56 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     });
   }, [files, selectedFiles.size]);
 
-  const loadFiles = useCallback(async (options: LoadAuthFilesOptions = {}) => {
-    const requestSeq = loadFilesRequestSeqRef.current + 1;
-    loadFilesRequestSeqRef.current = requestSeq;
-    if (!options.silent) {
-      loadFilesLoadingSeqRef.current = requestSeq;
-      setLoading(true);
-    }
-    setError('');
-    try {
-      const data = await authFilesApi.list();
-      if (requestSeq !== loadFilesRequestSeqRef.current) return null;
-      const nextFiles = data?.files || [];
-      const resolvedFiles =
-        options.preserveExisting && filesRef.current.length > 0 && nextFiles.length === 0
-          ? filesRef.current
-          : nextFiles;
-      rememberAuthFileDisplayNames(resolvedFiles);
-      filesRef.current = resolvedFiles;
-      setFiles(resolvedFiles);
-      return resolvedFiles;
-    } catch (err: unknown) {
-      if (requestSeq !== loadFilesRequestSeqRef.current) return null;
-      const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
-      setError(errorMessage);
-      return null;
-    } finally {
-      if (!options.silent && requestSeq === loadFilesLoadingSeqRef.current) {
-        setLoading(false);
+  const loadFiles = useCallback(
+    async (options: LoadAuthFilesOptions = {}) => {
+      const requestSeq = loadFilesRequestSeqRef.current + 1;
+      loadFilesRequestSeqRef.current = requestSeq;
+      if (!options.silent) {
+        loadFilesLoadingSeqRef.current = requestSeq;
+        setLoading(true);
       }
-    }
-  }, [t]);
+      setError('');
+      try {
+        const data = await authFilesApi.list();
+        if (requestSeq !== loadFilesRequestSeqRef.current) return null;
+        const nextFiles = data?.files || [];
+        const resolvedFiles =
+          options.preserveExisting && filesRef.current.length > 0 && nextFiles.length === 0
+            ? filesRef.current
+            : nextFiles;
+        const finalFiles = options.restoreRememberedDisplayNames
+          ? (
+              await restoreRememberedAuthFileDisplayNames({
+                files: resolvedFiles,
+                mode: options.restoreRememberedDisplayNames,
+                shouldRestore: options.restoreDisplayNameFilter,
+              })
+            ).files
+          : resolvedFiles;
+        if (requestSeq !== loadFilesRequestSeqRef.current) return null;
+        rememberAuthFileDisplayNames(finalFiles);
+        filesRef.current = finalFiles;
+        setFiles(finalFiles);
+        return finalFiles;
+      } catch (err: unknown) {
+        if (requestSeq !== loadFilesRequestSeqRef.current) return null;
+        const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
+        setError(errorMessage);
+        return null;
+      } finally {
+        if (!options.silent && requestSeq === loadFilesLoadingSeqRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [t]
+  );
+
+  const rememberDisplayNamesForFiles = useCallback((filesToRemember: AuthFileItem[]) => {
+    filesToRemember.forEach((file) => {
+      rememberAuthFileDisplayName(file, readAuthFileNote(file));
+    });
+  }, []);
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -675,46 +763,16 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             )
             .map((item) => item.originalName);
 
-          let nextRefreshedFiles = refreshedFiles;
-          let restoredDisplayNameCount = 0;
-          let restoreDisplayNameFailedCount = 0;
-          let skippedExistingDisplayNameCount = 0;
-
-          for (const file of refreshedFiles) {
-            if (!uploadedNameSet.has(file.name)) continue;
-
-            const existingNote = typeof file.note === 'string' ? file.note.trim() : '';
-            if (existingNote) {
-              skippedExistingDisplayNameCount++;
-              rememberAuthFileDisplayName(
-                file,
-                existingNote,
-                uploadDisplayNameLookupByName.get(file.name)
-              );
-              continue;
-            }
-
-            const rememberedNote = getRememberedAuthFileDisplayName(
-              file,
-              uploadDisplayNameLookupByName.get(file.name)
-            );
-            if (!rememberedNote) continue;
-
-            try {
-              await authFilesApi.patchFields(file.name, { note: rememberedNote });
-              restoredDisplayNameCount++;
-              nextRefreshedFiles = nextRefreshedFiles.map((item) =>
-                item.name === file.name ? { ...item, note: rememberedNote } : item
-              );
-              rememberAuthFileDisplayName(
-                { ...file, note: rememberedNote },
-                rememberedNote,
-                uploadDisplayNameLookupByName.get(file.name)
-              );
-            } catch {
-              restoreDisplayNameFailedCount++;
-            }
-          }
+          const displayNameRestore = await restoreRememberedAuthFileDisplayNames({
+            files: refreshedFiles,
+            mode: 'missing',
+            shouldRestore: (file) => uploadedNameSet.has(file.name),
+            lookupByName: uploadDisplayNameLookupByName,
+          });
+          const nextRefreshedFiles = displayNameRestore.files;
+          const restoredDisplayNameCount = displayNameRestore.restoredCount;
+          const restoreDisplayNameFailedCount = displayNameRestore.failedCount;
+          const skippedExistingDisplayNameCount = displayNameRestore.skippedExistingCount;
 
           rememberAuthFileDisplayNames(nextRefreshedFiles);
           setFiles(nextRefreshedFiles);
@@ -1575,6 +1633,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     noteUpdating,
     fileInputRef,
     loadFiles,
+    rememberDisplayNamesForFiles,
     uploadAuthFiles,
     handleUploadClick,
     handleFileChange,
