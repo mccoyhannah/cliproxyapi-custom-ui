@@ -3,6 +3,7 @@ param(
     [string]$CustomUiDir = "D:\CLIProxyAPI_Maintenance\custom-ui",
     [switch]$Rebuild,
     [switch]$DryRun,
+    [switch]$Embed,
     [switch]$PruneRecordedLogs,
     [switch]$PruneOnly,
     [int]$ActiveWindowMinutes = 5
@@ -29,6 +30,9 @@ if ($Rebuild) {
 }
 if ($DryRun) {
     $arguments += "--dry-run"
+}
+if ($Embed) {
+    $arguments += "--embed"
 }
 if ($PruneRecordedLogs) {
     $arguments += "--prune-recorded-logs"

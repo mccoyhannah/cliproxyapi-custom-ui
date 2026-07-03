@@ -5,6 +5,8 @@ import type { AuthFileItem } from '@/types';
 import { CODEX_CONFIG } from './quotaConfigs';
 import { useQuotaLoader } from './useQuotaLoader';
 
+const BACKGROUND_REFRESH_DELAY_MS = 4000;
+
 const buildSignature = (files: AuthFileItem[]) => files.map((file) => file.name).join('|');
 
 export function CodexQuotaBackgroundRefresher() {
@@ -73,7 +75,12 @@ export function CodexQuotaBackgroundRefresher() {
 
   useEffect(() => {
     if (connectionStatus !== 'connected') return;
-    void refreshCodexQuota();
+
+    const timeoutId = window.setTimeout(() => {
+      void refreshCodexQuota();
+    }, BACKGROUND_REFRESH_DELAY_MS);
+
+    return () => window.clearTimeout(timeoutId);
   }, [connectionStatus, refreshCodexQuota]);
 
   useEffect(() => {

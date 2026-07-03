@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { PageTransition } from '@/components/common/PageTransition';
 import {
   AUTH_FILES_PATH,
-  AUTH_FILES_FOCUS_QUERY_KEY,
   createAuthFilesCardsFocusState,
+  createAuthFilesCardsUnpinnedState,
   dispatchAuthFilesCardsFocusEvent,
   resolveAuthFilesCardsEnterScrollTop,
-  shouldFocusAuthFilesCards,
+  shouldPinAuthFilesCards,
 } from '@/router/authFilesFocus';
 import { MainRoutes } from '@/router/MainRoutes';
 import { getRouteOrder, getTransitionVariant } from '@/router/navMeta';
@@ -54,9 +54,9 @@ export function MainLayout() {
   const isLogsPage = location.pathname.startsWith('/logs');
   const showAuthFilesQuickJump =
     location.pathname === AUTH_FILES_PATH || location.pathname.startsWith(`${AUTH_FILES_PATH}/`);
-  const authFilesCardsFocusRequested = shouldFocusAuthFilesCards(location);
+  const authFilesCardsStatePinned = shouldPinAuthFilesCards(location);
   const authFilesQuickJumpPinned =
-    showAuthFilesQuickJump && (authFilesCardsFocusRequested || authFilesQuickJumpPinnedOverride);
+    showAuthFilesQuickJump && (authFilesQuickJumpPinnedOverride || authFilesCardsStatePinned);
 
   // 将顶部悬浮控制区高度写入 CSS 变量，供移动端粘性元素和浮层避让。
   useLayoutEffect(() => {
@@ -176,13 +176,12 @@ export function MainLayout() {
     if (authFilesQuickJumpPinned) {
       setAuthFilesQuickJumpPinnedOverride(false);
       dispatchAuthFilesCardsFocusEvent({ pinned: false });
-
-      const params = new URLSearchParams(location.search);
-      if (!params.has(AUTH_FILES_FOCUS_QUERY_KEY)) return;
-
-      params.delete(AUTH_FILES_FOCUS_QUERY_KEY);
-      const nextSearch = params.toString();
-      navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, { replace: true });
+      if (authFilesCardsStatePinned) {
+        navigate(`${location.pathname}${location.search}${location.hash}`, {
+          replace: true,
+          state: createAuthFilesCardsUnpinnedState(),
+        });
+      }
       return;
     }
 
@@ -194,7 +193,14 @@ export function MainLayout() {
     }
 
     navigate(AUTH_FILES_PATH, { state: createAuthFilesCardsFocusState() });
-  }, [authFilesQuickJumpPinned, location.pathname, location.search, navigate]);
+  }, [
+    authFilesCardsStatePinned,
+    authFilesQuickJumpPinned,
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+  ]);
 
   const resolveRouteOrder = useCallback(
     (pathname: string) =>

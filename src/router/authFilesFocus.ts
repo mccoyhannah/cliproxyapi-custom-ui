@@ -5,6 +5,7 @@ export const AUTH_FILES_FOCUS_QUERY_KEY = 'focus';
 export const AUTH_FILES_FOCUS_CARDS_VALUE = 'cards';
 export const AUTH_FILES_FOCUS_CARDS_STATE_KEY = 'authFilesFocusCards';
 export const AUTH_FILES_FOCUS_CARDS_PINNED_STATE_KEY = 'authFilesFocusCardsPinned';
+export const AUTH_FILES_FOCUS_CARDS_UNPINNED_STATE_KEY = 'authFilesFocusCardsUnpinned';
 export const AUTH_FILES_FOCUS_CARDS_HEADER_ATTR = 'data-auth-files-focus-cards-header';
 export const AUTH_FILES_FOCUS_CARDS_GRID_ATTR = 'data-auth-files-focus-cards-grid';
 export const AUTH_FILES_FOCUS_CARDS_HEADER_SELECTOR = `[${AUTH_FILES_FOCUS_CARDS_HEADER_ATTR}="true"]`;
@@ -45,11 +46,24 @@ export const createAuthFilesCardsFocusState = () => ({
   [AUTH_FILES_FOCUS_CARDS_PINNED_STATE_KEY]: true,
 });
 
+export const createAuthFilesCardsUnpinnedState = () => ({
+  [AUTH_FILES_FOCUS_CARDS_UNPINNED_STATE_KEY]: true,
+});
+
 export const hasAuthFilesCardsFocusState = (location: Pick<AuthFilesFocusLocation, 'state'>) =>
   isRecord(location.state) && location.state[AUTH_FILES_FOCUS_CARDS_STATE_KEY] === true;
 
+export const hasAuthFilesCardsPinnedState = (location: Pick<AuthFilesFocusLocation, 'state'>) =>
+  isRecord(location.state) && location.state[AUTH_FILES_FOCUS_CARDS_PINNED_STATE_KEY] === true;
+
+export const hasAuthFilesCardsUnpinnedState = (location: Pick<AuthFilesFocusLocation, 'state'>) =>
+  isRecord(location.state) && location.state[AUTH_FILES_FOCUS_CARDS_UNPINNED_STATE_KEY] === true;
+
 export const shouldFocusAuthFilesCards = (location: AuthFilesFocusLocation) =>
-  isAuthFilesCardsFocusLocation(location) || hasAuthFilesCardsFocusState(location);
+  location.pathname === AUTH_FILES_PATH && !hasAuthFilesCardsUnpinnedState(location);
+
+export const shouldPinAuthFilesCards = (location: AuthFilesFocusLocation) =>
+  location.pathname === AUTH_FILES_PATH && !hasAuthFilesCardsUnpinnedState(location);
 
 export type AuthFilesCardsFocusEventDetail = {
   pinned?: boolean;

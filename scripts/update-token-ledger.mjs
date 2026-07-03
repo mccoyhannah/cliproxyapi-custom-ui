@@ -149,6 +149,21 @@ const embedLedgerInHtml = async (htmlPath, projection) => {
   return true;
 };
 
+const removeEmbeddedLedgerFromHtml = async (htmlPath) => {
+  if (!(await pathExists(htmlPath))) return false;
+
+  const html = await fs.readFile(htmlPath, 'utf8');
+  const existingPattern = new RegExp(
+    `\\s*<script[^>]*id=["']${EMBEDDED_LEDGER_ID}["'][^>]*>[\\s\\S]*?<\\/script>`,
+    'gi'
+  );
+  const nextHtml = html.replace(existingPattern, '');
+
+  if (nextHtml === html) return false;
+  await atomicWriteText(htmlPath, nextHtml);
+  return true;
+};
+
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const normalizeModelName = (value) => {
@@ -631,7 +646,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
-      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--no-embed] [--prune-recorded-logs] [--prune-only] [--active-window-minutes 5]'
+      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--no-embed] [--prune-recorded-logs] [--prune-only] [--active-window-minutes 5]'
     );
     return;
   }
@@ -644,7 +659,7 @@ const main = async () => {
   const customUiDir = args['custom-ui-dir'] ?? (cwdLooksLikeCustomUi ? process.cwd() : null);
   const ledgerPath = args['ledger-path'] ?? path.join(ledgerDir, 'ledger.json');
   const projectionPath = args['projection-path'] ?? path.join(staticDir, 'token-ledger.json');
-  const shouldEmbed = !args['no-embed'];
+  const shouldEmbed = Boolean(args.embed) && !args['no-embed'];
   const pruneOnly = Boolean(args['prune-only']);
 
   if (pruneOnly && !args['prune-recorded-logs']) {
@@ -790,6 +805,7 @@ const main = async () => {
   };
 
   const embeddedHtmlFiles = [];
+  const strippedHtmlFiles = [];
   let prune = emptyPruneSummary({
     enabled: false,
     dryRun: Boolean(args.dryRun),
@@ -804,15 +820,21 @@ const main = async () => {
     await atomicWriteJson(ledgerPath, ledger);
     await atomicWriteJson(projectionPath, projection);
 
-    if (shouldEmbed) {
-      const htmlCandidates = [
-        path.join(staticDir, 'management.html'),
-        customUiDir ? path.join(customUiDir, 'dist', 'index.html') : null,
-      ].filter(Boolean);
+    const htmlCandidates = [
+      path.join(staticDir, 'management.html'),
+      customUiDir ? path.join(customUiDir, 'dist', 'index.html') : null,
+    ].filter(Boolean);
 
+    if (shouldEmbed) {
       for (const htmlPath of htmlCandidates) {
         if (await embedLedgerInHtml(htmlPath, projection)) {
           embeddedHtmlFiles.push(htmlPath);
+        }
+      }
+    } else {
+      for (const htmlPath of htmlCandidates) {
+        if (await removeEmbeddedLedgerFromHtml(htmlPath)) {
+          strippedHtmlFiles.push(htmlPath);
         }
       }
     }
@@ -840,6 +862,7 @@ const main = async () => {
         ledgerPath,
         projectionPath,
         embeddedHtmlFiles,
+        strippedHtmlFiles,
         source: projection.source,
         scannedFiles: logFiles.length,
         updatedFiles,

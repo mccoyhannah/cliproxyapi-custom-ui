@@ -23,6 +23,28 @@ interface LoadQuotaResult<TData> {
   errorStatus?: number;
 }
 
+const REFRESH_ALL_BATCH_SIZE = 3;
+const REFRESH_ALL_MIN_DELAY_MS = 600;
+const REFRESH_ALL_MAX_DELAY_MS = 1600;
+
+const sleep = (durationMs: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
+
+const randomDelayMs = () =>
+  REFRESH_ALL_MIN_DELAY_MS +
+  Math.floor(Math.random() * (REFRESH_ALL_MAX_DELAY_MS - REFRESH_ALL_MIN_DELAY_MS + 1));
+
+const shuffleTargets = (targets: AuthFileItem[]) => {
+  const shuffled = [...targets];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+};
+
 export interface LoadQuotaOptions {
   preserveExisting?: boolean;
   silent?: boolean;
@@ -81,24 +103,9 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           return nextState;
         });
 
-        const results = await Promise.all(
-          targets.map(async (file): Promise<LoadQuotaResult<TData>> => {
-            try {
-              const data = await config.fetchQuota(file, t);
-              return { name: file.name, status: 'success', data };
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : t('common.unknown_error');
-              const errorStatus = getStatusFromError(err);
-              return { name: file.name, status: 'error', error: message, errorStatus };
-            }
-          })
-        );
-
-        if (requestId !== requestIdRef.current) return false;
-
-        setQuota((prev) => {
-          const nextState = { ...prev };
-          results.forEach((result) => {
+        const applyResult = (result: LoadQuotaResult<TData>) => {
+          setQuota((prev) => {
+            const nextState = { ...prev };
             if (result.status === 'success') {
               nextState[result.name] = config.buildSuccessState(result.data as TData);
             } else {
@@ -107,9 +114,46 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
                 result.errorStatus
               );
             }
+            return nextState;
           });
-          return nextState;
-        });
+        };
+
+        const loadOne = async (file: AuthFileItem): Promise<LoadQuotaResult<TData>> => {
+          try {
+            const data = await config.fetchQuota(file, t);
+            return { name: file.name, status: 'success', data };
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : t('common.unknown_error');
+            const errorStatus = getStatusFromError(err);
+            return { name: file.name, status: 'error', error: message, errorStatus };
+          }
+        };
+
+        const orderedTargets = scope === 'all' && targets.length > 1 ? shuffleTargets(targets) : targets;
+        const batchSize =
+          scope === 'all' && orderedTargets.length > 1 ? REFRESH_ALL_BATCH_SIZE : orderedTargets.length;
+
+        for (let index = 0; index < orderedTargets.length; index += batchSize) {
+          if (requestId !== requestIdRef.current) return false;
+
+          const batch = orderedTargets.slice(index, index + batchSize);
+          const results = await Promise.all(
+            batch.map(async (file): Promise<LoadQuotaResult<TData>> => {
+              const result = await loadOne(file);
+              if (requestId === requestIdRef.current) {
+                applyResult(result);
+              }
+              return result;
+            })
+          );
+
+          if (requestId !== requestIdRef.current) return false;
+          if (results.length === 0) continue;
+          if (index + batchSize < orderedTargets.length && scope === 'all') {
+            await sleep(randomDelayMs());
+          }
+        }
+
         return true;
       } finally {
         if (requestId === requestIdRef.current) {

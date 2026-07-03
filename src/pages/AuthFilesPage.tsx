@@ -133,8 +133,8 @@ import {
   consumeAuthFilesInitialQuotaRefresh,
   getAuthFilesCardsFocusEventDetail,
   getAuthFilesCardsScrollTop,
-  isAuthFilesCardsFocusLocation,
   shouldFocusAuthFilesCards,
+  shouldPinAuthFilesCards,
 } from '@/router/authFilesFocus';
 import {
   normalizeRecentRequestAuthIndex,
@@ -170,6 +170,55 @@ const ACCOUNT_MEMO_LINK_LIMIT = 8;
 const ACCOUNT_MEMO_AUTH_TIME_HISTORY_VISIBLE_LIMIT = 8;
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
 const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
+const FILE_CARDS_SMOOTH_LOCK_DELAY_MS = 460;
+const FILE_CARDS_SCROLL_LOCK_KEYS = new Set([
+  'ArrowDown',
+  'ArrowUp',
+  'End',
+  'Home',
+  'PageDown',
+  'PageUp',
+  ' ',
+  'Spacebar',
+]);
+
+type FileCardsScrollLock = {
+  container: HTMLElement;
+  previousOverflowY: string;
+  previousOverscrollBehaviorY: string;
+};
+
+const isEditableScrollKeyTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return (
+    tagName === 'input' ||
+    tagName === 'textarea' ||
+    tagName === 'select' ||
+    target.isContentEditable
+  );
+};
+
+const isActivatableSpaceKeyTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest(
+      [
+        'button',
+        'a[href]',
+        'summary',
+        '[role="button"]',
+        '[role="checkbox"]',
+        '[role="menuitem"]',
+        '[role="menuitemcheckbox"]',
+        '[role="menuitemradio"]',
+        '[role="radio"]',
+        '[role="switch"]',
+        '[role="tab"]',
+      ].join(',')
+    )
+  );
+};
 
 const formatCodexOAuthShortcutRemaining = (remainingMs: number) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -1035,12 +1084,14 @@ export function AuthFilesPage() {
   const [uploadDropActive, setUploadDropActive] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
   const [fileCardsFocusPinned, setFileCardsFocusPinned] = useState(() =>
-    shouldFocusAuthFilesCards(location)
+    shouldPinAuthFilesCards(location)
   );
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const fileListHeaderRef = useRef<HTMLDivElement>(null);
   const fileGridRef = useRef<HTMLDivElement>(null);
   const focusedFileListOnOpenRef = useRef({ search: '', header: false, grid: false });
+  const fileCardsFocusCleanupRef = useRef<(() => void) | null>(null);
+  const fileCardsScrollLockRef = useRef<FileCardsScrollLock | null>(null);
   const pageDragDepthRef = useRef(0);
   const loadedFilesOnceRef = useRef(false);
   const filesRef = useRef<AuthFileItem[]>([]);
@@ -3814,12 +3865,9 @@ export function AuthFilesPage() {
     };
   }, [batchActionBarVisible, selectionCount]);
 
-  const scrollToFileCards = useCallback((behavior: ScrollBehavior = 'auto') => {
-    if (typeof window === 'undefined') return;
-
+  const getFileCardsScrollContainer = useCallback((): HTMLElement | null => {
     const header = fileListHeaderRef.current;
-    const grid = fileGridRef.current;
-    if (!header) return;
+    if (!header) return null;
 
     const contentContainer = header.closest('.content') as HTMLElement | null;
     const contentScrollContainer = (() => {
@@ -3840,59 +3888,126 @@ export function AuthFilesPage() {
         ? document.scrollingElement
         : document.documentElement);
 
-    if (container === document.scrollingElement || container === document.documentElement) {
-      const headerHeight = Number.parseFloat(
-        window.getComputedStyle(document.documentElement).getPropertyValue('--header-height')
-      );
-      const stickyOffset = Number.isFinite(headerHeight) ? headerHeight + 14 : 14;
-      const maxScrollTop = Math.max(0, container.scrollHeight - window.innerHeight);
-      container.scrollTo({
-        top: Math.min(
-          maxScrollTop,
-          Math.max(0, container.scrollTop + header.getBoundingClientRect().top - stickyOffset)
-        ),
-        behavior,
-      });
-      return;
-    }
-
-    container.scrollTo({
-      top: getAuthFilesCardsScrollTop({ container, header, grid }),
-      behavior,
-    });
+    return container;
   }, []);
 
-  const scheduleFileCardsScroll = useCallback(
-    (behavior: ScrollBehavior = 'auto') => {
+  const unlockFileCardsScroll = useCallback(() => {
+    const lock = fileCardsScrollLockRef.current;
+    if (!lock) return;
+
+    lock.container.style.overflowY = lock.previousOverflowY;
+    lock.container.style.overscrollBehaviorY = lock.previousOverscrollBehaviorY;
+    lock.container.removeAttribute('data-auth-files-focus-locked');
+    fileCardsScrollLockRef.current = null;
+  }, []);
+
+  const lockFileCardsScroll = useCallback(
+    (container: HTMLElement) => {
+      const existing = fileCardsScrollLockRef.current;
+      if (existing?.container === container) return;
+
+      unlockFileCardsScroll();
+      fileCardsScrollLockRef.current = {
+        container,
+        previousOverflowY: container.style.overflowY,
+        previousOverscrollBehaviorY: container.style.overscrollBehaviorY,
+      };
+      container.style.overflowY = 'hidden';
+      container.style.overscrollBehaviorY = 'contain';
+      container.setAttribute('data-auth-files-focus-locked', 'true');
+    },
+    [unlockFileCardsScroll]
+  );
+
+  const scrollToFileCards = useCallback(
+    (behavior: ScrollBehavior = 'auto'): HTMLElement | null => {
+      if (typeof window === 'undefined') return null;
+
+      const header = fileListHeaderRef.current;
+      const grid = fileGridRef.current;
+      if (!header) return null;
+
+      const container = getFileCardsScrollContainer();
+      if (!container) return null;
+
+      if (container === document.scrollingElement || container === document.documentElement) {
+        const headerHeight = Number.parseFloat(
+          window.getComputedStyle(document.documentElement).getPropertyValue('--header-height')
+        );
+        const stickyOffset = Number.isFinite(headerHeight) ? headerHeight + 14 : 14;
+        const maxScrollTop = Math.max(0, container.scrollHeight - window.innerHeight);
+        container.scrollTo({
+          top: Math.min(
+            maxScrollTop,
+            Math.max(0, container.scrollTop + header.getBoundingClientRect().top - stickyOffset)
+          ),
+          behavior,
+        });
+        return container;
+      }
+
+      container.scrollTo({
+        top: getAuthFilesCardsScrollTop({ container, header, grid }),
+        behavior,
+      });
+      return container;
+    },
+    [getFileCardsScrollContainer]
+  );
+
+  const cancelFileCardsFocus = useCallback(() => {
+    fileCardsFocusCleanupRef.current?.();
+  }, []);
+
+  const focusFileCards = useCallback(
+    (behavior: ScrollBehavior = 'auto', lockAfterScroll = false) => {
       if (typeof window === 'undefined') return () => undefined;
+
+      cancelFileCardsFocus();
+      if (lockAfterScroll) {
+        unlockFileCardsScroll();
+      }
 
       const frames: number[] = [];
       const timers: number[] = [];
-      const runScroll = () => scrollToFileCards(behavior);
+      const container = scrollToFileCards(behavior);
 
-      runScroll();
-      frames.push(window.requestAnimationFrame(runScroll));
-      frames.push(
-        window.requestAnimationFrame(() => {
-          frames.push(window.requestAnimationFrame(runScroll));
-        })
-      );
-      timers.push(window.setTimeout(runScroll, 120));
-      timers.push(window.setTimeout(runScroll, 360));
-      timers.push(window.setTimeout(runScroll, 700));
+      if (lockAfterScroll && container) {
+        const lockCurrentContainer = () => {
+          lockFileCardsScroll(getFileCardsScrollContainer() ?? container);
+        };
 
-      return () => {
+        if (behavior === 'smooth') {
+          timers.push(window.setTimeout(lockCurrentContainer, FILE_CARDS_SMOOTH_LOCK_DELAY_MS));
+        } else {
+          frames.push(window.requestAnimationFrame(lockCurrentContainer));
+        }
+      }
+
+      const cleanup = () => {
         frames.forEach((frame) => window.cancelAnimationFrame(frame));
         timers.forEach((timer) => window.clearTimeout(timer));
+        if (fileCardsFocusCleanupRef.current === cleanup) {
+          fileCardsFocusCleanupRef.current = null;
+        }
       };
+
+      fileCardsFocusCleanupRef.current = cleanup;
+      return cleanup;
     },
-    [scrollToFileCards]
+    [
+      cancelFileCardsFocus,
+      getFileCardsScrollContainer,
+      lockFileCardsScroll,
+      scrollToFileCards,
+      unlockFileCardsScroll,
+    ]
   );
 
   const refocusFileCardsAfterListViewChange = useCallback(() => {
     if (!fileCardsFocusPinned) return;
-    scheduleFileCardsScroll('auto');
-  }, [fileCardsFocusPinned, scheduleFileCardsScroll]);
+    focusFileCards('auto', true);
+  }, [fileCardsFocusPinned, focusFileCards]);
 
   const handleListPageChange = useCallback(
     (nextPage: number) => {
@@ -3921,7 +4036,10 @@ export function AuthFilesPage() {
     if (focusedFileListOnOpenRef.current.search !== focusIdentity) {
       focusedFileListOnOpenRef.current = { search: focusIdentity, header: false, grid: false };
     }
-    setFileCardsFocusPinned(true);
+    const shouldPinFileCards = shouldPinAuthFilesCards(location);
+    if (shouldPinFileCards) {
+      setFileCardsFocusPinned(true);
+    }
 
     const target = fileListHeaderRef.current;
     if (!target) return;
@@ -3936,8 +4054,8 @@ export function AuthFilesPage() {
       header: true,
       grid: focusedFileListOnOpenRef.current.grid || hasGrid,
     };
-    return scheduleFileCardsScroll('auto');
-  }, [isCurrentLayer, loading, location, pageItems.length, scheduleFileCardsScroll]);
+    return focusFileCards('auto', shouldPinFileCards);
+  }, [focusFileCards, isCurrentLayer, loading, location, pageItems.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -3946,19 +4064,70 @@ export function AuthFilesPage() {
     const handleFocusCards = (event: Event) => {
       const detail = getAuthFilesCardsFocusEventDetail(event);
       if (detail?.pinned === false) {
+        cancelFileCardsFocus();
+        unlockFileCardsScroll();
         setFileCardsFocusPinned(false);
         return;
       }
       if (detail?.pinned === true) {
         setFileCardsFocusPinned(true);
-        window.requestAnimationFrame(() => scrollToFileCards(detail.behavior ?? 'smooth'));
+        focusFileCards(detail.behavior ?? 'smooth', true);
         return;
       }
-      scheduleFileCardsScroll(detail?.behavior ?? 'auto');
+      focusFileCards(detail?.behavior ?? 'auto', false);
     };
     window.addEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
     return () => window.removeEventListener(AUTH_FILES_FOCUS_CARDS_EVENT, handleFocusCards);
-  }, [isCurrentLayer, scheduleFileCardsScroll, scrollToFileCards]);
+  }, [cancelFileCardsFocus, focusFileCards, isCurrentLayer, unlockFileCardsScroll]);
+
+  useEffect(() => {
+    if (!fileCardsFocusPinned || !isCurrentLayer) {
+      cancelFileCardsFocus();
+      unlockFileCardsScroll();
+      return;
+    }
+
+    const container = getFileCardsScrollContainer();
+    if (!container) return;
+
+    const preventPointerScroll = (event: WheelEvent | TouchEvent) => {
+      if (!fileCardsScrollLockRef.current) return;
+      event.preventDefault();
+    };
+    const preventKeyboardScroll = (event: KeyboardEvent) => {
+      if (!fileCardsScrollLockRef.current) return;
+      if (!FILE_CARDS_SCROLL_LOCK_KEYS.has(event.key)) return;
+      if (isEditableScrollKeyTarget(event.target)) return;
+      if ((event.key === ' ' || event.key === 'Spacebar') && isActivatableSpaceKeyTarget(event.target)) {
+        return;
+      }
+      event.preventDefault();
+    };
+
+    container.addEventListener('wheel', preventPointerScroll, { passive: false });
+    container.addEventListener('touchmove', preventPointerScroll, { passive: false });
+    window.addEventListener('keydown', preventKeyboardScroll, true);
+
+    return () => {
+      container.removeEventListener('wheel', preventPointerScroll);
+      container.removeEventListener('touchmove', preventPointerScroll);
+      window.removeEventListener('keydown', preventKeyboardScroll, true);
+    };
+  }, [
+    cancelFileCardsFocus,
+    fileCardsFocusPinned,
+    getFileCardsScrollContainer,
+    isCurrentLayer,
+    unlockFileCardsScroll,
+  ]);
+
+  useEffect(
+    () => () => {
+      cancelFileCardsFocus();
+      unlockFileCardsScroll();
+    },
+    [cancelFileCardsFocus, unlockFileCardsScroll]
+  );
 
   useEffect(() => {
     setBatchActionBarVisible(selectionCount > 0);
@@ -4474,8 +4643,6 @@ export function AuthFilesPage() {
           total: sorted.length,
           defaultValue: `本页 ${pageItems.length} / 筛选 ${sorted.length}`,
         });
-  const shouldRenderFileListFocusBuffer =
-    fileCardsFocusPinned || isAuthFilesCardsFocusLocation(location);
   const summaryChipItems = [
     {
       key: 'total',
@@ -5588,9 +5755,7 @@ export function AuthFilesPage() {
         </div>
       </Card>
 
-      {shouldRenderFileListFocusBuffer && (
-        <div className={styles.fileListFocusScrollBuffer} aria-hidden="true" />
-      )}
+      <div className={styles.fileListFocusScrollBuffer} aria-hidden="true" />
 
       <section
         className={styles.oauthConfigSection}
