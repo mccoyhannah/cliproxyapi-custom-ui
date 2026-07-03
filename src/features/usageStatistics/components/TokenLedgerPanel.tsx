@@ -49,6 +49,11 @@ interface TokenLedgerPanelProps {
     key: K,
     value: TokenLedgerFilters[K]
   ) => void;
+  updateStatus: {
+    phase: 'idle' | 'starting-control' | 'refreshing-ledger' | 'loading-ledger' | 'done' | 'error';
+    message: string;
+    detail?: string;
+  };
 }
 
 const EMPTY_LEDGER_ENTRIES: TokenLedgerEntry[] = [];
@@ -84,6 +89,7 @@ export function TokenLedgerPanel({
   pruneDisabled,
   pruning,
   setFilterValue,
+  updateStatus,
 }: TokenLedgerPanelProps) {
   const { i18n } = useTranslation();
   const [pricingOpen, setPricingOpen] = useState(false);
@@ -155,6 +161,13 @@ export function TokenLedgerPanel({
     ((rangeWindow.start !== null && coverageStart !== null && rangeWindow.start < coverageStart) ||
       (rangeWindow.end !== null && coverageEnd !== null && rangeWindow.end > coverageEnd));
   const activePricingOverrideCount = effectivePricingOverrides.length;
+  const shouldShowStatus = updateStatus.phase !== 'idle' && Boolean(updateStatus.message);
+  const statusClassName =
+    updateStatus.phase === 'error'
+      ? styles.ledgerStatusError
+      : updateStatus.phase === 'done'
+        ? styles.ledgerStatusDone
+        : styles.ledgerStatusRunning;
 
   const updatePricingOverride = (index: number, patch: Partial<ModelPricingOverride>) => {
     setPricingOverrides((current) => {
@@ -270,6 +283,16 @@ export function TokenLedgerPanel({
         )}
         {ledger && <span className={styles.ledgerRangeNote}>当前范围 {selectedSpanLabel}</span>}
       </div>
+
+      {shouldShowStatus && (
+        <div className={`${styles.ledgerStatusBar} ${statusClassName}`} role="status">
+          <span className={styles.ledgerStatusDot} />
+          <div>
+            <strong>{updateStatus.message}</strong>
+            {updateStatus.detail && <small>{updateStatus.detail}</small>}
+          </div>
+        </div>
+      )}
 
       {pricingOpen && (
         <div className={styles.pricingPanel}>

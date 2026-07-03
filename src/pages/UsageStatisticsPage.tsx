@@ -54,6 +54,7 @@ import { configApi, logsApi } from '@/services/api';
 import {
   cliProxyBackendControlApi,
   launchCliProxyBackendControlSidecar,
+  type TokenLedgerMaintenanceResult,
 } from '@/services/api/cliProxyBackendControl';
 import { tokenLedgerApi } from '@/services/runtime/tokenLedger';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
@@ -113,6 +114,41 @@ const REQUEST_DETAIL_DOWNLOAD_MESSAGE = '详情下载失败';
 const TOKEN_LEDGER_CONTROL_WAKE_ATTEMPTS = 18;
 const TOKEN_LEDGER_CONTROL_WAKE_INTERVAL_MS = 850;
 const TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES = 5;
+
+type TokenLedgerUpdatePhase =
+  | 'idle'
+  | 'starting-control'
+  | 'refreshing-ledger'
+  | 'loading-ledger'
+  | 'done'
+  | 'error';
+
+type TokenLedgerUpdateStatus = {
+  phase: TokenLedgerUpdatePhase;
+  message: string;
+  detail?: string;
+};
+
+const IDLE_TOKEN_LEDGER_STATUS: TokenLedgerUpdateStatus = {
+  phase: 'idle',
+  message: '',
+};
+
+const formatLedgerCount = (value: number | null | undefined): string =>
+  new Intl.NumberFormat('zh-CN').format(Math.max(0, Number(value) || 0));
+
+const buildTokenLedgerResultMessage = (result: TokenLedgerMaintenanceResult): string => {
+  const updated = Number(result.updatedFiles) || 0;
+  if (updated > 0) {
+    return `Token 台账已更新，新增 ${formatLedgerCount(updated)} 个日志文件`;
+  }
+  return 'Token 台账已检查，无新增日志';
+};
+
+const buildTokenLedgerResultDetail = (result: TokenLedgerMaintenanceResult): string =>
+  `扫描 ${formatLedgerCount(result.scannedFiles)} 个，跳过 ${formatLedgerCount(
+    result.skippedFiles
+  )} 个，错误 ${formatLedgerCount(result.errorFiles)} 个`;
 
 const wait = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms));
 
@@ -230,6 +266,8 @@ export function UsageStatisticsPage() {
   const [tokenLedgerPruneRunning, setTokenLedgerPruneRunning] = useState(false);
   const [error, setError] = useState('');
   const [tokenLedgerError, setTokenLedgerError] = useState('');
+  const [tokenLedgerUpdateStatus, setTokenLedgerUpdateStatus] =
+    useState<TokenLedgerUpdateStatus>(IDLE_TOKEN_LEDGER_STATUS);
   const [enablingRequestLog, setEnablingRequestLog] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -292,19 +330,45 @@ export function UsageStatisticsPage() {
     tokenLedgerDetailsRef.current = tokenLedgerDetailsByRequestId;
   }, [tokenLedgerDetailsByRequestId]);
 
-  const loadTokenLedger = useCallback(async (forceNetwork = false) => {
+  const loadTokenLedger = useCallback(async (
+    forceNetwork = false,
+    options: { showStatus?: boolean; requireLedger?: boolean } = {}
+  ) => {
     const isInitialLoad = !tokenLedgerLoadedRef.current;
-    if (isInitialLoad) {
+    if (isInitialLoad || options.showStatus) {
       setTokenLedgerLoading(true);
     }
     setTokenLedgerError('');
+    if (options.showStatus) {
+      setTokenLedgerUpdateStatus({
+        phase: 'loading-ledger',
+        message: '正在读取新的 Token 台账',
+        detail: '正在加载 token-ledger.json，文件较大时需要等几秒',
+      });
+    }
 
     try {
-      const snapshot = await tokenLedgerApi.getLedger({ forceNetwork });
+      const snapshot = await tokenLedgerApi.getLedger({
+        forceNetwork,
+        controlFallback: true,
+        requireLedger: options.requireLedger,
+      });
+      if (!snapshot && !options.requireLedger) {
+        setTokenLedgerError('未从 8317 直接读取到台账；点击“更新 Token 台账”会启动本机助手读取。');
+      }
       setTokenLedger(snapshot);
       tokenLedgerLoadedRef.current = true;
     } catch (err: unknown) {
-      setTokenLedgerError(getErrorMessage(err) || '长期 Token 台账加载失败');
+      const message = getErrorMessage(err) || '长期 Token 台账加载失败';
+      setTokenLedgerError(message);
+      if (options.showStatus) {
+        setTokenLedgerUpdateStatus({
+          phase: 'error',
+          message: 'Token 台账读取失败',
+          detail: message,
+        });
+      }
+      throw err;
     } finally {
       setTokenLedgerLoading(false);
     }
@@ -344,14 +408,24 @@ export function UsageStatisticsPage() {
 
     setTokenLedgerPruneRunning(true);
     setTokenLedgerError('');
+    setTokenLedgerUpdateStatus({
+      phase: 'starting-control',
+      message: '正在启动本机控制助手',
+      detail: '用于清理已入账日志并重新读取台账',
+    });
     try {
       await wakeTokenLedgerControlSidecar();
+      setTokenLedgerUpdateStatus({
+        phase: 'refreshing-ledger',
+        message: '正在清理已入账日志',
+        detail: '只清理已经写入台账的详情日志，活跃日志会保留',
+      });
       const response = await cliProxyBackendControlApi.pruneRecordedTokenLedgerLogs({
         apiBase,
         managementKey,
         activeWindowMinutes: TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES,
       });
-      await loadTokenLedger(true);
+      await loadTokenLedger(true, { showStatus: true, requireLedger: true });
 
       const prune = response.result.prune;
       const deletedLabel =
@@ -362,12 +436,22 @@ export function UsageStatisticsPage() {
         `已清理 ${prune.deletedFiles} 个已入账日志，释放 ${deletedLabel}`,
         'success'
       );
+      setTokenLedgerUpdateStatus({
+        phase: 'done',
+        message: `清理完成，删除 ${formatLedgerCount(prune.deletedFiles)} 个日志`,
+        detail: `释放 ${deletedLabel}，台账已重新读取`,
+      });
       if (prune.failedDeletes > 0) {
         showNotification(`有 ${prune.failedDeletes} 个日志删除失败，已保留`, 'warning');
       }
     } catch (err: unknown) {
       const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
       setTokenLedgerError(`清理已入账日志失败${message ? `: ${message}` : ''}`);
+      setTokenLedgerUpdateStatus({
+        phase: 'error',
+        message: '清理已入账日志失败',
+        detail: message,
+      });
       showNotification(`清理已入账日志失败${message ? `: ${message}` : ''}`, 'error');
     } finally {
       setTokenLedgerPruneRunning(false);
@@ -528,18 +612,44 @@ export function UsageStatisticsPage() {
 
     setTokenLedgerRefreshRunning(true);
     setTokenLedgerError('');
+    setTokenLedgerUpdateStatus({
+      phase: 'starting-control',
+      message: '正在启动本机控制助手',
+      detail: '如果助手刚刚空闲退出，会先唤起 8319 本地助手',
+    });
     try {
       await wakeTokenLedgerControlSidecar();
-      await cliProxyBackendControlApi.refreshTokenLedger({
+      setTokenLedgerUpdateStatus({
+        phase: 'refreshing-ledger',
+        message: '正在扫描日志并生成 Token 台账',
+        detail: '日志较多时可能需要几十秒，请保持本页打开',
+      });
+      const response = await cliProxyBackendControlApi.refreshTokenLedger({
         apiBase,
         managementKey,
       });
-      await loadTokenLedger(true);
-      showNotification('Token 台账已更新', 'success');
+      const resultMessage = buildTokenLedgerResultMessage(response.result);
+      const resultDetail = buildTokenLedgerResultDetail(response.result);
+      await loadTokenLedger(true, { showStatus: true, requireLedger: true });
+      setTokenLedgerUpdateStatus({
+        phase: 'done',
+        message: resultMessage,
+        detail: resultDetail,
+      });
+      showNotification(resultMessage, 'success');
     } catch (err: unknown) {
       const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
-      setTokenLedgerError(`更新 Token 台账失败${message ? `: ${message}` : ''}`);
-      showNotification(`更新 Token 台账失败${message ? `: ${message}` : ''}`, 'error');
+      const detail = `更新 Token 台账失败${message ? `: ${message}` : ''}`;
+      setTokenLedgerError(detail);
+      setTokenLedgerUpdateStatus({
+        phase: 'error',
+        message: '更新 Token 台账失败',
+        detail:
+          message && isControlOfflineError(message)
+            ? '本机控制助手未启动，无法更新台账'
+            : message,
+      });
+      showNotification(detail, 'error');
     } finally {
       setTokenLedgerRefreshRunning(false);
     }
@@ -773,6 +883,7 @@ export function UsageStatisticsPage() {
         pruneDisabled={connectionStatus !== 'connected' || tokenLedgerRefreshRunning}
         pruning={tokenLedgerPruneRunning}
         setFilterValue={setTokenLedgerFilterValue}
+        updateStatus={tokenLedgerUpdateStatus}
       />
 
       <section className={styles.currentWindowSection} aria-labelledby="current-window-title">

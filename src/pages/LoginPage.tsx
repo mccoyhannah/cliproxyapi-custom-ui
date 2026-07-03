@@ -148,11 +148,8 @@ export function LoginPage() {
         const autoLoggedIn = await restoreSession();
         if (autoLoggedIn) {
           setAutoLoginSuccess(true);
-          // 延迟跳转，让用户看到成功动画
-          setTimeout(() => {
-            const redirect = buildLoginRedirect((location.state as RedirectState | null)?.from);
-            navigate(redirect, { replace: true });
-          }, 1500);
+          const redirect = buildLoginRedirect((location.state as RedirectState | null)?.from);
+          navigate(redirect, { replace: true });
         } else {
           setApiBase(storedBase || detectedBase);
           setManagementKey(storedKey || '');

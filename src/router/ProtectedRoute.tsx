@@ -11,7 +11,7 @@ export function ProtectedRoute({ children }: { children: ReactElement }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const managementKey = useAuthStore((state) => state.managementKey);
   const apiBase = useAuthStore((state) => state.apiBase);
-  const checkAuth = useAuthStore((state) => state.checkAuth);
+  const restoreSession = useAuthStore((state) => state.restoreSession);
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
@@ -19,14 +19,14 @@ export function ProtectedRoute({ children }: { children: ReactElement }) {
       if (!isAuthenticated && managementKey && apiBase && hasStoredAutoLoginIntent()) {
         setChecking(true);
         try {
-          await checkAuth();
+          await restoreSession();
         } finally {
           setChecking(false);
         }
       }
     };
     tryRestore();
-  }, [apiBase, isAuthenticated, managementKey, checkAuth]);
+  }, [apiBase, isAuthenticated, managementKey, restoreSession]);
 
   if (checking) {
     return (

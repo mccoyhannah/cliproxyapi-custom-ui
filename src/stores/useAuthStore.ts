@@ -98,20 +98,22 @@ export const useAuthStore = create<AuthStoreState>()(
           apiClient.setConfig({ apiBase: resolvedBase, managementKey: resolvedKey });
 
           if (wasLoggedIn && resolvedBase && resolvedKey) {
-            try {
-              await get().login({
-                apiBase: resolvedBase,
-                managementKey: resolvedKey,
-                rememberPassword: resolvedRememberPassword
+            set({
+              isAuthenticated: true,
+              apiBase: resolvedBase,
+              managementKey: resolvedKey,
+              rememberPassword: resolvedRememberPassword,
+              connectionStatus: 'connecting',
+              connectionError: null
+            });
+
+            void get()
+              .checkAuth()
+              .catch((error) => {
+                console.warn('Auto login background check failed:', error);
               });
-              return true;
-            } catch (error) {
-              console.warn('Auto login failed:', error);
-              if (isAuthFailure(error)) {
-                disableStoredAutoLogin();
-              }
-              return false;
-            }
+
+            return true;
           }
 
           return false;

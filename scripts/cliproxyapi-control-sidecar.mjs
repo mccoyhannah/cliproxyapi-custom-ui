@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -53,6 +53,7 @@ const restartScriptPath =
   args['restart-script'] ?? path.join(installDir, 'Restart-CLIProxyAPI-Logged.ps1');
 const tokenLedgerScriptPath =
   args['token-ledger-script'] ?? path.join(customUiDir, 'scripts', 'update-token-ledger.ps1');
+const tokenLedgerProjectionPath = path.join(installDir, 'static', 'token-ledger.json');
 const logsDir = args['logs-dir'] ?? path.join(installDir, 'logs');
 const expectedExePath = path.join(installDir, 'cli-proxy-api.exe');
 
@@ -577,6 +578,21 @@ function sendJson(req, res, statusCode, payload) {
   res.end(`${JSON.stringify(payload)}\n`);
 }
 
+async function sendTokenLedgerSnapshot(req, res) {
+  let text = '';
+  try {
+    text = await readFile(tokenLedgerProjectionPath, 'utf8');
+  } catch {
+    throw new HttpError(404, 'Token ledger snapshot not found');
+  }
+
+  applyCors(req, res);
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(text);
+}
+
 function sendError(req, res, error) {
   const statusCode = error instanceof HttpError ? error.statusCode : error.statusCode || 500;
   sendJson(req, res, statusCode, {
@@ -619,6 +635,11 @@ async function handleRequest(req, res) {
 
   if (req.method === 'GET' && (url.pathname === '/health' || url.pathname === '/status')) {
     sendJson(req, res, 200, await buildStatusPayload());
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/token-ledger') {
+    await sendTokenLedgerSnapshot(req, res);
     return;
   }
 

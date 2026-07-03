@@ -581,6 +581,87 @@
   }
 }
 
+.ledgerStatusBar {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-primary) 58%, transparent);
+
+  > div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  strong {
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+
+  small {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 680;
+    line-height: 1.35;
+  }
+}
+
+.ledgerStatusDot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
+}
+
+.ledgerStatusRunning {
+  border-color: color-mix(in srgb, var(--primary-color) 26%, var(--border-color));
+
+  .ledgerStatusDot {
+    animation: ledgerStatusPulse 1.15s ease-in-out infinite;
+  }
+}
+
+.ledgerStatusDone {
+  border-color: color-mix(in srgb, var(--success-color) 28%, var(--border-color));
+
+  .ledgerStatusDot {
+    background: var(--success-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success-color) 16%, transparent);
+  }
+}
+
+.ledgerStatusError {
+  border-color: color-mix(in srgb, var(--error-color) 34%, var(--border-color));
+  background: color-mix(in srgb, var(--error-color) 5%, var(--bg-primary));
+
+  .ledgerStatusDot {
+    background: var(--error-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--error-color) 15%, transparent);
+  }
+}
+
+@keyframes ledgerStatusPulse {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.62;
+  }
+
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
 .ledgerSummaryGrid {
   display: grid;
   grid-template-columns: minmax(180px, 0.95fr) repeat(4, minmax(0, 1fr));
