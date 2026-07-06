@@ -122,6 +122,7 @@ import {
   type PriorityRotationSidecarSettings,
   type PriorityRotationSidecarStatus,
 } from '@/services/api/priorityRotationSidecar';
+import { authFilesApi } from '@/services/api';
 import { oauthApi } from '@/services/api/oauth';
 import { CODEX_CONFIG, useQuotaLoader } from '@/components/quota';
 import { useAuthStore, useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
@@ -148,7 +149,9 @@ import {
   isCodexFile,
   isDisabledAuthFile,
   normalizePlanType,
+  readCodexAuthTimeSnapshotFromRecord,
   resolveCodexPlanType,
+  type CodexAuthTimeSnapshot,
 } from '@/utils/quota';
 import { normalizeApiBase } from '@/utils/connection';
 import { downloadBlob } from '@/utils/download';
@@ -170,6 +173,8 @@ const ACCOUNT_MEMO_LINK_LIMIT = 8;
 const ACCOUNT_MEMO_AUTH_TIME_HISTORY_VISIBLE_LIMIT = 8;
 const CODEX_OAUTH_SHORTCUT_WAIT_MS = 8 * 60 * 1000;
 const CODEX_OAUTH_SHORTCUT_POLL_INTERVAL_MS = 3000;
+const CODEX_OAUTH_RECENT_AUTH_RECORD_WINDOW_MS = 15 * 60 * 1000;
+const CODEX_OAUTH_AUTH_TIME_REFRESH_LIMIT = 6;
 const FILE_CARDS_SMOOTH_LOCK_DELAY_MS = 460;
 const FILE_CARDS_SCROLL_LOCK_KEYS = new Set([
   'ArrowDown',
@@ -225,6 +230,39 @@ const formatCodexOAuthShortcutRemaining = (remainingMs: number) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+
+const getErrorStatus = (error: unknown): number | null => {
+  const status = typeof (error as { status?: unknown } | null)?.status === 'number'
+    ? (error as { status: number }).status
+    : null;
+  return status;
+};
+
+const getErrorCode = (error: unknown): string => {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : '';
+};
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  return typeof error === 'string' ? error : '';
+};
+
+const isRecoverableCodexOAuthPollError = (error: unknown): boolean => {
+  const status = getErrorStatus(error);
+  if (typeof status === 'number') return status >= 500;
+
+  const code = getErrorCode(error).toLowerCase();
+  if (code === 'econnaborted' || code === 'err_network') return true;
+
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('network') ||
+    message.includes('aborted')
+  );
 };
 
 const escapeHtml = (value: string) =>
@@ -1106,6 +1144,7 @@ export function AuthFilesPage() {
   const codexOAuthPollTimerRef = useRef<number | null>(null);
   const codexOAuthAttemptIdRef = useRef(0);
   const codexOAuthOpenRequestIdRef = useRef(0);
+  const codexOAuthPollRecoverableWarningShownRef = useRef(false);
 
   const {
     files,
@@ -1157,6 +1196,7 @@ export function AuthFilesPage() {
 
   const finishCodexOAuthAttempt = useCallback(() => {
     clearCodexOAuthPollTimer();
+    codexOAuthPollRecoverableWarningShownRef.current = false;
     setCodexOAuthLastUrl('');
     setCodexOAuthAttemptExpiresAt(null);
     setCodexOAuthNowMs(Date.now());
@@ -1294,6 +1334,83 @@ export function AuthFilesPage() {
     [loadCodexQuota, loadFiles, setCodexQuotaRefreshLoading]
   );
 
+  const recordCodexAuthTimeSnapshots = useCallback(
+    (entries: Iterable<[string, CodexAuthTimeSnapshot]>) => {
+      const recordedAt = Date.now();
+      setAccountMemosByFile((current) => {
+        let next = current;
+        let changed = false;
+
+        for (const [fileName, snapshot] of entries) {
+          const result = upsertAuthFileAccountMemoAuthTime(next, fileName, snapshot, recordedAt);
+          if (!result.changed) continue;
+          next = result.map;
+          changed = true;
+        }
+
+        if (!changed) return current;
+        if (!writeAuthFilesAccountMemos(next)) {
+          showNotification(
+            t('auth_files.account_memo_auth_time_save_failed', {
+              defaultValue: '认证记录保存失败，浏览器本地存储可能已满。',
+            }),
+            'warning'
+          );
+          return current;
+        }
+        return next;
+      });
+    },
+    [showNotification, t]
+  );
+
+  const recordRecentCodexAuthTimesFromFiles = useCallback(
+    async (sourceFiles: AuthFileItem[]) => {
+      const now = Date.now();
+      const candidates = sourceFiles
+        .filter((file) => CODEX_CONFIG.filterFn(file) && !isRuntimeOnlyAuthFile(file))
+        .map((file) => ({
+          file,
+          snapshot: readCodexAuthTimeSnapshotFromRecord(file),
+        }))
+        .filter((entry) => entry.snapshot.authTimeStatus !== 'missing')
+        .sort((left, right) => {
+          const leftMs = left.snapshot.authenticatedAtMs ?? 0;
+          const rightMs = right.snapshot.authenticatedAtMs ?? 0;
+          return rightMs - leftMs;
+        });
+
+      const recentCandidates = candidates.filter((entry) => {
+        const valueMs = entry.snapshot.authenticatedAtMs;
+        return valueMs !== null && now - valueMs <= CODEX_OAUTH_RECENT_AUTH_RECORD_WINDOW_MS;
+      });
+      const targets = (recentCandidates.length > 0 ? recentCandidates : candidates)
+        .slice(0, CODEX_OAUTH_AUTH_TIME_REFRESH_LIMIT)
+        .map((entry) => entry.file);
+      if (targets.length === 0) return;
+
+      const results = await Promise.allSettled(
+        targets.map(async (file) => {
+          const authJson = await authFilesApi.downloadJsonObject(file.name);
+          return [
+            file.name,
+            readCodexAuthTimeSnapshotFromRecord(authJson, file),
+          ] as [string, CodexAuthTimeSnapshot];
+        })
+      );
+
+      recordCodexAuthTimeSnapshots(
+        results
+          .filter(
+            (result): result is PromiseFulfilledResult<[string, CodexAuthTimeSnapshot]> =>
+              result.status === 'fulfilled'
+          )
+          .map((result) => result.value)
+      );
+    },
+    [recordCodexAuthTimeSnapshots]
+  );
+
   const startCodexOAuthPolling = useCallback(
     (state: string, attemptId: number) => {
       clearCodexOAuthPollTimer();
@@ -1305,13 +1422,14 @@ export function AuthFilesPage() {
 
           if (result.status === 'ok') {
             finishCodexOAuthAttempt();
-            void loadFiles({
+            const nextFiles = await loadFiles({
               preserveExisting: true,
               silent: true,
               restoreRememberedDisplayNames: 'overwrite',
               restoreDisplayNameFilter: (file) =>
                 CODEX_CONFIG.filterFn(file) && !isRuntimeOnlyAuthFile(file),
             });
+            void recordRecentCodexAuthTimesFromFiles(nextFiles ?? filesRef.current);
             showNotification(
               t('auth_files.codex_oauth_success', { defaultValue: 'Codex 认证成功。' }),
               'success'
@@ -1333,7 +1451,19 @@ export function AuthFilesPage() {
           }
         } catch (err) {
           if (codexOAuthAttemptIdRef.current !== attemptId) return;
-          const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+          const message = getErrorMessage(err);
+          if (isRecoverableCodexOAuthPollError(err)) {
+            if (!codexOAuthPollRecoverableWarningShownRef.current) {
+              codexOAuthPollRecoverableWarningShownRef.current = true;
+              showNotification(
+                t('auth_files.codex_oauth_slow_network_waiting', {
+                  defaultValue: '认证网络较慢，正在继续等待结果。',
+                }),
+                'warning'
+              );
+            }
+            return;
+          }
           finishCodexOAuthAttempt();
           showNotification(
             t('auth_files.codex_oauth_status_error', {
@@ -1354,6 +1484,7 @@ export function AuthFilesPage() {
       clearCodexOAuthPollTimer,
       finishCodexOAuthAttempt,
       loadFiles,
+      recordRecentCodexAuthTimesFromFiles,
       showNotification,
       t,
     ]
@@ -1497,6 +1628,7 @@ export function AuthFilesPage() {
 
     const openRequestId = codexOAuthOpenRequestIdRef.current + 1;
     codexOAuthOpenRequestIdRef.current = openRequestId;
+    codexOAuthPollRecoverableWarningShownRef.current = false;
     setCodexOAuthLastUrl('');
     rememberDisplayNamesForFiles(filesRef.current.filter((file) => CODEX_CONFIG.filterFn(file)));
     let authWindow: Window | null = null;
@@ -2173,32 +2305,8 @@ export function AuthFilesPage() {
 
   useEffect(() => {
     if (authTimeSnapshots.size === 0) return;
-
-    const recordedAt = Date.now();
-    setAccountMemosByFile((current) => {
-      let next = current;
-      let changed = false;
-
-      authTimeSnapshots.forEach((snapshot, fileName) => {
-        const result = upsertAuthFileAccountMemoAuthTime(next, fileName, snapshot, recordedAt);
-        if (!result.changed) return;
-        next = result.map;
-        changed = true;
-      });
-
-      if (!changed) return current;
-      if (!writeAuthFilesAccountMemos(next)) {
-        showNotification(
-          t('auth_files.account_memo_save_failed', {
-            defaultValue: '账号备注保存失败，可能是浏览器本地存储空间不足',
-          }),
-          'error'
-        );
-        return current;
-      }
-      return next;
-    });
-  }, [authTimeSnapshots, showNotification, t]);
+    recordCodexAuthTimeSnapshots(authTimeSnapshots);
+  }, [authTimeSnapshots, recordCodexAuthTimeSnapshots]);
 
   const priorityRotationTierDetailGroups = useMemo(() => {
     const groups: Record<AuthFilePriorityTier, PriorityRotationTierDetailItem[]> = {

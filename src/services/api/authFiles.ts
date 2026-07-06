@@ -6,6 +6,7 @@ import { apiClient } from './client';
 import type { AuthFilesResponse } from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
 import { parseTimestampMs } from '@/utils/timestamp';
+import { MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS } from '@/utils/constants';
 
 type StatusError = { status?: number };
 type AuthFileStatusResponse = { status: string; disabled: boolean };
@@ -404,13 +405,22 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
 const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
 
 export const authFilesApi = {
-  list: async () => dedupeAuthFilesResponse(await apiClient.get<AuthFilesResponse>('/auth-files')),
+  list: async () =>
+    dedupeAuthFilesResponse(
+      await apiClient.get<AuthFilesResponse>('/auth-files', {
+        timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
+      })
+    ),
 
   setStatus: (name: string, disabled: boolean) =>
-    apiClient.patch<AuthFileStatusResponse>('/auth-files/status', { name, disabled }),
+    apiClient.patch<AuthFileStatusResponse>('/auth-files/status', { name, disabled }, {
+      timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
+    }),
 
   patchFields: (name: string, fields: AuthFileFieldsPatch) =>
-    apiClient.patch('/auth-files/fields', { name, ...fields }),
+    apiClient.patch('/auth-files/fields', { name, ...fields }, {
+      timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
+    }),
 
   uploadFiles: async (files: File[]): Promise<AuthFileBatchUploadResult> => {
     const requestedNames = files.map((file) => file.name);
@@ -422,7 +432,9 @@ export const authFilesApi = {
     files.forEach((file) => {
       formData.append('file', file, file.name);
     });
-    const payload = await apiClient.postForm<AuthFileBatchUploadResponse>('/auth-files', formData);
+    const payload = await apiClient.postForm<AuthFileBatchUploadResponse>('/auth-files', formData, {
+      timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
+    });
     return normalizeBatchUploadResponse(payload, requestedNames);
   },
 
@@ -436,17 +448,23 @@ export const authFilesApi = {
 
     const payload = await apiClient.delete<AuthFileBatchDeleteResponse>('/auth-files', {
       data: { names: requestedNames },
+      timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
     });
     return normalizeBatchDeleteResponse(payload, requestedNames);
   },
 
   deleteFile: (name: string) => authFilesApi.deleteFiles([name]),
 
-  deleteAll: () => apiClient.delete('/auth-files', { params: { all: true } }),
+  deleteAll: () =>
+    apiClient.delete('/auth-files', {
+      params: { all: true },
+      timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
+    }),
 
   downloadText: async (name: string): Promise<string> => {
     const response = await apiClient.getRaw(`/auth-files/download?name=${encodeURIComponent(name)}`, {
-      responseType: 'blob'
+      responseType: 'blob',
+      timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS,
     });
     const blob = response.data as Blob;
     return blob.text();
@@ -508,7 +526,8 @@ export const authFilesApi = {
   // 获取认证凭证支持的模型
   async getModelsForAuthFile(name: string): Promise<{ id: string; display_name?: string; type?: string; owned_by?: string }[]> {
     const data = await apiClient.get<Record<string, unknown>>(
-      `/auth-files/models?name=${encodeURIComponent(name)}`
+      `/auth-files/models?name=${encodeURIComponent(name)}`,
+      { timeout: MANAGEMENT_SLOW_REQUEST_TIMEOUT_MS }
     );
     const models = data.models ?? data['models'];
     return Array.isArray(models)

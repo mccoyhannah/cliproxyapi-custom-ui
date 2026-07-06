@@ -3,6 +3,7 @@
  */
 
 import { apiClient } from './client';
+import { OAUTH_STATUS_REQUEST_TIMEOUT_MS } from '@/utils/constants';
 
 export type OAuthProvider =
   | 'codex'
@@ -35,13 +36,15 @@ export const oauthApi = {
       params.project_id = options.projectId;
     }
     return apiClient.get<OAuthStartResponse>(`/${provider}-auth-url`, {
-      params: Object.keys(params).length ? params : undefined
+      params: Object.keys(params).length ? params : undefined,
+      timeout: OAUTH_STATUS_REQUEST_TIMEOUT_MS,
     });
   },
 
   getAuthStatus: (state: string) =>
     apiClient.get<{ status: 'ok' | 'wait' | 'error'; error?: string }>(`/get-auth-status`, {
-      params: { state }
+      params: { state },
+      timeout: OAUTH_STATUS_REQUEST_TIMEOUT_MS,
     }),
 
   submitCallback: (provider: OAuthProvider, redirectUrl: string) => {
@@ -49,6 +52,8 @@ export const oauthApi = {
     return apiClient.post<OAuthCallbackResponse>('/oauth-callback', {
       provider: callbackProvider,
       redirect_url: redirectUrl
+    }, {
+      timeout: OAUTH_STATUS_REQUEST_TIMEOUT_MS,
     });
   }
 };
