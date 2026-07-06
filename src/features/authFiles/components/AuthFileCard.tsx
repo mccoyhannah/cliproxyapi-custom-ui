@@ -17,6 +17,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import {
   IconChevronDown,
   IconDownload,
+  IconDiamond,
   IconFileText,
   IconMinus,
   IconModelCluster,
@@ -64,6 +65,7 @@ type AuthFilePriorityTier = 'active' | 'standby' | 'buffer' | 'manualLocked';
 type CodexCardQuotaState = {
   status?: string;
   planType?: string | null;
+  rateLimitResetCreditsAvailableCount?: number | null;
   error?: string;
   errorStatus?: number;
   errorObservedAt?: number;
@@ -211,6 +213,8 @@ export type AuthFileCardProps = {
   noteUpdating: boolean;
   quotaRefreshing: boolean;
   quotaRefreshDisabled: boolean;
+  quotaResetting: boolean;
+  quotaResetDisabled: boolean;
   quotaFilterType: QuotaProviderType | null;
   statusData: AuthFileStatusBarData;
   authTimeSnapshot?: CodexAuthTimeSnapshot | null;
@@ -224,6 +228,7 @@ export type AuthFileCardProps = {
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
   onManualExpiryEdit: (file: AuthFileItem) => void;
   onRefreshQuota: (file: AuthFileItem) => void;
+  onResetQuota: (file: AuthFileItem) => void;
   onAccountMemoOpen: (file: AuthFileItem) => void;
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
@@ -480,6 +485,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     noteUpdating,
     quotaRefreshing,
     quotaRefreshDisabled,
+    quotaResetting,
+    quotaResetDisabled,
     quotaFilterType,
     statusData,
     authTimeSnapshot,
@@ -493,6 +500,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     onOpenPrefixProxyEditor,
     onManualExpiryEdit,
     onRefreshQuota,
+    onResetQuota,
     onAccountMemoOpen,
     onDelete,
     onToggleStatus,
@@ -755,8 +763,14 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     ? t('auth_files.account_memo_button_filled', { defaultValue: '查看/编辑账号备注' })
     : t('auth_files.account_memo_button_empty', { defaultValue: '添加账号备注' });
   const showCardQuotaRefreshButton = resolvedQuotaType === 'codex' && !isRuntimeOnly;
+  const showCardQuotaResetButton =
+    showCardQuotaRefreshButton &&
+    (codexQuotaEntry?.rateLimitResetCreditsAvailableCount ?? 0) > 0;
   const cardQuotaRefreshLabel = t('auth_files.quota_refresh_single_button', {
     defaultValue: '刷新这个认证文件的额度',
+  });
+  const cardQuotaResetLabel = t('codex_quota.reset_button', {
+    defaultValue: '消耗一次重置额度',
   });
   const visibleAuthTimeSnapshot =
     showCardQuotaRefreshButton && authTimeSnapshot?.authenticatedAtShort ? authTimeSnapshot : null;
@@ -1662,6 +1676,26 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                         <IconRefreshCw size={13} />
                       )}
                     </button>
+                    {showCardQuotaResetButton && (
+                      <button
+                        type="button"
+                        className={`${styles.cardQuotaRefreshButton} ${styles.cardQuotaResetButton} ${
+                          quotaResetting ? styles.cardQuotaResetButtonLoading : ''
+                        }`}
+                        onClick={() => onResetQuota(file)}
+                        disabled={
+                          disableControls || file.disabled || quotaResetDisabled || quotaResetting
+                        }
+                        aria-label={cardQuotaResetLabel}
+                        title={cardQuotaResetLabel}
+                      >
+                        {quotaResetting ? (
+                          <LoadingSpinner size={12} />
+                        ) : (
+                          <IconDiamond size={13} />
+                        )}
+                      </button>
+                    )}
                   </span>
                 )}
               </div>

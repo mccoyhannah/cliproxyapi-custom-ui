@@ -24,6 +24,7 @@ import { Select } from '@/components/ui/Select';
 import {
   IconChevronDown,
   IconCopy,
+  IconDiamond,
   IconDownload,
   IconEye,
   IconExternalLink,
@@ -1020,11 +1021,13 @@ const isPriorityRotationSidecarDraftDirty = (
 export function AuthFilesPage() {
   const { t } = useTranslation();
   const showNotification = useNotificationStore((state) => state.showNotification);
+  const showConfirmation = useNotificationStore((state) => state.showConfirmation);
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const apiBase = useAuthStore((state) => state.apiBase);
   const managementKey = useAuthStore((state) => state.managementKey);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
+  const setCodexQuota = useQuotaStore((state) => state.setCodexQuota);
   const { loadQuota: loadCodexQuota } = useQuotaLoader(CODEX_CONFIG);
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
@@ -1108,6 +1111,10 @@ export function AuthFilesPage() {
   const [priorityRotationSidecarAutoSaving, setPriorityRotationSidecarAutoSaving] = useState(false);
   const [codexQuotaRefreshing, setCodexQuotaRefreshing] = useState(false);
   const [codexQuotaRefreshingByFile, setCodexQuotaRefreshingByFile] = useState<
+    Record<string, boolean>
+  >({});
+  const [codexQuotaResetting, setCodexQuotaResetting] = useState(false);
+  const [codexQuotaResettingByFile, setCodexQuotaResettingByFile] = useState<
     Record<string, boolean>
   >({});
   const [codexOAuthOpening, setCodexOAuthOpening] = useState(false);
@@ -1293,12 +1300,32 @@ export function AuthFilesPage() {
     () => files.filter((file) => CODEX_CONFIG.filterFn(file) && !isRuntimeOnlyAuthFile(file)),
     [files]
   );
+  const codexQuotaResetTargets = useMemo(
+    () =>
+      codexQuotaRefreshTargets.filter((file) => {
+        const quota = codexQuota[file.name];
+        return quota !== undefined && Boolean(CODEX_CONFIG.canResetQuota?.(quota));
+      }),
+    [codexQuota, codexQuotaRefreshTargets]
+  );
   const setCodexQuotaRefreshLoading = useCallback((isLoading: boolean) => {
     setCodexQuotaRefreshing(isLoading);
   }, []);
 
   const setSingleCodexQuotaRefreshLoading = useCallback((fileName: string, isLoading: boolean) => {
     setCodexQuotaRefreshingByFile((prev) => {
+      if (isLoading) {
+        return { ...prev, [fileName]: true };
+      }
+      if (!prev[fileName]) return prev;
+      const next = { ...prev };
+      delete next[fileName];
+      return next;
+    });
+  }, []);
+
+  const setSingleCodexQuotaResetLoading = useCallback((fileName: string, isLoading: boolean) => {
+    setCodexQuotaResettingByFile((prev) => {
       if (isLoading) {
         return { ...prev, [fileName]: true };
       }
@@ -1622,6 +1649,163 @@ export function AuthFilesPage() {
       t,
     ]
   );
+
+  const resetCodexQuotaForTargets = useCallback(
+    async (targets: AuthFileItem[]) => {
+      const resetQuota = CODEX_CONFIG.resetQuota;
+      if (!resetQuota || targets.length === 0) {
+        return { success: 0, failed: 0 };
+      }
+
+      let success = 0;
+      let failed = 0;
+
+      for (const file of targets) {
+        setSingleCodexQuotaResetLoading(file.name, true);
+        try {
+          const data = await resetQuota(file, t);
+          setCodexQuota((prev) => ({
+            ...prev,
+            [file.name]: CODEX_CONFIG.buildSuccessState(data),
+          }));
+          success += 1;
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : t('common.unknown_error');
+          const status = getErrorStatus(err) ?? undefined;
+          setCodexQuota((prev) => ({
+            ...prev,
+            [file.name]: CODEX_CONFIG.buildErrorState(message, status),
+          }));
+          failed += 1;
+        } finally {
+          setSingleCodexQuotaResetLoading(file.name, false);
+        }
+      }
+
+      return { success, failed };
+    },
+    [setCodexQuota, setSingleCodexQuotaResetLoading, t]
+  );
+
+  const handleResetSingleCodexQuota = useCallback(
+    (file: AuthFileItem) => {
+      const quota = codexQuota[file.name];
+      if (
+        disableControls ||
+        loading ||
+        codexQuotaRefreshing ||
+        codexQuotaResetting ||
+        codexQuotaResettingByFile[file.name] ||
+        !CODEX_CONFIG.filterFn(file) ||
+        isRuntimeOnlyAuthFile(file) ||
+        isDisabledAuthFile(file) ||
+        !quota ||
+        !CODEX_CONFIG.canResetQuota?.(quota)
+      ) {
+        return;
+      }
+
+      showConfirmation({
+        title: t('codex_quota.reset_confirm_title', {
+          defaultValue: '消耗一次 Codex 重置额度',
+        }),
+        message: t('codex_quota.reset_confirm_message', {
+          name: file.name,
+          defaultValue:
+            '确定为 {{name}} 消耗一次重置额度？这会立即向 Codex 发起重置请求，不能自动撤销。',
+        }),
+        confirmText: t('codex_quota.reset_confirm_button', {
+          defaultValue: '确认消耗',
+        }),
+        variant: 'primary',
+        onConfirm: async () => {
+          const result = await resetCodexQuotaForTargets([file]);
+          if (result.success > 0 && result.failed === 0) {
+            showNotification(t('codex_quota.reset_success', { name: file.name }), 'success');
+            return;
+          }
+
+          const latestQuota = useQuotaStore.getState().codexQuota[file.name];
+          const message = resolveQuotaErrorMessage(
+            t,
+            latestQuota?.errorStatus,
+            latestQuota?.error || t('common.unknown_error')
+          );
+          showNotification(t('codex_quota.reset_failed', { name: file.name, message }), 'error');
+        },
+      });
+    },
+    [
+      codexQuota,
+      codexQuotaRefreshing,
+      codexQuotaResetting,
+      codexQuotaResettingByFile,
+      disableControls,
+      loading,
+      resetCodexQuotaForTargets,
+      showConfirmation,
+      showNotification,
+      t,
+    ]
+  );
+
+  const handleResetCodexQuota = useCallback(() => {
+    if (disableControls || loading || codexQuotaRefreshing || codexQuotaResetting) return;
+
+    if (codexQuotaResetTargets.length === 0) {
+      showNotification(
+        t('auth_files.quota_reset_all_none', {
+          defaultValue: '没有可消耗重置额度的 Codex 认证文件。',
+        }),
+        'info'
+      );
+      return;
+    }
+
+    showConfirmation({
+      title: t('auth_files.quota_reset_all_confirm_title', {
+        defaultValue: '给所有可用 Codex 卡片重置额度',
+      }),
+      message: t('auth_files.quota_reset_all_confirm_message', {
+        count: codexQuotaResetTargets.length,
+        defaultValue:
+          '确定给 {{count}} 个 Codex 认证文件逐个消耗一次重置额度？这会立即向 Codex 发起重置请求，不能自动撤销。',
+      }),
+      confirmText: t('auth_files.quota_reset_all_confirm_button', {
+        defaultValue: '确认重置',
+      }),
+      variant: 'primary',
+      onConfirm: async () => {
+        setCodexQuotaResetting(true);
+        try {
+          const result = await resetCodexQuotaForTargets(codexQuotaResetTargets);
+          showNotification(
+            t('auth_files.quota_reset_all_done', {
+              success: result.success,
+              failed: result.failed,
+              defaultValue:
+                result.failed > 0
+                  ? '重置额度完成：{{success}} 个成功，{{failed}} 个失败。'
+                  : '已给 {{success}} 个 Codex 卡片重置额度。',
+            }),
+            result.failed > 0 ? 'warning' : 'success'
+          );
+        } finally {
+          setCodexQuotaResetting(false);
+        }
+      },
+    });
+  }, [
+    codexQuotaRefreshing,
+    codexQuotaResetTargets,
+    codexQuotaResetting,
+    disableControls,
+    loading,
+    resetCodexQuotaForTargets,
+    showConfirmation,
+    showNotification,
+    t,
+  ]);
 
   const handleOpenCodexOAuth = useCallback(async () => {
     if (disableControls || codexOAuthOpening) return;
@@ -4132,6 +4316,11 @@ export function AuthFilesPage() {
     void handleRefreshCodexQuota().finally(refocusFileCardsAfterListViewChange);
   }, [handleRefreshCodexQuota, refocusFileCardsAfterListViewChange]);
 
+  const handleResetCodexQuotaFromListHeader = useCallback(() => {
+    refocusFileCardsAfterListViewChange();
+    handleResetCodexQuota();
+  }, [handleResetCodexQuota, refocusFileCardsAfterListViewChange]);
+
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
@@ -5699,6 +5888,7 @@ export function AuthFilesPage() {
                     disabled={
                       disableControls ||
                       codexQuotaRefreshing ||
+                      codexQuotaResetting ||
                       loading ||
                       codexQuotaRefreshTargets.length === 0
                     }
@@ -5712,6 +5902,31 @@ export function AuthFilesPage() {
                     <span>{t('codex_quota.refresh_button')}</span>
                     <span className={styles.fileListQuotaRefreshCount}>
                       {codexQuotaRefreshTargets.length}
+                    </span>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className={`${styles.fileListQuotaRefreshButton} ${styles.fileListQuotaResetButton}`}
+                    leftIcon={<IconDiamond size={14} />}
+                    onClick={handleResetCodexQuotaFromListHeader}
+                    disabled={
+                      disableControls ||
+                      codexQuotaResetting ||
+                      codexQuotaRefreshing ||
+                      loading ||
+                      codexQuotaResetTargets.length === 0
+                    }
+                    loading={codexQuotaResetting}
+                    loadingLabel={t('codex_quota.reset_button')}
+                    title={t('auth_files.quota_reset_all_title', {
+                      count: codexQuotaResetTargets.length,
+                      defaultValue: '给 {{count}} 个 Codex 卡片消耗重置额度',
+                    })}
+                  >
+                    <span>{t('codex_quota.reset_button')}</span>
+                    <span className={styles.fileListQuotaRefreshCount}>
+                      {codexQuotaResetTargets.length}
                     </span>
                   </Button>
                 </div>
@@ -5831,7 +6046,9 @@ export function AuthFilesPage() {
                     deleting={deleting === file.name}
                     statusUpdating={statusUpdating[file.name] === true}
                     quotaRefreshing={codexQuotaRefreshingByFile[file.name] === true}
-                    quotaRefreshDisabled={loading || codexQuotaRefreshing}
+                    quotaRefreshDisabled={loading || codexQuotaRefreshing || codexQuotaResetting}
+                    quotaResetting={codexQuotaResettingByFile[file.name] === true}
+                    quotaResetDisabled={loading || codexQuotaRefreshing || codexQuotaResetting}
                     quotaFilterType={quotaFilterType}
                     statusData={statusDataByFileName.get(file.name)!}
                     authTimeSnapshot={authTimeSnapshots.get(file.name)}
@@ -5847,6 +6064,7 @@ export function AuthFilesPage() {
                     onOpenPrefixProxyEditor={openPrefixProxyEditor}
                     onManualExpiryEdit={openManualExpiryEditor}
                     onRefreshQuota={handleRefreshSingleCodexQuota}
+                    onResetQuota={handleResetSingleCodexQuota}
                     onAccountMemoOpen={openAccountMemoEditor}
                     onDelete={handleDelete}
                     onToggleStatus={handleStatusToggle}
