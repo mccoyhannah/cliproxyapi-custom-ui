@@ -2413,6 +2413,19 @@
   white-space: nowrap;
 }
 
+.codexResetCreditsUnknown {
+  gap: 5px;
+  color: var(--warning-color);
+  text-transform: none;
+}
+
+.codexResetCreditsErrorText {
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--warning-text);
+  text-transform: none;
+}
+
 .codexPlanBadge {
   position: relative;
   gap: 4px;

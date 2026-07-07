@@ -120,14 +120,26 @@ const resolveLogDirs = (args, installDir) => {
 
 const escapeJsonForHtml = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
 
-const buildEmbeddedLedgerScript = (projection) =>
-  `<script id="${EMBEDDED_LEDGER_ID}" type="application/json">${escapeJsonForHtml(projection)}</script>`;
+const buildEmbeddedLedgerSummary = (projection) => ({
+  version: projection.version,
+  generatedAt: projection.generatedAt,
+  source: projection.source,
+  coverage: projection.coverage,
+  entries: [],
+  embeddedMode: 'summary',
+  externalLedgerUrl: '/token-ledger.json',
+});
 
-const embedLedgerInHtml = async (htmlPath, projection) => {
+const buildEmbeddedLedgerScript = (projection, mode) => {
+  const payload = mode === 'full' ? projection : buildEmbeddedLedgerSummary(projection);
+  return `<script id="${EMBEDDED_LEDGER_ID}" type="application/json">${escapeJsonForHtml(payload)}</script>`;
+};
+
+const embedLedgerInHtml = async (htmlPath, projection, mode) => {
   if (!(await pathExists(htmlPath))) return false;
 
   const html = await fs.readFile(htmlPath, 'utf8');
-  const script = buildEmbeddedLedgerScript(projection);
+  const script = buildEmbeddedLedgerScript(projection, mode);
   const existingPattern = new RegExp(
     `\\s*<script[^>]*id=["']${EMBEDDED_LEDGER_ID}["'][^>]*>[\\s\\S]*?<\\/script>`,
     'gi'
@@ -646,7 +658,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
-      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--no-embed] [--prune-recorded-logs] [--prune-only] [--active-window-minutes 5]'
+      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--embed-full] [--no-embed] [--prune-recorded-logs] [--prune-only] [--active-window-minutes 5]'
     );
     return;
   }
@@ -660,6 +672,7 @@ const main = async () => {
   const ledgerPath = args['ledger-path'] ?? path.join(ledgerDir, 'ledger.json');
   const projectionPath = args['projection-path'] ?? path.join(staticDir, 'token-ledger.json');
   const shouldEmbed = Boolean(args.embed) && !args['no-embed'];
+  const embeddedLedgerMode = args['embed-full'] ? 'full' : 'summary';
   const pruneOnly = Boolean(args['prune-only']);
 
   if (pruneOnly && !args['prune-recorded-logs']) {
@@ -827,7 +840,7 @@ const main = async () => {
 
     if (shouldEmbed) {
       for (const htmlPath of htmlCandidates) {
-        if (await embedLedgerInHtml(htmlPath, projection)) {
+        if (await embedLedgerInHtml(htmlPath, projection, embeddedLedgerMode)) {
           embeddedHtmlFiles.push(htmlPath);
         }
       }
@@ -862,6 +875,7 @@ const main = async () => {
         ledgerPath,
         projectionPath,
         embeddedHtmlFiles,
+        embeddedLedgerMode: shouldEmbed ? embeddedLedgerMode : 'none',
         strippedHtmlFiles,
         source: projection.source,
         scannedFiles: logFiles.length,

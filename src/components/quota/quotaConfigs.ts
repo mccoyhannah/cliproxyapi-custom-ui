@@ -55,6 +55,7 @@ import {
   normalizeQuotaFraction,
   normalizeStringValue,
   normalizeCodexResetCreditsPayload,
+  resolveCodexResetCreditsAvailableCount,
   parseAntigravityPayload,
   parseClaudeUsagePayload,
   parseCodexUsagePayload,
@@ -93,7 +94,7 @@ type QuotaUpdater<T> = T | ((prev: T) => T);
 type QuotaType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kimi';
 
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
-const CODEX_RESET_CREDITS_REQUEST_TIMEOUT_MS = 8000;
+const CODEX_RESET_CREDITS_REQUEST_TIMEOUT_MS = 15000;
 const QUOTA_PROGRESS_HIGH_THRESHOLD = 70;
 const QUOTA_PROGRESS_MEDIUM_THRESHOLD = 30;
 const geminiCliSupplementaryRequestIds = new Map<string, number>();
@@ -665,12 +666,15 @@ const fetchCodexQuota = async (
     resetCredits?.available_count ?? resetCredits?.availableCount
   );
   const resetCreditsData = await fetchCodexResetCredits(authIndex, requestHeader, t);
+  const resetCreditsError = resetCreditsData.error.trim();
   const resetCreditsCountFromDetails =
     resetCreditsData.credits.length > 0 ? resetCreditsData.credits.length : null;
-  const resolvedResetCreditsAvailableCount =
-    resetCreditsData.availableCount ??
-    resetCreditsCountFromDetails ??
-    rateLimitResetCreditsAvailableCount;
+  const resolvedResetCreditsAvailableCount = resolveCodexResetCreditsAvailableCount({
+    detailsAvailableCount: resetCreditsData.availableCount,
+    detailsCreditsCount: resetCreditsCountFromDetails ?? 0,
+    usageAvailableCount: rateLimitResetCreditsAvailableCount,
+    detailsError: resetCreditsError,
+  });
   const windows = buildCodexQuotaWindows(payload, t);
   const authExpiresAt = resolveCodexAuthExpiry(file);
   const subscriptionSnapshot = await subscriptionSnapshotPromise;
@@ -679,7 +683,7 @@ const fetchCodexQuota = async (
     windows,
     rateLimitResetCreditsAvailableCount: resolvedResetCreditsAvailableCount,
     rateLimitResetCredits: resetCreditsData.credits,
-    rateLimitResetCreditsError: resetCreditsData.error,
+    rateLimitResetCreditsError: resetCreditsError,
     authExpiresAt,
     ...subscriptionSnapshot,
   };
@@ -1033,6 +1037,8 @@ const renderCodexItems = (
   const planType = quota.planType ?? null;
   const rateLimitResetCreditsAvailableCount =
     quota.rateLimitResetCreditsAvailableCount ?? null;
+  const rateLimitResetCreditsError = quota.rateLimitResetCreditsError?.trim() ?? '';
+  const resetCreditsUnavailable = rateLimitResetCreditsError.length > 0;
   const authTokenSnapshot = helpers.authTokenSnapshot ?? null;
   const accessTokenOnly = authTokenSnapshot?.hasRefreshToken === false;
   const manualExpiry = accessTokenOnly ? null : (helpers.manualExpiry ?? null);
@@ -1300,12 +1306,32 @@ const renderCodexItems = (
         .join(' ');
   pushInfoRow('plan', 'codex_quota.plan_label', planDisplayValue, planValueClass);
 
-  if (rateLimitResetCreditsAvailableCount !== null) {
+  if (rateLimitResetCreditsAvailableCount !== null || resetCreditsUnavailable) {
+    const resetCreditsValue = resetCreditsUnavailable
+      ? h(
+          Fragment,
+          null,
+          t('codex_quota.reset_credits_unknown', { defaultValue: '未知' }),
+          h(
+            'span',
+            { className: styleMap.codexResetCreditsErrorText },
+            t('codex_quota.reset_credits_error_short', { defaultValue: '详情接口失败' })
+          )
+        )
+      : rateLimitResetCreditsAvailableCount?.toString();
     pushInfoRow(
       'reset-credits',
       'codex_quota.reset_credits_label',
-      rateLimitResetCreditsAvailableCount.toString(),
-      styleMap.codexPlanValue
+      resetCreditsValue,
+      resetCreditsUnavailable
+        ? [styleMap.codexPlanValue, styleMap.codexResetCreditsUnknown].filter(Boolean).join(' ')
+        : styleMap.codexPlanValue,
+      resetCreditsUnavailable
+        ? t('codex_quota.reset_credits_error_title', {
+            message: rateLimitResetCreditsError,
+            defaultValue: '无法确认重置次数：{{message}}',
+          })
+        : undefined
     );
   }
 
@@ -1791,7 +1817,9 @@ export const CODEX_CONFIG: QuotaConfig<
   filterFn: (file) => isCodexFile(file) && !isDisabledAuthFile(file),
   fetchQuota: fetchCodexQuota,
   resetQuota: resetCodexQuota,
-  canResetQuota: (quota) => (quota.rateLimitResetCreditsAvailableCount ?? 0) > 0,
+  canResetQuota: (quota) =>
+    (quota.rateLimitResetCreditsAvailableCount ?? 0) > 0 &&
+    !quota.rateLimitResetCreditsError?.trim(),
   storeSelector: (state) => state.codexQuota,
   storeSetter: 'setCodexQuota',
   buildLoadingState: () => ({ status: 'loading', windows: [] }),

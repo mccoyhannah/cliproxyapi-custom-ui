@@ -66,6 +66,7 @@ type CodexCardQuotaState = {
   status?: string;
   planType?: string | null;
   rateLimitResetCreditsAvailableCount?: number | null;
+  rateLimitResetCreditsError?: string;
   error?: string;
   errorStatus?: number;
   errorObservedAt?: number;
@@ -765,7 +766,8 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const showCardQuotaRefreshButton = resolvedQuotaType === 'codex' && !isRuntimeOnly;
   const showCardQuotaResetButton =
     showCardQuotaRefreshButton &&
-    (codexQuotaEntry?.rateLimitResetCreditsAvailableCount ?? 0) > 0;
+    (codexQuotaEntry?.rateLimitResetCreditsAvailableCount ?? 0) > 0 &&
+    !codexQuotaEntry?.rateLimitResetCreditsError?.trim();
   const cardQuotaRefreshLabel = t('auth_files.quota_refresh_single_button', {
     defaultValue: '刷新这个认证文件的额度',
   });

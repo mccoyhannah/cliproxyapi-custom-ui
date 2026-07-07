@@ -11,6 +11,13 @@ export interface CodexResetCreditsSummary {
   invalidPayload: boolean;
 }
 
+export interface CodexResetCreditsAvailabilityInput {
+  detailsAvailableCount: number | null;
+  detailsCreditsCount: number;
+  usageAvailableCount: number | null;
+  detailsError?: string | null;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -93,4 +100,21 @@ export const normalizeCodexResetCreditsPayload = (
     credits,
     invalidPayload: !hasExpectedShape,
   };
+};
+
+export const resolveCodexResetCreditsAvailableCount = ({
+  detailsAvailableCount,
+  detailsCreditsCount,
+  usageAvailableCount,
+  detailsError,
+}: CodexResetCreditsAvailabilityInput): number | null => {
+  if (detailsAvailableCount !== null) return detailsAvailableCount;
+  if (detailsCreditsCount > 0) return detailsCreditsCount;
+
+  const hasDetailsError = Boolean(detailsError?.trim());
+  if (hasDetailsError && usageAvailableCount === 0) {
+    return null;
+  }
+
+  return usageAvailableCount;
 };

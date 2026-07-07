@@ -4,6 +4,7 @@ param(
     [switch]$Rebuild,
     [switch]$DryRun,
     [switch]$Embed,
+    [switch]$EmbedFull,
     [switch]$PruneRecordedLogs,
     [switch]$PruneOnly,
     [int]$ActiveWindowMinutes = 5
@@ -33,6 +34,9 @@ if ($DryRun) {
 }
 if ($Embed) {
     $arguments += "--embed"
+}
+if ($EmbedFull) {
+    $arguments += "--embed-full"
 }
 if ($PruneRecordedLogs) {
     $arguments += "--prune-recorded-logs"

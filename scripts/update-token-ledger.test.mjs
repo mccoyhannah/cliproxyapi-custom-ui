@@ -30,7 +30,7 @@ const runLedgerProcess = (installDir, extraArgs = []) =>
       '--install-dir',
       installDir,
       '--custom-ui-dir',
-      path.dirname(__dirname),
+      path.join(installDir, 'custom-ui'),
       ...extraArgs,
     ],
     {
@@ -119,6 +119,26 @@ try {
   assert.equal(duplicateEntries.length, 1);
   assert.equal(duplicateEntries[0].tokenUsage.total, 34);
   assert.equal(path.normalize(duplicateEntries[0].sourceDir), path.normalize(authLogsDir));
+
+  const htmlPath = path.join(tmpRoot, 'static', 'management.html');
+  await fs.writeFile(htmlPath, '<html><body><div id="root"></div></body></html>', 'utf8');
+  const embedResult = runLedgerWrite(tmpRoot, ['--embed']);
+  assert.equal(embedResult.embeddedHtmlFiles.length, 1);
+  assert.equal(embedResult.embeddedLedgerMode, 'summary');
+  const embeddedHtml = await fs.readFile(htmlPath, 'utf8');
+  const embeddedMatch = embeddedHtml.match(
+    /<script[^>]+id=["']cpamc-token-ledger["'][^>]*>([\s\S]*?)<\/script>/
+  );
+  assert.ok(embeddedMatch, 'expected embedded ledger summary script');
+  const embeddedPayload = JSON.parse(embeddedMatch[1]);
+  assert.equal(embeddedPayload.embeddedMode, 'summary');
+  assert.equal(embeddedPayload.coverage.totalEntries, embedResult.coverage.totalEntries);
+  assert.deepEqual(embeddedPayload.entries, []);
+  assert.equal(embeddedPayload.externalLedgerUrl, '/token-ledger.json');
+  assert.ok(
+    !embeddedHtml.includes('gpt-test-duplicate-auth'),
+    'full ledger entries should stay out of management.html'
+  );
 
   const pruneRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-prune-'));
   try {
