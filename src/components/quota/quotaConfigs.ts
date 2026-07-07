@@ -15,6 +15,7 @@ import type {
   ClaudeQuotaState,
   ClaudeQuotaWindow,
   ClaudeUsagePayload,
+  CodexRateLimitResetCredit,
   CodexRateLimitInfo,
   CodexQuotaState,
   CodexSubscriptionStatus,
@@ -39,6 +40,7 @@ import {
   CLAUDE_USAGE_URL,
   CLAUDE_REQUEST_HEADERS,
   CLAUDE_USAGE_WINDOW_KEYS,
+  CODEX_RATE_LIMIT_RESET_CREDITS_URL,
   CODEX_RATE_LIMIT_RESET_CREDITS_CONSUME_URL,
   CODEX_USAGE_URL,
   CODEX_REQUEST_HEADERS,
@@ -52,6 +54,7 @@ import {
   normalizePlanType,
   normalizeQuotaFraction,
   normalizeStringValue,
+  normalizeCodexResetCreditsPayload,
   parseAntigravityPayload,
   parseClaudeUsagePayload,
   parseCodexUsagePayload,
@@ -90,6 +93,7 @@ type QuotaUpdater<T> = T | ((prev: T) => T);
 type QuotaType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kimi';
 
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
+const CODEX_RESET_CREDITS_REQUEST_TIMEOUT_MS = 8000;
 const QUOTA_PROGRESS_HIGH_THRESHOLD = 70;
 const QUOTA_PROGRESS_MEDIUM_THRESHOLD = 30;
 const geminiCliSupplementaryRequestIds = new Map<string, number>();
@@ -540,20 +544,95 @@ const resolveCodexSubscriptionSnapshot = async (
   }
 };
 
-const fetchCodexQuota = async (
-  file: AuthFileItem,
-  t: TFunction
-): Promise<{
+type CodexResetCreditsData = {
+  availableCount: number | null;
+  credits: CodexRateLimitResetCredit[];
+  error: string;
+};
+
+type CodexQuotaData = {
   planType: string | null;
   windows: CodexQuotaWindow[];
   rateLimitResetCreditsAvailableCount: number | null;
+  rateLimitResetCredits: CodexRateLimitResetCredit[];
+  rateLimitResetCreditsError: string;
   authExpiresAt: string | null;
   subscriptionActiveUntil: string | null;
   subscriptionActiveUntilMs: number | null;
   subscriptionLastChecked: string | null;
   subscriptionStatus: CodexSubscriptionStatus;
   subscriptionStatusMessage: string | null;
-}> => {
+};
+
+const buildCodexRequestHeader = (file: AuthFileItem): Record<string, string> => {
+  const accountId = resolveCodexChatgptAccountId(file);
+  const requestHeader: Record<string, string> = {
+    ...CODEX_REQUEST_HEADERS,
+  };
+  if (accountId) {
+    requestHeader['Chatgpt-Account-Id'] = accountId;
+  }
+  return requestHeader;
+};
+
+const fetchCodexResetCredits = async (
+  authIndex: string,
+  requestHeader: Record<string, string>,
+  t: TFunction
+): Promise<CodexResetCreditsData> => {
+  try {
+    const result = await apiCallApi.request(
+      {
+        authIndex,
+        method: 'GET',
+        url: CODEX_RATE_LIMIT_RESET_CREDITS_URL,
+        header: {
+          ...requestHeader,
+          Accept: 'application/json',
+          'OpenAI-Beta': 'codex-1',
+          Originator: 'Codex Desktop',
+        },
+      },
+      { timeout: CODEX_RESET_CREDITS_REQUEST_TIMEOUT_MS }
+    );
+
+    if (result.statusCode < 200 || result.statusCode >= 300) {
+      return {
+        availableCount: null,
+        credits: [],
+        error: getApiCallErrorMessage(result),
+      };
+    }
+
+    const summary = normalizeCodexResetCreditsPayload(result.body ?? result.bodyText);
+    if (summary.invalidPayload) {
+      return {
+        availableCount: null,
+        credits: [],
+        error: t('codex_quota.reset_credits_invalid_payload', {
+          defaultValue: '重置额度接口返回异常',
+        }),
+      };
+    }
+
+    return {
+      availableCount: summary.availableCount,
+      credits: summary.credits,
+      error: '',
+    };
+  } catch (err: unknown) {
+    return {
+      availableCount: null,
+      credits: [],
+      error: err instanceof Error ? err.message : t('common.unknown_error'),
+    };
+  }
+};
+
+const fetchCodexQuota = async (
+  file: AuthFileItem,
+  t: TFunction
+): Promise<CodexQuotaData> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {
@@ -562,14 +641,7 @@ const fetchCodexQuota = async (
 
   const planTypeFromFile = resolveCodexPlanType(file);
   const subscriptionSnapshotPromise = resolveCodexSubscriptionSnapshot(file);
-  const accountId = resolveCodexChatgptAccountId(file);
-
-  const requestHeader: Record<string, string> = {
-    ...CODEX_REQUEST_HEADERS,
-  };
-  if (accountId) {
-    requestHeader['Chatgpt-Account-Id'] = accountId;
-  }
+  const requestHeader = buildCodexRequestHeader(file);
 
   const result = await apiCallApi.request({
     authIndex,
@@ -592,13 +664,22 @@ const fetchCodexQuota = async (
   const rateLimitResetCreditsAvailableCount = normalizeNumberValue(
     resetCredits?.available_count ?? resetCredits?.availableCount
   );
+  const resetCreditsData = await fetchCodexResetCredits(authIndex, requestHeader, t);
+  const resetCreditsCountFromDetails =
+    resetCreditsData.credits.length > 0 ? resetCreditsData.credits.length : null;
+  const resolvedResetCreditsAvailableCount =
+    resetCreditsData.availableCount ??
+    resetCreditsCountFromDetails ??
+    rateLimitResetCreditsAvailableCount;
   const windows = buildCodexQuotaWindows(payload, t);
   const authExpiresAt = resolveCodexAuthExpiry(file);
   const subscriptionSnapshot = await subscriptionSnapshotPromise;
   return {
     planType: planTypeFromUsage ?? planTypeFromFile,
     windows,
-    rateLimitResetCreditsAvailableCount,
+    rateLimitResetCreditsAvailableCount: resolvedResetCreditsAvailableCount,
+    rateLimitResetCredits: resetCreditsData.credits,
+    rateLimitResetCreditsError: resetCreditsData.error,
     authExpiresAt,
     ...subscriptionSnapshot,
   };
@@ -621,13 +702,7 @@ const consumeCodexRateLimitResetCredit = async (
     throw new Error(t('codex_quota.missing_auth_index'));
   }
 
-  const accountId = resolveCodexChatgptAccountId(file);
-  const requestHeader: Record<string, string> = {
-    ...CODEX_REQUEST_HEADERS,
-  };
-  if (accountId) {
-    requestHeader['Chatgpt-Account-Id'] = accountId;
-  }
+  const requestHeader = buildCodexRequestHeader(file);
 
   const result = await apiCallApi.request({
     authIndex,
@@ -647,17 +722,7 @@ const consumeCodexRateLimitResetCredit = async (
 const resetCodexQuota = async (
   file: AuthFileItem,
   t: TFunction
-): Promise<{
-  planType: string | null;
-  windows: CodexQuotaWindow[];
-  rateLimitResetCreditsAvailableCount: number | null;
-  authExpiresAt: string | null;
-  subscriptionActiveUntil: string | null;
-  subscriptionActiveUntilMs: number | null;
-  subscriptionLastChecked: string | null;
-  subscriptionStatus: CodexSubscriptionStatus;
-  subscriptionStatusMessage: string | null;
-}> => {
+): Promise<CodexQuotaData> => {
   await consumeCodexRateLimitResetCredit(file, t);
   return fetchCodexQuota(file, t);
 };
@@ -1718,17 +1783,7 @@ export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQ
 
 export const CODEX_CONFIG: QuotaConfig<
   CodexQuotaState,
-  {
-    planType: string | null;
-    windows: CodexQuotaWindow[];
-    rateLimitResetCreditsAvailableCount: number | null;
-    authExpiresAt: string | null;
-    subscriptionActiveUntil: string | null;
-    subscriptionActiveUntilMs: number | null;
-    subscriptionLastChecked: string | null;
-    subscriptionStatus: CodexSubscriptionStatus;
-    subscriptionStatusMessage: string | null;
-  }
+  CodexQuotaData
 > = {
   type: 'codex',
   i18nPrefix: 'codex_quota',
@@ -1745,6 +1800,8 @@ export const CODEX_CONFIG: QuotaConfig<
     windows: data.windows,
     planType: data.planType,
     rateLimitResetCreditsAvailableCount: data.rateLimitResetCreditsAvailableCount,
+    rateLimitResetCredits: data.rateLimitResetCredits,
+    rateLimitResetCreditsError: data.rateLimitResetCreditsError,
     authExpiresAt: data.authExpiresAt,
     subscriptionActiveUntil: data.subscriptionActiveUntil,
     subscriptionActiveUntilMs: data.subscriptionActiveUntilMs,
