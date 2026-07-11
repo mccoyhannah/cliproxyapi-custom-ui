@@ -313,7 +313,8 @@ export function UsageStatisticsPage() {
 
   const tokenLedgerDetailsByRequestId = useMemo(() => {
     const entries = new Map<string, TokenLedgerEntry>();
-    tokenLedger?.entries.forEach((entry) => {
+    const ledgerEntries = Array.isArray(tokenLedger?.entries) ? tokenLedger.entries : [];
+    ledgerEntries.forEach((entry) => {
       if (!entry.requestId) return;
       if (isPreferredTokenLedgerEntry(entry, entries.get(entry.requestId))) {
         entries.set(entry.requestId, entry);
@@ -356,7 +357,14 @@ export function UsageStatisticsPage() {
       if (!snapshot && !options.requireLedger) {
         setTokenLedgerError('未从 8317 直接读取到台账；点击“更新 Token 台账”会启动本机助手读取。');
       }
-      setTokenLedger(snapshot);
+      setTokenLedger(
+        snapshot
+          ? {
+              ...snapshot,
+              entries: Array.isArray(snapshot.entries) ? snapshot.entries : [],
+            }
+          : null
+      );
       tokenLedgerLoadedRef.current = true;
     } catch (err: unknown) {
       const message = getErrorMessage(err) || '长期 Token 台账加载失败';

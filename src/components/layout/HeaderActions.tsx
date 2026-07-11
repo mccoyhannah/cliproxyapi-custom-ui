@@ -230,6 +230,11 @@ export function HeaderActions({
     setOpenMenu((current) => (current === 'theme' ? null : 'theme'));
   }, []);
 
+  const handleToggleSidebarOpen = useCallback(() => {
+    setOpenMenu(null);
+    onToggleSidebarOpen();
+  }, [onToggleSidebarOpen]);
+
   const handleLanguageSelect = useCallback(
     (nextLanguage: string) => {
       if (!isSupportedLanguage(nextLanguage)) {
@@ -263,12 +268,16 @@ export function HeaderActions({
         <span className="sidebar-toggle-icon">{headerIcons.chevronLeft}</span>
       </button>
 
-      <div className="mobile-sidebar-actions">
+      <div
+        className="mobile-sidebar-actions"
+        aria-hidden={sidebarOpen || undefined}
+        inert={sidebarOpen}
+      >
         <Button
           className="mobile-menu-btn"
           variant="ghost"
           size="sm"
-          onClick={onToggleSidebarOpen}
+          onClick={handleToggleSidebarOpen}
           title={mobileSidebarToggleLabel}
           aria-label={mobileSidebarToggleLabel}
           aria-controls={sidebarId}
@@ -278,7 +287,11 @@ export function HeaderActions({
         </Button>
       </div>
 
-      <div className="header-actions floating-actions">
+      <div
+        className="header-actions floating-actions"
+        aria-hidden={sidebarOpen || undefined}
+        inert={sidebarOpen}
+      >
         <div
           className="header-status-cluster"
           aria-label={t('dashboard.system_status', { defaultValue: 'System status' })}

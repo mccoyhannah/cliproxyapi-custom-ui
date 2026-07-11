@@ -1082,6 +1082,10 @@
     background: var(--floating-surface);
     box-shadow: var(--floating-shadow);
   }
+
+  .sidebar-dialog-close {
+    display: none;
+  }
 }
 
 .main-header .header-actions .btn[aria-pressed='true'] {
@@ -1241,11 +1245,51 @@
     .mobile-sidebar-actions {
       top: var(--shell-gutter);
     }
+
+    .header-actions[aria-hidden='true'] {
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-4px);
+    }
+
+    .mobile-sidebar-actions[aria-hidden='true'] {
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-4px);
+    }
   }
 
   .sidebar {
     background: var(--surface-card);
     box-shadow: var(--floating-shadow);
+
+    .sidebar-dialog-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      min-width: 44px;
+      height: 44px;
+      margin-left: auto;
+      padding: 0;
+      border: 1px solid var(--border-base);
+      border-radius: var(--radius-md);
+      background: var(--surface-control);
+      color: var(--text-secondary);
+      cursor: pointer;
+
+      &:hover {
+        background: var(--surface-control-hover);
+        color: var(--text-primary);
+      }
+
+      &:focus-visible {
+        outline: none;
+        box-shadow: var(--focus-ring);
+      }
+    }
   }
 
   .main-content {
@@ -1375,6 +1419,30 @@
 }
 
 @media (max-width: $breakpoint-mobile) {
+  .main-header {
+    isolation: isolate;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0 0 -14px;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        var(--bg-body) 0 calc(100% - 14px),
+        color-mix(in srgb, var(--bg-body) 94%, transparent) calc(100% - 7px),
+        transparent 100%
+      );
+    }
+
+    .sidebar-toggle-floating,
+    .mobile-sidebar-actions,
+    .header-actions {
+      z-index: 1;
+    }
+  }
+
   .main-content {
     padding: calc(var(--header-height) + 14px) $spacing-md $spacing-lg;
   }

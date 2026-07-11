@@ -15,53 +15,63 @@ interface ThemeMenuProps {
 const THEME_CARDS: Array<{
   key: Theme;
   labelKey: string;
-  colors: { bg: string; card: string; border: string; text: string; textMuted: string };
 }> = [
   {
     key: 'auto',
     labelKey: 'theme.auto',
-    colors: {
-      bg: 'linear-gradient(135deg, #ffffff 0 50%, #111111 50% 100%)',
-      card: 'linear-gradient(135deg, #ffffff 0 50%, #171d1a 50% 100%)',
-      border: '#b9c7bd',
-      text: '#202520',
-      textMuted: 'linear-gradient(135deg, #9aa69d 0 50%, #617168 50% 100%)',
-    },
   },
   {
     key: 'white',
     labelKey: 'theme.white',
-    colors: {
-      bg: '#ffffff',
-      card: '#ffffff',
-      border: '#e1e7df',
-      text: '#202520',
-      textMuted: '#8a948c',
-    },
   },
   {
     key: 'light',
     labelKey: 'theme.light',
-    colors: {
-      bg: '#f5f7f4',
-      card: '#ffffff',
-      border: '#dfe6dc',
-      text: '#202520',
-      textMuted: '#8a948c',
-    },
   },
   {
     key: 'dark',
     labelKey: 'theme.dark',
-    colors: {
-      bg: '#101412',
-      card: '#171d1a',
-      border: '#2d3a33',
-      text: '#f2f6f3',
-      textMuted: '#8b9a90',
-    },
   },
 ];
+
+type PreviewTheme = Exclude<Theme, 'auto'>;
+
+function ThemePreviewPane({ theme, divided = false }: { theme: PreviewTheme; divided?: boolean }) {
+  return (
+    <div
+      data-theme={theme}
+      style={{
+        display: 'flex',
+        minWidth: 0,
+        height: '100%',
+        flexDirection: 'column',
+        borderLeft: divided ? '1px solid var(--border-base)' : undefined,
+        background: 'var(--bg-body)',
+      }}
+    >
+      <div
+        className="theme-card-header"
+        style={{
+          background: 'var(--surface-card)',
+          borderBottom: '1px solid var(--border-base)',
+        }}
+      />
+      <div className="theme-card-body">
+        <div
+          className="theme-card-sidebar"
+          style={{
+            background: 'var(--surface-card)',
+            borderRight: '1px solid var(--border-base)',
+          }}
+        />
+        <div className="theme-card-content" style={{ background: 'var(--bg-body)' }}>
+          <div className="theme-card-line" style={{ background: 'var(--text-tertiary)' }} />
+          <div className="theme-card-line short" style={{ background: 'var(--primary-color)' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ThemeMenu({
   open,
@@ -99,34 +109,23 @@ export function ThemeMenu({
             >
               <div
                 className="theme-card-preview"
+                data-theme={tc.key === 'auto' ? undefined : tc.key}
+                aria-hidden="true"
                 style={{
-                  background: tc.colors.bg,
-                  border: `1px solid ${tc.colors.border}`,
+                  display: 'grid',
+                  gridTemplateColumns: tc.key === 'auto' ? '1fr 1fr' : '1fr',
+                  background: 'var(--bg-body)',
+                  border: '1px solid var(--border-base)',
                 }}
               >
-                <div
-                  className="theme-card-header"
-                  style={{
-                    background: tc.colors.card,
-                    borderBottom: `1px solid ${tc.colors.border}`,
-                  }}
-                />
-                <div className="theme-card-body">
-                  <div
-                    className="theme-card-sidebar"
-                    style={{
-                      background: tc.colors.card,
-                      borderRight: `1px solid ${tc.colors.border}`,
-                    }}
-                  />
-                  <div className="theme-card-content" style={{ background: tc.colors.bg }}>
-                    <div className="theme-card-line" style={{ background: tc.colors.textMuted }} />
-                    <div
-                      className="theme-card-line short"
-                      style={{ background: tc.colors.textMuted }}
-                    />
-                  </div>
-                </div>
+                {tc.key === 'auto' ? (
+                  <>
+                    <ThemePreviewPane theme="white" />
+                    <ThemePreviewPane theme="dark" divided />
+                  </>
+                ) : (
+                  <ThemePreviewPane theme={tc.key} />
+                )}
               </div>
               <span className="theme-card-label">{t(tc.labelKey)}</span>
             </button>

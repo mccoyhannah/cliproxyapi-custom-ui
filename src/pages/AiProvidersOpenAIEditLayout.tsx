@@ -434,10 +434,11 @@ export function AiProvidersOpenAIEditLayout() {
     }
     return '/ai-providers/openai/new';
   }, [hasIndexParam, params.index]);
-  const canGuard = !resolvedLoading && !saving && !invalidIndexParam && !invalidIndex;
+  const canGuard = !resolvedLoading && !invalidIndexParam && !invalidIndex;
 
   const { allowNextNavigation } = useUnsavedChangesGuard({
     enabled: canGuard,
+    hasUnsavedChanges: isDirty,
     shouldBlock: ({ nextLocation }) => {
       const nextPath = nextLocation.pathname;
       const isWithinRoot =

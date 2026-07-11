@@ -420,10 +420,11 @@ export function AiProvidersGeminiEditPage() {
     isHeadersDirty ||
     isModelsDirty ||
     isExcludedModelsDirty;
-  const canGuard = !loading && !saving && !invalidIndexParam && !invalidIndex;
+  const canGuard = !loading && !invalidIndexParam && !invalidIndex;
 
   const { allowNextNavigation } = useUnsavedChangesGuard({
     enabled: canGuard,
+    hasUnsavedChanges: isDirty,
     shouldBlock: ({ currentLocation, nextLocation }) =>
       isDirty && currentLocation.pathname !== nextLocation.pathname,
     dialog: {

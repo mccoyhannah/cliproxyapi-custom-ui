@@ -13,19 +13,32 @@ export type UnsavedChangesDialog = {
   variant?: ConfirmationVariant;
 };
 
-export type UseUnsavedChangesGuardOptions = {
+type UseUnsavedChangesGuardBaseOptions = {
   enabled?: boolean;
-  shouldBlock: boolean | BlockerFunction;
   dialog: UnsavedChangesDialog;
 };
 
+export type UseUnsavedChangesGuardOptions = UseUnsavedChangesGuardBaseOptions &
+  (
+    | {
+        shouldBlock: boolean;
+        hasUnsavedChanges?: boolean;
+      }
+    | {
+        shouldBlock: BlockerFunction;
+        hasUnsavedChanges: boolean;
+      }
+  );
+
 export function useUnsavedChangesGuard(options: UseUnsavedChangesGuardOptions) {
-  const { enabled = true, shouldBlock, dialog } = options;
+  const { enabled = true, hasUnsavedChanges, shouldBlock, dialog } = options;
   const { showConfirmation } = useNotificationStore();
   const lastBlockedRef = useRef<string>('');
   const allowNextNavigationUntilRef = useRef(0);
   const allowNextNavigationKeyRef = useRef('');
   const location = useLocation();
+  const shouldWarnBeforeUnload =
+    hasUnsavedChanges ?? (typeof shouldBlock === 'boolean' ? shouldBlock : false);
 
   const allowNextNavigation = useCallback(() => {
     // Allow one programmatic navigation after successful save.
@@ -58,6 +71,19 @@ export function useUnsavedChangesGuard(options: UseUnsavedChangesGuardOptions) {
   );
 
   const blocker = useBlocker(shouldBlockFunction);
+
+  useEffect(() => {
+    if (!enabled || !shouldWarnBeforeUnload) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (allowNextNavigationUntilRef.current > Date.now()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [enabled, shouldWarnBeforeUnload]);
 
   useEffect(() => {
     if (allowNextNavigationUntilRef.current === 0) return;

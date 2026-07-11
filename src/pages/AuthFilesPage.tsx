@@ -132,7 +132,6 @@ import {
   AUTH_FILES_FOCUS_CARDS_EVENT,
   AUTH_FILES_FOCUS_CARDS_GRID_ATTR,
   AUTH_FILES_FOCUS_CARDS_HEADER_ATTR,
-  consumeAuthFilesInitialQuotaRefresh,
   getAuthFilesCardsFocusEventDetail,
   getAuthFilesCardsScrollTop,
   shouldFocusAuthFilesCards,
@@ -1141,8 +1140,6 @@ export function AuthFilesPage() {
   const loadedFilesOnceRef = useRef(false);
   const filesRef = useRef<AuthFileItem[]>([]);
   const filesLengthRef = useRef(0);
-  const initialQuotaRefreshInFlightRef = useRef(false);
-  const initialQuotaRefreshConsumedRef = useRef(false);
   const priorityRotationSidecarDraftTouchedRef = useRef(false);
   const priorityRotationSidecarAutoSaveSignatureRef = useRef('');
   const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
@@ -1335,31 +1332,6 @@ export function AuthFilesPage() {
       return next;
     });
   }, []);
-
-  const refreshAuthFilesAndCodexQuota = useCallback(
-    async (options: { silent?: boolean } = {}) => {
-      const nextFiles = await loadFiles({
-        preserveExisting: true,
-        silent: options.silent ?? true,
-      });
-      const quotaTargets = (nextFiles ?? filesRef.current).filter(
-        (file) =>
-          CODEX_CONFIG.filterFn(file) &&
-          !isRuntimeOnlyAuthFile(file) &&
-          !isDisabledAuthFile(file)
-      );
-
-      if (quotaTargets.length > 0) {
-        await loadCodexQuota(quotaTargets, 'all', setCodexQuotaRefreshLoading, {
-          preserveExisting: true,
-          silent: true,
-        });
-      }
-
-      return nextFiles;
-    },
-    [loadCodexQuota, loadFiles, setCodexQuotaRefreshLoading]
-  );
 
   const recordCodexAuthTimeSnapshots = useCallback(
     (entries: Iterable<[string, CodexAuthTimeSnapshot]>) => {
@@ -2341,36 +2313,19 @@ export function AuthFilesPage() {
 
   const handleHeaderRefresh = useCallback(async () => {
     await Promise.all([
-      refreshAuthFilesAndCodexQuota({ silent: files.length > 0 }),
+      loadFiles({ preserveExisting: true, silent: files.length > 0 }),
       loadExcluded(),
       loadModelAlias(),
     ]);
-  }, [files.length, loadExcluded, loadModelAlias, refreshAuthFilesAndCodexQuota]);
+  }, [files.length, loadExcluded, loadFiles, loadModelAlias]);
 
-  useHeaderRefresh(handleHeaderRefresh);
+  useHeaderRefresh(handleHeaderRefresh, isCurrentLayer);
 
   useEffect(() => {
     if (!isCurrentLayer) return;
     const preserveExisting = loadedFilesOnceRef.current || filesLengthRef.current > 0;
     loadedFilesOnceRef.current = true;
-    const shouldRunInitialQuotaRefresh =
-      shouldFocusAuthFilesCards({
-        pathname: location.pathname,
-        search: location.search,
-        state: location.state,
-      }) &&
-      !initialQuotaRefreshConsumedRef.current &&
-      consumeAuthFilesInitialQuotaRefresh();
-
-    if (shouldRunInitialQuotaRefresh) {
-      initialQuotaRefreshConsumedRef.current = true;
-      initialQuotaRefreshInFlightRef.current = true;
-      void refreshAuthFilesAndCodexQuota({ silent: preserveExisting }).finally(() => {
-        initialQuotaRefreshInFlightRef.current = false;
-      });
-    } else if (!initialQuotaRefreshInFlightRef.current) {
-      void loadFiles({ preserveExisting, silent: preserveExisting });
-    }
+    void loadFiles({ preserveExisting, silent: preserveExisting });
     loadExcluded();
     loadModelAlias();
   }, [
@@ -2378,10 +2333,6 @@ export function AuthFilesPage() {
     loadFiles,
     loadExcluded,
     loadModelAlias,
-    location.pathname,
-    location.search,
-    location.state,
-    refreshAuthFilesAndCodexQuota,
   ]);
 
   useInterval(

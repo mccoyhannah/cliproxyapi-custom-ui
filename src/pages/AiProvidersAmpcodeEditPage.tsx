@@ -196,10 +196,11 @@ export function AiProvidersAmpcodeEditPage() {
     baseline.forceModelMappings !== Boolean(form.forceModelMappings) ||
     isUpstreamApiKeysDirty ||
     isModelMappingsDirtyNormalized;
-  const canGuard = !loading && !saving;
+  const canGuard = !loading;
 
   const { allowNextNavigation } = useUnsavedChangesGuard({
     enabled: canGuard,
+    hasUnsavedChanges: isDirty,
     shouldBlock: ({ currentLocation, nextLocation }) =>
       isDirty && currentLocation.pathname !== nextLocation.pathname,
     dialog: {

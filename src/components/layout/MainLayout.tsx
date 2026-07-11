@@ -20,6 +20,7 @@ import {
   useThemeStore,
 } from '@/stores';
 import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { HeaderActions } from './HeaderActions';
 import { SidebarNav } from './SidebarNav';
 
@@ -43,6 +44,7 @@ export function MainLayout() {
   const setTheme = useThemeStore((state) => state.setTheme);
   const language = useLanguageStore((state) => state.language);
   const setLanguage = useLanguageStore((state) => state.setLanguage);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -57,6 +59,7 @@ export function MainLayout() {
   const authFilesCardsStatePinned = shouldPinAuthFilesCards(location);
   const authFilesQuickJumpPinned =
     showAuthFilesQuickJump && (authFilesQuickJumpPinnedOverride || authFilesCardsStatePinned);
+  const mobileSidebarActive = isMobile && sidebarOpen;
 
   // 将顶部悬浮控制区高度写入 CSS 变量，供移动端粘性元素和浮层避让。
   useLayoutEffect(() => {
@@ -127,29 +130,51 @@ export function MainLayout() {
   }, [config, updateServerCapabilities]);
 
   useEffect(() => {
-    if (!sidebarOpen) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+    const mobileMediaQuery = window.matchMedia('(max-width: 768px)');
+    const handleBreakpointChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) {
         setSidebarOpen(false);
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
+    mobileMediaQuery.addEventListener('change', handleBreakpointChange);
+    return () => mobileMediaQuery.removeEventListener('change', handleBreakpointChange);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileSidebarActive) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleEscape);
-      mobileToggleRestoreRef.current?.focus();
+      const restoreTarget = mobileToggleRestoreRef.current;
+      if (restoreTarget?.getClientRects().length) {
+        restoreTarget.focus();
+      }
     };
-  }, [sidebarOpen]);
+  }, [mobileSidebarActive]);
 
   const handleToggleSidebarOpen = useCallback(() => {
-    mobileToggleRestoreRef.current = document.activeElement as HTMLElement | null;
+    const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const activeToggle = activeElement?.closest<HTMLElement>(
+      `button[aria-controls="${SIDEBAR_ID}"]`
+    );
+    const visibleToggle = Array.from(
+      headerRef.current?.querySelectorAll<HTMLElement>(
+        `button[aria-controls="${SIDEBAR_ID}"]`
+      ) ?? []
+    ).find((element) => element.getClientRects().length > 0);
+    mobileToggleRestoreRef.current =
+      activeToggle ??
+      visibleToggle ??
+      null;
     setSidebarOpen((prev) => !prev);
+  }, []);
+
+  const handleCloseSidebar = useCallback(() => {
+    setSidebarOpen(false);
   }, []);
 
   const handleRefreshAll = async () => {
@@ -237,22 +262,29 @@ export function MainLayout() {
         <button
           type="button"
           className={`sidebar-backdrop ${sidebarOpen ? 'visible' : ''}`}
-          onClick={() => setSidebarOpen(false)}
+          onClick={handleCloseSidebar}
           aria-label={t('common.close')}
           aria-hidden={!sidebarOpen}
-          tabIndex={sidebarOpen ? 0 : -1}
+          tabIndex={-1}
         />
 
         <SidebarNav
           id={SIDEBAR_ID}
           open={sidebarOpen}
+          mobile={isMobile}
           collapsed={sidebarCollapsed}
           loggingToFile={config?.loggingToFile}
           supportsPlugin={supportsPlugin}
-          onNavigate={() => setSidebarOpen(false)}
+          onClose={handleCloseSidebar}
+          onNavigate={handleCloseSidebar}
         />
 
-        <div className={`content${isLogsPage ? ' content-logs' : ''}`} ref={contentRef}>
+        <div
+          className={`content${isLogsPage ? ' content-logs' : ''}`}
+          ref={contentRef}
+          aria-hidden={mobileSidebarActive || undefined}
+          inert={mobileSidebarActive}
+        >
           <main className={`main-content${isLogsPage ? ' main-content-logs' : ''}`}>
             <PageTransition
               render={(location) => <MainRoutes location={location} />}

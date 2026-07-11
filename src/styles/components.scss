@@ -69,23 +69,23 @@
   }
 
   &.btn-danger {
-    background-color: var(--status-error-text);
-    border-color: var(--status-error-text);
-    color: #fff;
+    background-color: var(--status-error-solid);
+    border-color: var(--status-error-solid);
+    color: var(--status-error-solid-text);
 
     &:hover {
-      background-color: color-mix(in srgb, var(--status-error-text) 88%, var(--ops-brand-panel));
+      background-color: color-mix(in srgb, var(--status-error-solid) 88%, var(--ops-brand-panel));
       transform: translateY(-1px);
     }
   }
 
   &.btn-success {
-    background-color: var(--status-success-text);
-    border-color: var(--status-success-text);
-    color: #fff;
+    background-color: var(--status-success-solid);
+    border-color: var(--status-success-solid);
+    color: var(--status-success-solid-text);
 
     &:hover {
-      background-color: color-mix(in srgb, var(--status-success-text) 88%, var(--ops-brand-panel));
+      background-color: color-mix(in srgb, var(--status-success-solid) 88%, var(--ops-brand-panel));
       transform: translateY(-1px);
     }
   }
@@ -166,17 +166,21 @@
 }
 
 [data-theme='dark'] {
-  .btn {
-    color: #fff;
-  }
-
   .btn.btn-secondary,
   .btn.btn-ghost {
-    color: #fff;
+    color: var(--text-primary);
   }
 
   .btn.btn-warning {
     color: var(--status-warning-text);
+  }
+
+  .btn.btn-danger {
+    color: var(--status-error-solid-text);
+  }
+
+  .btn.btn-success {
+    color: var(--status-success-solid-text);
   }
 }
 

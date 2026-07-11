@@ -1074,7 +1074,7 @@
 
 .priorityRotationTierLabel {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 760;
 }
 
@@ -1096,7 +1096,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 820;
   line-height: 1;
 }
@@ -1162,7 +1162,7 @@
   background: color-mix(in srgb, var(--surface-control) 42%, transparent);
   box-shadow: none;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: none;
@@ -2344,7 +2344,7 @@
   flex-wrap: wrap;
   gap: 3px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.1;
 }
 
@@ -2366,7 +2366,7 @@
   height: 17px;
   padding: 0 1px;
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 760;
   line-height: 1;
   white-space: nowrap;
@@ -2420,7 +2420,7 @@
 }
 
 .codexResetCreditsErrorText {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   color: var(--warning-text);
   text-transform: none;
@@ -2555,7 +2555,7 @@ button.codexCompactChip {
 
 .codexCompactPlanLabel {
   color: color-mix(in srgb, currentColor 72%, var(--text-primary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
 }
 
@@ -2790,7 +2790,7 @@ button.codexSubscriptionValue {
 .codexSubscriptionLabel {
   flex: 0 0 auto;
   color: color-mix(in srgb, currentColor 70%, var(--text-secondary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
 }
 
@@ -2821,13 +2821,13 @@ button.codexSubscriptionValue {
 
 .codexCompactIdentityLine .codexSubscriptionLabel {
   color: color-mix(in srgb, var(--text-tertiary) 86%, var(--text-secondary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
 }
 
 .codexCompactIdentityLine .codexSubscriptionDate {
   color: color-mix(in srgb, var(--text-secondary) 78%, var(--text-tertiary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
 }
 
@@ -3323,7 +3323,7 @@ button.codexSubscriptionValue {
   .typeBadge,
   .stateBadge {
     padding: 3px 7px;
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .fileName {
@@ -3364,11 +3364,11 @@ button.codexSubscriptionValue {
 
   .codexPlanLabel,
   .codexPlanDateValue {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .codexCompactChip {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .codexCompactQuotaChip {
@@ -3435,7 +3435,7 @@ button.codexSubscriptionValue {
   }
 
   .statusToggleLabel {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .priorityStepper {
@@ -3486,7 +3486,7 @@ button.codexSubscriptionValue {
   .subscriptionExpiryPill {
     max-width: 126px;
     padding: 1px 6px;
-    font-size: 10px;
+    font-size: 12px;
   }
 }
 
@@ -3567,7 +3567,7 @@ button.codexSubscriptionValue {
 .cardHeaderStatusBadges .stateBadge {
   min-height: 20px;
   padding: 2px 7px 2px 6px;
-  font-size: 10px;
+  font-size: 12px;
 
   &::before {
     width: 5px;
@@ -3584,7 +3584,7 @@ button.codexSubscriptionValue {
   border-radius: 999px;
   background: color-mix(in srgb, var(--bg-tertiary) 62%, var(--bg-primary));
   color: color-mix(in srgb, var(--text-secondary) 82%, var(--text-primary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 740;
   line-height: 1;
   white-space: nowrap;
@@ -3613,7 +3613,7 @@ button.codexSubscriptionValue {
   background: color-mix(in srgb, currentColor 5%, var(--bg-primary));
   color: color-mix(in srgb, var(--text-secondary) 74%, var(--text-primary));
   font-family: inherit;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -3753,7 +3753,7 @@ button.subscriptionHeaderBadge {
   min-height: 24px;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 780;
   line-height: 1;
   white-space: nowrap;
@@ -4009,7 +4009,7 @@ button.subscriptionHeaderBadge {
 }
 
 .cardMetaCompact .metaLabel {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .cardMetaCompact .metaValue {
@@ -4212,7 +4212,7 @@ button.subscriptionHeaderBadge {
   margin-right: 7px;
   overflow: hidden;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 760;
   line-height: 1;
   text-overflow: ellipsis;
@@ -4324,7 +4324,7 @@ button.subscriptionHeaderBadge {
   margin-left: 7px;
   overflow: hidden;
   color: color-mix(in srgb, var(--priority-badge-color) 70%, var(--text-secondary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 740;
   line-height: 1;
   text-overflow: ellipsis;
@@ -4649,7 +4649,7 @@ button.subscriptionHeaderBadge {
 }
 
 .cardStatsCompact .statLabel {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .cardStatsCompact .statValue {
@@ -4740,7 +4740,7 @@ button.subscriptionHeaderBadge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-tertiary);
   text-transform: uppercase;
@@ -5310,7 +5310,7 @@ button.subscriptionHeaderBadge {
   display: block;
   margin-bottom: 5px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 820;
   letter-spacing: 0;
   line-height: 1.1;
@@ -6015,7 +6015,11 @@ button.subscriptionHeaderBadge {
   color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
-  transition: all $transition-fast;
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast,
+    color $transition-fast,
+    opacity $transition-fast;
 
   &:hover {
     border-color: var(--primary-color);
@@ -6214,7 +6218,10 @@ button.subscriptionHeaderBadge {
   border: 1px solid var(--border-color);
   flex-wrap: wrap;
   cursor: pointer;
-  transition: all $transition-fast;
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast,
+    transform $transition-fast;
 
   &:hover {
     background-color: var(--bg-hover);
@@ -6266,7 +6273,7 @@ button.subscriptionHeaderBadge {
 }
 
 .modelExcludedBadge {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--danger-color);
   background-color: rgba($error-color, 0.1);
   padding: 2px 6px;
@@ -6660,13 +6667,13 @@ button.subscriptionHeaderBadge {
 
   > span:first-child {
     color: var(--text-secondary);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 820;
   }
 
   > span:last-child {
     color: var(--text-tertiary);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 700;
     white-space: normal;
   }
@@ -6698,7 +6705,7 @@ button.subscriptionHeaderBadge {
   min-height: 19px;
   padding: 1px 6px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
 }
 
@@ -6870,7 +6877,7 @@ button.subscriptionHeaderBadge {
 
   label {
     color: var(--text-tertiary);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 680;
     text-transform: none;
   }
@@ -7004,7 +7011,7 @@ button.subscriptionHeaderBadge {
 }
 
 .fileNameSource {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 
@@ -7020,7 +7027,7 @@ button.subscriptionHeaderBadge {
 }
 
 .metaLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 520;
 }
 
@@ -7087,7 +7094,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .statValue {
@@ -7148,7 +7155,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusToggleLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 680;
 }
 
@@ -7549,7 +7556,7 @@ button.subscriptionHeaderBadge {
 .priorityRotationTierLabel,
 .priorityRotationTierCount,
 .priorityRotationTierValue {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .priorityRotationActions {
@@ -7569,7 +7576,7 @@ button.subscriptionHeaderBadge {
   min-height: 18px;
   padding: 1px 6px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
   letter-spacing: 0;
 
@@ -7629,7 +7636,7 @@ button.subscriptionHeaderBadge {
   border-color: transparent;
   background: transparent;
   color: color-mix(in srgb, var(--text-tertiary) 86%, transparent);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -7660,7 +7667,7 @@ button.subscriptionHeaderBadge {
 
   span {
     color: var(--text-tertiary);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 640;
   }
 }
@@ -7712,7 +7719,7 @@ button.subscriptionHeaderBadge {
 
 .priorityRotationSettingHeader {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 690;
 }
 
@@ -7795,7 +7802,7 @@ button.subscriptionHeaderBadge {
 
   label {
     color: var(--auth-command-muted);
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 680;
     text-transform: none;
   }
@@ -7949,7 +7956,7 @@ button.subscriptionHeaderBadge {
   min-height: 20px;
   padding: 2px 7px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
   box-shadow: none;
 }
@@ -8009,7 +8016,7 @@ button.subscriptionHeaderBadge {
 .fileNameSource {
   gap: 4px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .noteLabel {
@@ -8018,7 +8025,7 @@ button.subscriptionHeaderBadge {
 
 .noteValue {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .cardMeta {
@@ -8035,7 +8042,7 @@ button.subscriptionHeaderBadge {
 
 .metaLabel {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 580;
 }
 
@@ -8061,7 +8068,7 @@ button.subscriptionHeaderBadge {
 
 .priorityBadgeLabel,
 .priorityBadgeTier {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .priorityBadgeValueShell {
@@ -8109,7 +8116,7 @@ button.subscriptionHeaderBadge {
   max-width: 158px;
   padding: 1px 6px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
   box-shadow: none;
 }
@@ -8160,7 +8167,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statLabel {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -8183,7 +8190,7 @@ button.subscriptionHeaderBadge {
 
 .statusPanelLabel {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -8201,7 +8208,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusRate {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .quotaSection {
@@ -8313,7 +8320,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusToggleLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 680;
 }
 
@@ -8480,7 +8487,7 @@ button.subscriptionHeaderBadge {
   min-height: 20px;
   padding: 2px 7px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   box-shadow: none;
 }
 
@@ -8524,7 +8531,7 @@ button.subscriptionHeaderBadge {
 }
 
 .noteLabel {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 620;
   letter-spacing: 0;
 }
@@ -8535,7 +8542,7 @@ button.subscriptionHeaderBadge {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -8554,7 +8561,7 @@ button.subscriptionHeaderBadge {
 
 .metaLabel {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -8603,7 +8610,7 @@ button.subscriptionHeaderBadge {
 
 .statusPanelLabel {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 640;
 }
 
@@ -8612,7 +8619,7 @@ button.subscriptionHeaderBadge {
   flex-wrap: wrap;
   gap: 6px 12px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -8625,7 +8632,7 @@ button.subscriptionHeaderBadge {
 
 .statusPanelStats strong {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
 }
 
@@ -8711,7 +8718,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusToggleLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 680;
 }
 
@@ -8750,7 +8757,7 @@ button.subscriptionHeaderBadge {
   border: 0;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -8777,7 +8784,7 @@ button.subscriptionHeaderBadge {
 }
 
 .priorityRotationRelayCopy span {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 @include mobile {
@@ -10094,7 +10101,7 @@ button.subscriptionHeaderBadge {
   border: 1px solid color-mix(in srgb, var(--border-color) 58%, transparent);
   background: color-mix(in srgb, var(--surface-panel) 92%, transparent);
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 820;
   pointer-events: none;
 }
@@ -10106,7 +10113,7 @@ button.subscriptionHeaderBadge {
   border-radius: 5px;
   background: color-mix(in srgb, #2563eb 10%, transparent);
   color: color-mix(in srgb, #2563eb 82%, var(--text-primary));
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 820;
 }
 
@@ -10324,7 +10331,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusPanelLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: color-mix(in srgb, #0f766e 74%, var(--text-tertiary));
 }
@@ -10357,11 +10364,11 @@ button.subscriptionHeaderBadge {
 }
 
 .statusPanelStatsCompact {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .statusPanelStatsCompact strong {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .quotaSection {
@@ -10409,7 +10416,7 @@ button.subscriptionHeaderBadge {
 
   .statusPanelStats {
     gap: 8px;
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .cardMeta {
@@ -10727,7 +10734,7 @@ button.subscriptionHeaderBadge {
 
 .filterTagText {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -10817,7 +10824,7 @@ button.subscriptionHeaderBadge {
   max-width: 124px;
   min-height: 20px;
   padding: 0;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .advancedControlsConnection {
@@ -10903,7 +10910,7 @@ button.subscriptionHeaderBadge {
   min-height: 22px;
   padding: 0 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .priorityRotationActions {
@@ -10926,7 +10933,7 @@ button.subscriptionHeaderBadge {
   border: 0;
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -11053,7 +11060,7 @@ button.subscriptionHeaderBadge {
   min-height: 20px;
   padding: 2px 7px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
   box-shadow: none;
 }
 
@@ -11094,7 +11101,7 @@ button.subscriptionHeaderBadge {
 }
 
 .noteLabel {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 620;
 }
 
@@ -11104,7 +11111,7 @@ button.subscriptionHeaderBadge {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -11121,7 +11128,7 @@ button.subscriptionHeaderBadge {
 }
 
 .metaLabel {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--text-tertiary);
 }
 
@@ -11168,7 +11175,7 @@ button.subscriptionHeaderBadge {
 
 .statusPanelLabel {
   color: var(--text-tertiary);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 640;
 }
 
@@ -11176,12 +11183,12 @@ button.subscriptionHeaderBadge {
   flex-wrap: wrap;
   gap: 6px 10px;
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
 }
 
 .statusPanelStats strong {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
 }
 
@@ -11266,7 +11273,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusToggleLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 680;
 }
 
@@ -11283,7 +11290,7 @@ button.subscriptionHeaderBadge {
 
 .oauthConfigKicker {
   color: color-mix(in srgb, var(--auth-command-accent) 72%, var(--text-tertiary));
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .oauthConfigTitle {
@@ -11292,7 +11299,7 @@ button.subscriptionHeaderBadge {
 
 .oauthConfigCopy {
   max-width: 60ch;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-tertiary);
 }
 
@@ -11459,13 +11466,13 @@ button.subscriptionHeaderBadge {
 
 .authFilesTitleChipLabel {
   color: var(--text-tertiary);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
 }
 
 .authFilesTitleChipValue {
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 840;
   font-variant-numeric: tabular-nums;
 }
@@ -11600,6 +11607,8 @@ button.subscriptionHeaderBadge {
   grid-column: 1;
   min-width: 0;
   overflow: hidden;
+  font-size: 13px;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -11944,6 +11953,7 @@ button.subscriptionHeaderBadge {
 
 .description {
   max-width: 980px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -12200,7 +12210,7 @@ button.subscriptionHeaderBadge {
 
   label {
     color: color-mix(in srgb, var(--text-tertiary) 88%, var(--text-secondary));
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 800;
   }
 }
@@ -12316,6 +12326,21 @@ button.subscriptionHeaderBadge {
       transparent 120px
     ),
     color-mix(in srgb, var(--surface-card) 72%, var(--bg-secondary));
+
+  .fileName,
+  .fileNameSource {
+    filter: grayscale(0.55) saturate(0.55);
+    opacity: 0.82;
+  }
+
+  .providerAvatar,
+  .typeBadge,
+  .noteText,
+  .cardMeta,
+  .healthStatusMessage {
+    filter: grayscale(0.68) saturate(0.42);
+    opacity: 0.72;
+  }
 }
 
 .fileCardCompact {
@@ -12387,7 +12412,7 @@ button.subscriptionHeaderBadge {
   padding: 1px 5px;
   border-radius: 5px;
   background: color-mix(in srgb, var(--surface-control) 60%, transparent);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .noteValue {
@@ -12417,6 +12442,7 @@ button.subscriptionHeaderBadge {
 }
 
 .metaValue {
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -12741,7 +12767,7 @@ button.subscriptionHeaderBadge {
 
     :global(.btn.btn-sm) {
       flex: 1 1 calc(50% - 3px);
-      min-height: 36px;
+      min-height: 44px;
       padding-inline: 8px;
     }
   }
@@ -12766,7 +12792,7 @@ button.subscriptionHeaderBadge {
     flex: 1 1 auto;
     min-width: 0;
     padding-inline: 4px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .filterControls {
@@ -12813,7 +12839,7 @@ button.subscriptionHeaderBadge {
   .primaryActionButton:global(.btn.btn-sm) {
     flex: 1 1 auto;
     max-width: none;
-    min-height: 34px;
+    min-height: 44px;
   }
 
   .cardUtilityActions {
@@ -12823,8 +12849,12 @@ button.subscriptionHeaderBadge {
   .statusToggle {
     width: 100%;
     justify-content: space-between;
-    min-height: 36px;
+    min-height: 44px;
     padding-inline: 10px;
+  }
+
+  .statusToggleLabel {
+    display: inline;
   }
 }
 
@@ -12852,7 +12882,7 @@ button.subscriptionHeaderBadge {
   gap: 5px;
   justify-content: center;
   border-radius: 7px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 760;
 }
 
@@ -12891,7 +12921,7 @@ button.subscriptionHeaderBadge {
     flex: 1 1 calc(50% - 3px);
     min-width: 0;
     max-width: none;
-    min-height: 36px;
+    min-height: 44px;
   }
 
   .cardUtilityActionsOpen .actionButtonLabel {
@@ -13182,7 +13212,7 @@ button.subscriptionHeaderBadge {
   }
 
   .cardUtilityActionsOpen .iconButton:global(.btn.btn-sm) {
-    min-height: 38px;
+    min-height: 44px;
   }
 }
 
@@ -13251,6 +13281,8 @@ button.subscriptionHeaderBadge {
   border-radius: 8px;
   border: 1px solid color-mix(in srgb, var(--border-color) 26%, transparent);
   background: color-mix(in srgb, var(--surface-control) 24%, transparent);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .noteLabel {
@@ -13266,8 +13298,8 @@ button.subscriptionHeaderBadge {
 .noteValue {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 11px;
-  line-height: 1.25;
+  font-size: 13px;
+  line-height: 1.35;
   white-space: nowrap;
 }
 
@@ -13345,7 +13377,7 @@ button.subscriptionHeaderBadge {
   max-width: 46px;
   margin-left: 0;
   padding: 1px 4px;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .fileCardCompact .priorityBadgeEditor {
@@ -13382,7 +13414,7 @@ button.subscriptionHeaderBadge {
 }
 
 .statusPanelLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 720;
 }
 
@@ -13396,7 +13428,12 @@ button.subscriptionHeaderBadge {
 }
 
 .statusPanelStats {
+  font-size: 12px;
   padding-inline: 2px;
+}
+
+.statusPanelStats strong {
+  font-size: 13px;
 }
 
 .quotaSection {
@@ -13417,16 +13454,16 @@ button.subscriptionHeaderBadge {
 
   .priorityBadgeEditor,
   .fileCardCompact .priorityBadgeEditor {
-    flex: 0 1 164px;
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
-    width: min(100%, 164px);
-    min-height: 40px;
+    flex: 0 1 176px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    width: min(100%, 176px);
+    min-height: 44px;
   }
 
   .priorityBadgeStepButton,
   .fileCardCompact .priorityBadgeStepButton {
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .priorityBadgeMain,
@@ -13690,7 +13727,7 @@ button.subscriptionHeaderBadge {
   padding-inline: 6px;
   gap: 4px;
   border-radius: 6px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 @include mobile {
@@ -13949,7 +13986,7 @@ button.subscriptionHeaderBadge {
   min-height: 18px;
   padding: 2px 6px;
   overflow: hidden;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -14124,7 +14161,7 @@ button.subscriptionHeaderBadge {
 
 .accountMemoFieldLabel {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 760;
 }
 
@@ -14196,7 +14233,7 @@ button.subscriptionHeaderBadge {
 .accountMemoPreviewNote {
   max-width: 100%;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 680;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -14545,6 +14582,22 @@ button.subscriptionHeaderBadge {
   .accountMemoFooter {
     flex-wrap: wrap;
   }
+
+  .accountMemoDisplayNameSaveButton,
+  .accountMemoCodexLoginButton,
+  .accountMemoCodexCancelButton,
+  .accountMemoCodexCopyButton,
+  .accountMemoCopyButton,
+  .accountMemoLink {
+    min-height: 44px;
+  }
+
+  .accountMemoCodexCancelButton,
+  .accountMemoCopyButton {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
 }
 
 // Relay settings command strip polish: keep operations grouped and dense.
@@ -14571,7 +14624,7 @@ button.subscriptionHeaderBadge {
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
 
   :global(.btn.btn-sm) {
-    min-height: 34px;
+    min-height: 36px;
     padding-inline: 12px;
     border-radius: 8px;
     white-space: nowrap;
@@ -14712,5 +14765,75 @@ button.subscriptionHeaderBadge {
 
   .priorityRotationPreviewButton {
     grid-column: auto;
+  }
+
+  .priorityRotationActions :global(.btn.btn-sm) {
+    min-height: 44px;
+  }
+}
+
+@media (pointer: coarse) {
+  .priorityBadgeEditor,
+  .fileCardCompact .priorityBadgeEditor {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    width: min(100%, 176px);
+    min-height: 44px;
+  }
+
+  .fileCardCompact .accountMemoButton,
+  .fileCardCompact .cardQuotaRefreshButton,
+  .accountMemoButton,
+  .cardQuotaRefreshButton,
+  .priorityBadgeStepButton,
+  .fileCardCompact .priorityBadgeStepButton,
+  .priorityRotationRelaySwitch,
+  .cardMoreButton:global(.btn.btn-sm),
+  .cardUtilityActionsOpen .iconButton:global(.btn.btn-sm) {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  .fileCardCompact .accountMemoButton,
+  .fileCardCompact .cardQuotaRefreshButton,
+  .accountMemoButton,
+  .cardQuotaRefreshButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  .priorityRotationRelaySwitch,
+  .cardMoreButton:global(.btn.btn-sm) {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container :global(.btn),
+  .container button,
+  .container input,
+  .container select,
+  .container textarea,
+  .fileCard,
+  .filterTag,
+  .filterTag::before,
+  .filterTag::after,
+  .uploadDropPool,
+  .advancedControlsSummary,
+  .accountMemoLink,
+  .priorityRotationRelayThumb,
+  .priorityRotationSliderFill {
+    animation: none;
+    transition: none;
+  }
+
+  .container :global(.btn:hover:not(:disabled)),
+  .container :global(.btn:active:not(:disabled)),
+  .container button:hover,
+  .container button:active,
+  .fileCard:hover,
+  .accountMemoLink:hover {
+    transform: none;
   }
 }

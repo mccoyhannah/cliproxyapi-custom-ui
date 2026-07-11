@@ -26,6 +26,7 @@ import { VisualConfigEditor } from '@/components/config/VisualConfigEditor';
 import { DiffModal } from '@/components/config/DiffModal';
 import { useCliProxyBackendRestart } from '@/hooks/useCliProxyBackendRestart';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import { useVisualConfig } from '@/hooks/useVisualConfig';
 import { useNotificationStore, useAuthStore, useThemeStore, useConfigStore } from '@/stores';
 import { configFileApi } from '@/services/api/configFile';
@@ -132,7 +133,6 @@ export function ConfigPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const isDirty = dirty || visualDirty;
-  const shouldRenderFloatingActions = isCurrentLayer;
   const hasVisualModeError = !!visualParseError;
   const hasVisualValidationErrors =
     activeTab === 'visual' &&
@@ -152,6 +152,28 @@ export function ConfigPage() {
       : sourceYamlError.message
     : '';
   const hasSourceYamlError = activeTab === 'source' && !!sourceYamlError;
+  const shouldRenderFloatingActions =
+    isCurrentLayer &&
+    (isDirty ||
+      saving ||
+      Boolean(error) ||
+      hasVisualModeError ||
+      hasVisualValidationErrors ||
+      hasSourceYamlError);
+
+  useUnsavedChangesGuard({
+    enabled: isCurrentLayer && !loading,
+    hasUnsavedChanges: isDirty,
+    shouldBlock: ({ currentLocation, nextLocation }) =>
+      isDirty && currentLocation.pathname !== nextLocation.pathname,
+    dialog: {
+      title: t('common.unsaved_changes_title'),
+      message: t('common.unsaved_changes_message'),
+      confirmText: t('common.leave'),
+      cancelText: t('common.stay'),
+      variant: 'danger',
+    },
+  });
 
   const loadConfig = useCallback(async () => {
     setLoading(true);

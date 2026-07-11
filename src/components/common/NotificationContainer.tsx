@@ -64,6 +64,9 @@ export function NotificationContainer() {
         <div
           key={notification.id}
           className={`notification ${notification.type} ${notification.isExiting ? 'exiting' : 'entering'}`}
+          role={notification.type === 'error' ? 'alert' : 'status'}
+          aria-live={notification.type === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
         >
           <div className="message">{notification.message}</div>
           <button

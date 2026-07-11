@@ -5,10 +5,6 @@ import { NotificationContainer } from '@/components/common/NotificationContainer
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { CustomUiVersionSync } from '@/components/common/CustomUiVersionSync';
 import { MainLayout } from '@/components/layout/MainLayout';
-import {
-  AUTH_FILES_FOCUS_CARDS_PATH,
-  requestAuthFilesInitialQuotaRefresh,
-} from '@/router/authFilesFocus';
 import { ProtectedRoute } from '@/router/ProtectedRoute';
 import { useLanguageStore, useThemeStore } from '@/stores';
 
@@ -23,16 +19,11 @@ function RootShell() {
   );
 }
 
-function AuthFilesInitialQuotaRedirect() {
-  requestAuthFilesInitialQuotaRefresh();
-  return <Navigate to={AUTH_FILES_FOCUS_CARDS_PATH} replace />;
-}
-
 const router = createHashRouter([
   {
     element: <RootShell />,
     children: [
-      { path: '/', element: <AuthFilesInitialQuotaRedirect /> },
+      { path: '/', element: <Navigate to="/dashboard" replace /> },
       { path: '/login', element: <LoginPage /> },
       {
         path: '/*',

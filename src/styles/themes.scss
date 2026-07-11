@@ -5,7 +5,10 @@
  * 组件继续通过既有 CSS 变量名消费，避免页面级样式改动。
  */
 
-:root {
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
   --font-sans:
     Geist, Inter, 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont,
     'Noto Sans SC', 'Microsoft YaHei UI', sans-serif;
@@ -86,7 +89,7 @@
   --status-success-bg: rgba(5, 150, 105, 0.11);
   --status-success-text: #047857;
   --status-success-border: rgba(5, 150, 105, 0.28);
-  --status-success-solid: #059669;
+  --status-success-solid: #047857;
   --status-success-solid-text: #ffffff;
   --status-success-glow: rgba(5, 150, 105, 0.18);
   --status-error-bg: rgba(220, 38, 38, 0.1);
@@ -156,6 +159,8 @@
 }
 
 [data-theme='white'] {
+  color-scheme: light;
+
   --bg-body: #ffffff;
   --bg-surface: #ffffff;
   --bg-secondary: var(--bg-body);
@@ -170,6 +175,15 @@
   --surface-control-hover: #f8fafc;
   --floating-surface: color-mix(in srgb, #ffffff 94%, transparent);
   --floating-border: #dfe4eb;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --text-quaternary: #94a3b8;
+  --text-muted: var(--text-tertiary);
+  --primary-color: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-active: #1e40af;
+  --primary-contrast: #ffffff;
   --border-base: #dfe4eb;
   --border-color: var(--border-base);
   --border-secondary: #edf0f4;
@@ -186,34 +200,36 @@
 }
 
 [data-theme='dark'] {
-  --bg-body: #09090b;
-  --bg-surface: #18181b;
+  color-scheme: dark;
+
+  --bg-body: #111318;
+  --bg-surface: #1a1e26;
   --bg-secondary: var(--bg-body);
   --bg-primary: var(--bg-surface);
-  --bg-tertiary: #27272a;
-  --bg-hover: #27272a;
-  --bg-quinary: #111113;
+  --bg-tertiary: #2a303a;
+  --bg-hover: #252b34;
+  --bg-quinary: #151820;
   --bg-error-light: rgba(248, 113, 113, 0.14);
 
-  --surface-card: #18181b;
-  --surface-card-hover: #202024;
-  --surface-panel: #111113;
-  --surface-control: #202024;
-  --surface-control-hover: #27272a;
-  --floating-surface: color-mix(in srgb, #18181b 92%, transparent);
-  --floating-border: rgba(255, 255, 255, 0.1);
+  --surface-card: #1a1e26;
+  --surface-card-hover: #222832;
+  --surface-panel: #151820;
+  --surface-control: #202631;
+  --surface-control-hover: #2a303a;
+  --floating-surface: color-mix(in srgb, #1a1e26 94%, transparent);
+  --floating-border: rgba(226, 232, 240, 0.12);
 
   --text-primary: #f4f4f5;
   --text-secondary: #d4d4d8;
   --text-tertiary: #a1a1aa;
-  --text-quaternary: #71717a;
+  --text-quaternary: #8b93a1;
   --text-muted: var(--text-tertiary);
 
-  --border-base: rgba(255, 255, 255, 0.08);
+  --border-base: rgba(226, 232, 240, 0.1);
   --border-color: var(--border-base);
-  --border-secondary: rgba(255, 255, 255, 0.06);
-  --border-primary: rgba(255, 255, 255, 0.12);
-  --border-hover: rgba(255, 255, 255, 0.18);
+  --border-secondary: rgba(226, 232, 240, 0.07);
+  --border-primary: rgba(226, 232, 240, 0.15);
+  --border-hover: rgba(226, 232, 240, 0.24);
 
   --primary-color: #60a5fa;
   --primary-hover: #93c5fd;
@@ -244,13 +260,13 @@
   --ops-ink-muted: var(--text-tertiary);
   --ops-surface-1: var(--surface-card);
   --ops-surface-2: var(--surface-panel);
-  --ops-surface-3: #27272a;
+  --ops-surface-3: #2a303a;
   --ops-border-subtle: var(--border-base);
   --ops-border-strong: var(--border-hover);
   --ops-panel-shadow: var(--shadow-card);
   --ops-control-shadow: var(--shadow-control);
-  --ops-brand-panel: #09090b;
-  --ops-brand-panel-alt: #18181b;
+  --ops-brand-panel: #111318;
+  --ops-brand-panel-alt: #1a1e26;
 
   --status-success-bg: rgba(52, 211, 153, 0.14);
   --status-success-text: #6ee7b7;
@@ -276,11 +292,11 @@
   --status-info-solid: #58a6ff;
   --status-info-solid-text: #061322;
   --status-info-glow: rgba(88, 166, 255, 0.2);
-  --status-neutral-bg: #202b38;
+  --status-neutral-bg: #232a35;
   --status-neutral-text: var(--text-secondary);
-  --status-neutral-border: #344154;
-  --status-neutral-solid: #8d9aac;
-  --status-neutral-solid-text: #101722;
+  --status-neutral-border: #3b4656;
+  --status-neutral-solid: #94a3b8;
+  --status-neutral-solid-text: #111318;
   --status-neutral-glow: rgba(141, 154, 172, 0.18);
   --status-recommended-bg: rgba(34, 211, 238, 0.14);
   --status-recommended-text: #67e8f9;
@@ -296,11 +312,11 @@
   --surface-raised: var(--surface-card);
   --surface-raised-hover: var(--surface-card-hover);
   --surface-subtle: var(--surface-panel);
-  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(226, 232, 240, 0.1);
   --border-focus: rgba(96, 165, 250, 0.5);
-  --terminal-bg: #09090b;
-  --terminal-surface: #111113;
-  --terminal-border: rgba(255, 255, 255, 0.08);
+  --terminal-bg: #0f1218;
+  --terminal-surface: #151a21;
+  --terminal-border: rgba(226, 232, 240, 0.09);
   --terminal-shadow: inset 0 2px 10px rgb(0 0 0 / 0.64), 0 22px 56px -38px rgb(0 0 0 / 0.88);
 }
 
