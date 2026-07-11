@@ -214,6 +214,12 @@ export function MainLayout() {
 
     if (location.pathname === AUTH_FILES_PATH) {
       dispatchAuthFilesCardsFocusEvent({ pinned: true, behavior: 'smooth' });
+      if (!authFilesCardsStatePinned) {
+        navigate(`${location.pathname}${location.search}${location.hash}`, {
+          replace: true,
+          state: createAuthFilesCardsFocusState(),
+        });
+      }
       return;
     }
 

@@ -10,6 +10,8 @@ const readSource = (relativePath) =>
 
 const configPage = readSource('src/pages/ConfigPage.tsx');
 const sidebarNav = readSource('src/components/layout/SidebarNav.tsx');
+const mainLayout = readSource('src/components/layout/MainLayout.tsx');
+const authFilesPage = readSource('src/pages/AuthFilesPage.tsx');
 
 assert.doesNotMatch(
   configPage,
@@ -33,6 +35,30 @@ assert.match(
   sidebarNav,
   /if \(event\.key === 'Escape'\) \{\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*onClose\(\);/,
   'The mobile drawer must consume Escape before the event reaches page-level handlers.'
+);
+
+assert.match(
+  authFilesPage,
+  /const refocusFileCardsAfterListViewChange = useCallback\(\(\) => \{\s*focusFileCards\('auto', fileCardsFocusPinned\);\s*\}, \[fileCardsFocusPinned, focusFileCards\]\);/,
+  'List pagination must always return to the cards area while locking only when the user kept it pinned.'
+);
+
+assert.match(
+  authFilesPage,
+  /const shouldPinFileCards = shouldPinAuthFilesCards\(location\);[\s\S]*?const isNewFocusIdentity = focusedFileListOnOpenRef\.current\.search !== focusIdentity;\s*if \(isNewFocusIdentity\) \{[\s\S]*?setFileCardsFocusPinned\(shouldPinFileCards\);[\s\S]*?\}/,
+  'Route pin state may initialize a new focus entry, but must not overwrite an explicit unpin on same-entry rerenders.'
+);
+
+assert.match(
+  authFilesPage,
+  /if \(!shouldFocusAuthFilesCards\(location\)\) \{\s*focusedFileListOnOpenRef\.current = \{\s*search: focusIdentity,/,
+  'An unpinned history entry must retain its focus identity so an explicit re-pin is not overwritten on the next render.'
+);
+
+assert.match(
+  mainLayout,
+  /dispatchAuthFilesCardsFocusEvent\(\{ pinned: true, behavior: 'smooth' \}\);\s*if \(!authFilesCardsStatePinned\) \{[\s\S]*?replace: true,[\s\S]*?state: createAuthFilesCardsFocusState\(\)/,
+  'Re-pinning must replace the stale unpinned history state as well as updating the visible control.'
 );
 
 console.log('ui interaction safety invariants passed');

@@ -16,6 +16,7 @@ import {
   IconX,
 } from '@/components/ui/icons';
 import { AUTH_FILES_FOCUS_CARDS_EVENT } from '@/router/authFilesFocus';
+import { createUsageStatisticsAutoMaintenanceState } from '@/features/usageStatistics';
 import {
   getVisibleNavItems,
   normalizeRoutePath,
@@ -185,6 +186,10 @@ export function SidebarNav({
         {navItems.map((item) => {
           const label = getNavLabel(item, t);
           const navTarget = item.navTo ?? item.path;
+          const navState =
+            item.key === 'usageStatistics'
+              ? createUsageStatisticsAutoMaintenanceState()
+              : undefined;
           const isActive = isNavItemActive(item, location.pathname);
           const handleNavigate = () => {
             onNavigate();
@@ -197,6 +202,7 @@ export function SidebarNav({
             <Link
               key={item.path}
               to={navTarget}
+              state={navState}
               className={`nav-item ${isActive ? 'active' : ''}`}
               onClick={handleNavigate}
               title={isVisuallyCollapsed ? label : undefined}

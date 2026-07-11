@@ -4248,8 +4248,7 @@ export function AuthFilesPage() {
   );
 
   const refocusFileCardsAfterListViewChange = useCallback(() => {
-    if (!fileCardsFocusPinned) return;
-    focusFileCards('auto', true);
+    focusFileCards('auto', fileCardsFocusPinned);
   }, [fileCardsFocusPinned, focusFileCards]);
 
   const handleListPageChange = useCallback(
@@ -4276,17 +4275,25 @@ export function AuthFilesPage() {
     if (typeof window === 'undefined') return;
     if (!isCurrentLayer) return;
 
-    if (!shouldFocusAuthFilesCards(location)) {
-      focusedFileListOnOpenRef.current = { search: '', header: false, grid: false };
-      return;
-    }
-    const focusIdentity = `${location.key}:${location.search}`;
-    if (focusedFileListOnOpenRef.current.search !== focusIdentity) {
-      focusedFileListOnOpenRef.current = { search: focusIdentity, header: false, grid: false };
-    }
     const shouldPinFileCards = shouldPinAuthFilesCards(location);
-    if (shouldPinFileCards) {
-      setFileCardsFocusPinned(true);
+    const focusIdentity = `${location.key}:${location.search}`;
+    const isNewFocusIdentity = focusedFileListOnOpenRef.current.search !== focusIdentity;
+    if (isNewFocusIdentity) {
+      focusedFileListOnOpenRef.current = { search: focusIdentity, header: false, grid: false };
+      setFileCardsFocusPinned(shouldPinFileCards);
+      if (!shouldPinFileCards) {
+        cancelFileCardsFocus();
+        unlockFileCardsScroll();
+      }
+    }
+
+    if (!shouldFocusAuthFilesCards(location)) {
+      focusedFileListOnOpenRef.current = {
+        search: focusIdentity,
+        header: false,
+        grid: false,
+      };
+      return;
     }
 
     const target = fileListHeaderRef.current;
@@ -4302,8 +4309,20 @@ export function AuthFilesPage() {
       header: true,
       grid: focusedFileListOnOpenRef.current.grid || hasGrid,
     };
-    return focusFileCards('auto', shouldPinFileCards);
-  }, [focusFileCards, isCurrentLayer, loading, location, pageItems.length]);
+    return focusFileCards(
+      'auto',
+      isNewFocusIdentity ? shouldPinFileCards : fileCardsFocusPinned
+    );
+  }, [
+    cancelFileCardsFocus,
+    fileCardsFocusPinned,
+    focusFileCards,
+    isCurrentLayer,
+    loading,
+    location,
+    pageItems.length,
+    unlockFileCardsScroll,
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -5,8 +5,11 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
+import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { Button } from '@/components/ui/Button';
 import { IconRefreshCw } from '@/components/ui/icons';
 import {
@@ -32,6 +35,9 @@ import {
   calculateAggregateTotals,
   calculateRequestMetrics,
   calculateTokenUsageMetrics,
+  createAutomaticTokenLedgerMaintenanceCoordinator,
+  createTokenLedgerMaintenanceSettlementTracker,
+  hasUsageStatisticsAutoMaintenanceIntent,
   detailFromTokenLedgerEntry,
   emptyDetail,
   enrichRecord,
@@ -44,9 +50,11 @@ import {
   getTimelineMax,
   hasRequestDetailLogMarkers,
   parseDetailLog,
+  runAutomaticTokenLedgerMaintenance,
   responseDataToBlob,
   responseDataToText,
   selectUsageRecord,
+  shouldStartAutomaticTokenLedgerMaintenance,
 } from '@/features/usageStatistics';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { apiKeyUsageApi } from '@/services/api/apiKeyUsage';
@@ -54,6 +62,7 @@ import { configApi, logsApi } from '@/services/api';
 import {
   cliProxyBackendControlApi,
   launchCliProxyBackendControlSidecar,
+  type TokenLedgerMaintenanceResponse,
   type TokenLedgerMaintenanceResult,
 } from '@/services/api/cliProxyBackendControl';
 import { tokenLedgerApi } from '@/services/runtime/tokenLedger';
@@ -114,6 +123,14 @@ const REQUEST_DETAIL_DOWNLOAD_MESSAGE = '详情下载失败';
 const TOKEN_LEDGER_CONTROL_WAKE_ATTEMPTS = 18;
 const TOKEN_LEDGER_CONTROL_WAKE_INTERVAL_MS = 850;
 const TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES = 5;
+
+type AutomaticTokenLedgerMaintenanceResult = {
+  refreshResult: TokenLedgerMaintenanceResponse;
+  pruneResult: TokenLedgerMaintenanceResponse;
+};
+
+const automaticTokenLedgerMaintenanceCoordinator =
+  createAutomaticTokenLedgerMaintenanceCoordinator();
 
 type TokenLedgerUpdatePhase =
   | 'idle'
@@ -232,10 +249,17 @@ const buildDetailDownloadMessage = (message: string, status?: number | null): st
 
 export function UsageStatisticsPage() {
   const { t, i18n } = useTranslation();
+  const location = useLocation();
+  const pageTransitionLayer = usePageTransitionLayer();
   const { showNotification } = useNotificationStore();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const apiBase = useAuthStore((state) => state.apiBase);
   const managementKey = useAuthStore((state) => state.managementKey);
+  const sharedTokenLedgerMaintenanceBusy = useSyncExternalStore(
+    automaticTokenLedgerMaintenanceCoordinator.subscribe,
+    automaticTokenLedgerMaintenanceCoordinator.isBusy,
+    automaticTokenLedgerMaintenanceCoordinator.isBusy
+  );
   const config = useConfigStore((state) => state.config);
   const fetchConfig = useConfigStore((state) => state.fetchConfig);
   const clearCache = useConfigStore((state) => state.clearCache);
@@ -264,6 +288,7 @@ export function UsageStatisticsPage() {
   const [tokenLedgerLoading, setTokenLedgerLoading] = useState(false);
   const [tokenLedgerRefreshRunning, setTokenLedgerRefreshRunning] = useState(false);
   const [tokenLedgerPruneRunning, setTokenLedgerPruneRunning] = useState(false);
+  const [automaticMaintenanceRunning, setAutomaticMaintenanceRunning] = useState(false);
   const [error, setError] = useState('');
   const [tokenLedgerError, setTokenLedgerError] = useState('');
   const [tokenLedgerUpdateStatus, setTokenLedgerUpdateStatus] =
@@ -280,6 +305,20 @@ export function UsageStatisticsPage() {
   const tokenLedgerLoadedRef = useRef(false);
   const requestDetailsRef = useRef<Record<string, UsageRequestDetail>>({});
   const tokenLedgerDetailsRef = useRef<Map<string, UsageRequestDetail>>(new Map());
+  const tokenLedgerMaintenanceInFlightRef = useRef(false);
+  const sharedTokenLedgerMaintenanceSettlementTrackerRef = useRef(
+    createTokenLedgerMaintenanceSettlementTracker(
+      automaticTokenLedgerMaintenanceCoordinator.isBusy()
+    )
+  );
+  const skipNextSharedMaintenanceSettledReloadRef = useRef(false);
+  const pendingSharedTokenLedgerReloadRef = useRef(false);
+  const lastAutomaticMaintenanceEntryKeyRef = useRef('');
+  const initialDataLoadStartedRef = useRef(false);
+
+  const hasAutomaticMaintenanceEntryIntent =
+    pageTransitionLayer?.navigationType === 'PUSH' &&
+    hasUsageStatisticsAutoMaintenanceIntent(location.state);
 
   useEffect(() => {
     requestDetailsRef.current = requestDetails;
@@ -413,56 +452,77 @@ export function UsageStatisticsPage() {
       showNotification('请先连接管理后台，再清理已入账日志', 'warning');
       return;
     }
+    if (
+      tokenLedgerMaintenanceInFlightRef.current ||
+      automaticTokenLedgerMaintenanceCoordinator.isBusy()
+    ) {
+      return;
+    }
 
-    setTokenLedgerPruneRunning(true);
-    setTokenLedgerError('');
-    setTokenLedgerUpdateStatus({
-      phase: 'starting-control',
-      message: '正在启动本机控制助手',
-      detail: '用于清理已入账日志并重新读取台账',
-    });
-    try {
-      await wakeTokenLedgerControlSidecar();
+    const operation = automaticTokenLedgerMaintenanceCoordinator.startManual(async () => {
+      setTokenLedgerPruneRunning(true);
+      setTokenLedgerError('');
       setTokenLedgerUpdateStatus({
-        phase: 'refreshing-ledger',
-        message: '正在清理已入账日志',
-        detail: '只清理已经写入台账的详情日志，活跃日志会保留',
+        phase: 'starting-control',
+        message: '正在启动本机控制助手',
+        detail: '用于清理已入账日志并重新读取台账',
       });
-      const response = await cliProxyBackendControlApi.pruneRecordedTokenLedgerLogs({
-        apiBase,
-        managementKey,
-        activeWindowMinutes: TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES,
-      });
-      await loadTokenLedger(true, { showStatus: true, requireLedger: true });
+      try {
+        await wakeTokenLedgerControlSidecar();
+        setTokenLedgerUpdateStatus({
+          phase: 'refreshing-ledger',
+          message: '正在清理已入账日志',
+          detail: '只清理已经写入台账的详情日志，活跃日志会保留',
+        });
+        const response = await cliProxyBackendControlApi.pruneRecordedTokenLedgerLogs({
+          apiBase,
+          managementKey,
+          activeWindowMinutes: TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES,
+        });
+        await loadTokenLedger(true, { showStatus: true, requireLedger: true });
 
-      const prune = response.result.prune;
-      const deletedLabel =
-        prune.deletedGB >= 0.01
-          ? `${prune.deletedGB}GB`
-          : `${Math.round(prune.deletedBytes / 1024)}KB`;
-      showNotification(
-        `已清理 ${prune.deletedFiles} 个已入账日志，释放 ${deletedLabel}`,
-        'success'
-      );
-      setTokenLedgerUpdateStatus({
-        phase: 'done',
-        message: `清理完成，删除 ${formatLedgerCount(prune.deletedFiles)} 个日志`,
-        detail: `释放 ${deletedLabel}，台账已重新读取`,
-      });
-      if (prune.failedDeletes > 0) {
-        showNotification(`有 ${prune.failedDeletes} 个日志删除失败，已保留`, 'warning');
+        const prune = response.result.prune;
+        const deletedLabel =
+          prune.deletedGB >= 0.01
+            ? `${prune.deletedGB}GB`
+            : `${Math.round(prune.deletedBytes / 1024)}KB`;
+        showNotification(
+          `已清理 ${prune.deletedFiles} 个已入账日志，释放 ${deletedLabel}`,
+          'success'
+        );
+        setTokenLedgerUpdateStatus({
+          phase: 'done',
+          message: `清理完成，删除 ${formatLedgerCount(prune.deletedFiles)} 个日志`,
+          detail: `释放 ${deletedLabel}，台账已重新读取`,
+        });
+        if (prune.failedDeletes > 0) {
+          showNotification(`有 ${prune.failedDeletes} 个日志删除失败，已保留`, 'warning');
+        }
+      } catch (err: unknown) {
+        const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
+        setTokenLedgerError(`清理已入账日志失败${message ? `: ${message}` : ''}`);
+        setTokenLedgerUpdateStatus({
+          phase: 'error',
+          message: '清理已入账日志失败',
+          detail: message,
+        });
+        showNotification(`清理已入账日志失败${message ? `: ${message}` : ''}`, 'error');
+        throw err;
+      } finally {
+        setTokenLedgerPruneRunning(false);
       }
-    } catch (err: unknown) {
-      const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
-      setTokenLedgerError(`清理已入账日志失败${message ? `: ${message}` : ''}`);
-      setTokenLedgerUpdateStatus({
-        phase: 'error',
-        message: '清理已入账日志失败',
-        detail: message,
-      });
-      showNotification(`清理已入账日志失败${message ? `: ${message}` : ''}`, 'error');
+    });
+    if (!operation) return;
+
+    skipNextSharedMaintenanceSettledReloadRef.current = true;
+    pendingSharedTokenLedgerReloadRef.current = false;
+    tokenLedgerMaintenanceInFlightRef.current = true;
+    try {
+      await operation;
+    } catch {
+      // The operation already surfaced its failure in the page status and notification.
     } finally {
-      setTokenLedgerPruneRunning(false);
+      tokenLedgerMaintenanceInFlightRef.current = false;
     }
   }, [
     apiBase,
@@ -617,49 +677,70 @@ export function UsageStatisticsPage() {
       showNotification('请先连接管理后台，再更新 Token 台账', 'warning');
       return;
     }
+    if (
+      tokenLedgerMaintenanceInFlightRef.current ||
+      automaticTokenLedgerMaintenanceCoordinator.isBusy()
+    ) {
+      return;
+    }
 
-    setTokenLedgerRefreshRunning(true);
-    setTokenLedgerError('');
-    setTokenLedgerUpdateStatus({
-      phase: 'starting-control',
-      message: '正在启动本机控制助手',
-      detail: '如果助手刚刚空闲退出，会先唤起 8319 本地助手',
+    const operation = automaticTokenLedgerMaintenanceCoordinator.startManual(async () => {
+      setTokenLedgerRefreshRunning(true);
+      setTokenLedgerError('');
+      setTokenLedgerUpdateStatus({
+        phase: 'starting-control',
+        message: '正在启动本机控制助手',
+        detail: '如果助手刚刚空闲退出，会先唤起 8319 本地助手',
+      });
+      try {
+        await wakeTokenLedgerControlSidecar();
+        setTokenLedgerUpdateStatus({
+          phase: 'refreshing-ledger',
+          message: '正在扫描日志并生成 Token 台账',
+          detail: '日志较多时可能需要几十秒，请保持本页打开',
+        });
+        const response = await cliProxyBackendControlApi.refreshTokenLedger({
+          apiBase,
+          managementKey,
+        });
+        const resultMessage = buildTokenLedgerResultMessage(response.result);
+        const resultDetail = buildTokenLedgerResultDetail(response.result);
+        await loadTokenLedger(true, { showStatus: true, requireLedger: true });
+        setTokenLedgerUpdateStatus({
+          phase: 'done',
+          message: resultMessage,
+          detail: resultDetail,
+        });
+        showNotification(resultMessage, 'success');
+      } catch (err: unknown) {
+        const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
+        const detail = `更新 Token 台账失败${message ? `: ${message}` : ''}`;
+        setTokenLedgerError(detail);
+        setTokenLedgerUpdateStatus({
+          phase: 'error',
+          message: '更新 Token 台账失败',
+          detail:
+            message && isControlOfflineError(message)
+              ? '本机控制助手未启动，无法更新台账'
+              : message,
+        });
+        showNotification(detail, 'error');
+        throw err;
+      } finally {
+        setTokenLedgerRefreshRunning(false);
+      }
     });
+    if (!operation) return;
+
+    skipNextSharedMaintenanceSettledReloadRef.current = true;
+    pendingSharedTokenLedgerReloadRef.current = false;
+    tokenLedgerMaintenanceInFlightRef.current = true;
     try {
-      await wakeTokenLedgerControlSidecar();
-      setTokenLedgerUpdateStatus({
-        phase: 'refreshing-ledger',
-        message: '正在扫描日志并生成 Token 台账',
-        detail: '日志较多时可能需要几十秒，请保持本页打开',
-      });
-      const response = await cliProxyBackendControlApi.refreshTokenLedger({
-        apiBase,
-        managementKey,
-      });
-      const resultMessage = buildTokenLedgerResultMessage(response.result);
-      const resultDetail = buildTokenLedgerResultDetail(response.result);
-      await loadTokenLedger(true, { showStatus: true, requireLedger: true });
-      setTokenLedgerUpdateStatus({
-        phase: 'done',
-        message: resultMessage,
-        detail: resultDetail,
-      });
-      showNotification(resultMessage, 'success');
-    } catch (err: unknown) {
-      const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
-      const detail = `更新 Token 台账失败${message ? `: ${message}` : ''}`;
-      setTokenLedgerError(detail);
-      setTokenLedgerUpdateStatus({
-        phase: 'error',
-        message: '更新 Token 台账失败',
-        detail:
-          message && isControlOfflineError(message)
-            ? '本机控制助手未启动，无法更新台账'
-            : message,
-      });
-      showNotification(detail, 'error');
+      await operation;
+    } catch {
+      // The operation already surfaced its failure in the page status and notification.
     } finally {
-      setTokenLedgerRefreshRunning(false);
+      tokenLedgerMaintenanceInFlightRef.current = false;
     }
   }, [
     apiBase,
@@ -671,22 +752,235 @@ export function UsageStatisticsPage() {
   ]);
 
   useEffect(() => {
+    const navigationType = pageTransitionLayer?.navigationType ?? 'POP';
+    const entryKey = location.key;
+    if (
+      !shouldStartAutomaticTokenLedgerMaintenance({
+        isCurrentLayer: pageTransitionLayer?.isCurrentLayer ?? false,
+        navigationType,
+        connectionStatus,
+        hasApiBase: Boolean(apiBase),
+        hasManagementKey: Boolean(managementKey),
+        hasEntryIntent: hasUsageStatisticsAutoMaintenanceIntent(location.state),
+        entryKey,
+        lastStartedEntryKey: lastAutomaticMaintenanceEntryKeyRef.current,
+        inFlight: tokenLedgerMaintenanceInFlightRef.current,
+      })
+    ) {
+      return;
+    }
+
+    lastAutomaticMaintenanceEntryKeyRef.current = entryKey;
+
+    const applyResult = (
+      { refreshResult, pruneResult }: AutomaticTokenLedgerMaintenanceResult,
+      notify: boolean
+    ) => {
+      const prune = pruneResult.result.prune;
+      const deletedLabel =
+        prune.deletedGB >= 0.01
+          ? `${prune.deletedGB}GB`
+          : `${Math.round(prune.deletedBytes / 1024)}KB`;
+      setTokenLedgerUpdateStatus({
+        phase: 'done',
+        message: '模型统计自动维护完成',
+        detail: `${buildTokenLedgerResultMessage(refreshResult.result)}；清理 ${formatLedgerCount(
+          prune.deletedFiles
+        )} 个日志，释放 ${deletedLabel}`,
+      });
+      if (notify) {
+        showNotification(
+          `Token 台账已更新，已清理 ${prune.deletedFiles} 个已入账日志`,
+          'success'
+        );
+        if (prune.failedDeletes > 0) {
+          showNotification(`有 ${prune.failedDeletes} 个日志删除失败，已保留`, 'warning');
+        }
+      }
+    };
+
+    const applyError = (err: unknown, notify: boolean) => {
+      const message = getErrorMessage(err) || (err instanceof Error ? err.message : String(err));
+      const detail = `模型统计自动维护未完成${message ? `: ${message}` : ''}`;
+      setTokenLedgerError(detail);
+      setTokenLedgerUpdateStatus({
+        phase: 'error',
+        message: '模型统计自动维护未完成',
+        detail: message,
+      });
+      if (notify) showNotification(detail, 'error');
+    };
+
+    const finishLocalWait = () => {
+      tokenLedgerMaintenanceInFlightRef.current = false;
+      setAutomaticMaintenanceRunning(false);
+    };
+
+    const sharedOperation = automaticTokenLedgerMaintenanceCoordinator.getInFlight();
+    if (sharedOperation) {
+      skipNextSharedMaintenanceSettledReloadRef.current = true;
+      pendingSharedTokenLedgerReloadRef.current = false;
+      tokenLedgerMaintenanceInFlightRef.current = true;
+      setAutomaticMaintenanceRunning(true);
+      setTokenLedgerError('');
+      setTokenLedgerUpdateStatus({
+        phase: 'refreshing-ledger',
+        message: '模型统计自动维护正在进行',
+        detail: '已接续另一个页面入口启动的维护任务，完成后会读取最新台账',
+      });
+      if (sharedOperation.kind === 'automatic') {
+        void (sharedOperation.promise as Promise<AutomaticTokenLedgerMaintenanceResult>)
+          .then(async (result) => {
+            await loadTokenLedger(true, { showStatus: true, requireLedger: true });
+            applyResult(result, false);
+          })
+          .catch((err: unknown) => applyError(err, false))
+          .finally(finishLocalWait);
+      } else {
+        void sharedOperation.promise
+          .then(async () => {
+            await loadTokenLedger(true, { showStatus: true, requireLedger: true });
+            setTokenLedgerUpdateStatus({
+              phase: 'done',
+              message: '已有台账维护任务已完成',
+              detail: '已读取最新 Token 台账，本次没有启动重复任务',
+            });
+          })
+          .catch((err: unknown) => applyError(err, false))
+          .finally(finishLocalWait);
+      }
+      return;
+    }
+
+    if (automaticTokenLedgerMaintenanceCoordinator.hasStarted(entryKey)) {
+      void loadTokenLedger(true, { showStatus: false }).catch(() => undefined);
+      return;
+    }
+
+    setTokenLedgerError('');
+    setTokenLedgerUpdateStatus({
+      phase: 'starting-control',
+      message: '正在自动维护模型统计台账',
+      detail: '先更新并确认 Token 台账，再清理已经入账的详情日志',
+    });
+
+    const operation = automaticTokenLedgerMaintenanceCoordinator.startAutomatic(entryKey, () =>
+      runAutomaticTokenLedgerMaintenance({
+        wakeControl: wakeTokenLedgerControlSidecar,
+        refreshLedger: async () => {
+          setTokenLedgerUpdateStatus({
+            phase: 'refreshing-ledger',
+            message: '正在更新 Token 托管台账',
+            detail: '扫描详情日志并写入长期台账',
+          });
+          return cliProxyBackendControlApi.refreshTokenLedger({ apiBase, managementKey });
+        },
+        reloadLedgerAfterRefresh: () =>
+          loadTokenLedger(true, { showStatus: true, requireLedger: true }),
+        pruneRecordedLogs: async () => {
+          setTokenLedgerUpdateStatus({
+            phase: 'refreshing-ledger',
+            message: '台账已确认，正在清理已入账日志',
+            detail: '只删除已入账且指纹匹配的非活跃详情日志',
+          });
+          return cliProxyBackendControlApi.pruneRecordedTokenLedgerLogs({
+            apiBase,
+            managementKey,
+            activeWindowMinutes: TOKEN_LEDGER_PRUNE_ACTIVE_WINDOW_MINUTES,
+          });
+        },
+        reloadLedgerAfterPrune: () =>
+          loadTokenLedger(true, { showStatus: true, requireLedger: true }),
+      })
+    );
+    if (!operation) return;
+
+    skipNextSharedMaintenanceSettledReloadRef.current = true;
+    pendingSharedTokenLedgerReloadRef.current = false;
+    tokenLedgerMaintenanceInFlightRef.current = true;
+    setAutomaticMaintenanceRunning(true);
+    void operation
+      .then((result) => applyResult(result, true))
+      .catch((err: unknown) => applyError(err, true))
+      .finally(finishLocalWait);
+  }, [
+    apiBase,
+    connectionStatus,
+    loadTokenLedger,
+    location.key,
+    location.state,
+    managementKey,
+    pageTransitionLayer,
+    showNotification,
+    wakeTokenLedgerControlSidecar,
+  ]);
+
+  useEffect(() => {
+    if (
+      sharedTokenLedgerMaintenanceSettlementTrackerRef.current.update(
+        sharedTokenLedgerMaintenanceBusy
+      )
+    ) {
+      if (skipNextSharedMaintenanceSettledReloadRef.current) {
+        skipNextSharedMaintenanceSettledReloadRef.current = false;
+      } else {
+        pendingSharedTokenLedgerReloadRef.current = true;
+      }
+    }
+
+    if (
+      sharedTokenLedgerMaintenanceBusy ||
+      !pendingSharedTokenLedgerReloadRef.current ||
+      !(pageTransitionLayer?.isCurrentLayer ?? true) ||
+      connectionStatus !== 'connected'
+    ) {
+      return;
+    }
+
+    pendingSharedTokenLedgerReloadRef.current = false;
+    void loadTokenLedger(true, { showStatus: false }).catch(() => undefined);
+  }, [
+    connectionStatus,
+    loadTokenLedger,
+    pageTransitionLayer?.isCurrentLayer,
+    sharedTokenLedgerMaintenanceBusy,
+  ]);
+
+  useEffect(() => {
     fetchConfig().catch(() => {
       // Login flow handles connection errors.
     });
   }, [fetchConfig]);
 
   useEffect(() => {
+    if (!(pageTransitionLayer?.isCurrentLayer ?? true)) return;
+    if (connectionStatus !== 'connected') return;
+    if (initialDataLoadStartedRef.current) return;
+    initialDataLoadStartedRef.current = true;
     latestTimestampRef.current = 0;
     void loadUsageStats(false);
-    void loadTokenLedger(false);
-  }, [loadTokenLedger, loadUsageStats]);
+    if (!hasAutomaticMaintenanceEntryIntent && !sharedTokenLedgerMaintenanceBusy) {
+      void loadTokenLedger(false);
+    }
+  }, [
+    connectionStatus,
+    hasAutomaticMaintenanceEntryIntent,
+    loadTokenLedger,
+    loadUsageStats,
+    pageTransitionLayer?.isCurrentLayer,
+    sharedTokenLedgerMaintenanceBusy,
+  ]);
 
   useEffect(() => {
     if (!autoRefresh || connectionStatus !== 'connected') return;
     const timer = window.setInterval(() => {
       void loadUsageStats(true);
-      void loadTokenLedger(true);
+      if (
+        !tokenLedgerMaintenanceInFlightRef.current &&
+        !automaticTokenLedgerMaintenanceCoordinator.isBusy()
+      ) {
+        void loadTokenLedger(true);
+      }
     }, refreshInterval);
     return () => window.clearInterval(timer);
   }, [autoRefresh, connectionStatus, loadTokenLedger, loadUsageStats, refreshInterval]);
@@ -873,8 +1167,15 @@ export function UsageStatisticsPage() {
             type="button"
             variant="primary"
             onClick={() => void handleUpdateTokenLedger()}
-            loading={tokenLedgerRefreshRunning || tokenLedgerLoading}
-            disabled={connectionStatus !== 'connected' || tokenLedgerPruneRunning}
+            loading={
+              tokenLedgerRefreshRunning || tokenLedgerLoading || automaticMaintenanceRunning
+            }
+            disabled={
+              connectionStatus !== 'connected' ||
+              tokenLedgerPruneRunning ||
+              automaticMaintenanceRunning ||
+              sharedTokenLedgerMaintenanceBusy
+            }
           >
             <IconRefreshCw size={16} />
             更新 Token 台账
@@ -888,8 +1189,13 @@ export function UsageStatisticsPage() {
         ledger={tokenLedger}
         loading={tokenLedgerLoading}
         onPruneRecordedLogs={() => void handlePruneRecordedTokenLedgerLogs()}
-        pruneDisabled={connectionStatus !== 'connected' || tokenLedgerRefreshRunning}
-        pruning={tokenLedgerPruneRunning}
+        pruneDisabled={
+          connectionStatus !== 'connected' ||
+          tokenLedgerRefreshRunning ||
+          automaticMaintenanceRunning ||
+          sharedTokenLedgerMaintenanceBusy
+        }
+        pruning={tokenLedgerPruneRunning || automaticMaintenanceRunning}
         setFilterValue={setTokenLedgerFilterValue}
         updateStatus={tokenLedgerUpdateStatus}
       />

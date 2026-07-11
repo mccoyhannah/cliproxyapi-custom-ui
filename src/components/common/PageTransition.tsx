@@ -1,5 +1,10 @@
 import { ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { useLocation, type Location } from 'react-router-dom';
+import {
+  useLocation,
+  useNavigationType,
+  type Location,
+  type NavigationType,
+} from 'react-router-dom';
 import { animate } from 'motion/mini';
 import type { AnimationPlaybackControlsWithThen } from 'motion-dom';
 import {
@@ -55,6 +60,7 @@ const clearLayerStyles = (element: HTMLElement | null) => {
 type Layer = {
   key: string;
   location: Location;
+  navigationType: NavigationType;
   status: LayerStatus;
 };
 
@@ -76,6 +82,7 @@ export function PageTransition({
   resolveEnterScrollTop,
 }: PageTransitionProps) {
   const location = useLocation();
+  const navigationType = useNavigationType();
   const currentLayerRef = useRef<HTMLDivElement>(null);
   const exitingLayerRef = useRef<HTMLDivElement>(null);
   const transitionDirectionRef = useRef<TransitionDirection>('forward');
@@ -90,6 +97,7 @@ export function PageTransition({
     {
       key: buildLayerKey(location),
       location,
+      navigationType,
       status: 'current',
     },
   ]);
@@ -171,7 +179,12 @@ export function PageTransition({
         .filter((_, idx) => idx !== resolvedCurrentIndex)
         .map((layer): Layer => ({ ...layer, status: 'stacked' }));
 
-      const nextCurrent: Layer = { key: locationLayerKey, location, status: 'current' };
+      const nextCurrent: Layer = {
+        key: locationLayerKey,
+        location,
+        navigationType,
+        status: 'current',
+      };
 
       if (!previousCurrent) {
         nextLayersRef.current = [nextCurrent];
@@ -194,6 +207,7 @@ export function PageTransition({
             return {
               ...layer,
               location: isTarget ? location : layer.location,
+              navigationType: isTarget ? navigationType : layer.navigationType,
               status: isTarget ? 'current' : 'stacked',
             };
           });
@@ -225,6 +239,7 @@ export function PageTransition({
     location,
     locationLayerKey,
     locationRouteIdentity,
+    navigationType,
     currentLayerKey,
     currentLayerPathname,
     currentLayerRouteIdentity,
@@ -469,6 +484,7 @@ export function PageTransition({
                 value={{
                   ...PAGE_TRANSITION_LAYER_CONTEXT_VALUES[layer.status],
                   isAnimating,
+                  navigationType: layer.navigationType,
                 }}
               >
                 {render(layer.location)}
