@@ -472,9 +472,19 @@ const calculateCoverage = (entries) => {
   const parsedEntries = entries.filter((entry) => entry.detailStatus !== 'error').length;
   const knownEntries = entries.filter((entry) => entry.tokenUsage?.status === 'available').length;
   const unreportedEntries = entries.filter((entry) => entry.tokenUsage?.status === 'unreported').length;
-  const timestamps = entries
-    .map((entry) => entry.timestampMs)
-    .filter((value) => typeof value === 'number' && Number.isFinite(value));
+  let earliestTimestampMs = null;
+  let latestTimestampMs = null;
+
+  entries.forEach((entry) => {
+    const timestampMs = entry.timestampMs;
+    if (typeof timestampMs !== 'number' || !Number.isFinite(timestampMs)) return;
+    if (earliestTimestampMs === null || timestampMs < earliestTimestampMs) {
+      earliestTimestampMs = timestampMs;
+    }
+    if (latestTimestampMs === null || timestampMs > latestTimestampMs) {
+      latestTimestampMs = timestampMs;
+    }
+  });
 
   return {
     totalEntries,
@@ -483,8 +493,8 @@ const calculateCoverage = (entries) => {
     unreportedEntries,
     coverageRate: totalEntries > 0 ? (knownEntries / totalEntries) * 100 : 0,
     parsedRate: totalEntries > 0 ? (parsedEntries / totalEntries) * 100 : 0,
-    earliestTimestampMs: timestamps.length > 0 ? Math.min(...timestamps) : null,
-    latestTimestampMs: timestamps.length > 0 ? Math.max(...timestamps) : null,
+    earliestTimestampMs,
+    latestTimestampMs,
   };
 };
 
@@ -672,6 +682,7 @@ const main = async () => {
   const ledgerPath = args['ledger-path'] ?? path.join(ledgerDir, 'ledger.json');
   const projectionPath = args['projection-path'] ?? path.join(staticDir, 'token-ledger.json');
   const shouldEmbed = Boolean(args.embed) && !args['no-embed'];
+  const shouldStripEmbeddedLedger = Boolean(args['no-embed']);
   const embeddedLedgerMode = args['embed-full'] ? 'full' : 'summary';
   const pruneOnly = Boolean(args['prune-only']);
 
@@ -844,7 +855,7 @@ const main = async () => {
           embeddedHtmlFiles.push(htmlPath);
         }
       }
-    } else {
+    } else if (shouldStripEmbeddedLedger) {
       for (const htmlPath of htmlCandidates) {
         if (await removeEmbeddedLedgerFromHtml(htmlPath)) {
           strippedHtmlFiles.push(htmlPath);

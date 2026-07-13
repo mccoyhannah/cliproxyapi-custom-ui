@@ -20,12 +20,14 @@ async function readSourceTree(directory) {
   return sources;
 }
 
-const [appSource, authFilesSource, authFilesFocusSource, sourceTree] = await Promise.all([
-  fs.readFile(path.join(repoRoot, 'src', 'App.tsx'), 'utf8'),
-  fs.readFile(path.join(repoRoot, 'src', 'pages', 'AuthFilesPage.tsx'), 'utf8'),
-  fs.readFile(path.join(repoRoot, 'src', 'router', 'authFilesFocus.ts'), 'utf8'),
-  readSourceTree(path.join(repoRoot, 'src')),
-]);
+const [appSource, authFilesSource, authFilesFocusSource, quotaLoaderSource, sourceTree] =
+  await Promise.all([
+    fs.readFile(path.join(repoRoot, 'src', 'App.tsx'), 'utf8'),
+    fs.readFile(path.join(repoRoot, 'src', 'pages', 'AuthFilesPage.tsx'), 'utf8'),
+    fs.readFile(path.join(repoRoot, 'src', 'router', 'authFilesFocus.ts'), 'utf8'),
+    fs.readFile(path.join(repoRoot, 'src', 'components', 'quota', 'useQuotaLoader.ts'), 'utf8'),
+    readSourceTree(path.join(repoRoot, 'src')),
+  ]);
 
 assert.match(
   appSource,
@@ -64,6 +66,22 @@ assert.doesNotMatch(
   authFilesFocusSource,
   /INITIAL_QUOTA_REFRESH|InitialQuotaRefresh|initial-quota-refresh/,
   'The obsolete automatic quota-refresh ticket mechanism must be removed.'
+);
+
+assert.match(
+  quotaLoaderSource,
+  /const REFRESH_ALL_BATCH_SIZE = 2;/,
+  'Refresh-all must process at most two auth files per batch.'
+);
+assert.match(
+  quotaLoaderSource,
+  /const REFRESH_ALL_MIN_DELAY_MS = 800;/,
+  'Refresh-all must wait at least 800ms between batches.'
+);
+assert.match(
+  quotaLoaderSource,
+  /const REFRESH_ALL_MAX_DELAY_MS = 1800;/,
+  'Refresh-all must cap the randomized inter-batch delay at 1800ms.'
 );
 
 const dormantAutoRefreshSources = sourceTree

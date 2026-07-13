@@ -23,9 +23,9 @@ interface LoadQuotaResult<TData> {
   errorStatus?: number;
 }
 
-const REFRESH_ALL_BATCH_SIZE = 3;
-const REFRESH_ALL_MIN_DELAY_MS = 600;
-const REFRESH_ALL_MAX_DELAY_MS = 1600;
+const REFRESH_ALL_BATCH_SIZE = 2;
+const REFRESH_ALL_MIN_DELAY_MS = 800;
+const REFRESH_ALL_MAX_DELAY_MS = 1800;
 
 const sleep = (durationMs: number) =>
   new Promise((resolve) => {

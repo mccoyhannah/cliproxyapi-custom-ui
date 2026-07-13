@@ -140,6 +140,64 @@ try {
     'full ledger entries should stay out of management.html'
   );
 
+  const preserveEmbeddedResult = runLedgerWrite(tmpRoot);
+  assert.deepEqual(
+    preserveEmbeddedResult.strippedHtmlFiles,
+    [],
+    'Default ledger refresh must preserve an existing embedded summary.'
+  );
+  assert.match(
+    await fs.readFile(htmlPath, 'utf8'),
+    /id=["']cpamc-token-ledger["']/,
+    'Default ledger refresh must leave the embedded summary available.'
+  );
+
+  const stripEmbeddedResult = runLedgerWrite(tmpRoot, ['--no-embed']);
+  assert.equal(stripEmbeddedResult.strippedHtmlFiles.length, 1);
+  assert.doesNotMatch(
+    await fs.readFile(htmlPath, 'utf8'),
+    /id=["']cpamc-token-ledger["']/,
+    'Explicit --no-embed must remove the embedded summary.'
+  );
+
+  const largeCoverageRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), 'cpamc-token-ledger-large-coverage-')
+  );
+  try {
+    const largeLogsDir = path.join(largeCoverageRoot, 'logs');
+    const largeLedgerDir = path.join(
+      largeCoverageRoot,
+      'usage-backups',
+      'token-ledger'
+    );
+    const largeEntryCount = 130_000;
+    await fs.mkdir(largeLogsDir, { recursive: true });
+    await fs.mkdir(largeLedgerDir, { recursive: true });
+    await fs.writeFile(
+      path.join(largeLedgerDir, 'ledger.json'),
+      JSON.stringify({
+        entries: Array.from({ length: largeEntryCount }, (_, index) => ({
+          fileName: `large-${String(index).padStart(6, '0')}.log`,
+          sourceDir: largeLogsDir,
+          sourceKey: `large:${index}`,
+          timestampMs: index,
+          detailStatus: 'ready',
+          tokenUsage: { status: 'available' },
+        })),
+        source: { logsDir: largeLogsDir, logsDirs: [largeLogsDir] },
+        state: { fileFingerprints: {} },
+      }),
+      'utf8'
+    );
+
+    const largeCoverageResult = runLedger(largeCoverageRoot, ['--no-embed']);
+    assert.equal(largeCoverageResult.coverage.totalEntries, largeEntryCount);
+    assert.equal(largeCoverageResult.coverage.earliestTimestampMs, 0);
+    assert.equal(largeCoverageResult.coverage.latestTimestampMs, largeEntryCount - 1);
+  } finally {
+    await fs.rm(largeCoverageRoot, { recursive: true, force: true });
+  }
+
   const pruneRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-prune-'));
   try {
     const pruneLogsDir = path.join(pruneRoot, 'logs');
