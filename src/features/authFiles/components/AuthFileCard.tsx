@@ -66,6 +66,7 @@ import {
   simplifyStatusFailureMessage,
   type StatusFailureHistoryBucket,
 } from '@/features/authFiles/statusFailureHistory';
+import { shouldShowAuthFileCardHeaderStatusBadge } from '@/features/authFiles/statusClassification';
 import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
@@ -662,6 +663,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       : null;
   const hasAuthFileStatusProblem = shouldShowAuthFileStatusProblem;
   const hasCredentialStatusError = credentialStatusProblem !== null;
+  const showAuthFileStatusHeaderBadge =
+    hasAuthFileStatusProblem &&
+    shouldShowAuthFileCardHeaderStatusBadge(visibleAuthFileStatusProblem?.category);
   const getStatusBadgeLabel = (category: AuthFileStatusCategory) =>
     t(AUTH_STATUS_LABEL_KEY[category], {
       defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
@@ -754,16 +758,15 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
       : t('auth_files.quota_error_badge', { defaultValue: '额度异常' });
   const hasVisibleQuotaError =
     hasQuotaError && (!quotaStatusProblem || visibleQuotaStatusProblem !== null);
+  const showQuotaStatusHeaderBadge =
+    hasVisibleQuotaError &&
+    shouldShowAuthFileCardHeaderStatusBadge(visibleQuotaStatusProblem?.category);
   const hideDuplicateQuotaStatusBadge =
     hasAuthFileStatusProblem &&
     hasVisibleQuotaError &&
     visibleQuotaStatusProblem?.category === visibleAuthFileStatusProblem?.category;
   const hasVisibleStatusWarning =
-    hasVisibleQuotaError ||
-    hasAuthFileStatusProblem ||
-    (shouldShowRawStatusWarning &&
-      !effectiveAuthFileStatusProblem &&
-      latestFailureRequestWindow !== null);
+    showAuthFileStatusHeaderBadge || showQuotaStatusHeaderBadge;
 
   const priorityValue = parsePriorityValue(file.priority ?? file['priority']);
   const currentPriorityText =
@@ -1268,7 +1271,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
   const cardToneClass = [
     cardPlanToneClass,
     isRuntimeOnly ? styles.fileCardVirtual : '',
-    hasVisibleQuotaError ? styles.fileCardQuotaError : '',
+    showQuotaStatusHeaderBadge ? styles.fileCardQuotaError : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -1364,16 +1367,16 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                   </button>
                 )}
                 {(isRuntimeOnly ||
-                  hasAuthFileStatusProblem ||
+                  showAuthFileStatusHeaderBadge ||
                   (accessTokenOnly && !hasCredentialStatusError) ||
-                  (hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge)) && (
+                  (showQuotaStatusHeaderBadge && !hideDuplicateQuotaStatusBadge)) && (
                   <span className={styles.cardHeaderStatusBadges}>
                     {isRuntimeOnly && (
                       <span className={`${styles.stateBadge} ${stateBadgeClass}`}>
                         {stateLabel}
                       </span>
                     )}
-                    {hasAuthFileStatusProblem && authFileStatusInfo && (
+                    {showAuthFileStatusHeaderBadge && authFileStatusInfo && (
                       <StatusProblemTooltip
                         info={authFileStatusInfo}
                         onActiveChange={(active) =>
@@ -1400,7 +1403,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                         })}
                       </span>
                     )}
-                    {hasVisibleQuotaError && !hideDuplicateQuotaStatusBadge && quotaErrorInfo && (
+                    {showQuotaStatusHeaderBadge && !hideDuplicateQuotaStatusBadge && quotaErrorInfo && (
                       <StatusProblemTooltip info={quotaErrorInfo}>
                         <span
                           className={`${styles.stateBadge} ${

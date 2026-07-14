@@ -172,3 +172,7 @@ export const isAuthFileStatusSignalOnly = (
     entry.signalOnlyPattern.test(value.trim())
   );
 };
+
+export const shouldShowAuthFileCardHeaderStatusBadge = (
+  category: AuthFileStatusCategory | null | undefined
+): boolean => category === 'credential_invalid';

@@ -220,6 +220,21 @@ assert.equal(
   false
 );
 
+assert.equal(
+  classifier.shouldShowAuthFileCardHeaderStatusBadge('credential_invalid'),
+  true,
+  'An invalid credential must remain visible as a serious card-header alert.'
+);
+for (const category of Object.keys(categoryLocaleKeys).filter(
+  (value) => value !== 'credential_invalid'
+)) {
+  assert.equal(
+    classifier.shouldShowAuthFileCardHeaderStatusBadge(category),
+    false,
+    `${category} must stay in status-dot details instead of adding a card-header badge.`
+  );
+}
+
 const [
   authFileCardSource,
   quotaTypeSource,
@@ -297,6 +312,22 @@ assert.equal(
   }),
   'invalid_token',
   'A safe error signal must remain visible when adjacent structured fields are sensitive.'
+);
+
+assert.match(
+  authFileCardSource,
+  /const hasVisibleStatusWarning\s*=\s*showAuthFileStatusHeaderBadge\s*\|\|\s*showQuotaStatusHeaderBadge;/,
+  'Only serious status categories that qualify for a header badge may tint the card controls.'
+);
+assert.match(
+  authFileCardSource,
+  /const cardToneClass\s*=\s*\[[\s\S]*?showQuotaStatusHeaderBadge\s*\?\s*styles\.fileCardQuotaError\s*:\s*''/,
+  'A quota-error card tone must be limited to a visible credential-invalid alert.'
+);
+assert.match(
+  authFileCardSource,
+  /file\.disabled[\s\S]*?hasVisibleStatusWarning[\s\S]*?styles\.statusToggleWarning/,
+  'The enabled toggle may use its warning tone only through the serious-alert gate.'
 );
 
 assert.match(
