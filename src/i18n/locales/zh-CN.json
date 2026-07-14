@@ -860,7 +860,7 @@
     "status_unknown_upstream_error_badge": "其他上游错误",
     "status_unknown_upstream_error_title": "上游返回未识别错误：{{message}}",
     "status_error_clue_label": "错误线索",
-    "status_failure_detail_unavailable": "该时段有失败，但没有可关联的具体原因",
+    "status_failure_detail_unavailable": "原因未记录",
     "status_auto_refresh_title": "请求状态每 10 秒自动更新；后台暂停，返回页面时立即更新",
     "status_auto_refresh_short": "状态 10 秒更新",
     "status_problem_request_window": "最近失败请求时段：{{window}}",
@@ -1503,7 +1503,7 @@
     "no_requests": "无请求",
     "request_window": "请求时段 {{window}}",
     "failure_window_hint": "此时段有失败请求",
-    "failure_reason_unavailable": "该时段有失败，但没有可关联的具体原因"
+    "failure_reason_unavailable": "原因未记录"
   },
   "service_health": {
     "title": "服务健康监测",

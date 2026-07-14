@@ -809,7 +809,7 @@
     "status_unknown_upstream_error_badge": "Другая ошибка сервиса",
     "status_unknown_upstream_error_title": "Вышестоящий сервис вернул неизвестную ошибку: {{message}}",
     "status_error_clue_label": "Признак ошибки",
-    "status_failure_detail_unavailable": "В этом окне были сбои, но конкретную причину связать не удалось",
+    "status_failure_detail_unavailable": "Причина не записана",
     "status_auto_refresh_title": "Статус запросов обновляется каждые 10 секунд, приостанавливается в фоне и сразу обновляется после возврата",
     "status_auto_refresh_short": "Обновление каждые 10 с",
     "status_problem_request_window": "Последнее окно с ошибкой: {{window}}",
@@ -1422,7 +1422,7 @@
     "no_requests": "Нет запросов",
     "request_window": "Окно запросов {{window}}",
     "failure_window_hint": "В этом окне есть неудачные запросы",
-    "failure_reason_unavailable": "В этом окне были сбои, но конкретную причину связать не удалось"
+    "failure_reason_unavailable": "Причина не записана"
   },
   "service_health": {
     "title": "Состояние сервиса",

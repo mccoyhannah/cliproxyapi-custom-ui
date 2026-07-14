@@ -70,6 +70,7 @@ import {
   useAuthFilesStatusBarCache,
   type AuthFileStatusBarData,
 } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
+import { useAuthFilesFailureHistory } from '@/features/authFiles/hooks/useAuthFilesFailureHistory';
 import { useCodexAuthFileSnapshots } from '@/features/authFiles/hooks/useCodexAuthFileSnapshots';
 import {
   isAuthFilesSortMode,
@@ -2632,7 +2633,7 @@ export function AuthFilesPage() {
   const statusDataByFileName = useMemo(() => {
     const next = new Map<string, AuthFileStatusBarData>();
 
-    pageItems.forEach((file) => {
+    files.forEach((file) => {
       const rawAuthIndex = file['auth_index'] ?? file.authIndex;
       const authIndexKey = normalizeRecentRequestAuthIndex(rawAuthIndex);
       next.set(
@@ -2645,7 +2646,8 @@ export function AuthFilesPage() {
     });
 
     return next;
-  }, [pageItems, statusBarCache]);
+  }, [files, statusBarCache]);
+  const failureHistoryByFileName = useAuthFilesFailureHistory(files, statusDataByFileName);
   const selectablePageItems = useMemo(
     () => pageItems.filter((file) => !isRuntimeOnlyAuthFile(file)),
     [pageItems]
@@ -6055,6 +6057,7 @@ export function AuthFilesPage() {
                     quotaResetDisabled={loading || codexQuotaRefreshing || codexQuotaResetting}
                     quotaFilterType={quotaFilterType}
                     statusData={statusDataByFileName.get(file.name)!}
+                    failureHistoryBuckets={failureHistoryByFileName.get(file.name) ?? []}
                     authTimeSnapshot={authTimeSnapshots.get(file.name)}
                     authTokenSnapshot={authTokenSnapshots.get(file.name)}
                     codexSubscriptionSnapshot={codexSubscriptionSnapshots.get(file.name)}

@@ -13,6 +13,7 @@
     "test:quota-reset": "node scripts/codex-reset-credits-state.test.mjs",
     "test:quota-refresh-safety": "node scripts/quota-refresh-safety.test.mjs",
     "test:auth-status-observability": "node scripts/auth-status-observability.test.mjs",
+    "test:auth-status-history": "node scripts/auth-status-history.test.mjs",
     "test:auth-status-classification": "node scripts/auth-status-classification.test.mjs",
     "test:priority-rotation-frontend": "node scripts/priority-rotation-frontend.test.mjs",
     "test:ui-safety": "node scripts/ui-interaction-safety.test.mjs",

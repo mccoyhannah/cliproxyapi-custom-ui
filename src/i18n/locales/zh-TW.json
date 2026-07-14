@@ -839,7 +839,7 @@
     "status_unknown_upstream_error_badge": "其他上游錯誤",
     "status_unknown_upstream_error_title": "上游返回未識別錯誤：{{message}}",
     "status_error_clue_label": "錯誤線索",
-    "status_failure_detail_unavailable": "該時段有失敗，但沒有可關聯的具體原因",
+    "status_failure_detail_unavailable": "原因未記錄",
     "status_auto_refresh_title": "請求狀態每 10 秒自動更新；背景暫停，返回頁面時立即更新",
     "status_auto_refresh_short": "狀態 10 秒更新",
     "status_problem_request_window": "最近失敗請求時段：{{window}}",
@@ -1492,7 +1492,7 @@
     "no_requests": "無請求",
     "request_window": "請求時段 {{window}}",
     "failure_window_hint": "此時段有失敗請求",
-    "failure_reason_unavailable": "該時段有失敗，但沒有可關聯的具體原因"
+    "failure_reason_unavailable": "原因未記錄"
   },
   "service_health": {
     "title": "服務健康監測",

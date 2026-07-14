@@ -840,7 +840,7 @@
     "status_unknown_upstream_error_badge": "Other upstream error",
     "status_unknown_upstream_error_title": "Upstream returned an unrecognized error: {{message}}",
     "status_error_clue_label": "Error clue",
-    "status_failure_detail_unavailable": "This window had failures, but no specific reason could be linked",
+    "status_failure_detail_unavailable": "Reason not recorded",
     "status_auto_refresh_title": "Request status refreshes every 10 seconds, pauses in the background, and refreshes immediately on return",
     "status_auto_refresh_short": "Status updates every 10s",
     "status_problem_request_window": "Latest failed request window: {{window}}",
@@ -1482,7 +1482,7 @@
     "no_requests": "No requests",
     "request_window": "Request window {{window}}",
     "failure_window_hint": "This window has failed requests",
-    "failure_reason_unavailable": "This window had failures, but no specific reason could be linked"
+    "failure_reason_unavailable": "Reason not recorded"
   },
   "service_health": {
     "title": "Service Health",

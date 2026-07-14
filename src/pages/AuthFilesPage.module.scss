@@ -4840,11 +4840,11 @@ button.subscriptionHeaderBadge {
   line-height: 1.5;
   width: max-content;
   min-width: 0;
-  max-width: min(320px, calc(100vw - 32px));
+  max-width: min(280px, calc(100vw - 24px));
   white-space: normal;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
   z-index: $z-dropdown;
-  pointer-events: none;
+  pointer-events: auto;
   color: var(--text-primary);
 
   &::after {
@@ -4896,12 +4896,22 @@ button.subscriptionHeaderBadge {
   color: var(--text-secondary);
   display: block;
   margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.statusTooltipContent {
+  display: block;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 .tooltipStats {
   display: flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 .tooltipErrorHint {
@@ -9525,11 +9535,11 @@ button.subscriptionHeaderBadge {
 }
 
 .tooltipFailureMessage {
+  display: block;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
-.tooltipFailureSource,
 .tooltipFailureUnknown {
   color: var(--text-tertiary);
   font-size: 10px;

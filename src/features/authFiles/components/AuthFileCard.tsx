@@ -60,6 +60,12 @@ import {
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import { AuthFileQuotaSection } from '@/features/authFiles/components/AuthFileQuotaSection';
 import { buildManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
+import {
+  STATUS_FAILURE_CAPTURE_MAX_AGE_MS,
+  getStatusFailureDetailsForBlock,
+  simplifyStatusFailureMessage,
+  type StatusFailureHistoryBucket,
+} from '@/features/authFiles/statusFailureHistory';
 import styles from '@/pages/AuthFilesPage.module.scss';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
@@ -168,8 +174,6 @@ const AUTH_STATUS_BADGE_TTL_MS: Record<AuthFileStatusCategory, number | null> = 
   invalid_request: 180_000,
   unknown_upstream_error: 90_000,
 };
-const RECENT_FAILURE_WINDOW_MAX_AGE_MS = 10 * 60 * 1000;
-
 const getStatusProblemKey = (
   problem: { category: AuthFileStatusCategory; message: string; rawMessage: string } | null,
   resetKey: string
@@ -249,6 +253,7 @@ export type AuthFileCardProps = {
   quotaResetDisabled: boolean;
   quotaFilterType: QuotaProviderType | null;
   statusData: AuthFileStatusBarData;
+  failureHistoryBuckets: StatusFailureHistoryBucket[];
   authTimeSnapshot?: CodexAuthTimeSnapshot | null;
   authTokenSnapshot?: CodexAuthTokenSnapshot | null;
   codexSubscriptionSnapshot?: CodexSubscriptionSnapshot | null;
@@ -306,52 +311,6 @@ const toHeaderDateLabel = (value: string): string => {
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
-const redactSensitiveStatusText = (message: string): string =>
-  message
-    .replace(
-      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|credential|password|secret)["']?\s*[:=]\s*["']?)(?:Bearer\s+)?[^"'\s,}]+/gi,
-      '$1[已隐藏]'
-    )
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [已隐藏]')
-    .replace(/([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi, '$1[已隐藏]')
-    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[已隐藏]')
-    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[已隐藏]');
-
-const getStatusHttpCode = (message: string): number | null => {
-  const explicitMatch = message.match(
-    /\b(?:HTTP(?:\/\d(?:\.\d)?)?|["']?(?:status(?:\s+code)?|code)["']?)\s*[:=]?\s*([45]\d{2})\b/i
-  );
-  const standaloneMatch = message.trim().match(/^([45]\d{2})$/);
-  const value = Number(explicitMatch?.[1] ?? standaloneMatch?.[1]);
-  return Number.isInteger(value) ? value : null;
-};
-
-const simplifyStatusMessage = (
-  category: AuthFileStatusCategory | null,
-  message: string
-): string => {
-  const normalized = redactSensitiveStatusText(message)
-    .replace(/\b(?:GET|POST|PUT|PATCH|DELETE)\s+"[^"]+"\s*:\s*/gi, '')
-    .replace(/upstream connect error or disconnect\/reset before headers\.?\s*/i, '')
-    .replace(/transport failure reason:\s*/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!normalized) return category ? AUTH_STATUS_LABEL_FALLBACK[category] : '状态异常';
-  if (category === 'connection_transient' && /\b(?:unexpected\s+)?EOF\b/i.test(normalized)) {
-    return /unexpected\s+EOF/i.test(normalized) ? 'unexpected EOF' : 'EOF';
-  }
-  if (category === 'local_proxy_unavailable' && /connection\s+refused/i.test(normalized)) {
-    return 'Connection refused';
-  }
-  if (category === 'request_interrupted' && /context\s+cancell?ed/i.test(normalized)) {
-    return /context\s+cancelled/i.test(normalized) ? 'context cancelled' : 'context canceled';
-  }
-
-  if (normalized.length <= 180) return normalized;
-  return `${normalized.slice(0, 110)} ... ${normalized.slice(-52)}`;
-};
-
 const getLatestFailureWindow = (
   statusData: AuthFileStatusBarData
 ): { index: number; label: string } | null => {
@@ -359,7 +318,7 @@ const getLatestFailureWindow = (
   for (let index = statusData.blockDetails.length - 1; index >= 0; index -= 1) {
     const detail = statusData.blockDetails[index];
     if (detail.failure <= 0) continue;
-    if (now - detail.endTime > RECENT_FAILURE_WINDOW_MAX_AGE_MS) continue;
+    if (now - detail.endTime > STATUS_FAILURE_CAPTURE_MAX_AGE_MS) continue;
     return {
       index,
       label: `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`,
@@ -375,7 +334,7 @@ const getLatestRecoveryWindow = (
   for (let index = statusData.blockDetails.length - 1; index >= 0; index -= 1) {
     const detail = statusData.blockDetails[index];
     if (detail.success <= 0 || detail.failure > 0) continue;
-    if (now - detail.endTime > RECENT_FAILURE_WINDOW_MAX_AGE_MS) continue;
+    if (now - detail.endTime > STATUS_FAILURE_CAPTURE_MAX_AGE_MS) continue;
     return {
       index,
       label: `${formatStatusClock(detail.startTime)} - ${formatStatusClock(detail.endTime)}`,
@@ -541,6 +500,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     quotaResetDisabled,
     quotaFilterType,
     statusData,
+    failureHistoryBuckets,
     authTimeSnapshot,
     authTokenSnapshot,
     codexSubscriptionSnapshot,
@@ -706,34 +666,16 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     t(AUTH_STATUS_LABEL_KEY[category], {
       defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
     });
-  const shouldShowRequestFailureDetail =
-    !isRuntimeOnly &&
-    !file.disabled &&
-    hasStatusWarning &&
-    !credentialInvalidHasRecovery;
-  const errorClueLabel = t('auth_files.status_error_clue_label', {
-    defaultValue: '错误线索',
+  const failureDetailsByBlockIndex: Record<number, StatusBarFailureDetail[]> = {};
+  statusData.blockDetails.forEach((detail, index) => {
+    if (detail.failure <= 0) return;
+    const storedDetails = getStatusFailureDetailsForBlock(failureHistoryBuckets, detail);
+    if (storedDetails.length === 0) return;
+    failureDetailsByBlockIndex[index] = storedDetails.map((detail) => ({
+      label: getStatusBadgeLabel(detail.category),
+      message: detail.message,
+    }));
   });
-  const requestFailureDetail: StatusBarFailureDetail | null = shouldShowRequestFailureDetail
-    ? {
-        label: parsedAuthFileStatusProblem
-          ? getStatusBadgeLabel(parsedAuthFileStatusProblem.category)
-          : errorClueLabel,
-        message: simplifyStatusMessage(
-          parsedAuthFileStatusProblem?.category ?? null,
-          parsedAuthFileStatusProblem?.message || rawStatusMessage
-        ),
-        httpStatus: getStatusHttpCode(
-          parsedAuthFileStatusProblem?.rawMessage || rawStatusMessage
-        ),
-      }
-    : null;
-  const requestFailureDetailUnavailableLabel = t(
-    'auth_files.status_failure_detail_unavailable',
-    {
-      defaultValue: '该时段有失败，但当前 CPA 只记录次数，没有可关联的具体原因',
-    }
-  );
   const buildStatusProblemInfo = (
     label: string,
     message: string,
@@ -763,7 +705,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
 
   return {
     label,
-    message: simplifyStatusMessage(problem?.category ?? null, message),
+    message: simplifyStatusFailureMessage(problem?.category ?? null, message),
     requestWindow,
     observedAt,
     closeLabel,
@@ -1649,9 +1591,7 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 statusData={statusData}
                 styles={styles}
                 highlightedBlockIndex={highlightedStatusBlockIndex}
-                failureDetail={requestFailureDetail}
-                failureDetailBlockIndex={latestFailureRequestWindow?.index ?? null}
-                failureDetailUnavailableLabel={requestFailureDetailUnavailableLabel}
+                failureDetailsByBlockIndex={failureDetailsByBlockIndex}
               />
               <div
                 className={`${styles.statusPanelStats} ${compact ? styles.statusPanelStatsCompact : ''}`}

@@ -14,6 +14,11 @@ const [
   authFileCardSource,
   authFilesPageSource,
   authFilesDataSource,
+  statusFailureHistorySource,
+  authFilesFailureHistoryHookSource,
+  authFilesStylesSource,
+  aiProvidersStylesSource,
+  ...localeSources
 ] =
   await Promise.all([
     readSource('src/utils/recentRequests.ts'),
@@ -21,6 +26,13 @@ const [
     readSource('src/features/authFiles/components/AuthFileCard.tsx'),
     readSource('src/pages/AuthFilesPage.tsx'),
     readSource('src/features/authFiles/hooks/useAuthFilesData.ts'),
+    readSource('src/features/authFiles/statusFailureHistory.ts'),
+    readSource('src/features/authFiles/hooks/useAuthFilesFailureHistory.ts'),
+    readSource('src/pages/AuthFilesPage.module.scss'),
+    readSource('src/pages/AiProvidersPage.module.scss'),
+    ...['zh-CN', 'zh-TW', 'en', 'ru'].map((locale) =>
+      readSource(`src/i18n/locales/${locale}.json`)
+    ),
   ]);
 
 const transpiledRecentRequests = ts.transpileModule(recentRequestsSource, {
@@ -55,23 +67,18 @@ assert.equal(
 
 assert.match(
   providerStatusBarSource,
-  /failureDetail\?:\s*StatusBarFailureDetail\s*\|\s*null/,
-  'The reusable status bar must accept an optional, explicitly typed failure detail.'
+  /failureDetailsByBlockIndex\?:\s*Readonly<Record<number,\s*StatusBarFailureDetail\[\]>>/,
+  'The reusable status bar must accept persisted failure details for each request bucket.'
+);
+assert.doesNotMatch(
+  providerStatusBarSource,
+  /failureDetailBlockIndex|failureDetailUnavailableLabel/,
+  'The status bar must not keep the old single-bucket clue contract or technical fallback prop.'
 );
 assert.match(
   providerStatusBarSource,
-  /failureDetailUnavailableLabel\?:\s*string/,
-  'The status bar must accept an honest fallback when CPA recorded only a failure count.'
-);
-assert.match(
-  providerStatusBarSource,
-  /failureDetailBlockIndex\?:\s*number\s*\|\s*null/,
-  'A current failure clue must identify the single bucket it can be linked to.'
-);
-assert.match(
-  providerStatusBarSource,
-  /failureDetailBlockIndex === idx\s*\?\s*failureDetail\s*:\s*null/,
-  'The current status clue must not be copied into every historical failed bucket.'
+  /failureDetailsByBlockIndex\?\.\[idx\]\s*\?\?\s*\[\]/,
+  'Each request bucket must read only its own persisted details.'
 );
 assert.match(
   providerStatusBarSource,
@@ -98,46 +105,91 @@ assert.match(
   /createPortal\([\s\S]*?document\.body/,
   'Status detail tooltips must render outside overflow-hidden cards.'
 );
+assert.doesNotMatch(
+  providerStatusBarSource,
+  /tooltipPreferredWidth|activeTooltipHasFailure|width:\s*tooltipPosition/,
+  'Tooltips must not reserve a fixed 180px or 280px inline width.'
+);
 assert.match(
   providerStatusBarSource,
-  /const tooltipPreferredWidth = activeTooltipHasFailure \? 280 : 180;/,
-  'Success and idle tooltips must stay compact instead of reserving failure-detail width.'
+  /tooltipRef\.current\?\.offsetWidth/,
+  'Tooltip placement must use the rendered content width.'
+);
+assert.match(
+  providerStatusBarSource,
+  /new ResizeObserver\(updateTooltipPosition\)/,
+  'An open tooltip must reposition when live text changes its size.'
+);
+assert.match(
+  providerStatusBarSource,
+  /window\.setTimeout\([\s\S]*?setActiveTooltip\(null\)[\s\S]*?,\s*160\)/,
+  'Pointer leave must allow enough time to cross the gap from a block into the portal tooltip.'
+);
+assert.match(
+  providerStatusBarSource,
+  /data-status-tooltip-content="true"[\s\S]*?tabIndex=\{0\}/,
+  'Scrollable tooltip content must be keyboard-focusable.'
+);
+assert.match(
+  providerStatusBarSource,
+  /const focusTooltipContent[\s\S]*?data-status-tooltip-content[\s\S]*?focus\(\)/,
+  'The status bar must expose a focused entry point into scrollable tooltip content.'
+);
+assert.match(
+  providerStatusBarSource,
+  /event\.key === 'Enter'[\s\S]*?focusTooltipContent\(\)/,
+  'Enter on a status block must move keyboard focus into the open tooltip content.'
+);
+assert.match(
+  providerStatusBarSource,
+  /Math\.min\([\s\S]*?tooltipRef\.current\?\.offsetHeight[\s\S]*?viewportHeight - 24/,
+  'Tooltip placement must cap the measured height to the visible viewport.'
 );
 
 assert.match(
   authFileCardSource,
-  /failureDetail=\{requestFailureDetail\}/,
-  'Auth-file cards must pass the current sanitized status clue into failed request blocks.'
+  /failureDetailsByBlockIndex=\{failureDetailsByBlockIndex\}/,
+  'Auth-file cards must pass persisted details for every matching request bucket.'
 );
 assert.match(
   authFileCardSource,
-  /failureDetailBlockIndex=\{latestFailureRequestWindow\?\.index \?\? null\}/,
-  'Auth-file cards must link the current clue only to the latest failed request window.'
-);
-assert.match(
-  authFileCardSource,
-  /failureDetailUnavailableLabel=/,
-  'Auth-file cards must explain when the backend did not retain a concrete reason.'
+  /getStatusFailureDetailsForBlock\(failureHistoryBuckets,\s*detail/,
+  'Auth-file cards must match history by the exact request bucket instead of copying one clue.'
 );
 assert.doesNotMatch(
   authFileCardSource,
-  /不是逐请求日志|not an exact per-request log/i,
-  'The compact tooltip must not repeat a long explanatory footer.'
+  /failureDetailUnavailableLabel|requestFailureDetailUnavailableLabel|errorClueLabel/,
+  'Auth-file cards must not carry explanatory fallback copy or a generic current-clue label.'
 );
 assert.doesNotMatch(
-  authFileCardSource,
+  [providerStatusBarSource, authFileCardSource, ...localeSources].join('\n'),
+  /当前 CPA 只记录|没有可关联的具体原因|no specific reason could be linked|конкретную причину связать/i,
+  'Compact tooltips and translations must not contain technical explanatory asides.'
+);
+assert.doesNotMatch(
+  statusFailureHistorySource,
   /if \(!normalized\) return message\.trim\(\);/,
   'Sanitization must never fall back to the original unredacted message.'
 );
 assert.match(
-  authFileCardSource,
-  /const shouldShowRequestFailureDetail\s*=\s*[\s\S]*?hasStatusWarning[\s\S]*?!credentialInvalidHasRecovery/,
-  'Only an active non-healthy status clue may be attached to failed buckets.'
+  authFilesFailureHistoryHookSource,
+  /hasStatusWarning[\s\S]*?!file\.disabled[\s\S]*?!isRuntimeOnlyAuthFile\(file\)[\s\S]*?findLatestCapturableFailureBlock/,
+  'Only an active, enabled, non-runtime status clue may be captured into a recent failed bucket.'
 );
 assert.match(
-  authFileCardSource,
-  /id\[_-\]\?token[\s\S]*?credential[\s\S]*?password[\s\S]*?secret/,
-  'Status tooltip sanitization must cover quoted JSON credential fields.'
+  authFilesFailureHistoryHookSource,
+  /hasLatestSuccessfulRequestBlock[\s\S]*?clearActiveStatusFailure/,
+  'A later successful request bucket must clear the stale active warning episode.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /parseStatusFailureHistory\(event\.newValue/,
+  'Cross-tab merging must include the storage-event snapshot even if localStorage was overwritten again.'
+);
+assert.match(
+  statusFailureHistorySource,
+  /api\[_-\]\?key[\s\S]*?auth[\s\S]*?token[\s\S]*?cookie[\s\S]*?session[\s\S]*?credential[\s\S]*?password[\s\S]*?secret/,
+  'Persisted status history sanitization must cover credential, Cookie, and session fields.'
 );
 assert.match(
   authFileCardSource,
@@ -146,8 +198,45 @@ assert.match(
 );
 assert.match(
   authFileCardSource,
-  /label:\s*parsedAuthFileStatusProblem[\s\S]*?\?\s*getStatusBadgeLabel\(parsedAuthFileStatusProblem\.category\)/,
-  'Failed buckets should lead with the concrete category instead of a generic current-clue label.'
+  /label:\s*getStatusBadgeLabel\(detail\.category\)/,
+  'Failed buckets should lead with the stored concrete category.'
+);
+assert.match(
+  statusFailureHistorySource,
+  /STATUS_FAILURE_HISTORY_TTL_MS\s*=\s*3\s*\*\s*60\s*\*\s*60\s*\*\s*1000/,
+  'Captured failure reasons must have a three-hour lifetime.'
+);
+assert.match(
+  authFilesPageSource,
+  /useAuthFilesFailureHistory\(files,\s*statusDataByFileName\)/,
+  'The page must capture status history for the complete auth-file list.'
+);
+assert.match(
+  authFilesPageSource,
+  /failureHistoryBuckets=\{failureHistoryByFileName\.get\(file\.name\) \?\? \[\]\}/,
+  'Each card must receive only its own persisted buckets.'
+);
+
+for (const source of [authFilesStylesSource, aiProvidersStylesSource]) {
+  assert.match(source, /\.statusTooltip\s*\{[\s\S]*?width:\s*max-content;/);
+  assert.match(source, /\.statusTooltip\s*\{[\s\S]*?max-width:\s*min\(280px,\s*calc\(100vw - 24px\)\);/);
+  assert.match(source, /\.tooltipTime\s*\{[\s\S]*?white-space:\s*nowrap;/);
+  assert.match(source, /\.tooltipStats\s*\{[\s\S]*?white-space:\s*nowrap;/);
+  assert.match(source, /\.tooltipFailureMessage\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/);
+  assert.match(source, /\.statusTooltipContent\s*\{[\s\S]*?max-height:\s*calc\(100vh - 48px\);/);
+  assert.match(source, /\.statusTooltipContent\s*\{[\s\S]*?overflow-y:\s*auto;/);
+}
+
+const expectedUnavailableLabels = ['原因未记录', '原因未記錄', 'Reason not recorded', 'Причина не записана'];
+localeSources.forEach((source, index) => {
+  const locale = JSON.parse(source);
+  assert.equal(locale.auth_files.status_failure_detail_unavailable, expectedUnavailableLabels[index]);
+  assert.equal(locale.status_bar.failure_reason_unavailable, expectedUnavailableLabels[index]);
+});
+assert.match(
+  providerStatusBarSource,
+  /defaultValue:\s*'原因未记录'/,
+  'The source fallback must stay as concise as the translated copy.'
 );
 
 assert.match(
