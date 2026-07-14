@@ -159,6 +159,7 @@ import styles from './AuthFilesPage.module.scss';
 
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
+const AUTH_FILES_STATUS_REFRESH_INTERVAL_MS = 10_000;
 const PRIORITY_ROTATION_THRESHOLD_STEP = 1;
 const PRIORITY_ROTATION_NO_STANDBY_THRESHOLD_DROP_STEP = 1;
 const PRIORITY_ROTATION_SLOT_STEP = 1;
@@ -1140,6 +1141,7 @@ export function AuthFilesPage() {
   const loadedFilesOnceRef = useRef(false);
   const filesRef = useRef<AuthFileItem[]>([]);
   const filesLengthRef = useRef(0);
+  const authFilesStatusRefreshInFlightRef = useRef(false);
   const priorityRotationSidecarDraftTouchedRef = useRef(false);
   const priorityRotationSidecarAutoSaveSignatureRef = useRef('');
   const priorityRotationSidecarAutoSaveFailedAtRef = useRef(0);
@@ -2335,12 +2337,35 @@ export function AuthFilesPage() {
     loadModelAlias,
   ]);
 
+  const refreshAuthFilesStatus = useCallback(async () => {
+    if (!isCurrentLayer) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+    if (authFilesStatusRefreshInFlightRef.current) return;
+
+    authFilesStatusRefreshInFlightRef.current = true;
+    try {
+      await loadFiles({
+        preserveExisting: true,
+        silent: true,
+        rememberDisplayNames: false,
+      });
+    } finally {
+      authFilesStatusRefreshInFlightRef.current = false;
+    }
+  }, [isCurrentLayer, loadFiles]);
+
   useInterval(
     () => {
-      void loadFiles({ preserveExisting: true, silent: true }).catch(() => {});
+      void refreshAuthFilesStatus();
     },
-    isCurrentLayer ? 240_000 : null
+    isCurrentLayer ? AUTH_FILES_STATUS_REFRESH_INTERVAL_MS : null
   );
+
+  useEffect(() => {
+    if (!isCurrentLayer || typeof document === 'undefined') return;
+    document.addEventListener('visibilitychange', refreshAuthFilesStatus);
+    return () => document.removeEventListener('visibilitychange', refreshAuthFilesStatus);
+  }, [isCurrentLayer, refreshAuthFilesStatus]);
 
   const existingTypes = useMemo(() => {
     const types = new Set<string>(['all']);
@@ -4956,6 +4981,15 @@ export function AuthFilesPage() {
         {files.length > 0 && <span className={styles.countBadge}>{files.length}</span>}
         <span className={styles.authFilesTitleScope}>{currentProviderLabel}</span>
         <span className={styles.authFilesTitleMeta}>{visibleRangeLabel}</span>
+        <span
+          className={styles.authFilesTitleLive}
+          title={t('auth_files.status_auto_refresh_title', {
+            defaultValue: '请求状态每 10 秒自动更新；切到后台时暂停，返回页面时立即更新',
+          })}
+        >
+          <span className={styles.authFilesTitleLiveDot} aria-hidden="true" />
+          {t('auth_files.status_auto_refresh_short', { defaultValue: '状态 10 秒更新' })}
+        </span>
       </div>
       <div
         className={styles.authFilesTitleStats}

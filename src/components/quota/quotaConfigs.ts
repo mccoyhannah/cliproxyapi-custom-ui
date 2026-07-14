@@ -86,6 +86,7 @@ import {
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
+import { classifyAuthFileStatusCategory } from '@/features/authFiles/statusClassification';
 import type { QuotaRenderHelpers } from './QuotaCard';
 import styles from '@/pages/QuotaPage.module.scss';
 
@@ -1837,13 +1838,22 @@ export const CODEX_CONFIG: QuotaConfig<
     subscriptionStatus: data.subscriptionStatus,
     subscriptionStatusMessage: data.subscriptionStatusMessage,
   }),
-  buildErrorState: (message, status) => ({
-    status: 'error',
-    windows: [],
-    error: message,
-    errorStatus: status,
-    errorObservedAt: Date.now(),
-  }),
+  buildErrorState: (message, status) => {
+    const errorKind = classifyAuthFileStatusCategory(message, status);
+    return {
+      status: 'error',
+      windows: [],
+      error: message,
+      errorStatus: status,
+      errorObservedAt: Date.now(),
+      ...(errorKind
+        ? {
+            errorKind,
+            retryable: errorKind !== 'credential_invalid',
+          }
+        : {}),
+    };
+  },
   cardClassName: styles.codexCard,
   controlsClassName: styles.codexControls,
   controlClassName: styles.codexControl,

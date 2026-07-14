@@ -85,6 +85,7 @@ type RestoreAuthFileDisplayNameMode = 'missing' | 'overwrite';
 export type LoadAuthFilesOptions = {
   silent?: boolean;
   preserveExisting?: boolean;
+  rememberDisplayNames?: boolean;
   restoreRememberedDisplayNames?: RestoreAuthFileDisplayNameMode;
   restoreDisplayNameFilter?: (file: AuthFileItem) => boolean;
 };
@@ -600,7 +601,9 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             ).files
           : resolvedFiles;
         if (requestSeq !== loadFilesRequestSeqRef.current) return null;
-        rememberAuthFileDisplayNames(finalFiles);
+        if (options.rememberDisplayNames !== false) {
+          rememberAuthFileDisplayNames(finalFiles);
+        }
         filesRef.current = finalFiles;
         setFiles(finalFiles);
         return finalFiles;

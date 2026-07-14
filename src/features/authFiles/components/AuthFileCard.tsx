@@ -27,7 +27,10 @@ import {
   IconTimer,
   IconTrash2,
 } from '@/components/ui/icons';
-import { ProviderStatusBar } from '@/components/providers/ProviderStatusBar';
+import {
+  ProviderStatusBar,
+  type StatusBarFailureDetail,
+} from '@/components/providers/ProviderStatusBar';
 import { useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import {
@@ -96,46 +99,74 @@ type StatusProblemTooltipPosition = {
 
 const AUTH_STATUS_LABEL_KEY: Record<AuthFileStatusCategory, string> = {
   credential_invalid: 'auth_files.credential_invalid_badge',
+  account_model_restricted: 'auth_files.status_account_model_restricted_badge',
+  upstream_access_blocked: 'auth_files.status_upstream_access_blocked_badge',
   local_proxy_unavailable: 'auth_files.status_local_proxy_unavailable_badge',
+  dns_resolution_failed: 'auth_files.status_dns_resolution_failed_badge',
+  tls_certificate_error: 'auth_files.status_tls_certificate_error_badge',
+  oauth_flow_failure: 'auth_files.status_oauth_flow_failure_badge',
   connection_transient: 'auth_files.status_connection_transient_badge',
   request_interrupted: 'auth_files.status_request_interrupted_badge',
   input_too_large: 'auth_files.status_input_too_large_badge',
   content_policy: 'auth_files.status_content_policy_badge',
   rate_limited: 'auth_files.status_rate_limited_badge',
+  invalid_request: 'auth_files.status_invalid_request_badge',
   upstream_service_error: 'auth_files.status_upstream_service_error_badge',
+  unknown_upstream_error: 'auth_files.status_unknown_upstream_error_badge',
 };
 
 const AUTH_STATUS_LABEL_FALLBACK: Record<AuthFileStatusCategory, string> = {
   credential_invalid: '认证失效',
+  account_model_restricted: '模型/账号不兼容',
+  upstream_access_blocked: '上游访问受限',
   local_proxy_unavailable: '本地代理不可用',
+  dns_resolution_failed: 'DNS 解析失败',
+  tls_certificate_error: 'TLS/证书错误',
+  oauth_flow_failure: '登录流程失败',
   connection_transient: '连接瞬断',
   request_interrupted: '请求中断',
   input_too_large: '上下文超限',
   content_policy: '内容策略拦截',
   rate_limited: '限流/额度不足',
+  invalid_request: '请求/接口错误',
   upstream_service_error: '上游服务异常',
+  unknown_upstream_error: '其他上游错误',
 };
 
 const AUTH_STATUS_TITLE_KEY: Record<AuthFileStatusCategory, string> = {
   credential_invalid: 'auth_files.credential_invalid_badge_title',
+  account_model_restricted: 'auth_files.status_account_model_restricted_title',
+  upstream_access_blocked: 'auth_files.status_upstream_access_blocked_title',
   local_proxy_unavailable: 'auth_files.status_local_proxy_unavailable_title',
+  dns_resolution_failed: 'auth_files.status_dns_resolution_failed_title',
+  tls_certificate_error: 'auth_files.status_tls_certificate_error_title',
+  oauth_flow_failure: 'auth_files.status_oauth_flow_failure_title',
   connection_transient: 'auth_files.status_connection_transient_title',
   request_interrupted: 'auth_files.status_request_interrupted_title',
   input_too_large: 'auth_files.status_input_too_large_title',
   content_policy: 'auth_files.status_content_policy_title',
   rate_limited: 'auth_files.status_rate_limited_title',
+  invalid_request: 'auth_files.status_invalid_request_title',
   upstream_service_error: 'auth_files.status_upstream_service_error_title',
+  unknown_upstream_error: 'auth_files.status_unknown_upstream_error_title',
 };
 
 const AUTH_STATUS_BADGE_TTL_MS: Record<AuthFileStatusCategory, number | null> = {
   credential_invalid: null,
+  account_model_restricted: 180_000,
+  upstream_access_blocked: 180_000,
   local_proxy_unavailable: 90_000,
+  dns_resolution_failed: 90_000,
+  tls_certificate_error: 90_000,
+  oauth_flow_failure: 180_000,
   connection_transient: 90_000,
   request_interrupted: 90_000,
   upstream_service_error: 90_000,
   input_too_large: 180_000,
   content_policy: 180_000,
   rate_limited: 180_000,
+  invalid_request: 180_000,
+  unknown_upstream_error: 90_000,
 };
 const RECENT_FAILURE_WINDOW_MAX_AGE_MS = 10 * 60 * 1000;
 
@@ -275,18 +306,38 @@ const toHeaderDateLabel = (value: string): string => {
 const clampNumber = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+const redactSensitiveStatusText = (message: string): string =>
+  message
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|credential|password|secret)["']?\s*[:=]\s*["']?)(?:Bearer\s+)?[^"'\s,}]+/gi,
+      '$1[已隐藏]'
+    )
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [已隐藏]')
+    .replace(/([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi, '$1[已隐藏]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[已隐藏]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[已隐藏]');
+
+const getStatusHttpCode = (message: string): number | null => {
+  const explicitMatch = message.match(
+    /\b(?:HTTP(?:\/\d(?:\.\d)?)?|["']?(?:status(?:\s+code)?|code)["']?)\s*[:=]?\s*([45]\d{2})\b/i
+  );
+  const standaloneMatch = message.trim().match(/^([45]\d{2})$/);
+  const value = Number(explicitMatch?.[1] ?? standaloneMatch?.[1]);
+  return Number.isInteger(value) ? value : null;
+};
+
 const simplifyStatusMessage = (
   category: AuthFileStatusCategory | null,
   message: string
 ): string => {
-  const normalized = message
+  const normalized = redactSensitiveStatusText(message)
     .replace(/\b(?:GET|POST|PUT|PATCH|DELETE)\s+"[^"]+"\s*:\s*/gi, '')
     .replace(/upstream connect error or disconnect\/reset before headers\.?\s*/i, '')
     .replace(/transport failure reason:\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-  if (!normalized) return message.trim();
+  if (!normalized) return category ? AUTH_STATUS_LABEL_FALLBACK[category] : '状态异常';
   if (category === 'connection_transient' && /\b(?:unexpected\s+)?EOF\b/i.test(normalized)) {
     return /unexpected\s+EOF/i.test(normalized) ? 'unexpected EOF' : 'EOF';
   }
@@ -611,10 +662,11 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     failure: statusData.totalFailure,
   };
   const rawStatusMessage = getAuthFileStatusMessage(file);
+  const parsedAuthFileStatusProblem = getAuthFileStatusProblem(file);
   const hasStatusWarning =
     Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
   const authFileStatusProblem =
-    !isRuntimeOnly && !file.disabled ? getAuthFileStatusProblem(file) : null;
+    !isRuntimeOnly && !file.disabled && hasStatusWarning ? parsedAuthFileStatusProblem : null;
   const latestFailureRequestWindow = getLatestFailureWindow(statusData);
   const latestRecoveryRequestWindow = getLatestRecoveryWindow(statusData);
   const codexQuotaSucceeded = resolvedQuotaType === 'codex' && codexQuotaEntry?.status === 'success';
@@ -654,6 +706,34 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
     t(AUTH_STATUS_LABEL_KEY[category], {
       defaultValue: AUTH_STATUS_LABEL_FALLBACK[category],
     });
+  const shouldShowRequestFailureDetail =
+    !isRuntimeOnly &&
+    !file.disabled &&
+    hasStatusWarning &&
+    !credentialInvalidHasRecovery;
+  const errorClueLabel = t('auth_files.status_error_clue_label', {
+    defaultValue: '错误线索',
+  });
+  const requestFailureDetail: StatusBarFailureDetail | null = shouldShowRequestFailureDetail
+    ? {
+        label: parsedAuthFileStatusProblem
+          ? getStatusBadgeLabel(parsedAuthFileStatusProblem.category)
+          : errorClueLabel,
+        message: simplifyStatusMessage(
+          parsedAuthFileStatusProblem?.category ?? null,
+          parsedAuthFileStatusProblem?.message || rawStatusMessage
+        ),
+        httpStatus: getStatusHttpCode(
+          parsedAuthFileStatusProblem?.rawMessage || rawStatusMessage
+        ),
+      }
+    : null;
+  const requestFailureDetailUnavailableLabel = t(
+    'auth_files.status_failure_detail_unavailable',
+    {
+      defaultValue: '该时段有失败，但当前 CPA 只记录次数，没有可关联的具体原因',
+    }
+  );
   const buildStatusProblemInfo = (
     label: string,
     message: string,
@@ -1569,6 +1649,9 @@ export const AuthFileCard = memo(function AuthFileCard(props: AuthFileCardProps)
                 statusData={statusData}
                 styles={styles}
                 highlightedBlockIndex={highlightedStatusBlockIndex}
+                failureDetail={requestFailureDetail}
+                failureDetailBlockIndex={latestFailureRequestWindow?.index ?? null}
+                failureDetailUnavailableLabel={requestFailureDetailUnavailableLabel}
               />
               <div
                 className={`${styles.statusPanelStats} ${compact ? styles.statusPanelStatsCompact : ''}`}

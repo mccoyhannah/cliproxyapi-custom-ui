@@ -273,13 +273,20 @@ export interface CodexQuotaState {
   errorObservedAt?: number;
   errorKind?:
     | 'credential_invalid'
+    | 'account_model_restricted'
+    | 'upstream_access_blocked'
     | 'local_proxy_unavailable'
+    | 'dns_resolution_failed'
+    | 'tls_certificate_error'
+    | 'oauth_flow_failure'
     | 'connection_transient'
     | 'request_interrupted'
     | 'input_too_large'
     | 'content_policy'
     | 'rate_limited'
-    | 'upstream_service_error';
+    | 'invalid_request'
+    | 'upstream_service_error'
+    | 'unknown_upstream_error';
   retryable?: boolean;
 }
 

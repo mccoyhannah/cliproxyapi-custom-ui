@@ -917,8 +917,22 @@ $openai-toolbar-control-height: 36px;
   flex: 1;
   min-width: 6px;
   position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary-color) 70%, #fff);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 .statusBlock {
@@ -941,17 +955,18 @@ $openai-toolbar-control-height: 36px;
 }
 
 .statusTooltip {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  transform: none;
   background: var(--bg-primary, #fff);
   border: 1px solid var(--border-secondary, #e5e7eb);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 11px;
   line-height: 1.5;
-  white-space: nowrap;
+  width: max-content;
+  min-width: 0;
+  max-width: min(320px, calc(100vw - 32px));
+  white-space: normal;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   z-index: $z-dropdown;
   pointer-events: none;
@@ -962,7 +977,7 @@ $openai-toolbar-control-height: 36px;
     content: '';
     position: absolute;
     top: 100%;
-    left: 50%;
+    left: var(--status-tooltip-arrow-left, 50%);
     transform: translateX(-50%);
     border: 5px solid transparent;
     border-top-color: var(--bg-primary, #fff);
@@ -972,7 +987,7 @@ $openai-toolbar-control-height: 36px;
     content: '';
     position: absolute;
     top: 100%;
-    left: 50%;
+    left: var(--status-tooltip-arrow-left, 50%);
     transform: translateX(-50%);
     border: 6px solid transparent;
     border-top-color: var(--border-secondary, #e5e7eb);
@@ -1014,6 +1029,49 @@ $openai-toolbar-control-height: 36px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.statusTooltipBelow {
+  &::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--bg-primary, #fff);
+  }
+
+  &::before {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--border-secondary, #e5e7eb);
+  }
+}
+
+.tooltipFailureDetail,
+.tooltipFailureUnknown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  text-align: left;
+}
+
+.tooltipFailureHeading {
+  color: var(--danger-color, #ef4444);
+  font-weight: 700;
+}
+
+.tooltipFailureMessage {
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.tooltipFailureSource,
+.tooltipFailureUnknown {
+  color: var(--text-secondary);
+  font-size: 10px;
 }
 
 .tooltipSuccess {

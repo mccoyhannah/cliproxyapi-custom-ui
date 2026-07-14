@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   analyzeCodexPriorityRotation,
   buildIdleShutdownStatePatch,
@@ -10,6 +13,10 @@ import {
   isModelRequestLogName,
   parseModelRequestLogTimeMs,
   readLatestModelRequestAtMs,
+  redactDiagnosticText,
+  sanitizeDiagnosticValue,
+  sanitizeStatePatch,
+  sanitizeStateForResponse,
   shouldStopForIdle,
   validateManagementKey,
 } from './priority-rotation-sidecar.mjs';
@@ -44,6 +51,21 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
   errorKind: 'credential_invalid',
   retryable: false,
 });
+
+async function getAvailablePort() {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const availablePort = address.port;
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+  return availablePort;
+}
 
 {
   assert.equal(
@@ -82,9 +104,213 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
     classifyUpstreamStatusText('invalidated oauth token for this account'),
     'credential_invalid'
   );
+  assert.equal(
+    classifyUpstreamStatusText('authentication failed: context deadline exceeded'),
+    'request_interrupted'
+  );
+  assert.equal(classifyUpstreamStatusText('authentication failed: EOF'), 'connection_transient');
+  assert.equal(
+    classifyUpstreamStatusText('dial tcp 104.18.1.1:443: connection refused'),
+    'connection_transient'
+  );
+  assert.equal(
+    classifyUpstreamStatusText('403 Forbidden invalid_token'),
+    'credential_invalid'
+  );
+  assert.equal(
+    classifyUpstreamStatusText('wsasend: connection was aborted by the software'),
+    'connection_transient'
+  );
+  assert.equal(classifyUpstreamStatusText('remote error: tls: handshake failure'), 'tls_certificate_error');
+  assert.equal(classifyUpstreamStatusText('413 Request Entity Too Large'), 'input_too_large');
+  assert.equal(classifyUpstreamStatusText('forbidden by content policy'), 'content_policy');
+  assert.equal(classifyUpstreamStatusText('access denied: quota exceeded'), 'rate_limited');
+  assert.equal(classifyUpstreamStatusText('authentication failed'), 'unknown_upstream_error');
+  assert.equal(classifyUpstreamStatusText('authentication_error: EOF'), 'connection_transient');
+  assert.equal(
+    classifyUpstreamStatusText('authentication_error: context deadline exceeded'),
+    'request_interrupted'
+  );
+  assert.equal(
+    classifyUpstreamStatusText('authentication_error: service unavailable'),
+    'upstream_service_error'
+  );
+  assert.equal(classifyUpstreamStatusText('authentication_error'), 'credential_invalid');
   assert.equal(classifyUpstreamStatusText('quota_exceeded'), 'rate_limited');
   assert.equal(classifyUpstreamStatusText('', 429), 'rate_limited');
   assert.equal(classifyUpstreamStatusText('', 503), 'upstream_service_error');
+  assert.equal(classifyUpstreamStatusText('', 418), 'invalid_request');
+}
+
+{
+  const rawError =
+    'authentication_error: EOF refresh_token=rt-secret-abcdef123456 Authorization: Bearer secret-token';
+  const redacted = redactDiagnosticText(rawError);
+  assert.doesNotMatch(redacted, /rt-secret-abcdef123456|secret-token/);
+  const responseState = sanitizeStateForResponse({
+    running: false,
+    enabled: false,
+    hasSecret: true,
+    lastError: rawError,
+  });
+  assert.doesNotMatch(responseState.lastError, /rt-secret-abcdef123456|secret-token/);
+  const diskPatch = sanitizeStatePatch({ lastError: rawError, running: false });
+  assert.doesNotMatch(diskPatch.lastError, /rt-secret-abcdef123456|secret-token/);
+  const logDetails = sanitizeDiagnosticValue({
+    message: rawError,
+    nested: { refresh_token: 'rt-secret-abcdef123456' },
+  });
+  assert.doesNotMatch(JSON.stringify(logDetails), /rt-secret-abcdef123456|secret-token/);
+}
+
+{
+  const root = await mkdtemp(path.join(tmpdir(), 'priority-rotation-state-migration-'));
+  const dataDir = path.join(root, 'priority-rotation');
+  const statePath = path.join(dataDir, 'state.json');
+  const rawError = 'refresh_token=rt-secret-abcdef123456';
+  const port = await getAvailablePort();
+  const sidecarPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'priority-rotation-sidecar.mjs'
+  );
+  await mkdir(dataDir, { recursive: true });
+  await writeFile(
+    statePath,
+    `${JSON.stringify({ serviceStartedAt: 'legacy', lastError: rawError })}\n`,
+    'utf8'
+  );
+
+  const child = spawn(
+    process.execPath,
+    [
+      sidecarPath,
+      '--install-dir',
+      root,
+      '--data-dir',
+      dataDir,
+      '--model-request-logs-dir',
+      path.join(root, 'logs'),
+      '--port',
+      String(port),
+      '--idle-shutdown-minutes',
+      '180',
+    ],
+    { stdio: 'ignore' }
+  );
+  const childClosed = new Promise((resolve) => child.once('close', resolve));
+
+  try {
+    const deadline = Date.now() + 5_000;
+    let migratedState = null;
+    while (Date.now() < deadline) {
+      const candidate = JSON.parse(await readFile(statePath, 'utf8'));
+      if (candidate.serviceStartedAt !== 'legacy') {
+        migratedState = candidate;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.ok(migratedState, 'Sidecar startup should rewrite legacy runtime state.');
+    assert.doesNotMatch(
+      migratedState.lastError,
+      /rt-secret-abcdef123456/,
+      'Legacy lastError values must be redacted before startup rewrites state.json.'
+    );
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await Promise.race([
+      childClosed,
+      new Promise((resolve) => setTimeout(resolve, 1_000)),
+    ]);
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = await mkdtemp(path.join(tmpdir(), 'priority-rotation-error-response-'));
+  const dataDir = path.join(root, 'priority-rotation');
+  const sidecarPort = await getAvailablePort();
+  const opaqueUpstreamBody = '<html>opaque-private-token-0123456789abcdef</html>';
+  const upstream = createServer((_req, res) => {
+    res.statusCode = 403;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(opaqueUpstreamBody);
+  });
+  await new Promise((resolve, reject) => {
+    upstream.once('error', reject);
+    upstream.listen(0, '127.0.0.1', resolve);
+  });
+  const upstreamAddress = upstream.address();
+  assert.ok(upstreamAddress && typeof upstreamAddress === 'object');
+
+  const sidecarPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'priority-rotation-sidecar.mjs'
+  );
+  const child = spawn(
+    process.execPath,
+    [
+      sidecarPath,
+      '--install-dir',
+      root,
+      '--data-dir',
+      dataDir,
+      '--model-request-logs-dir',
+      path.join(root, 'logs'),
+      '--port',
+      String(sidecarPort),
+      '--idle-shutdown-minutes',
+      '180',
+    ],
+    { stdio: 'ignore' }
+  );
+  const childClosed = new Promise((resolve) => child.once('close', resolve));
+
+  try {
+    const healthUrl = `http://127.0.0.1:${sidecarPort}/health`;
+    const deadline = Date.now() + 5_000;
+    let healthy = false;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(healthUrl);
+        if (response.ok) {
+          healthy = true;
+          break;
+        }
+      } catch {
+        // Sidecar may still be starting.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(healthy, true, 'Sidecar should become healthy for response sanitization test.');
+
+    const response = await fetch(`http://127.0.0.1:${sidecarPort}/secret`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        managementKey: 'dummy-key',
+        apiBase: `http://127.0.0.1:${upstreamAddress.port}`,
+      }),
+    });
+    const body = await response.json();
+    assert.equal(response.status, 403);
+    assert.equal(
+      body.error,
+      'HTTP 403',
+      'Untrusted upstream failures must use a stable fail-closed response message.'
+    );
+    assert.doesNotMatch(JSON.stringify(body), /opaque-private-token|<html>/i);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await Promise.race([
+      childClosed,
+      new Promise((resolve) => setTimeout(resolve, 1_000)),
+    ]);
+    await new Promise((resolve, reject) => {
+      upstream.close((error) => (error ? reject(error) : resolve()));
+    });
+    await rm(root, { recursive: true, force: true });
+  }
 }
 
 {
@@ -201,6 +427,28 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
 }
 
 {
+  const files = [codexFile('active-global-failure.json', 2), codexFile('active-healthy.json', 2)];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-global-failure.json': retryableQuotaError(
+        'upstream_access_blocked',
+        'cloudflare challenge'
+      ),
+      'active-healthy.json': quota(10),
+    },
+    50,
+    1
+  );
+  assert.equal(result.status, 'quota_unknown');
+  assert.deepEqual(
+    result.changes,
+    [],
+    'A protected global failure must not consume the slot and push a healthy account down.'
+  );
+}
+
+{
   const files = [
     codexFile('active-a.json', 0),
     codexFile('active-b.json', 0),
@@ -267,6 +515,54 @@ const credentialQuotaError = (error = 'invalidated oauth token for this account'
   assert.equal(
     result.candidates.every((candidate) => candidate.decision === 'quota_unknown_retryable'),
     true
+  );
+}
+
+{
+  const files = [
+    codexFile('active-cloudflare.json', 2),
+    codexFile('active-model-restricted.json', 2),
+    codexFile('active-unknown.json', 2),
+  ];
+  const result = analyzeCodexPriorityRotation(
+    files,
+    {
+      'active-cloudflare.json': {
+        status: 'error',
+        planType: 'team',
+        windows: [],
+        error: 'cloudflare challenge',
+        errorStatus: 403,
+      },
+      'active-model-restricted.json': {
+        status: 'error',
+        planType: 'team',
+        windows: [],
+        error: "The model is not supported when using Codex with a ChatGPT account.",
+        errorStatus: 500,
+      },
+      'active-unknown.json': {
+        status: 'error',
+        planType: 'team',
+        windows: [],
+        error: 'provider returned an unfamiliar failure',
+      },
+    },
+    50,
+    1
+  );
+  assert.equal(result.status, 'quota_unknown');
+  assert.deepEqual(result.changes, []);
+  assert.equal(
+    result.candidates.every(
+      (candidate) =>
+        candidate.quotaRetryable === true && candidate.decision === 'quota_unknown_retryable'
+    ),
+    true
+  );
+  assert.equal(
+    result.candidates.some((candidate) => candidate.decision === 'demote_credential_invalid'),
+    false
   );
 }
 

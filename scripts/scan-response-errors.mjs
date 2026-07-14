@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
 import { classifyUpstreamStatusText } from './priority-rotation-sidecar.mjs';
 
 const DEFAULT_LOGS_DIR = 'D:\\CLIProxyAPI\\logs';
@@ -35,14 +36,43 @@ function increment(map, key) {
   map.set(key, (map.get(key) ?? 0) + 1);
 }
 
-async function scanResponseLog(filePath) {
+function redactDiagnosticSignal(value) {
+  return String(value ?? '')
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|credential|password|secret)["']?\s*[:=]\s*["']?)(?:Bearer\s+)?[^"'\s,}]+/gi,
+      '$1[redacted]'
+    )
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
+    .replace(/([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted]')
+    .slice(0, 240);
+}
+
+export async function scanResponseLog(filePath) {
   let statusCode = null;
   const errors = [];
   const events = [];
+  let section = 'unknown';
+  let hasStructuredSections = false;
   const stream = createReadStream(filePath, { encoding: 'utf8' });
   const lines = readline.createInterface({ input: stream, crlfDelay: Infinity });
 
   for await (const line of lines) {
+    const sectionMatch = /^===\s*(.+?)\s*===$/.exec(line);
+    if (sectionMatch) {
+      const sectionName = sectionMatch[1].trim().toUpperCase();
+      hasStructuredSections = true;
+      section = sectionName.includes('RESPONSE')
+        ? 'response'
+        : sectionName.includes('REQUEST')
+          ? 'request'
+          : 'other';
+      continue;
+    }
+
+    if (hasStructuredSections && section !== 'response') continue;
+
     const statusMatch = /^Status:\s*(\d+)/.exec(line);
     if (statusMatch) {
       statusCode = Number(statusMatch[1]);
@@ -70,6 +100,9 @@ async function main() {
   const limit = toPositiveInteger(args.limit, DEFAULT_LIMIT);
   const sampleLimit = toPositiveInteger(args.samples, DEFAULT_SAMPLE_LIMIT);
   const json = args.json === true;
+  const showSignals = args['show-signals'] === true;
+  const sampleSignals = (signals) =>
+    showSignals ? signals.slice(0, 3).map(redactDiagnosticSignal) : [];
 
   const entries = await readdir(logsDir, { withFileTypes: true });
   const files = [];
@@ -85,6 +118,8 @@ async function main() {
   const statusCounts = new Map();
   const samples = [];
   const uncategorized = [];
+  const unknownSamples = [];
+  let unknownCount = 0;
 
   for (const file of selectedFiles) {
     const result = await scanResponseLog(file.fullPath);
@@ -117,12 +152,22 @@ async function main() {
     }
 
     const categoryList = [...categories];
+    if (categoryList.includes('unknown_upstream_error')) {
+      unknownCount += 1;
+      if (unknownSamples.length < sampleLimit) {
+        unknownSamples.push({
+          file: file.name,
+          status: result.statusCode,
+          signals: sampleSignals(signals),
+        });
+      }
+    }
     if (categoryList.length === 0) {
       if (uncategorized.length < sampleLimit) {
         uncategorized.push({
           file: file.name,
           status: result.statusCode,
-          signals: signals.slice(0, 3),
+          signals: sampleSignals(signals),
         });
       }
     } else {
@@ -134,7 +179,7 @@ async function main() {
         file: file.name,
         status: result.statusCode,
         categories: categoryList,
-        signals: signals.slice(0, 3),
+        signals: sampleSignals(signals),
       });
     }
   }
@@ -148,6 +193,8 @@ async function main() {
     ),
     samples,
     uncategorized,
+    unknownCount,
+    unknownSamples,
   };
 
   if (json) {
@@ -171,9 +218,20 @@ async function main() {
       console.log(`  ${sample.file} status=${sample.status} signal=${sample.signals[0] ?? ''}`);
     });
   }
+  if (output.unknownSamples.length > 0) {
+    console.log(`Unknown fallback count: ${output.unknownCount}`);
+    console.log('Unknown fallback samples:');
+    output.unknownSamples.forEach((sample) => {
+      console.log(`  ${sample.file} status=${sample.status} signal=${sample.signals[0] ?? ''}`);
+    });
+  }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
-});
+const isDirectRun =
+  process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+if (isDirectRun) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

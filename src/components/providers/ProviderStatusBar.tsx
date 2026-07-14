@@ -1,4 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useId,
+  type CSSProperties,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { StatusBarData, StatusBlockDetail } from '@/utils/recentRequests';
 import defaultStyles from '@/pages/AiProvidersPage.module.scss';
@@ -38,22 +46,78 @@ function formatSuccessRate(rate: number): string {
 }
 
 type StylesModule = Record<string, string>;
+type TooltipPosition = {
+  left: number;
+  top: number;
+  width: number;
+  arrowLeft: number;
+  placement: 'top' | 'bottom';
+};
+
+const clampNumber = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+export interface StatusBarFailureDetail {
+  label: string;
+  message: string;
+  httpStatus?: number | null;
+  observedAt?: string;
+  sourceLabel?: string;
+}
+
+function getDefaultFocusableBlockIndex(details: StatusBlockDetail[]): number {
+  for (let index = details.length - 1; index >= 0; index -= 1) {
+    if (details[index].success + details[index].failure > 0) return index;
+  }
+  return Math.max(0, details.length - 1);
+}
 
 interface ProviderStatusBarProps {
   statusData: StatusBarData;
   styles?: StylesModule;
   highlightedBlockIndex?: number | null;
+  failureDetail?: StatusBarFailureDetail | null;
+  failureDetailBlockIndex?: number | null;
+  failureDetailUnavailableLabel?: string;
 }
 
 export function ProviderStatusBar({
   statusData,
   styles: stylesProp,
   highlightedBlockIndex = null,
+  failureDetail = null,
+  failureDetailBlockIndex = null,
+  failureDetailUnavailableLabel,
 }: ProviderStatusBarProps) {
   const { t } = useTranslation();
   const s = (stylesProp || defaultStyles) as StylesModule;
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
+  const [preferredFocusableBlockIndex, setFocusableBlockIndex] = useState(() =>
+    getDefaultFocusableBlockIndex(statusData.blockDetails)
+  );
   const blocksRef = useRef<HTMLDivElement>(null);
+  const blockRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tooltipRef = useRef<HTMLSpanElement | null>(null);
+  const tooltipIdPrefix = useId();
+  const focusableBlockIndex =
+    preferredFocusableBlockIndex >= 0 &&
+    preferredFocusableBlockIndex < statusData.blockDetails.length
+      ? preferredFocusableBlockIndex
+      : getDefaultFocusableBlockIndex(statusData.blockDetails);
+
+  const showTooltip = useCallback((idx: number) => {
+    setTooltipPosition(null);
+    setActiveTooltip(idx);
+  }, []);
+  const hideTooltip = useCallback(() => {
+    setActiveTooltip(null);
+    setTooltipPosition(null);
+  }, []);
+
+  const activeTooltipHasFailure =
+    activeTooltip !== null && (statusData.blockDetails[activeTooltip]?.failure ?? 0) > 0;
+  const tooltipPreferredWidth = activeTooltipHasFailure ? 280 : 180;
 
   const hasData = statusData.totalSuccess + statusData.totalFailure > 0;
   const rateClass = !hasData
@@ -69,45 +133,107 @@ export function ProviderStatusBar({
     if (activeTooltip === null) return;
     const handler = (e: PointerEvent) => {
       if (blocksRef.current && !blocksRef.current.contains(e.target as Node)) {
-        setActiveTooltip(null);
+        hideTooltip();
       }
     };
     document.addEventListener('pointerdown', handler);
     return () => document.removeEventListener('pointerdown', handler);
-  }, [activeTooltip]);
+  }, [activeTooltip, hideTooltip]);
 
-  const handlePointerEnter = useCallback((e: React.PointerEvent, idx: number) => {
-    if (e.pointerType === 'mouse') {
-      setActiveTooltip(idx);
-    }
-  }, []);
+  const handlePointerEnter = useCallback(
+    (e: React.PointerEvent, idx: number) => {
+      if (e.pointerType === 'mouse') {
+        showTooltip(idx);
+      }
+    },
+    [showTooltip]
+  );
 
-  const handlePointerLeave = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse') {
-      setActiveTooltip(null);
-    }
-  }, []);
+  const handlePointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'mouse') {
+        hideTooltip();
+      }
+    },
+    [hideTooltip]
+  );
 
-  const handlePointerDown = useCallback((e: React.PointerEvent, idx: number) => {
-    if (e.pointerType === 'touch') {
-      e.preventDefault();
-      setActiveTooltip((prev) => (prev === idx ? null : idx));
-    }
-  }, []);
+  const updateTooltipPosition = useCallback(() => {
+    if (activeTooltip === null || typeof window === 'undefined') return;
+    const anchor = blockRefs.current[activeTooltip];
+    if (!anchor) return;
 
-  const getTooltipPositionClass = (idx: number, total: number): string => {
-    if (idx <= 2) return s.statusTooltipLeft;
-    if (idx >= total - 3) return s.statusTooltipRight;
-    return '';
-  };
+    const rect = anchor.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const width = Math.min(tooltipPreferredWidth, Math.max(140, viewportWidth - 24));
+    const measuredHeight = tooltipRef.current?.offsetHeight ?? 142;
+    const centerX = rect.left + rect.width / 2;
+    const left = clampNumber(centerX - width / 2, 12, Math.max(12, viewportWidth - width - 12));
+    const canPlaceAbove = rect.top >= measuredHeight + 14;
+    const canPlaceBelow = rect.bottom + measuredHeight + 14 <= viewportHeight;
+    const placement = canPlaceAbove || !canPlaceBelow ? 'top' : 'bottom';
+    const top =
+      placement === 'top'
+        ? clampNumber(rect.top - measuredHeight - 10, 12, viewportHeight - measuredHeight - 12)
+        : clampNumber(rect.bottom + 10, 12, viewportHeight - measuredHeight - 12);
 
-  const renderTooltip = (detail: StatusBlockDetail, idx: number) => {
+    setTooltipPosition({
+      left,
+      top,
+      width,
+      arrowLeft: clampNumber(centerX - left, 18, width - 18),
+      placement,
+    });
+  }, [activeTooltip, tooltipPreferredWidth]);
+
+  useEffect(() => {
+    if (activeTooltip === null) return;
+
+    updateTooltipPosition();
+    const frameId = window.requestAnimationFrame(updateTooltipPosition);
+    window.addEventListener('resize', updateTooltipPosition);
+    window.addEventListener('scroll', updateTooltipPosition, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', updateTooltipPosition);
+      window.removeEventListener('scroll', updateTooltipPosition, true);
+    };
+  }, [activeTooltip, updateTooltipPosition, failureDetail?.message, failureDetailBlockIndex]);
+
+  const renderTooltip = (detail: StatusBlockDetail, idx: number, tooltipId: string) => {
     const total = detail.success + detail.failure;
-    const posClass = getTooltipPositionClass(idx, statusData.blockDetails.length);
-    const timeRange = `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
+    const linkedFailureDetail = failureDetailBlockIndex === idx ? failureDetail : null;
+    const timeRange = detail.timeLabel
+      ? detail.timeLabel.replace(/\s*[-–—]\s*/, ' – ')
+      : `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
+    const unavailableLabel =
+      failureDetailUnavailableLabel ||
+      t('status_bar.failure_reason_unavailable', {
+        defaultValue: '该时段有失败，但当前 CPA 只记录了次数，没有保存具体原因',
+      });
+    const tooltipStyle = {
+      left: tooltipPosition ? `${tooltipPosition.left}px` : '0',
+      top: tooltipPosition ? `${tooltipPosition.top}px` : '0',
+      width: tooltipPosition
+        ? `${tooltipPosition.width}px`
+        : `min(${tooltipPreferredWidth}px, calc(100vw - 24px))`,
+      visibility: tooltipPosition ? 'visible' : 'hidden',
+      '--status-tooltip-arrow-left': tooltipPosition
+        ? `${tooltipPosition.arrowLeft}px`
+        : '50%',
+    } as CSSProperties;
 
     return (
-      <div className={`${s.statusTooltip} ${posClass}`}>
+      <span
+        ref={tooltipRef}
+        id={tooltipId}
+        role="tooltip"
+        className={`${s.statusTooltip} ${
+          tooltipPosition?.placement === 'bottom' ? s.statusTooltipBelow : ''
+        }`}
+        style={tooltipStyle}
+      >
         <span className={s.tooltipTime}>{timeRange}</span>
         {total > 0 ? (
           <span className={s.tooltipStats}>
@@ -118,7 +244,26 @@ export function ProviderStatusBar({
         ) : (
           <span className={s.tooltipStats}>{t('status_bar.no_requests')}</span>
         )}
-      </div>
+        {detail.failure > 0 &&
+          (linkedFailureDetail ? (
+            <span className={s.tooltipFailureDetail}>
+              <span className={s.tooltipFailureHeading}>
+                {linkedFailureDetail.label}
+                {linkedFailureDetail.httpStatus ? ` · HTTP ${linkedFailureDetail.httpStatus}` : ''}
+              </span>
+              <span className={s.tooltipFailureMessage}>{linkedFailureDetail.message}</span>
+              {(linkedFailureDetail.observedAt || linkedFailureDetail.sourceLabel) && (
+                <span className={s.tooltipFailureSource}>
+                  {[linkedFailureDetail.observedAt, linkedFailureDetail.sourceLabel]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className={s.tooltipFailureUnknown}>{unavailableLabel}</span>
+          ))}
+      </span>
     );
   };
 
@@ -130,23 +275,87 @@ export function ProviderStatusBar({
           const blockStyle = isIdle ? undefined : { backgroundColor: rateToColor(detail.rate) };
           const isActive = activeTooltip === idx;
           const isHighlighted = highlightedBlockIndex === idx;
+          const total = detail.success + detail.failure;
+          const timeRange = detail.timeLabel
+            ? detail.timeLabel.replace(/\s*[-–—]\s*/, ' – ')
+            : `${formatTime(detail.startTime)} – ${formatTime(detail.endTime)}`;
+          const tooltipId = `${tooltipIdPrefix}-status-${idx}`;
+          const linkedFailureDetail = failureDetailBlockIndex === idx ? failureDetail : null;
+          const reasonLabel =
+            detail.failure <= 0
+              ? ''
+              : linkedFailureDetail
+                ? `${linkedFailureDetail.label}: ${linkedFailureDetail.message}`
+                : failureDetailUnavailableLabel ||
+                  t('status_bar.failure_reason_unavailable', {
+                    defaultValue: '该时段有失败，但当前 CPA 只记录了次数，没有保存具体原因',
+                  });
+          const ariaLabel =
+            total > 0
+              ? `${timeRange}, ${t('status_bar.success_short')} ${detail.success}, ${t('status_bar.failure_short')} ${detail.failure}${reasonLabel ? `, ${reasonLabel}` : ''}`
+              : `${timeRange}, ${t('status_bar.no_requests')}`;
+          const moveKeyboardFocus = (nextIndex: number) => {
+            setFocusableBlockIndex(nextIndex);
+            showTooltip(nextIndex);
+            window.requestAnimationFrame(() => blockRefs.current[nextIndex]?.focus());
+          };
 
           return (
-            <div
+            <button
+              type="button"
               key={idx}
+              ref={(node) => {
+                blockRefs.current[idx] = node;
+              }}
               className={`${s.statusBlockWrapper} ${
                 isActive || isHighlighted ? s.statusBlockActive : ''
               } ${isHighlighted ? s.statusBlockHighlighted : ''}`}
+              tabIndex={idx === focusableBlockIndex ? 0 : -1}
+              aria-label={ariaLabel}
+              aria-expanded={isActive}
+              aria-describedby={isActive ? tooltipId : undefined}
               onPointerEnter={(e) => handlePointerEnter(e, idx)}
               onPointerLeave={handlePointerLeave}
-              onPointerDown={(e) => handlePointerDown(e, idx)}
+              onFocus={() => {
+                setFocusableBlockIndex(idx);
+                showTooltip(idx);
+              }}
+              onBlur={hideTooltip}
+              onClick={() => {
+                setFocusableBlockIndex(idx);
+                showTooltip(idx);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                  event.preventDefault();
+                  const direction = event.key === 'ArrowLeft' ? -1 : 1;
+                  const count = statusData.blockDetails.length;
+                  if (count > 0) {
+                    moveKeyboardFocus((idx + direction + count) % count);
+                  }
+                  return;
+                }
+                if (event.key === 'Home' || event.key === 'End') {
+                  event.preventDefault();
+                  const lastIndex = Math.max(0, statusData.blockDetails.length - 1);
+                  moveKeyboardFocus(event.key === 'Home' ? 0 : lastIndex);
+                  return;
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  hideTooltip();
+                  event.currentTarget.blur();
+                }
+              }}
             >
               <div
                 className={`${s.statusBlock} ${isIdle ? s.statusBlockIdle : ''}`}
                 style={blockStyle}
               />
-              {isActive && renderTooltip(detail, idx)}
-            </div>
+              {isActive &&
+                typeof document !== 'undefined' &&
+                createPortal(renderTooltip(detail, idx, tooltipId), document.body)}
+            </button>
           );
         })}
       </div>

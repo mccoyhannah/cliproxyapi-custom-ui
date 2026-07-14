@@ -6,6 +6,7 @@ export interface StatusBlockDetail {
   rate: number;
   startTime: number;
   endTime: number;
+  timeLabel?: string;
 }
 
 export interface StatusBarData {
@@ -43,6 +44,57 @@ export type ApiKeyUsageResponse = Record<
 
 const RECENT_REQUEST_BLOCK_COUNT = 20;
 const RECENT_REQUEST_BLOCK_DURATION_MS = 10 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const parseRecentRequestTimeRange = (
+  value: string | undefined,
+  nowMs: number
+): { startTime: number; endTime: number } | null => {
+  const match = value?.trim().match(/^(\d{1,2}):(\d{2})\s*[-–—]\s*(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const [, startHourText, startMinuteText, endHourText, endMinuteText] = match;
+  const startHour = Number(startHourText);
+  const startMinute = Number(startMinuteText);
+  const endHour = Number(endHourText);
+  const endMinute = Number(endMinuteText);
+  if (
+    startHour > 23 ||
+    endHour > 23 ||
+    startMinute > 59 ||
+    endMinute > 59
+  ) {
+    return null;
+  }
+
+  const reference = new Date(nowMs);
+  let startTime = new Date(
+    reference.getFullYear(),
+    reference.getMonth(),
+    reference.getDate(),
+    startHour,
+    startMinute,
+    0,
+    0
+  ).getTime();
+  let endTime = new Date(
+    reference.getFullYear(),
+    reference.getMonth(),
+    reference.getDate(),
+    endHour,
+    endMinute,
+    0,
+    0
+  ).getTime();
+
+  if (endTime <= startTime) endTime += DAY_MS;
+  if (startTime > nowMs + RECENT_REQUEST_BLOCK_DURATION_MS) {
+    startTime -= DAY_MS;
+    endTime -= DAY_MS;
+  }
+
+  return { startTime, endTime };
+};
 
 const toFiniteNumber = (value: unknown): number => {
   const numberValue = typeof value === 'number' ? value : Number(value);
@@ -165,16 +217,21 @@ export function sumRecentRequests(
   );
 }
 
-export function statusBarDataFromRecentRequests(buckets: RecentRequestBucket[]): StatusBarData {
+export function statusBarDataFromRecentRequests(
+  buckets: RecentRequestBucket[],
+  nowMs = Date.now()
+): StatusBarData {
   const normalizedBuckets = normalizeRecentRequestBuckets(buckets);
   const emptyBucketCount = Math.max(0, RECENT_REQUEST_BLOCK_COUNT - normalizedBuckets.length);
-  const blockStats = [
+  const blockStats: RecentRequestBucket[] = [
     ...Array.from({ length: emptyBucketCount }, () => ({ success: 0, failed: 0 })),
     ...normalizedBuckets.slice(-RECENT_REQUEST_BLOCK_COUNT),
   ];
 
-  const now = Date.now();
-  const windowStart = now - RECENT_REQUEST_BLOCK_COUNT * RECENT_REQUEST_BLOCK_DURATION_MS;
+  const currentBucketStart =
+    Math.floor(nowMs / RECENT_REQUEST_BLOCK_DURATION_MS) * RECENT_REQUEST_BLOCK_DURATION_MS;
+  const windowStart =
+    currentBucketStart - (RECENT_REQUEST_BLOCK_COUNT - 1) * RECENT_REQUEST_BLOCK_DURATION_MS;
 
   const blocks: StatusBlockState[] = [];
   const blockDetails: StatusBarData['blockDetails'] = [];
@@ -199,13 +256,16 @@ export function statusBarDataFromRecentRequests(buckets: RecentRequestBucket[]):
       blocks.push('mixed');
     }
 
-    const blockStartTime = windowStart + index * RECENT_REQUEST_BLOCK_DURATION_MS;
+    const parsedTimeRange = parseRecentRequestTimeRange(bucket.time, nowMs);
+    const blockStartTime =
+      parsedTimeRange?.startTime ?? windowStart + index * RECENT_REQUEST_BLOCK_DURATION_MS;
     blockDetails.push({
       success,
       failure,
       rate: total > 0 ? success / total : -1,
       startTime: blockStartTime,
-      endTime: blockStartTime + RECENT_REQUEST_BLOCK_DURATION_MS,
+      endTime: parsedTimeRange?.endTime ?? blockStartTime + RECENT_REQUEST_BLOCK_DURATION_MS,
+      ...(bucket.time ? { timeLabel: bucket.time } : {}),
     });
   });
 

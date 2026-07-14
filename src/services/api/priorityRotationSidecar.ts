@@ -1,3 +1,5 @@
+import type { CodexQuotaState } from '@/types';
+
 export type PriorityRotationSidecarSettings = {
   enabled: boolean;
   apiBase: string;
@@ -31,6 +33,8 @@ export type PriorityRotationSidecarCandidate = {
   isManualLocked?: boolean;
   belowThreshold: boolean | null;
   decision: string;
+  quotaErrorKind?: CodexQuotaState['errorKind'] | null;
+  quotaRetryable?: boolean;
 };
 
 export type PriorityRotationSidecarAnalysis = {

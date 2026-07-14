@@ -36,23 +36,71 @@ const MANAGED_CODEX_PLANS = new Set(['team', 'plus', 'self_serve_business_usage_
 const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
 const MAX_ROTATION_PASSES = 8;
 const RETRYABLE_QUOTA_ERROR_KINDS = new Set([
+  'account_model_restricted',
+  'upstream_access_blocked',
   'local_proxy_unavailable',
+  'dns_resolution_failed',
+  'tls_certificate_error',
+  'oauth_flow_failure',
   'connection_transient',
   'request_interrupted',
   'input_too_large',
   'content_policy',
   'rate_limited',
+  'invalid_request',
   'upstream_service_error',
+  'unknown_upstream_error',
 ]);
+const HEALTHY_STATUS_PATTERN = /^(?:ok|healthy|ready|success|available)$/i;
+const UPSTREAM_ACCESS_BLOCKED_PATTERN =
+  /\b(?:cloudflare(?:\s+security)?\s+(?:challenge|verification|captcha|blocked)|cf[_\s-]?mitigated\s*:\s*challenge|cf_chl|__cf_chl_tk|challenge-platform|captcha|turnstile|challenge[_\s-]?(?:required|page)|attention\s+required|checking\s+your\s+browser|error\s*1020|unsupported[_\s-]?(?:country|region)|region[_\s-]?not[_\s-]?supported|ip\s+(?:blocked|banned))\b/i;
+const GENERIC_UPSTREAM_ACCESS_BLOCKED_PATTERN =
+  /\b(?:forbidden|access[_\s-]?denied)\b/i;
+const CONTENT_POLICY_PATTERN =
+  /\b(?:content[_\s-]?conceal(?:ed)?|content[_\s-]?(?:filter|policy)|safety[_\s-]?(?:policy|filter)|(?:blocked|rejected|concealed)\s+(?:by|under)\s+(?:the\s+)?(?:upstream\s+)?safety)\b/i;
 const UPSTREAM_STATUS_PATTERNS = [
   {
     kind: 'input_too_large',
     pattern:
-      /\b(?:context_too_large|context\s+window|input\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i,
+      /\b(?:context_too_large|context\s+window|input\s+too\s+large|request\s+entity\s+too\s+large|payload\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i,
+  },
+  {
+    kind: 'account_model_restricted',
+    pattern:
+      /(?:\bunsupported[_\s-]?model\b|\bmodel[_\s-]?not[_\s-]?(?:found|supported|allowed)\b|\bmodel[^\n]{0,120}\b(?:not\s+supported|unsupported|not\s+allowed)\b|\bmodel[^\n]{0,120}\bnot\s+available\s+(?:for|to)\s+(?:this|your|the)?\s*(?:account|plan)\b|\bdoes\s+not\s+have\s+access\s+to(?:\s+the)?\s+model\b|\bnot\s+supported\s+when\s+using\s+codex\s+with\s+a\s+chatgpt\s+account\b|\baccount(?:\s+type|\s+plan)?[^\n]{0,96}\b(?:not\s+supported|not\s+eligible)\b)/i,
+  },
+  {
+    kind: 'upstream_access_blocked',
+    pattern: UPSTREAM_ACCESS_BLOCKED_PATTERN,
+  },
+  {
+    kind: 'local_proxy_unavailable',
+    pattern:
+      /\b(?:local_proxy_unavailable|proxy\s+authentication\s+required|proxyconnect|delayed\s+connect\s+error|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect|actively\s+refused)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect|actively\s+refused))\b/i,
+  },
+  {
+    kind: 'dns_resolution_failed',
+    pattern:
+      /\b(?:ENOTFOUND|EAI_AGAIN|getaddrinfo|no\s+such\s+host|temporary\s+failure\s+in\s+name\s+resolution|dns(?:\s+lookup|\s+resolution)?\s+(?:failed|error))\b/i,
+  },
+  {
+    kind: 'tls_certificate_error',
+    pattern:
+      /\b(?:x509:|ERR_(?:TLS|SSL|CERT)[A-Z0-9_]*|CERT_[A-Z0-9_]+|TLS(?::\s*|\s+)(?:handshake\s+)?(?:failed|failure|error|timeout)|certificate\s+(?:verification\s+failed|signed\s+by\s+unknown\s+authority|has\s+expired)|self[- ]signed\s+certificate|unable\s+to\s+verify\s+the\s+first\s+certificate)\b/i,
+  },
+  {
+    kind: 'oauth_flow_failure',
+    pattern:
+      /\b(?:authentication\s+timed\s+out|oauth[_\s-]?(?:flow|callback|login)[^\n]{0,64}(?:authentication\s+)?(?:failed|failure|timeout|timed\s+out)|authorization[_\s-]?code[^\n]{0,64}(?:exchange|failed|invalid)|code[_\s-]?exchange[_\s-]?failed)\b/i,
   },
   {
     kind: 'content_policy',
-    pattern: /\b(?:content[_\s-]?conceal(?:ed)?|content_filter|content_policy|safety)\b/i,
+    pattern: CONTENT_POLICY_PATTERN,
+  },
+  {
+    kind: 'rate_limited',
+    pattern:
+      /\b(?:rate[_\s-]?limit(?:ed)?|too[_\s-]?many[_\s-]?requests|insufficient[_\s-]?quota|quota[_\s-]?exceeded)\b/i,
   },
   {
     kind: 'request_interrupted',
@@ -60,29 +108,28 @@ const UPSTREAM_STATUS_PATTERNS = [
       /\b(?:request_interrupted|context\s+cancell?ed|context\s+deadline\s+exceeded|stream\s+error:?[^\n]*(?:internal_error|received\s+from\s+peer)|internal_error;\s*received\s+from\s+peer)\b/i,
   },
   {
-    kind: 'local_proxy_unavailable',
-    pattern:
-      /\b(?:local_proxy_unavailable|proxyconnect|connectex|delayed\s+connect\s+error|connection\s+refused|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i,
-  },
-  {
     kind: 'connection_transient',
     pattern:
-      /\b(?:connection_transient|network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|wsarecv[^\n]*(?:forcibly\s+closed|reset)|forcibly\s+closed\s+by\s+the\s+remote\s+host)\b/i,
+      /\b(?:connection_transient|network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|connectex|connection\s+(?:was\s+)?(?:refused|reset|aborted)|connection\s+reset\s+by\s+peer|target\s+machine\s+actively\s+refused|wsa(?:recv|send)[^\n]*(?:forcibly\s+closed|reset|aborted)|forcibly\s+closed\s+by\s+the\s+remote\s+host|aborted\s+by\s+(?:the\s+)?software|connection\s+timed\s+out)\b/i,
   },
   {
-    kind: 'rate_limited',
+    kind: 'invalid_request',
     pattern:
-      /\b(?:429|rate[_\s-]?limit(?:ed)?|too[_\s-]?many[_\s-]?requests|insufficient[_\s-]?quota|quota[_\s-]?exceeded)\b/i,
-  },
-  {
-    kind: 'credential_invalid',
-    pattern:
-      /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i,
+      /\b(?:invalid[_\s-]?request(?:[_\s-]?error)?|bad\s+request|not\s+found|method\s+not\s+allowed|unsupported\s+media\s+type|unprocessable\s+entity|unsupported[_\s-]?(?:endpoint|operation|method))\b/i,
   },
   {
     kind: 'upstream_service_error',
     pattern:
-      /\b(?:upstream_service_error|status[:\s]+5\d\d|http[:\s]+5\d\d|server\s+error|service\s+unavailable|bad\s+gateway|gateway\s+timeout|\b5\d\d\b)\b/i,
+      /\b(?:upstream_service_error|status[:\s]+5\d\d|http[:\s]+5\d\d|code[:\s]+5\d\d|server\s+error|service\s+unavailable|temporarily\s+unavailable|bad\s+gateway|gateway\s+timeout)\b/i,
+  },
+  {
+    kind: 'credential_invalid',
+    pattern:
+      /\b(?:unauthorized|unauthenticated|authentication_error|invalid[_\s-]?(?:grant|token|api[_\s-]?key)|incorrect[_\s-]?api[_\s-]?key|refresh[_\s-]?token[_\s-]?(?:reused|invalidated|invalid|expired)|invalid[_\s-]?refresh[_\s-]?token|token[_\s-]?expired|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired|revoked)|credentials?\s+(?:are\s+)?(?:invalid|expired|revoked|rejected)|(?:rejected|refused)\s+(?:this\s+)?credentials?)\b/i,
+  },
+  {
+    kind: 'upstream_access_blocked',
+    pattern: GENERIC_UPSTREAM_ACCESS_BLOCKED_PATTERN,
   },
 ];
 
@@ -171,15 +218,44 @@ function clampInteger(value, fallback, min, max) {
 
 export function classifyUpstreamStatusText(text = '', statusCode = undefined) {
   const numericStatus = Number(statusCode);
-  const haystack = String(text ?? '');
+  const haystack = String(text ?? '').trim();
+  const explicitStatusCategory = Number.isFinite(numericStatus)
+    ? classifyUpstreamStatusCode(numericStatus)
+    : null;
+  if (haystack && HEALTHY_STATUS_PATTERN.test(haystack) && explicitStatusCategory === null) {
+    return null;
+  }
   const matched = UPSTREAM_STATUS_PATTERNS.find(({ pattern }) => pattern.test(haystack));
   if (matched) return matched.kind;
 
-  if (numericStatus === 401 || numericStatus === 403) return 'credential_invalid';
-  if (numericStatus === 429) return 'rate_limited';
-  if (Number.isFinite(numericStatus) && numericStatus >= 500 && numericStatus <= 599) {
-    return 'upstream_service_error';
+  const standaloneStatus = haystack.match(
+    /^(?:(?:http(?:\/\d(?:\.\d)?)?|status(?:\s+code)?|code)\s*[:=]?\s*)?([45]\d{2})$/i
+  )?.[1];
+  const inlineStatus = haystack.match(
+    /\b(?:http(?:\/\d(?:\.\d)?)?|status(?:\s+code)?|code)\s*[:=]?\s*([45]\d{2})\b/i
+  )?.[1];
+  return (
+    explicitStatusCategory ??
+    classifyUpstreamStatusCode(standaloneStatus ?? inlineStatus) ??
+    (haystack ? 'unknown_upstream_error' : null)
+  );
+}
+
+function classifyUpstreamStatusCode(statusCode) {
+  const numericStatus = Number(statusCode);
+  if (!Number.isFinite(numericStatus)) return null;
+  if (numericStatus === 401) return 'credential_invalid';
+  if (numericStatus === 402 || numericStatus === 429) return 'rate_limited';
+  if (numericStatus === 403 || numericStatus === 423 || numericStatus === 451) {
+    return 'upstream_access_blocked';
   }
+  if (numericStatus === 407) return 'local_proxy_unavailable';
+  if (numericStatus === 408) return 'request_interrupted';
+  if (numericStatus === 413) return 'input_too_large';
+  if ([400, 404, 405, 409, 415, 422].includes(numericStatus)) return 'invalid_request';
+  if (numericStatus >= 400 && numericStatus <= 499) return 'invalid_request';
+  if (numericStatus >= 500 && numericStatus <= 599) return 'upstream_service_error';
+  if (numericStatus >= 400) return 'unknown_upstream_error';
   return null;
 }
 
@@ -327,19 +403,69 @@ function sanitizeSettingsForResponse(value = settings) {
   return normalizeSettings(value);
 }
 
-function sanitizeStateForResponse(value = state) {
+export function redactDiagnosticText(value) {
+  return String(value ?? '')
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|cookie|credential|password|secret|session)["']?\s*[:=]\s*["']?)(?:Bearer\s+)?[^"'\s,}]+/gi,
+      '$1[redacted]'
+    )
+    .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '[redacted authorization]')
+    .replace(/([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted]')
+    .replace(/\b(?:rt|at|sess|access|refresh)[-_][A-Za-z0-9._~+/=-]{8,}\b/gi, '[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+}
+
+const SENSITIVE_DIAGNOSTIC_KEY_PATTERN =
+  /^(?:api[_-]?key|key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|cookie|credential|managementKey|password|secret|session)$/i;
+
+export function sanitizeDiagnosticValue(value, depth = 0) {
+  if (typeof value === 'string') return redactDiagnosticText(value);
+  if (value === null || value === undefined || typeof value !== 'object') return value;
+  if (depth >= 5) return '[redacted nested value]';
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeDiagnosticValue(item, depth + 1));
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      SENSITIVE_DIAGNOSTIC_KEY_PATTERN.test(key)
+        ? '[redacted]'
+        : sanitizeDiagnosticValue(item, depth + 1),
+    ])
+  );
+}
+
+export function sanitizeStatePatch(patch = {}) {
+  if (!patch || typeof patch !== 'object') return {};
+  return {
+    ...patch,
+    ...('lastError' in patch
+      ? {
+          lastError: patch.lastError ? redactDiagnosticText(patch.lastError) : null,
+        }
+      : {}),
+  };
+}
+
+export function sanitizeStateForResponse(value = state) {
   return {
     ...value,
     running: Boolean(value.running),
     enabled: settings.enabled,
     hasSecret: Boolean(value.hasSecret),
+    lastError: value.lastError ? redactDiagnosticText(value.lastError) : null,
   };
 }
 
 async function updateState(patch) {
+  const safePatch = sanitizeStatePatch(patch);
   state = {
     ...state,
-    ...patch,
+    ...safePatch,
     enabled: settings.enabled,
     hasSecret: await hasSecretFile(),
     updatedAt: new Date().toISOString(),
@@ -439,7 +565,7 @@ async function shutdownForIdle() {
 
 async function loadRuntimeState() {
   settings = normalizeSettings(await readJson(settingsPath, DEFAULT_SETTINGS));
-  const loadedState = await readJson(statePath, {});
+  const loadedState = sanitizeStatePatch(await readJson(statePath, {}));
   state = {
     ...state,
     ...loadedState,
@@ -456,16 +582,13 @@ async function loadRuntimeState() {
 }
 
 async function logLine(level, message, details = {}) {
-  const safeDetails = { ...details };
-  delete safeDetails.managementKey;
-  delete safeDetails.secret;
-  delete safeDetails.authorization;
+  const safeDetails = sanitizeDiagnosticValue(details);
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const logPath = path.join(sidecarLogsDir, `sidecar-${today}.log`);
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     level,
-    message,
+    message: redactDiagnosticText(message),
     ...safeDetails,
   });
   await writeFile(logPath, `${line}\n`, { encoding: 'utf8', flag: 'a' }).catch(() => {});
@@ -1152,7 +1275,11 @@ export function analyzeCodexPriorityRotation(
 
   const getActiveDemotionCount = () =>
     activeCandidates.filter((candidate) => demotionMap.has(candidate.file.name)).length;
-  let projectedActiveCount = activeCandidates.length - getActiveDemotionCount();
+  const protectedActiveCount = activeCandidates.filter(
+    (candidate) => candidate.quotaRetryable === true
+  ).length;
+  let projectedActiveCount =
+    activeCandidates.length - protectedActiveCount - getActiveDemotionCount();
   if (projectedActiveCount > slotLimit) {
     activeCandidates
       .filter((candidate) => !demotionMap.has(candidate.file.name) && candidate.quotaRetryable !== true)
@@ -1438,7 +1565,9 @@ async function buildCodexQuotaMap(files, key) {
     try {
       quota[file.name] = await fetchCodexQuotaState(file, key);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactDiagnosticText(
+        error instanceof Error ? error.message : String(error)
+      ) || 'Priority rotation failed';
       quota[file.name] = buildQuotaErrorState({
         planType: planTypeFromFile,
         error: message,
@@ -1654,15 +1783,17 @@ export async function runPriorityRotation(options = {}) {
       });
       return sanitizeStateForResponse();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactDiagnosticText(
+        error instanceof Error ? error.message : String(error)
+      ) || 'Priority rotation failed';
       await updateState({
         running: false,
         lastStatus: 'error',
-        lastError: message.slice(0, 500),
+        lastError: message,
         lastCompletedAt: new Date().toISOString(),
         nextRunAt: nextRunIso(),
       });
-      await logLine('error', 'priority rotation failed', { message: message.slice(0, 500) });
+      await logLine('error', 'priority rotation failed', { message });
       return sanitizeStateForResponse();
     } finally {
       runInFlight = null;
@@ -1697,9 +1828,21 @@ function sendJson(req, res, statusCode, payload) {
 }
 
 function sendError(req, res, error) {
-  const statusCode = error instanceof HttpError ? error.statusCode : error.statusCode || 500;
+  const untrustedStatusCode = Number(error?.statusCode ?? error?.status);
+  const hasExplicitStatusCode =
+    Number.isInteger(untrustedStatusCode) && untrustedStatusCode >= 400 && untrustedStatusCode <= 599;
+  const statusCode = error instanceof HttpError
+    ? error.statusCode
+    : hasExplicitStatusCode
+      ? untrustedStatusCode
+      : 500;
   sendJson(req, res, statusCode, {
-    error: error instanceof Error ? error.message : String(error),
+    error:
+      error instanceof HttpError
+        ? error.message
+        : hasExplicitStatusCode
+          ? `HTTP ${statusCode}`
+          : 'Request failed',
   });
 }
 

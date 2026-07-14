@@ -10,6 +10,13 @@ import iconQwen from '@/assets/icons/qwen.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem } from '@/types';
 import { parseTimestamp } from '@/utils/timestamp';
+import {
+  classifyAuthFileStatusCategory,
+  isAuthFileStatusSignalOnly,
+  type AuthFileStatusCategory,
+} from '@/features/authFiles/statusClassification';
+
+export type { AuthFileStatusCategory } from '@/features/authFiles/statusClassification';
 
 export type ThemeColors = { bg: string; text: string; border?: string };
 export type TypeColorSet = { light: ThemeColors; dark?: ThemeColors };
@@ -123,8 +130,13 @@ export const resolveQuotaErrorMessage = (
   status: number | undefined,
   fallback: string
 ): string => {
-  if (status === 404) return t('common.quota_update_required');
-  if (status === 403) return t('common.quota_check_credential');
+  const category = classifyAuthFileStatusCategory(fallback, status);
+  if (status === 404 && category === 'invalid_request') {
+    return t('common.quota_update_required');
+  }
+  if (status === 403 && category === 'credential_invalid') {
+    return t('common.quota_check_credential');
+  }
   return fallback;
 };
 
@@ -136,36 +148,9 @@ export type AuthFileCredentialProblem = {
   signals: string[];
 };
 
-export type AuthFileStatusCategory =
-  | 'credential_invalid'
-  | 'local_proxy_unavailable'
-  | 'connection_transient'
-  | 'request_interrupted'
-  | 'input_too_large'
-  | 'content_policy'
-  | 'rate_limited'
-  | 'upstream_service_error';
-
 export type AuthFileStatusProblem = AuthFileCredentialProblem & {
   category: AuthFileStatusCategory;
 };
-
-const AUTH_FILE_CREDENTIAL_STATUS_PATTERN =
-  /\b(?:401|403|invalid_grant|invalid_token|invalid(?:ated)?\s+(?:oauth\s+)?token|oauth\s+token\s+invalidated|token\s+(?:is\s+)?(?:invalid|expired))\b/i;
-const AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN =
-  /\b(?:local_proxy_unavailable|proxyconnect|connectex|delayed\s+connect\s+error|connection\s+refused|target\s+machine\s+actively\s+refused|127\.0\.0\.1:\d+[^\n]*(?:refused|connectex|proxyconnect)|localhost:\d+[^\n]*(?:refused|connectex|proxyconnect))\b/i;
-const AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN =
-  /\b(?:connection_transient|network_transient|unexpected\s+EOF|EOF|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|wsarecv[^\n]*(?:forcibly\s+closed|reset)|forcibly\s+closed\s+by\s+the\s+remote\s+host)\b/i;
-const AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN =
-  /\b(?:request_interrupted|context\s+cancell?ed|context\s+deadline\s+exceeded|stream\s+error:?[^\n]*(?:internal_error|received\s+from\s+peer)|internal_error;\s*received\s+from\s+peer)\b/i;
-const AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN =
-  /\b(?:context_too_large|context\s+window|input\s+too\s+large|exceeds?\s+(?:the\s+)?context)\b/i;
-const AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN =
-  /\b(?:content[_\s-]?conceal(?:ed)?|content_filter|content_policy|safety)\b/i;
-const AUTH_FILE_RATE_LIMITED_STATUS_PATTERN =
-  /\b(?:429|rate[_\s-]?limit(?:ed)?|too[_\s-]?many[_\s-]?requests|insufficient[_\s-]?quota|quota[_\s-]?exceeded)\b/i;
-const AUTH_FILE_UPSTREAM_SERVICE_ERROR_STATUS_PATTERN =
-  /\b(?:upstream_service_error|status[:\s]+5\d\d|http[:\s]+5\d\d|server\s+error|service\s+unavailable|bad\s+gateway|gateway\s+timeout|\b5\d\d\b)\b/i;
 const AUTH_FILE_STATUS_PARSE_DEPTH = 5;
 const AUTH_FILE_STATUS_MESSAGE_KEYS = [
   'detail',
@@ -176,6 +161,8 @@ const AUTH_FILE_STATUS_MESSAGE_KEYS = [
   'type',
   'status',
 ] as const;
+const AUTH_FILE_STATUS_SENSITIVE_KEY_PATTERN =
+  /(?:^|[_-])(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|cookie|credential|password|secret|session)(?:$|[_-])/i;
 
 const getRawAuthFileStatusMessage = (file: AuthFileItem): string => {
   const raw = file['status_message'] ?? file.statusMessage;
@@ -204,7 +191,8 @@ const pushUniqueStatusPart = (parts: string[], value: unknown) => {
 const collectAuthFileStatusParts = (
   value: unknown,
   parts: string[],
-  depth = 0
+  depth = 0,
+  allowPrimitive = true
 ) => {
   if (depth > AUTH_FILE_STATUS_PARSE_DEPTH || value == null) return;
 
@@ -214,34 +202,41 @@ const collectAuthFileStatusParts = (
 
     const parsed = tryParseStatusJson(trimmed);
     if (parsed !== undefined) {
-      collectAuthFileStatusParts(parsed, parts, depth + 1);
+      collectAuthFileStatusParts(parsed, parts, depth + 1, false);
       return;
     }
 
+    if (!allowPrimitive) return;
     pushUniqueStatusPart(parts, trimmed);
     return;
   }
 
   if (typeof value !== 'object') {
+    if (!allowPrimitive) return;
     pushUniqueStatusPart(parts, value);
     return;
   }
 
   if (Array.isArray(value)) {
-    value.forEach((item) => collectAuthFileStatusParts(item, parts, depth + 1));
+    value.forEach((item) =>
+      collectAuthFileStatusParts(item, parts, depth + 1, allowPrimitive)
+    );
     return;
   }
 
   const record = value as Record<string, unknown>;
   AUTH_FILE_STATUS_MESSAGE_KEYS.forEach((key) => {
     if (key in record) {
-      collectAuthFileStatusParts(record[key], parts, depth + 1);
+      collectAuthFileStatusParts(record[key], parts, depth + 1, true);
     }
   });
 
   Object.entries(record).forEach(([key, item]) => {
     if ((AUTH_FILE_STATUS_MESSAGE_KEYS as readonly string[]).includes(key)) return;
-    collectAuthFileStatusParts(item, parts, depth + 1);
+    if (AUTH_FILE_STATUS_SENSITIVE_KEY_PATTERN.test(key)) return;
+    if (item !== null && typeof item === 'object') {
+      collectAuthFileStatusParts(item, parts, depth + 1, false);
+    }
   });
 };
 
@@ -253,56 +248,11 @@ export const getAuthFileStatusMessageParts = (file: AuthFileItem): string[] => {
 };
 
 export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
+  const raw = getRawAuthFileStatusMessage(file);
   const parts = getAuthFileStatusMessageParts(file);
-  return parts[0] ?? getRawAuthFileStatusMessage(file);
+  if (parts[0]) return parts[0];
+  return tryParseStatusJson(raw) === undefined ? raw : '';
 };
-
-const AUTH_FILE_STATUS_PATTERNS: Array<{
-  category: AuthFileStatusCategory;
-  pattern: RegExp;
-  signalOnlyPattern: RegExp;
-}> = [
-  {
-    category: 'input_too_large',
-    pattern: AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_INPUT_TOO_LARGE_STATUS_PATTERN,
-  },
-  {
-    category: 'content_policy',
-    pattern: AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_CONTENT_POLICY_STATUS_PATTERN,
-  },
-  {
-    category: 'request_interrupted',
-    pattern: AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_REQUEST_INTERRUPTED_STATUS_PATTERN,
-  },
-  {
-    category: 'local_proxy_unavailable',
-    pattern: AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_LOCAL_PROXY_UNAVAILABLE_STATUS_PATTERN,
-  },
-  {
-    category: 'connection_transient',
-    pattern: AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_CONNECTION_TRANSIENT_STATUS_PATTERN,
-  },
-  {
-    category: 'rate_limited',
-    pattern: AUTH_FILE_RATE_LIMITED_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_RATE_LIMITED_STATUS_PATTERN,
-  },
-  {
-    category: 'credential_invalid',
-    pattern: AUTH_FILE_CREDENTIAL_STATUS_PATTERN,
-    signalOnlyPattern: /^(401|403|invalid_grant|invalid_token|authentication_error|auth_unavailable)$/i,
-  },
-  {
-    category: 'upstream_service_error',
-    pattern: AUTH_FILE_UPSTREAM_SERVICE_ERROR_STATUS_PATTERN,
-    signalOnlyPattern: AUTH_FILE_UPSTREAM_SERVICE_ERROR_STATUS_PATTERN,
-  },
-];
 
 export const getAuthFileStatusProblemFromText = (
   text: string,
@@ -312,15 +262,24 @@ export const getAuthFileStatusProblemFromText = (
   if (!rawMessage && parts.length === 0) return null;
 
   const haystack = [rawMessage, ...parts].join(' ');
-  const matched = AUTH_FILE_STATUS_PATTERNS.find(({ pattern }) => pattern.test(haystack));
-  if (!matched) return null;
+  const combinedCategory = classifyAuthFileStatusCategory(haystack);
+  const partCategory = parts
+    .map((part) => classifyAuthFileStatusCategory(part))
+    .find((candidate) => candidate && candidate !== 'unknown_upstream_error');
+  const category =
+    combinedCategory && combinedCategory !== 'unknown_upstream_error'
+      ? combinedCategory
+      : partCategory ?? combinedCategory;
+  if (!category) return null;
 
-  const signals = parts.filter((part) => matched.pattern.test(part));
+  const signals = parts.filter(
+    (part) => classifyAuthFileStatusCategory(part) === category
+  );
   const message =
-    parts.find((part) => !matched.signalOnlyPattern.test(part)) ?? signals[0] ?? rawMessage;
+    parts.find((part) => !isAuthFileStatusSignalOnly(category, part)) ?? signals[0] ?? rawMessage;
 
   return {
-    category: matched.category,
+    category,
     message,
     rawMessage,
     signals,
@@ -332,7 +291,9 @@ export const getAuthFileStatusProblem = (file: AuthFileItem): AuthFileStatusProb
   if (!rawMessage) return null;
 
   const parts = getAuthFileStatusMessageParts(file);
-  return getAuthFileStatusProblemFromText(rawMessage, parts);
+  if (parts.length === 0 && tryParseStatusJson(rawMessage) !== undefined) return null;
+  const safeMessage = tryParseStatusJson(rawMessage) === undefined ? rawMessage : parts.join(' ');
+  return getAuthFileStatusProblemFromText(safeMessage, parts);
 };
 
 export const getAuthFileCredentialProblem = (

@@ -8,6 +8,7 @@ import {
   resolveCodexPlanType,
 } from '@/utils/quota';
 import { parsePriorityValue } from './constants';
+import { classifyAuthFileStatusCategory } from './statusClassification';
 
 const STORAGE_KEY = 'authFilesPage.priorityRotation.v1';
 const DEFAULT_THRESHOLD_PERCENT = 50;
@@ -79,6 +80,7 @@ type PriorityRotationCandidate = {
   remainingPercent: number | null;
   managed: boolean;
   quotaErrorKind?: CodexQuotaState['errorKind'] | null;
+  quotaRetryable: boolean;
 };
 
 const clampThresholdPercent = (value: unknown): number => {
@@ -192,6 +194,9 @@ const getDisplayName = (file: AuthFileItem): string => {
 const isManagedPlan = (planType: string | null): boolean =>
   planType !== null && MANAGED_CODEX_PLANS.has(planType);
 
+const isRetryableQuotaErrorKind = (kind: CodexQuotaState['errorKind'] | null): boolean =>
+  kind !== null && kind !== undefined && kind !== 'credential_invalid';
+
 const buildEmptyAnalysis = (
   thresholdPercent: number,
   activeSlotLimit: number,
@@ -229,6 +234,7 @@ export const analyzeCodexPriorityRotation = (
   const fallbackThreshold = Math.max(0, threshold - fallbackDrop);
   const candidates: PriorityRotationCandidate[] = [];
   let unknownCount = 0;
+  let retryableUnknownCount = 0;
 
   files.forEach((file) => {
     if (!isCodexFile(file) || isDisabledAuthFile(file) || isRuntimeOnlyAuthFile(file)) return;
@@ -244,7 +250,10 @@ export const analyzeCodexPriorityRotation = (
     const quota = codexQuota[file.name];
     const planType = normalizePlanType(quota?.planType ?? resolveCodexPlanType(file));
     const remainingPercent = getCodexFiveHourRemainingPercent(quota);
-    const quotaErrorKind = quota?.errorKind ?? null;
+    const quotaErrorKind =
+      quota?.errorKind ??
+      classifyAuthFileStatusCategory(quota?.error ?? '', quota?.errorStatus);
+    const quotaRetryable = quota?.retryable === true || isRetryableQuotaErrorKind(quotaErrorKind);
     if (quotaErrorKind === 'credential_invalid') {
       candidates.push({
         file,
@@ -252,6 +261,7 @@ export const analyzeCodexPriorityRotation = (
         remainingPercent,
         managed: false,
         quotaErrorKind,
+        quotaRetryable: false,
       });
       return;
     }
@@ -264,6 +274,7 @@ export const analyzeCodexPriorityRotation = (
           remainingPercent: null,
           managed: false,
           quotaErrorKind,
+          quotaRetryable,
         });
       }
       return;
@@ -271,6 +282,7 @@ export const analyzeCodexPriorityRotation = (
 
     if (planType === null || remainingPercent === null) {
       unknownCount++;
+      if (quotaRetryable) retryableUnknownCount++;
       if (priority === PRIORITY_ROTATION_ACTIVE_PRIORITY) {
         candidates.push({
           file,
@@ -278,6 +290,7 @@ export const analyzeCodexPriorityRotation = (
           remainingPercent: null,
           managed: false,
           quotaErrorKind,
+          quotaRetryable,
         });
       }
       return;
@@ -289,6 +302,7 @@ export const analyzeCodexPriorityRotation = (
       remainingPercent,
       managed: true,
       quotaErrorKind,
+      quotaRetryable,
     });
   });
 
@@ -351,10 +365,17 @@ export const analyzeCodexPriorityRotation = (
 
   const getActiveDemotionCount = () =>
     activeCandidates.filter((candidate) => demotionMap.has(candidate.file.name)).length;
-  let projectedActiveCount = activeCandidates.length - getActiveDemotionCount();
+  const protectedActiveCount = activeCandidates.filter(
+    (candidate) => candidate.quotaRetryable === true
+  ).length;
+  let projectedActiveCount =
+    activeCandidates.length - protectedActiveCount - getActiveDemotionCount();
   if (projectedActiveCount > slotLimit) {
     activeCandidates
-      .filter((candidate) => !demotionMap.has(candidate.file.name))
+      .filter(
+        (candidate) =>
+          !demotionMap.has(candidate.file.name) && candidate.quotaRetryable !== true
+      )
       .sort((a, b) => {
         const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
         return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
@@ -431,7 +452,9 @@ export const analyzeCodexPriorityRotation = (
     const missingReplacementStandby =
       lowRemainingDemotionCount > 0 && healthyStandbyCandidates.length === 0;
     const status: PriorityRotationStatus =
-      unknownCount > 0 && managedCandidates.length === 0
+      retryableUnknownCount > 0
+        ? 'quota_unknown'
+        : unknownCount > 0 && managedCandidates.length === 0
         ? 'quota_unknown'
         : missingAdjacentStandby || missingReplacementStandby
           ? 'no_standby'

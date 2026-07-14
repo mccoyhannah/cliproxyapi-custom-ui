@@ -12,6 +12,7 @@ import {
   type CodexSubscriptionSnapshot,
 } from '@/utils/quota';
 import type { ManualExpiryRenderInfo } from '@/features/authFiles/manualExpiry';
+import { classifyAuthFileStatusCategory } from '@/features/authFiles/statusClassification';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -222,7 +223,12 @@ const resolveQuotaErrorMessage = (
   status: number | undefined,
   fallback: string
 ): string => {
-  if (status === 404) return t('common.quota_update_required');
-  if (status === 403) return t('common.quota_check_credential');
+  const category = classifyAuthFileStatusCategory(fallback, status);
+  if (status === 404 && category === 'invalid_request') {
+    return t('common.quota_update_required');
+  }
+  if (status === 403 && category === 'credential_invalid') {
+    return t('common.quota_check_credential');
+  }
   return fallback;
 };

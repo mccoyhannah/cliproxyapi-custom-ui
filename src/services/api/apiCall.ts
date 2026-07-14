@@ -45,13 +45,27 @@ const normalizeBody = (input: unknown): { bodyText: string; body: unknown | null
   }
 };
 
+export const redactApiCallErrorText = (value: unknown): string =>
+  String(value ?? '')
+    .replace(
+      /(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|cookie|credential|password|secret|session)["']?\s*[:=]\s*["']?)(?:Bearer\s+)?[^"'\s,}]+/gi,
+      '$1[redacted]'
+    )
+    .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '[redacted authorization]')
+    .replace(/([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi, '$1[redacted]')
+    .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted]')
+    .replace(/\b(?:rt|at|sess|access|refresh)[-_][A-Za-z0-9._~+/=-]{8,}\b/gi, '[redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+
 export const getApiCallErrorMessage = (result: ApiCallResult): string => {
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     value !== null && typeof value === 'object';
 
   const status = result.statusCode;
   const body = result.body;
-  const bodyText = result.bodyText;
   let message = '';
 
   if (isRecord(body)) {
@@ -64,13 +78,9 @@ export const getApiCallErrorMessage = (result: ApiCallResult): string => {
     if (!message && typeof body.message === 'string') {
       message = body.message;
     }
-  } else if (typeof body === 'string') {
-    message = body;
   }
 
-  if (!message && bodyText) {
-    message = bodyText;
-  }
+  message = redactApiCallErrorText(message);
 
   if (status && message) return `${status} ${message}`.trim();
   if (status) return `HTTP ${status}`;
