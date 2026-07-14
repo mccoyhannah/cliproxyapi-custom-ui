@@ -7,6 +7,8 @@ param(
     [switch]$EmbedFull,
     [switch]$PruneRecordedLogs,
     [switch]$PruneOnly,
+    [switch]$RescueLowSpace,
+    [Nullable[long]]$MinFreeBytes = $null,
     [int]$ActiveWindowMinutes = 5
 )
 
@@ -43,6 +45,13 @@ if ($PruneRecordedLogs) {
 }
 if ($PruneOnly) {
     $arguments += "--prune-only"
+}
+if ($RescueLowSpace) {
+    $arguments += "--rescue-low-space"
+}
+if ($PSBoundParameters.ContainsKey("MinFreeBytes")) {
+    $arguments += "--min-free-bytes"
+    $arguments += [string]$MinFreeBytes
 }
 if ($PSBoundParameters.ContainsKey("ActiveWindowMinutes")) {
     $arguments += "--active-window-minutes"

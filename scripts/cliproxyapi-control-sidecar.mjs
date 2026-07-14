@@ -14,6 +14,7 @@ const DEFAULT_IDLE_SHUTDOWN_MINUTES = 10;
 const DEFAULT_RESTART_TIMEOUT_MS = 75_000;
 const DEFAULT_TOKEN_LEDGER_TIMEOUT_MS = 30 * 60_000;
 const PROCESS_INFO_TIMEOUT_MS = 1_500;
+const TOKEN_LEDGER_LOW_SPACE_CODE = 'TOKEN_LEDGER_LOW_SPACE';
 const MANAGEMENT_PREFIX = '/v0/management';
 const MAX_BODY_BYTES = 128 * 1024;
 const ALLOWED_ORIGINS = new Set([
@@ -171,10 +172,73 @@ function applyCors(req, res) {
 }
 
 class HttpError extends Error {
-  constructor(statusCode, message) {
+  constructor(statusCode, message, { code, details } = {}) {
     super(message);
     this.statusCode = statusCode;
+    if (code) this.code = code;
+    if (details && typeof details === 'object') this.details = details;
   }
+}
+
+function parseEmbeddedJsonObjects(message) {
+  const text = String(message ?? '').trim();
+  if (!text) return [];
+
+  const candidates = [text];
+  const firstObjectStart = text.indexOf('{');
+  const lastObjectEnd = text.lastIndexOf('}');
+  if (firstObjectStart >= 0 && lastObjectEnd > firstObjectStart) {
+    candidates.push(text.slice(firstObjectStart, lastObjectEnd + 1));
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const start = line.indexOf('{');
+    const end = line.lastIndexOf('}');
+    if (start >= 0 && end > start) candidates.push(line.slice(start, end + 1));
+  }
+
+  const parsed = [];
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      const value = JSON.parse(candidate);
+      if (value && typeof value === 'object' && !Array.isArray(value)) parsed.push(value);
+    } catch {
+      // Ignore non-JSON stderr/stack fragments and keep looking for the structured payload.
+    }
+  }
+  return parsed;
+}
+
+export function normalizeTokenLedgerMaintenanceError(error) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const payload = parseEmbeddedJsonObjects(message).find(
+    (value) => value.code === TOKEN_LEDGER_LOW_SPACE_CODE
+  );
+  if (!payload) return error;
+
+  const details = {};
+  if (Number.isFinite(payload.availableBytes)) details.availableBytes = payload.availableBytes;
+  if (Number.isFinite(payload.requiredBytes)) details.requiredBytes = payload.requiredBytes;
+  return new HttpError(
+    507,
+    typeof payload.message === 'string' && payload.message.trim()
+      ? payload.message.trim()
+      : 'Token ledger maintenance needs more free disk space.',
+    {
+      code: TOKEN_LEDGER_LOW_SPACE_CODE,
+      details,
+    }
+  );
+}
+
+export function buildErrorResponse(error) {
+  const isHttpError = error instanceof HttpError;
+  const statusCode = isHttpError ? error.statusCode : error?.statusCode || 500;
+  const payload = {
+    error: error instanceof Error ? error.message : String(error),
+  };
+  if (isHttpError && error.code) payload.code = error.code;
+  if (isHttpError && error.details) Object.assign(payload, error.details);
+  return { statusCode, payload };
 }
 
 function extractBearer(req) {
@@ -501,6 +565,34 @@ function parseJsonOutput(output, label) {
   }
 }
 
+export function buildTokenLedgerMaintenanceArguments({
+  action = 'refresh',
+  installDir: targetInstallDir,
+  customUiDir: targetCustomUiDir,
+  activeWindowMinutes,
+  pruneRecordedLogs = false,
+  pruneOnly = false,
+} = {}) {
+  const argumentList = [
+    '-InstallDir',
+    targetInstallDir,
+    '-CustomUiDir',
+    targetCustomUiDir,
+  ];
+  if (action === 'refresh' || action === 'refresh-prune') {
+    argumentList.push('-RescueLowSpace');
+  }
+  if (pruneRecordedLogs) argumentList.push('-PruneRecordedLogs');
+  if (pruneOnly) argumentList.push('-PruneOnly');
+  if (Number.isFinite(Number(activeWindowMinutes))) {
+    argumentList.push(
+      '-ActiveWindowMinutes',
+      String(Math.max(0, Math.floor(Number(activeWindowMinutes))))
+    );
+  }
+  return argumentList;
+}
+
 async function runTokenLedgerMaintenance({
   action = 'refresh',
   activeWindowMinutes,
@@ -512,17 +604,14 @@ async function runTokenLedgerMaintenance({
   }
 
   tokenLedgerInFlight = (async () => {
-    const argumentList = [
-      '-InstallDir',
+    const argumentList = buildTokenLedgerMaintenanceArguments({
+      action,
       installDir,
-      '-CustomUiDir',
       customUiDir,
-    ];
-    if (pruneRecordedLogs) argumentList.push('-PruneRecordedLogs');
-    if (pruneOnly) argumentList.push('-PruneOnly');
-    if (Number.isFinite(Number(activeWindowMinutes))) {
-      argumentList.push('-ActiveWindowMinutes', String(Math.max(0, Math.floor(Number(activeWindowMinutes)))));
-    }
+      activeWindowMinutes,
+      pruneRecordedLogs,
+      pruneOnly,
+    });
 
     await logLine('info', `token ledger ${action} requested`, {
       tokenLedgerScriptPath,
@@ -545,10 +634,14 @@ async function runTokenLedgerMaintenance({
   try {
     return await tokenLedgerInFlight;
   } catch (error) {
+    const normalizedError = normalizeTokenLedgerMaintenanceError(error);
     await logLine('error', `token ledger ${action} failed`, {
-      message: error instanceof Error ? error.message : String(error),
+      message:
+        normalizedError instanceof Error ? normalizedError.message : String(normalizedError),
+      code: normalizedError instanceof HttpError ? normalizedError.code : undefined,
+      ...(normalizedError instanceof HttpError ? normalizedError.details : {}),
     });
-    throw error;
+    throw normalizedError;
   } finally {
     tokenLedgerInFlight = null;
   }
@@ -594,10 +687,8 @@ async function sendTokenLedgerSnapshot(req, res) {
 }
 
 function sendError(req, res, error) {
-  const statusCode = error instanceof HttpError ? error.statusCode : error.statusCode || 500;
-  sendJson(req, res, statusCode, {
-    error: error instanceof Error ? error.message : String(error),
-  });
+  const { statusCode, payload } = buildErrorResponse(error);
+  sendJson(req, res, statusCode, payload);
 }
 
 function touchActivity() {

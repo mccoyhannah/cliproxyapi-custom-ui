@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const scriptPath = path.join(__dirname, 'update-token-ledger.mjs');
+const wrapperPath = path.join(__dirname, 'update-token-ledger.ps1');
 
 const makeLogText = (model, totalTokens) => `
 === REQUEST BODY ===
@@ -63,6 +64,11 @@ const pathExistsForTest = async (filePath) => {
   } catch {
     return false;
   }
+};
+
+const availableBytesAt = async (targetPath) => {
+  const stats = await fs.statfs(targetPath);
+  return Number(stats.bsize) * Number(stats.bavail ?? stats.bfree);
 };
 
 const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-'));
@@ -274,6 +280,175 @@ try {
   } finally {
     await fs.rm(pruneOnlyRoot, { recursive: true, force: true });
   }
+
+  const lowSpaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-low-space-'));
+  try {
+    const lowSpaceLogsDir = path.join(lowSpaceRoot, 'logs');
+    await fs.mkdir(lowSpaceLogsDir, { recursive: true });
+    const recordedLog = path.join(
+      lowSpaceLogsDir,
+      'v1-responses-2026-06-18T010000-lowspace1.log'
+    );
+    await fs.writeFile(recordedLog, makeLogText('gpt-test-low-space', 113), 'utf8');
+    await setFileAgeMinutes(recordedLog, 10);
+
+    runLedgerWrite(lowSpaceRoot, ['--no-embed', '--min-free-bytes', '0']);
+    const ledgerPath = path.join(lowSpaceRoot, 'usage-backups', 'token-ledger', 'ledger.json');
+    const ledgerBefore = await fs.readFile(ledgerPath, 'utf8');
+
+    const lowSpaceResult = runLedgerProcess(lowSpaceRoot, [
+      '--no-embed',
+      '--prune-recorded-logs',
+      '--active-window-minutes',
+      '0',
+      '--min-free-bytes',
+      String(Number.MAX_SAFE_INTEGER),
+    ]);
+    assert.notEqual(lowSpaceResult.status, 0, 'ordinary refresh must fail closed on low space');
+    const lowSpaceStderrLines = lowSpaceResult.stderr.trim().split(/\r?\n/);
+    assert.equal(lowSpaceStderrLines.length, 1, lowSpaceResult.stderr);
+    const lowSpaceError = JSON.parse(lowSpaceStderrLines[0]);
+    assert.equal(lowSpaceError.code, 'TOKEN_LEDGER_LOW_SPACE');
+    assert.equal(Number.isFinite(lowSpaceError.availableBytes), true);
+    assert.equal(Number.isFinite(lowSpaceError.requiredBytes), true);
+    assert.equal(lowSpaceError.requiredBytes > lowSpaceError.availableBytes, true);
+    assert.doesNotMatch(lowSpaceResult.stderr, /\bError:|\n\s*at\s/);
+    assert.equal(await pathExistsForTest(recordedLog), true, 'fail-closed refresh must not prune');
+    assert.equal(await fs.readFile(ledgerPath, 'utf8'), ledgerBefore);
+  } finally {
+    await fs.rm(lowSpaceRoot, { recursive: true, force: true });
+  }
+
+  const rescueRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-rescue-'));
+  try {
+    const rescueLogsDir = path.join(rescueRoot, 'logs');
+    await fs.mkdir(rescueLogsDir, { recursive: true });
+    const recordedLog = path.join(
+      rescueLogsDir,
+      'v1-responses-2026-06-19T010000-rescue01.log'
+    );
+    const unrecordedLog = path.join(
+      rescueLogsDir,
+      'v1-responses-2026-06-19T020000-rescue02.log'
+    );
+    const recordedHandle = await fs.open(recordedLog, 'w');
+    try {
+      await recordedHandle.writeFile(makeLogText('gpt-test-rescue-recorded', 127), 'utf8');
+      await recordedHandle.write(Buffer.alloc(64 * 1024 * 1024, 0x78));
+    } finally {
+      await recordedHandle.close();
+    }
+    await setFileAgeMinutes(recordedLog, 10);
+
+    runLedgerWrite(rescueRoot, ['--no-embed', '--min-free-bytes', '0']);
+    await fs.writeFile(unrecordedLog, makeLogText('gpt-test-rescue-new', 131), 'utf8');
+    await setFileAgeMinutes(unrecordedLog, 10);
+
+    const availableBeforeRescue = await availableBytesAt(rescueRoot);
+    const rescueResult = runLedgerWrite(rescueRoot, [
+      '--no-embed',
+      '--rescue-low-space',
+      '--active-window-minutes',
+      '0',
+      '--min-free-bytes',
+      String(availableBeforeRescue + 32 * 1024 * 1024),
+    ]);
+    assert.equal(rescueResult.rescueLowSpace.attempted, true);
+    assert.equal(rescueResult.rescueLowSpace.prune.deletedFiles, 1);
+    assert.equal(rescueResult.rescueLowSpace.prune.keptUnrecordedFiles, 1);
+    assert.equal(rescueResult.scannedFiles, 1, 'refresh must re-list logs after rescue prune');
+    assert.equal(await pathExistsForTest(recordedLog), false);
+    assert.equal(await pathExistsForTest(unrecordedLog), true);
+
+    const rescueProjection = await readProjection(rescueRoot);
+    assert.equal(rescueProjection.entries.length, 2);
+  } finally {
+    await fs.rm(rescueRoot, { recursive: true, force: true });
+  }
+
+  const corruptRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-corrupt-'));
+  try {
+    const corruptLogsDir = path.join(corruptRoot, 'logs');
+    const corruptLedgerDir = path.join(corruptRoot, 'usage-backups', 'token-ledger');
+    await fs.mkdir(corruptLogsDir, { recursive: true });
+    await fs.mkdir(corruptLedgerDir, { recursive: true });
+    const recordedLog = path.join(
+      corruptLogsDir,
+      'v1-responses-2026-06-20T010000-corrupt1.log'
+    );
+    await fs.writeFile(recordedLog, makeLogText('gpt-test-corrupt-ledger', 137), 'utf8');
+    await setFileAgeMinutes(recordedLog, 10);
+    await fs.writeFile(path.join(corruptLedgerDir, 'ledger.json'), '{not-json', 'utf8');
+
+    const corruptResult = runLedgerProcess(corruptRoot, [
+      '--prune-recorded-logs',
+      '--prune-only',
+      '--active-window-minutes',
+      '0',
+    ]);
+    assert.notEqual(corruptResult.status, 0, 'corrupt history must stop maintenance');
+    assert.match(corruptResult.stderr, /Unable to read JSON file/);
+    assert.equal(
+      await pathExistsForTest(recordedLog),
+      true,
+      'corrupt history must never authorize log deletion'
+    );
+  } finally {
+    await fs.rm(corruptRoot, { recursive: true, force: true });
+  }
+
+  const atomicRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'cpamc-token-ledger-atomic-'));
+  try {
+    const atomicLogsDir = path.join(atomicRoot, 'logs');
+    const atomicLedgerDir = path.join(atomicRoot, 'usage-backups', 'token-ledger');
+    await fs.mkdir(atomicLogsDir, { recursive: true });
+    await fs.mkdir(atomicLedgerDir, { recursive: true });
+    await fs.writeFile(
+      path.join(atomicLogsDir, 'v1-responses-2026-06-21T010000-atomic01.log'),
+      makeLogText('gpt-test-atomic', 149),
+      'utf8'
+    );
+    const legacyTempPath = path.join(atomicLedgerDir, 'ledger.json.tmp');
+    await fs.writeFile(legacyTempPath, 'legacy-temp-sentinel', 'utf8');
+
+    runLedgerWrite(atomicRoot, ['--no-embed', '--min-free-bytes', '0']);
+    assert.equal(
+      await fs.readFile(legacyTempPath, 'utf8'),
+      'legacy-temp-sentinel',
+      'new writes must not reuse the legacy fixed .tmp path'
+    );
+    const ledgerTempFiles = (await fs.readdir(atomicLedgerDir)).filter(
+      (name) => name !== 'ledger.json.tmp' && name.endsWith('.tmp')
+    );
+    assert.deepEqual(ledgerTempFiles, []);
+
+    const projectionTarget = path.join(atomicRoot, 'static', 'projection-target');
+    await fs.mkdir(projectionTarget, { recursive: true });
+    const failedAtomicWrite = runLedgerProcess(atomicRoot, [
+      '--no-embed',
+      '--min-free-bytes',
+      '0',
+      '--projection-path',
+      projectionTarget,
+    ]);
+    assert.notEqual(failedAtomicWrite.status, 0);
+    const projectionParentFiles = await fs.readdir(path.dirname(projectionTarget));
+    assert.deepEqual(
+      projectionParentFiles.filter(
+        (name) => name.startsWith('projection-target.') && name.endsWith('.tmp')
+      ),
+      [],
+      'failed atomic writes must clean their unique staging file'
+    );
+  } finally {
+    await fs.rm(atomicRoot, { recursive: true, force: true });
+  }
+
+  const wrapperSource = await fs.readFile(wrapperPath, 'utf8');
+  assert.match(wrapperSource, /\[switch\]\$RescueLowSpace/);
+  assert.match(wrapperSource, /--rescue-low-space/);
+  assert.match(wrapperSource, /\$MinFreeBytes/);
+  assert.match(wrapperSource, /--min-free-bytes/);
 
   const missingRoot = path.join(tmpRoot, 'missing-install');
   const projectionPath = path.join(missingRoot, 'static', 'token-ledger.json');

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 const VERSION = 1;
@@ -12,6 +13,9 @@ const TAIL_BYTES = 256 * 1024;
 const DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES = 5;
 const PRUNE_ERROR_SAMPLE_LIMIT = 10;
 const EMBEDDED_LEDGER_ID = 'cpamc-token-ledger';
+const LOW_SPACE_ERROR_CODE = 'TOKEN_LEDGER_LOW_SPACE';
+const DEFAULT_MIN_FREE_BYTES = 2 * 1024 ** 3;
+const DEFAULT_MIN_FREE_RATIO = 0.02;
 const MODEL_NAME_RULES = JSON.parse(
   await fs.readFile(
     new URL('../src/features/usageStatistics/lib/modelNameRules.json', import.meta.url),
@@ -71,23 +75,22 @@ const parseArgs = (argv) => {
 const readJson = async (filePath) => {
   try {
     return JSON.parse(await fs.readFile(filePath, 'utf8'));
-  } catch {
-    return null;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Unable to read JSON file ${filePath}: ${message}`, { cause: error });
   }
-};
-
-const atomicWriteJson = async (filePath, value) => {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  await fs.writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  await fs.rename(tempPath, filePath);
 };
 
 const atomicWriteText = async (filePath, value) => {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  await fs.writeFile(tempPath, value, 'utf8');
-  await fs.rename(tempPath, filePath);
+  const tempPath = `${filePath}.${process.pid}-${Date.now()}-${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(tempPath, value, { encoding: 'utf8', flag: 'wx' });
+    await fs.rename(tempPath, filePath);
+  } finally {
+    await fs.rm(tempPath, { force: true }).catch(() => {});
+  }
 };
 
 const pathExists = async (filePath) => {
@@ -232,6 +235,91 @@ const nonNegativeInteger = (value, fallback) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(0, Math.floor(parsed));
+};
+
+const minFreeBytesOverride = (value) => {
+  if (value === undefined) return null;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error(`--min-free-bytes must be a non-negative safe integer: ${value}`);
+  }
+  return parsed;
+};
+
+const nearestExistingAncestor = async (targetPath) => {
+  let currentPath = path.resolve(targetPath);
+
+  while (true) {
+    try {
+      await fs.access(currentPath);
+      return currentPath;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      const parentPath = path.dirname(currentPath);
+      if (parentPath === currentPath) throw error;
+      currentPath = parentPath;
+    }
+  }
+};
+
+const inspectFreeSpace = async (targetPaths, overrideBytes, writeBytes = 0) => {
+  const checks = [];
+  const checkedRoots = new Set();
+
+  for (const targetPath of targetPaths) {
+    const probePath = await nearestExistingAncestor(path.dirname(targetPath));
+    const rootPath = path.parse(probePath).root.toLowerCase();
+    if (checkedRoots.has(rootPath)) continue;
+    checkedRoots.add(rootPath);
+
+    const stats = await fs.statfs(probePath);
+    const blockSize = Number(stats.bsize);
+    const capacityBytes = blockSize * Number(stats.blocks);
+    const availableBytes = blockSize * Number(stats.bavail ?? stats.bfree);
+    const reserveBytes =
+      overrideBytes ?? Math.max(DEFAULT_MIN_FREE_BYTES, Math.ceil(capacityBytes * DEFAULT_MIN_FREE_RATIO));
+    const requiredBytes = reserveBytes + Math.max(0, writeBytes);
+
+    checks.push({
+      targetPath,
+      probePath,
+      capacityBytes,
+      availableBytes,
+      reserveBytes,
+      writeBytes,
+      requiredBytes,
+      lowSpace: availableBytes < requiredBytes,
+    });
+  }
+
+  return checks;
+};
+
+const assertEnoughFreeSpace = async (
+  targetPaths,
+  overrideBytes,
+  writeBytes = 0,
+  details = {}
+) => {
+  const checks = await inspectFreeSpace(targetPaths, overrideBytes, writeBytes);
+  const failed = checks.find((check) => check.lowSpace);
+  if (!failed) return checks;
+
+  const error = new Error(
+    `Token ledger refresh requires ${failed.requiredBytes} free bytes but only ${failed.availableBytes} are available.`
+  );
+  error.code = LOW_SPACE_ERROR_CODE;
+  error.details = {
+    ...details,
+    targetPath: failed.targetPath,
+    probePath: failed.probePath,
+    capacityBytes: failed.capacityBytes,
+    availableBytes: failed.availableBytes,
+    reserveBytes: failed.reserveBytes,
+    writeBytes: failed.writeBytes,
+    requiredBytes: failed.requiredBytes,
+  };
+  throw error;
 };
 
 const fingerprintForStats = (stats) => `${stats.size}:${Math.floor(stats.mtimeMs)}`;
@@ -668,7 +756,7 @@ const main = async () => {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     console.log(
-      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--embed-full] [--no-embed] [--prune-recorded-logs] [--prune-only] [--active-window-minutes 5]'
+      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--embed-full] [--no-embed] [--prune-recorded-logs] [--prune-only] [--rescue-low-space] [--min-free-bytes N] [--active-window-minutes 5]'
     );
     return;
   }
@@ -685,13 +773,11 @@ const main = async () => {
   const shouldStripEmbeddedLedger = Boolean(args['no-embed']);
   const embeddedLedgerMode = args['embed-full'] ? 'full' : 'summary';
   const pruneOnly = Boolean(args['prune-only']);
+  const minimumFreeBytes = minFreeBytesOverride(args['min-free-bytes']);
 
   if (pruneOnly && !args['prune-recorded-logs']) {
     throw new Error('--prune-only requires --prune-recorded-logs');
   }
-
-  await fs.mkdir(ledgerDir, { recursive: true });
-  await fs.mkdir(staticDir, { recursive: true });
 
   const previous = (await readJson(ledgerPath)) ?? {};
   if (
@@ -727,16 +813,78 @@ const main = async () => {
     throw new Error(`No CLIProxyAPI log directories found: ${normalizedLogDirs.join(', ')}`);
   }
 
-  const logFiles = await listLogFiles(logsDirs);
+  let logFiles = await listLogFiles(logsDirs);
+  let rescueLowSpace = {
+    requested: Boolean(args['rescue-low-space']),
+    attempted: false,
+    phase: null,
+    prune: null,
+    freeSpace: null,
+  };
+
+  const activeWindowMinutes = nonNegativeInteger(
+    args['active-window-minutes'],
+    DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
+  );
+
+  const ensureWriteSpace = async (phase, writeBytes = 0) => {
+    try {
+      rescueLowSpace.freeSpace = await assertEnoughFreeSpace(
+        [ledgerPath, projectionPath],
+        minimumFreeBytes,
+        writeBytes,
+        {
+          phase,
+          rescueRequested: rescueLowSpace.requested,
+          rescueAttempted: rescueLowSpace.attempted,
+        }
+      );
+    } catch (error) {
+      if (
+        error?.code !== LOW_SPACE_ERROR_CODE ||
+        !rescueLowSpace.requested ||
+        rescueLowSpace.attempted
+      ) {
+        throw error;
+      }
+
+      const rescuePrune = await pruneRecordedLogs({
+        dryRun: false,
+        entriesBySourceKey,
+        logFiles,
+        logsDirs: normalizedLogDirs,
+        nextFingerprints: previousFingerprints,
+        activeWindowMinutes,
+      });
+      rescueLowSpace = {
+        ...rescueLowSpace,
+        attempted: true,
+        phase,
+        prune: rescuePrune,
+      };
+      logFiles = await listLogFiles(logsDirs);
+      rescueLowSpace.freeSpace = await assertEnoughFreeSpace(
+        [ledgerPath, projectionPath],
+        minimumFreeBytes,
+        writeBytes,
+        {
+          phase: `${phase}-after-rescue`,
+          rescueRequested: true,
+          rescueAttempted: true,
+          rescuePrune,
+        }
+      );
+    }
+  };
+
+  if (!args.dryRun && !pruneOnly) {
+    await ensureWriteSpace('pre-refresh');
+  }
   let updatedFiles = 0;
   let skippedFiles = 0;
   let errorFiles = 0;
 
   if (pruneOnly) {
-    const activeWindowMinutes = nonNegativeInteger(
-      args['active-window-minutes'],
-      DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
-    );
     const prune = await pruneRecordedLogs({
       dryRun: Boolean(args.dryRun),
       entriesBySourceKey,
@@ -839,10 +987,16 @@ const main = async () => {
       DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
     ),
   });
+  const ledgerText = `${JSON.stringify(ledger, null, 2)}\n`;
+  const projectionText = `${JSON.stringify(projection, null, 2)}\n`;
 
   if (!args.dryRun) {
-    await atomicWriteJson(ledgerPath, ledger);
-    await atomicWriteJson(projectionPath, projection);
+    await ensureWriteSpace(
+      'pre-write',
+      Buffer.byteLength(ledgerText, 'utf8') + Buffer.byteLength(projectionText, 'utf8')
+    );
+    await atomicWriteText(ledgerPath, ledgerText);
+    await atomicWriteText(projectionPath, projectionText);
 
     const htmlCandidates = [
       path.join(staticDir, 'management.html'),
@@ -894,6 +1048,7 @@ const main = async () => {
         skippedFiles,
         errorFiles,
         coverage: projection.coverage,
+        rescueLowSpace,
         prune,
       },
       null,
@@ -903,6 +1058,18 @@ const main = async () => {
 };
 
 main().catch((error) => {
+  if (error?.code === LOW_SPACE_ERROR_CODE || error?.code === 'ENOSPC') {
+    console.error(
+      JSON.stringify({
+        status: 'error',
+        code: LOW_SPACE_ERROR_CODE,
+        message: error instanceof Error ? error.message : String(error),
+        ...(error?.details ?? {}),
+      })
+    );
+    process.exitCode = 1;
+    return;
+  }
   console.error(error);
   process.exitCode = 1;
 });
