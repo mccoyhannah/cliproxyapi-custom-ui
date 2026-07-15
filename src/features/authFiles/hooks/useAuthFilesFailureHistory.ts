@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AuthFileItem } from '@/types';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import {
@@ -22,8 +22,42 @@ import {
   writeStatusFailureHistory,
   type StatusFailureHistoryStore,
 } from '@/features/authFiles/statusFailureHistory';
+import {
+  launchPriorityRotationSidecar,
+  priorityRotationSidecarApi,
+  type AuthFailureHistoryResponse,
+} from '@/services/api/priorityRotationSidecar';
 
 const HEALTHY_STATUS_MESSAGES = new Set(['ok', 'healthy', 'ready', 'success', 'available']);
+const AUTH_FAILURE_HISTORY_REFRESH_INTERVAL_MS = 10_000;
+const AUTH_FAILURE_HISTORY_WAKE_COOLDOWN_MS = AUTH_FAILURE_HISTORY_REFRESH_INTERVAL_MS;
+const AUTH_FAILURE_HISTORY_WAKE_ATTEMPTS = 8;
+const AUTH_FAILURE_HISTORY_WAKE_INITIAL_DELAY_MS = 650;
+const AUTH_FAILURE_HISTORY_WAKE_RETRY_MS = 350;
+
+const wait = (delayMs: number, signal: AbortSignal) =>
+  new Promise<boolean>((resolve) => {
+    if (signal.aborted) {
+      resolve(false);
+      return;
+    }
+    let timeoutId: number | null = null;
+    const handleAbort = () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      resolve(false);
+    };
+    signal.addEventListener('abort', handleAbort, { once: true });
+    timeoutId = window.setTimeout(() => {
+      signal.removeEventListener('abort', handleAbort);
+      resolve(true);
+    }, delayMs);
+  });
+
+const getRequestStatus = (error: unknown): number | null => {
+  if (!error || typeof error !== 'object' || !('status' in error)) return null;
+  const status = Number((error as { status?: unknown }).status);
+  return Number.isInteger(status) ? status : null;
+};
 
 const getBrowserStorage = () => {
   if (typeof window === 'undefined') return null;
@@ -45,9 +79,122 @@ export function useAuthFilesFailureHistory(
       : createEmptyStatusFailureHistory();
   });
   const historyRef = useRef(history);
+  const remoteRefreshInFlightRef = useRef<Promise<void> | null>(null);
+  const remoteAbortControllerRef = useRef<AbortController | null>(null);
+  const sidecarWakeRetryAtRef = useRef(0);
   useEffect(() => {
     historyRef.current = history;
   }, [history]);
+
+  const mergeRemoteHistory = useCallback((response: AuthFailureHistoryResponse) => {
+    const mergeNow = Date.now();
+    const storage = getBrowserStorage();
+    const remoteHistory = parseStatusFailureHistory(
+      JSON.stringify(response),
+      mergeNow,
+      'observer'
+    );
+    const mergedWithRemote = mergeStatusFailureHistories(
+      historyRef.current,
+      remoteHistory,
+      mergeNow
+    );
+    const mergedHistory = storage
+      ? mergeStatusFailureHistories(
+          mergedWithRemote,
+          readStatusFailureHistory(storage, mergeNow),
+          mergeNow
+        )
+      : mergedWithRemote;
+    if (storage) writeStatusFailureHistory(storage, mergedHistory);
+    historyRef.current = mergedHistory;
+    setHistory((current) =>
+      serializeStatusFailureHistory(current) === serializeStatusFailureHistory(mergedHistory)
+        ? current
+        : mergedHistory
+    );
+  }, []);
+
+  const refreshRemoteHistory = useCallback(async () => {
+    if (remoteRefreshInFlightRef.current) return remoteRefreshInFlightRef.current;
+
+    const controller = new AbortController();
+    remoteAbortControllerRef.current = controller;
+    const refreshPromise = (async () => {
+      try {
+        const response = await priorityRotationSidecarApi.getAuthFailureHistory(controller.signal);
+        if (controller.signal.aborted) return;
+        sidecarWakeRetryAtRef.current = 0;
+        mergeRemoteHistory(response);
+        return;
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (getRequestStatus(error) !== null || Date.now() < sidecarWakeRetryAtRef.current) return;
+      }
+
+      sidecarWakeRetryAtRef.current = Date.now() + AUTH_FAILURE_HISTORY_WAKE_COOLDOWN_MS;
+      if (!launchPriorityRotationSidecar()) return;
+      for (let attempt = 0; attempt < AUTH_FAILURE_HISTORY_WAKE_ATTEMPTS; attempt += 1) {
+        const shouldContinue = await wait(
+          attempt === 0
+            ? AUTH_FAILURE_HISTORY_WAKE_INITIAL_DELAY_MS
+            : AUTH_FAILURE_HISTORY_WAKE_RETRY_MS,
+          controller.signal
+        );
+        if (!shouldContinue) return;
+        try {
+          const response = await priorityRotationSidecarApi.getAuthFailureHistory(
+            controller.signal
+          );
+          if (controller.signal.aborted) return;
+          sidecarWakeRetryAtRef.current = 0;
+          mergeRemoteHistory(response);
+          return;
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          if (getRequestStatus(error) !== null) return;
+        }
+      }
+    })().finally(() => {
+      if (remoteAbortControllerRef.current === controller) {
+        remoteAbortControllerRef.current = null;
+      }
+      if (remoteRefreshInFlightRef.current === refreshPromise) {
+        remoteRefreshInFlightRef.current = null;
+      }
+    });
+    remoteRefreshInFlightRef.current = refreshPromise;
+    return refreshPromise;
+  }, [mergeRemoteHistory]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const refreshIfVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      void refreshRemoteHistory();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      sidecarWakeRetryAtRef.current = 0;
+      void refreshRemoteHistory();
+    };
+
+    refreshIfVisible();
+    const intervalId = window.setInterval(
+      refreshIfVisible,
+      AUTH_FAILURE_HISTORY_REFRESH_INTERVAL_MS
+    );
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      remoteAbortControllerRef.current?.abort(
+        new DOMException('Auth failure history view unmounted', 'AbortError')
+      );
+      remoteAbortControllerRef.current = null;
+      remoteRefreshInFlightRef.current = null;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshRemoteHistory]);
 
   useEffect(() => {
     const storage = getBrowserStorage();
@@ -59,8 +206,7 @@ export function useAuthFilesFailureHistory(
       const rawStatusMessage = getAuthFileStatusMessage(file);
       const hasStatusWarning =
         Boolean(rawStatusMessage) && !HEALTHY_STATUS_MESSAGES.has(rawStatusMessage.toLowerCase());
-      const canCapture =
-        hasStatusWarning && !file.disabled && !isRuntimeOnlyAuthFile(file);
+      const canCapture = hasStatusWarning && !file.disabled && !isRuntimeOnlyAuthFile(file);
       if (!canCapture) {
         nextHistory = clearActiveStatusFailure(nextHistory, file.name, now);
         return;
@@ -85,6 +231,7 @@ export function useAuthFilesFailureHistory(
         category: problem.category,
         message: problem.message || rawStatusMessage,
         observedAt: now,
+        source: 'browser',
       });
     });
 

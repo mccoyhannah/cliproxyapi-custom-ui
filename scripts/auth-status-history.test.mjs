@@ -78,7 +78,11 @@ const persistedDetails = detailsFor(
   bucket,
   observedAt + history.STATUS_FAILURE_HISTORY_TTL_MS - 1
 );
-assert.equal(persistedDetails.length, 1, 'A captured reason must survive a page reload for three hours.');
+assert.equal(
+  persistedDetails.length,
+  1,
+  'A captured reason must survive a page reload for three hours.'
+);
 assert.equal(persistedDetails[0].category, 'connection_transient');
 assert.equal(persistedDetails[0].message, 'unexpected EOF');
 
@@ -128,15 +132,23 @@ const unchangedReasonInNextBucket = history.recordStatusFailure(sameReasonSeenAg
   message: 'unexpected EOF',
   observedAt: observedAt + 11 * 60 * 1000,
 });
-assert.deepEqual(
-  detailsFor(
-    unchangedReasonInNextBucket,
-    'account-a.json',
-    nextBucket,
-    observedAt + 11 * 60 * 1000
-  ),
-  [],
-  'One unchanged warning episode must not be copied into a later failure bucket.'
+const unchangedReasonNextBucketDetails = detailsFor(
+  unchangedReasonInNextBucket,
+  'account-a.json',
+  nextBucket,
+  observedAt + 11 * 60 * 1000
+);
+assert.equal(
+  unchangedReasonNextBucketDetails.length,
+  1,
+  'A continuing failure must be attached to every exact ten-minute bucket that counted it.'
+);
+assert.equal(unchangedReasonNextBucketDetails[0].category, 'connection_transient');
+assert.equal(unchangedReasonNextBucketDetails[0].message, 'unexpected EOF');
+assert.equal(unchangedReasonNextBucketDetails[0].observedAt, observedAt + 11 * 60 * 1000);
+assert.equal(
+  unchangedReasonNextBucketDetails[0].expiresAt,
+  observedAt + 11 * 60 * 1000 + history.STATUS_FAILURE_HISTORY_TTL_MS
 );
 const clearedEpisode = history.clearActiveStatusFailure(
   unchangedReasonInNextBucket,
@@ -151,12 +163,8 @@ const recapturedAfterHealthy = history.recordStatusFailure(clearedEpisode, {
   observedAt: observedAt + 11 * 60 * 1000,
 });
 assert.equal(
-  detailsFor(
-    recapturedAfterHealthy,
-    'account-a.json',
-    nextBucket,
-    observedAt + 11 * 60 * 1000
-  ).length,
+  detailsFor(recapturedAfterHealthy, 'account-a.json', nextBucket, observedAt + 11 * 60 * 1000)
+    .length,
   1,
   'The same reason may bind to a new bucket only after a healthy state clears the episode.'
 );
@@ -204,7 +212,11 @@ let multiCategory = history.recordStatusFailure(sameReasonSeenAgain, {
 });
 multiCategory = history.recordStatusFailure(multiCategory, {
   fileName: 'account-b.json',
-  bucket: { ...bucket, startTime: bucket.startTime + 10 * 60 * 1000, endTime: bucket.endTime + 10 * 60 * 1000 },
+  bucket: {
+    ...bucket,
+    startTime: bucket.startTime + 10 * 60 * 1000,
+    endTime: bucket.endTime + 10 * 60 * 1000,
+  },
   category: 'rate_limited',
   message: 'quota exceeded',
   observedAt: observedAt + 30_000,
@@ -217,12 +229,7 @@ assert.deepEqual(
   'Different categories observed in one bucket must both remain available.'
 );
 assert.deepEqual(
-  detailsFor(
-    multiCategory,
-    'account-b.json',
-    bucket,
-    observedAt + 30_000
-  ),
+  detailsFor(multiCategory, 'account-b.json', bucket, observedAt + 30_000),
   [],
   'Accounts and request buckets must never share reasons.'
 );
@@ -230,7 +237,11 @@ assert.equal(
   detailsFor(
     multiCategory,
     'account-b.json',
-    { ...bucket, startTime: bucket.startTime + 10 * 60 * 1000, endTime: bucket.endTime + 10 * 60 * 1000 },
+    {
+      ...bucket,
+      startTime: bucket.startTime + 10 * 60 * 1000,
+      endTime: bucket.endTime + 10 * 60 * 1000,
+    },
     observedAt + 30_000
   ).length,
   1,
@@ -239,7 +250,7 @@ assert.equal(
 assert.equal(
   detailsFor(multiCategory, 'account-a.json', nextBucket, observedAt + 30_000).length,
   0,
-  'A second bucket for the same account must stay empty until that episode is explicitly cleared.'
+  'A store that never observed the next bucket must not invent a reason for it.'
 );
 
 const serialized = history.serializeStatusFailureHistory(multiCategory);
@@ -257,7 +268,11 @@ for (const [index, message] of [
 ].entries()) {
   privacyStore = history.recordStatusFailure(privacyStore, {
     fileName: `privacy-${index}.json`,
-    bucket: { ...bucket, startTime: bucket.startTime + index * 60_000, endTime: bucket.endTime + index * 60_000 },
+    bucket: {
+      ...bucket,
+      startTime: bucket.startTime + index * 60_000,
+      endTime: bucket.endTime + index * 60_000,
+    },
     category: 'unknown_upstream_error',
     message,
     observedAt: observedAt + index,
@@ -268,6 +283,88 @@ assert.doesNotMatch(
   privacySerialized,
   /secret-cookie|secret-session|dXNlcjpwYXNz|user:password|secret-query|secret-one|secret-two|secret-three|proxy-user|proxy-password/i,
   'Cookie, session, Basic auth, URL credentials, and generic token values must never persist.'
+);
+
+const unknownFreeText = 'provider internal diagnostic payload account-742';
+assert.equal(
+  history.simplifyStatusFailureMessage('unknown_upstream_error', unknownFreeText),
+  '',
+  'Unknown upstream free text must fail closed instead of relying on incomplete redaction.'
+);
+const unknownFreeTextStore = history.recordStatusFailure(
+  history.createEmptyStatusFailureHistory(),
+  {
+    fileName: 'unknown-free-text.json',
+    bucket,
+    category: 'unknown_upstream_error',
+    message: unknownFreeText,
+    observedAt,
+  }
+);
+const [unknownFreeTextDetail] = detailsFor(
+  unknownFreeTextStore,
+  'unknown-free-text.json',
+  bucket,
+  observedAt
+);
+assert.equal(unknownFreeTextDetail.category, 'unknown_upstream_error');
+assert.equal(
+  unknownFreeTextDetail.message,
+  '',
+  'Unknown evidence must keep its category so the tooltip does not fall back to reason unavailable.'
+);
+assert.doesNotMatch(
+  history.serializeStatusFailureHistory(unknownFreeTextStore),
+  /provider internal diagnostic|account-742/i,
+  'Unknown upstream free text must never be persisted in the three-hour history.'
+);
+
+const allowlistedMessageCases = [
+  {
+    category: 'connection_transient',
+    raw: 'ECONNRESET while contacting Alice at C:/Users/Alice/private.txt',
+    expected: 'connection reset',
+  },
+  {
+    category: 'request_interrupted',
+    raw: 'context canceled for Alice at C:/Users/Alice/private.txt',
+    expected: 'context canceled',
+  },
+  {
+    category: 'upstream_service_error',
+    raw: 'HTTP 503 - Alice C:/Users/Alice/private.txt',
+    expected: 'HTTP 503',
+  },
+  {
+    category: 'credential_invalid',
+    raw: 'invalid token for Alice at C:/Users/Alice/private.txt',
+    expected: 'credential invalid',
+  },
+  {
+    category: 'rate_limited',
+    raw: 'quota exceeded for Alice at C:/Users/Alice/private.txt',
+    expected: 'rate limited',
+  },
+];
+let allowlistedStore = history.createEmptyStatusFailureHistory();
+allowlistedMessageCases.forEach(({ category, raw, expected }, index) => {
+  assert.equal(
+    history.simplifyStatusFailureMessage(category, raw),
+    expected,
+    `${category} must persist only an allowlisted short reason.`
+  );
+  allowlistedStore = history.recordStatusFailure(allowlistedStore, {
+    fileName: `allowlisted-${index}.json`,
+    bucket,
+    category,
+    message: raw,
+    observedAt: observedAt + index,
+  });
+});
+assert.doesNotMatch(
+  history.serializeStatusFailureHistory(allowlistedStore),
+  /Alice|private\.txt|C:\/Users/i,
+  'Known categories must not persist arbitrary names, paths, or explanatory suffixes.'
 );
 
 const midnightBucket = {
@@ -345,6 +442,59 @@ assert.deepEqual(
   history.createEmptyStatusFailureHistory(),
   'Unknown storage versions must fail soft.'
 );
+
+const legacySensitiveFingerprintPayload = {
+  version: 1,
+  files: {},
+  active: {
+    'legacy-known.json': {
+      fingerprint: JSON.stringify([
+        'credential_invalid',
+        'invalid token for Alice at C:/Users/Alice/private.txt',
+      ]),
+      bucketStartTime: bucket.startTime,
+      observedAt,
+      expiresAt: observedAt + history.STATUS_FAILURE_HISTORY_TTL_MS,
+    },
+    'legacy-unknown.json': {
+      fingerprint: JSON.stringify([
+        'unknown_upstream_error',
+        'provider note for Bob at C:/Users/Bob/private.txt',
+      ]),
+      bucketStartTime: bucket.startTime,
+      observedAt,
+      expiresAt: observedAt + history.STATUS_FAILURE_HISTORY_TTL_MS,
+    },
+    'legacy-malformed.json': {
+      fingerprint: 'raw note for Carol at C:/Users/Carol/private.txt',
+      bucketStartTime: bucket.startTime,
+      observedAt,
+      expiresAt: observedAt + history.STATUS_FAILURE_HISTORY_TTL_MS,
+    },
+  },
+};
+const legacySensitiveFingerprintStore = history.parseStatusFailureHistory(
+  JSON.stringify(legacySensitiveFingerprintPayload),
+  observedAt + 1
+);
+assert.equal(
+  legacySensitiveFingerprintStore.active['legacy-known.json'].fingerprint,
+  JSON.stringify(['browser', 'credential_invalid', 'credential invalid'])
+);
+assert.equal(
+  legacySensitiveFingerprintStore.active['legacy-unknown.json'].fingerprint,
+  JSON.stringify(['browser', 'unknown_upstream_error', ''])
+);
+assert.equal(
+  legacySensitiveFingerprintStore.active['legacy-malformed.json'].fingerprint,
+  null,
+  'An unverifiable legacy fingerprint must become a cleared episode.'
+);
+assert.doesNotMatch(
+  history.serializeStatusFailureHistory(legacySensitiveFingerprintStore),
+  /Alice|Bob|Carol|private\.txt|C:\/Users/i,
+  'Re-serializing legacy active episodes must never preserve arbitrary fingerprint text.'
+);
 const corruptLifetime = JSON.parse(history.serializeStatusFailureHistory(store));
 const corruptFile = corruptLifetime.files['account-a.json'];
 const corruptBucket = Object.values(corruptFile)[0];
@@ -413,6 +563,57 @@ assert.equal(
   ),
   'Equal-timestamp cross-tab conflicts must converge deterministically.'
 );
+
+const legacyV1Payload = JSON.parse(history.serializeStatusFailureHistory(leftTab));
+delete Object.values(legacyV1Payload.files['left-tab.json'])[0].details.connection_transient.source;
+const legacyV1Store = history.parseStatusFailureHistory(
+  JSON.stringify(legacyV1Payload),
+  observedAt + 2
+);
+assert.equal(
+  detailsFor(legacyV1Store, 'left-tab.json', bucket, observedAt + 2)[0].source,
+  'browser',
+  'Legacy v1 details without an explicit source must default to browser evidence.'
+);
+const observerEvidence = history.recordStatusFailure(
+  history.createEmptyStatusFailureHistory(),
+  {
+    fileName: 'source-priority.json',
+    bucket,
+    category: 'connection_transient',
+    message: 'unexpected EOF',
+    observedAt,
+    source: 'observer',
+  }
+);
+const newerBrowserEvidence = history.recordStatusFailure(
+  history.createEmptyStatusFailureHistory(),
+  {
+    fileName: 'source-priority.json',
+    bucket,
+    category: 'connection_transient',
+    message: 'fetch failed',
+    observedAt: observedAt + 2 * 60 * 1000,
+    source: 'browser',
+  }
+);
+for (const merged of [
+  history.mergeStatusFailureHistories(observerEvidence, newerBrowserEvidence, observedAt + 3 * 60 * 1000),
+  history.mergeStatusFailureHistories(newerBrowserEvidence, observerEvidence, observedAt + 3 * 60 * 1000),
+]) {
+  const [detail] = detailsFor(
+    merged,
+    'source-priority.json',
+    bucket,
+    observedAt + 3 * 60 * 1000
+  );
+  assert.equal(detail.source, 'observer');
+  assert.equal(
+    detail.message,
+    'unexpected EOF',
+    'Observer evidence must outrank a newer browser status for the same bucket and category.'
+  );
+}
 assert.equal(
   history.writeStatusFailureHistory(
     {

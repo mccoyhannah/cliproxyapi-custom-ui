@@ -6,7 +6,6 @@ export const STATUS_FAILURE_HISTORY_TTL_MS = 3 * 60 * 60 * 1000;
 export const STATUS_FAILURE_CAPTURE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const STATUS_FAILURE_HISTORY_VERSION = 1 as const;
-const STATUS_FAILURE_MESSAGE_MAX_LENGTH = 72;
 const STATUS_FAILURE_CATEGORIES = new Set<AuthFileStatusCategory>([
   'credential_invalid',
   'account_model_restricted',
@@ -24,12 +23,32 @@ const STATUS_FAILURE_CATEGORIES = new Set<AuthFileStatusCategory>([
   'upstream_service_error',
   'unknown_upstream_error',
 ]);
+const STATUS_FAILURE_CATEGORY_FALLBACK: Record<AuthFileStatusCategory, string> = {
+  credential_invalid: 'credential invalid',
+  account_model_restricted: 'model unavailable',
+  upstream_access_blocked: 'access blocked',
+  local_proxy_unavailable: 'local proxy unavailable',
+  dns_resolution_failed: 'DNS failed',
+  tls_certificate_error: 'TLS error',
+  oauth_flow_failure: 'OAuth failed',
+  connection_transient: 'connection interrupted',
+  request_interrupted: 'request interrupted',
+  input_too_large: 'input too large',
+  content_policy: 'content policy',
+  rate_limited: 'rate limited',
+  invalid_request: 'invalid request',
+  upstream_service_error: 'upstream service error',
+  unknown_upstream_error: '',
+};
+
+export type StatusFailureHistorySource = 'browser' | 'observer';
 
 export type StatusFailureHistoryDetail = {
   category: AuthFileStatusCategory;
   message: string;
   observedAt: number;
   expiresAt: number;
+  source?: StatusFailureHistorySource;
 };
 
 export type StatusFailureHistoryBucket = {
@@ -64,6 +83,7 @@ type RecordStatusFailureInput = {
   category: AuthFileStatusCategory;
   message: string;
   observedAt: number;
+  source?: StatusFailureHistorySource;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -78,6 +98,12 @@ const normalizeCategory = (value: unknown): AuthFileStatusCategory | null =>
   typeof value === 'string' && STATUS_FAILURE_CATEGORIES.has(value as AuthFileStatusCategory)
     ? (value as AuthFileStatusCategory)
     : null;
+
+const normalizeStatusFailureSource = (value: unknown): StatusFailureHistorySource =>
+  value === 'observer' ? 'observer' : 'browser';
+
+const getStatusFailureSourcePriority = (source: unknown): number =>
+  normalizeStatusFailureSource(source) === 'observer' ? 1 : 0;
 
 const bucketKeyFromStartTime = (startTime: number): string => String(Math.trunc(startTime));
 
@@ -96,10 +122,7 @@ const redactSensitiveStatusText = (message: string): string =>
       /([?&])(?:key|api[_-]?key|access[_-]?token|refresh[_-]?token|token|session(?:[_-]?(?:id|token))?|cookie)=[^&\s]+/gi,
       '$1'
     )
-    .replace(
-      /\b([a-z][a-z0-9+.-]*):\/\/[^/\s:@]+:[^/\s@]+@/gi,
-      '$1://[已隐藏]@'
-    )
+    .replace(/\b([a-z][a-z0-9+.-]*):\/\/[^/\s:@]+:[^/\s@]+@/gi, '$1://[已隐藏]@')
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[已隐藏邮箱]')
     .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[已隐藏]')
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[已隐藏]');
@@ -113,15 +136,26 @@ export const simplifyStatusFailureMessage = (
     .replace(/\b(?:GET|POST|PUT|PATCH|DELETE)\s+"[^"]+"\s*:\s*/gi, '')
     .replace(/upstream connect error or disconnect\/reset before headers\.?\s*/i, '')
     .replace(/transport failure reason:\s*/i, '')
-    .replace(/^(?:(?:HTTP(?:\/\d(?:\.\d)?)?|status(?:\s+code)?|code)\s*[:=]?\s*)?[45]\d{2}\s*[-:]?\s*/i, '')
     .replace(/\p{Cc}+/gu, ' ')
     .replace(/\s+/g, ' ')
     .replace(/^[-,;:\s]+|[-,;:\s]+$/g, '')
     .trim();
 
-  if (!normalized) return '';
+  if (!category || category === 'unknown_upstream_error') return '';
   if (category === 'connection_transient' && /\b(?:unexpected\s+)?EOF\b/i.test(normalized)) {
     return /unexpected\s+EOF/i.test(normalized) ? 'unexpected EOF' : 'EOF';
+  }
+  if (
+    category === 'connection_transient' &&
+    /connection\s+(?:was\s+)?reset|ECONNRESET|forcibly\s+closed/i.test(normalized)
+  ) {
+    return 'connection reset';
+  }
+  if (
+    category === 'connection_transient' &&
+    /timed?\s*out|ETIMEDOUT|connection\s+timeout/i.test(normalized)
+  ) {
+    return 'connection timeout';
   }
   if (category === 'local_proxy_unavailable' && /connection\s+refused/i.test(normalized)) {
     return 'Connection refused';
@@ -129,9 +163,39 @@ export const simplifyStatusFailureMessage = (
   if (category === 'request_interrupted' && /context\s+cancell?ed/i.test(normalized)) {
     return /context\s+cancelled/i.test(normalized) ? 'context cancelled' : 'context canceled';
   }
+  if (category === 'request_interrupted' && /deadline\s+exceeded/i.test(normalized)) {
+    return 'deadline exceeded';
+  }
 
-  if (normalized.length <= STATUS_FAILURE_MESSAGE_MAX_LENGTH) return normalized;
-  return `${normalized.slice(0, STATUS_FAILURE_MESSAGE_MAX_LENGTH - 1).trimEnd()}…`;
+  const explicitStatusCode = normalized.match(
+    /\b(?:HTTP(?:\/\d(?:\.\d)?)?|status(?:\s+code)?|code)\s*[:=]?\s*([45]\d{2})\b/i
+  )?.[1];
+  const leadingStatusCode = normalized.match(/^([45]\d{2})\b/)?.[1];
+  const statusCode = explicitStatusCode ?? leadingStatusCode;
+  if (statusCode) return `HTTP ${statusCode}`;
+
+  return STATUS_FAILURE_CATEGORY_FALLBACK[category];
+};
+
+const rebuildStatusFailureFingerprint = (
+  value: unknown,
+  sourceOverride?: StatusFailureHistorySource
+): string | null => {
+  if (value === null) return null;
+  if (typeof value !== 'string' || value.length > 1024) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed) || (parsed.length !== 2 && parsed.length !== 3)) return null;
+    const [rawSource, rawCategory, rawMessage] =
+      parsed.length === 3 ? parsed : ['browser', parsed[0], parsed[1]];
+    const category = normalizeCategory(rawCategory);
+    if (!category || typeof rawMessage !== 'string') return null;
+    const source = sourceOverride ?? normalizeStatusFailureSource(rawSource);
+    const message = simplifyStatusFailureMessage(category, rawMessage);
+    return JSON.stringify([source, category, message]);
+  } catch {
+    return null;
+  }
 };
 
 export const createEmptyStatusFailureHistory = (): StatusFailureHistoryStore => ({
@@ -142,9 +206,14 @@ export const createEmptyStatusFailureHistory = (): StatusFailureHistoryStore => 
 
 const normalizeStatusFailureHistory = (
   value: unknown,
-  now: number
+  now: number,
+  sourceOverride?: StatusFailureHistorySource
 ): StatusFailureHistoryStore => {
-  if (!isRecord(value) || value.version !== STATUS_FAILURE_HISTORY_VERSION || !isRecord(value.files)) {
+  if (
+    !isRecord(value) ||
+    value.version !== STATUS_FAILURE_HISTORY_VERSION ||
+    !isRecord(value.files)
+  ) {
     return createEmptyStatusFailureHistory();
   }
 
@@ -174,16 +243,19 @@ const normalizeStatusFailureHistory = (
         ) {
           return;
         }
-        const boundedExpiresAt = Math.min(
-          expiresAt,
-          observedAt + STATUS_FAILURE_HISTORY_TTL_MS
-        );
+        const boundedExpiresAt = Math.min(expiresAt, observedAt + STATUS_FAILURE_HISTORY_TTL_MS);
         if (boundedExpiresAt <= observedAt || boundedExpiresAt <= now) return;
         const message = simplifyStatusFailureMessage(
           category,
           typeof rawDetail.message === 'string' ? rawDetail.message : ''
         );
-        details[category] = { category, message, observedAt, expiresAt: boundedExpiresAt };
+        details[category] = {
+          category,
+          message,
+          observedAt,
+          expiresAt: boundedExpiresAt,
+          source: sourceOverride ?? normalizeStatusFailureSource(rawDetail.source),
+        };
       });
 
       if (Object.keys(details).length === 0) return;
@@ -198,19 +270,15 @@ const normalizeStatusFailureHistory = (
     Object.entries(value.active).forEach(([rawFileKey, rawEpisode]) => {
       if (!isRecord(rawEpisode)) return;
       const fileKey = normalizeStatusFailureFileKey(rawFileKey);
-      const fingerprint =
-        rawEpisode.fingerprint === null
-          ? null
-          : typeof rawEpisode.fingerprint === 'string'
-            ? rawEpisode.fingerprint.trim()
-            : '';
+      const fingerprint = rebuildStatusFailureFingerprint(
+        rawEpisode.fingerprint,
+        sourceOverride
+      );
       const bucketStartTime = toFiniteTimestamp(rawEpisode.bucketStartTime);
       const observedAt = toFiniteTimestamp(rawEpisode.observedAt);
       const expiresAt = toFiniteTimestamp(rawEpisode.expiresAt);
       if (
         !fileKey ||
-        fingerprint === '' ||
-        (typeof fingerprint === 'string' && fingerprint.length > 256) ||
         bucketStartTime === null ||
         observedAt === null ||
         expiresAt === null ||
@@ -239,11 +307,12 @@ export const pruneStatusFailureHistory = (
 
 export const parseStatusFailureHistory = (
   raw: string | null | undefined,
-  now = Date.now()
+  now = Date.now(),
+  sourceOverride?: StatusFailureHistorySource
 ): StatusFailureHistoryStore => {
   if (!raw) return createEmptyStatusFailureHistory();
   try {
-    return normalizeStatusFailureHistory(JSON.parse(raw), now);
+    return normalizeStatusFailureHistory(JSON.parse(raw), now, sourceOverride);
   } catch {
     return createEmptyStatusFailureHistory();
   }
@@ -339,14 +408,18 @@ export const recordStatusFailure = (
   const existingFile = pruned.files[fileKey] ?? {};
   const existingBucket = existingFile[bucketKey];
   const message = simplifyStatusFailureMessage(input.category, input.message);
-  const fingerprint = JSON.stringify([input.category, message]);
+  const source = normalizeStatusFailureSource(input.source);
+  const fingerprint = JSON.stringify([source, input.category, message]);
   const existingActive = pruned.active[fileKey];
-  if (existingActive?.fingerprint === fingerprint) return pruned;
+  if (existingActive?.fingerprint === fingerprint && existingActive.bucketStartTime === startTime) {
+    return pruned;
+  }
   const detail = {
     category: input.category,
     message,
     observedAt,
     expiresAt: observedAt + STATUS_FAILURE_HISTORY_TTL_MS,
+    source,
   };
 
   return {
@@ -418,13 +491,17 @@ export const mergeStatusFailureHistories = (
         Object.entries(bucket.details).forEach(([category, detail]) => {
           if (!detail) return;
           const existing = details[category as AuthFileStatusCategory];
+          const detailSourcePriority = getStatusFailureSourcePriority(detail.source);
+          const existingSourcePriority = getStatusFailureSourcePriority(existing?.source);
           const detailTieBreak = existing
             ? JSON.stringify(detail).localeCompare(JSON.stringify(existing))
             : 1;
           if (
             !existing ||
-            detail.observedAt > existing.observedAt ||
-            (detail.observedAt === existing.observedAt && detailTieBreak > 0)
+            detailSourcePriority > existingSourcePriority ||
+            (detailSourcePriority === existingSourcePriority &&
+              (detail.observedAt > existing.observedAt ||
+                (detail.observedAt === existing.observedAt && detailTieBreak > 0)))
           ) {
             details[category as AuthFileStatusCategory] = detail;
           }
@@ -482,12 +559,13 @@ export const getStatusFailureDetailsForBlock = (
   now = Date.now()
 ): StatusFailureHistoryDetail[] => {
   const bucket = buckets.find(
-    (candidate) =>
-      candidate.startTime === block.startTime && candidate.endTime === block.endTime
+    (candidate) => candidate.startTime === block.startTime && candidate.endTime === block.endTime
   );
   if (!bucket) return [];
   return Object.values(bucket.details)
-    .filter((detail): detail is StatusFailureHistoryDetail => Boolean(detail && detail.expiresAt > now))
+    .filter((detail): detail is StatusFailureHistoryDetail =>
+      Boolean(detail && detail.expiresAt > now)
+    )
     .sort((left, right) => right.observedAt - left.observedAt);
 };
 

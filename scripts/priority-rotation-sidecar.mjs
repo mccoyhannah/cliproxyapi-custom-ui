@@ -3,6 +3,10 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  observeAuthFailureHistory,
+  readAuthFailureHistoryProjection,
+} from './auth-status-history-observer.mjs';
 
 const DEFAULT_INSTALL_DIR = 'D:\\CLIProxyAPI';
 const DEFAULT_HOST = '127.0.0.1';
@@ -27,6 +31,7 @@ const PRIORITY_ROTATION_BUFFER_PRIORITY = 0;
 const PRIORITY_ROTATION_MANUAL_LOCKED_MIN_PRIORITY = 3;
 const MAX_BODY_BYTES = 1024 * 1024;
 const MODEL_ACTIVITY_SCAN_MIN_MS = 30_000;
+const AUTH_FAILURE_OBSERVER_INTERVAL_MS = 15_000;
 const ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8317',
   'http://localhost:8317',
@@ -54,8 +59,7 @@ const RETRYABLE_QUOTA_ERROR_KINDS = new Set([
 const HEALTHY_STATUS_PATTERN = /^(?:ok|healthy|ready|success|available)$/i;
 const UPSTREAM_ACCESS_BLOCKED_PATTERN =
   /\b(?:cloudflare(?:\s+security)?\s+(?:challenge|verification|captcha|blocked)|cf[_\s-]?mitigated\s*:\s*challenge|cf_chl|__cf_chl_tk|challenge-platform|captcha|turnstile|challenge[_\s-]?(?:required|page)|attention\s+required|checking\s+your\s+browser|error\s*1020|unsupported[_\s-]?(?:country|region)|region[_\s-]?not[_\s-]?supported|ip\s+(?:blocked|banned))\b/i;
-const GENERIC_UPSTREAM_ACCESS_BLOCKED_PATTERN =
-  /\b(?:forbidden|access[_\s-]?denied)\b/i;
+const GENERIC_UPSTREAM_ACCESS_BLOCKED_PATTERN = /\b(?:forbidden|access[_\s-]?denied)\b/i;
 const CONTENT_POLICY_PATTERN =
   /\b(?:content[_\s-]?conceal(?:ed)?|content[_\s-]?(?:filter|policy)|safety[_\s-]?(?:policy|filter)|(?:blocked|rejected|concealed)\s+(?:by|under)\s+(?:the\s+)?(?:upstream\s+)?safety)\b/i;
 const UPSTREAM_STATUS_PATTERNS = [
@@ -156,6 +160,8 @@ const customUiDir =
 const modelRequestLogsDir = args['model-request-logs-dir'] ?? path.join(installDir, 'logs');
 const settingsPath = path.join(dataDir, 'settings.json');
 const statePath = path.join(dataDir, 'state.json');
+const authFailureHistoryPath =
+  args['auth-failure-history-path'] ?? path.join(dataDir, 'auth-failure-history.json');
 const secretPath = path.join(dataDir, 'management-key.dpapi');
 const sidecarLogsDir = path.join(dataDir, 'logs');
 
@@ -181,6 +187,9 @@ let state = {
 };
 let runInFlight = null;
 let loopTimer = null;
+let authFailureObserverTimer = null;
+let authFailureObserverInFlight = null;
+let cachedManagementKey = null;
 let idleShutdownTimer = null;
 let serverRef = null;
 let shuttingDown = false;
@@ -380,14 +389,23 @@ async function readJson(filePath, fallback) {
 
 async function writeJsonAtomic(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
-  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  try {
-    await rm(filePath, { force: true });
-  } catch {
-    // ignore
+  let lastError = null;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const tmpPath = `${filePath}.${process.pid}.${Date.now()}.${attempt}.tmp`;
+    try {
+      await writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+      await rename(tmpPath, filePath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 5) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
+    } finally {
+      await rm(tmpPath, { force: true }).catch(() => {});
+    }
   }
-  await rename(tmpPath, filePath);
+  throw lastError ?? new Error(`Failed to write ${filePath}`);
 }
 
 async function hasSecretFile() {
@@ -410,7 +428,10 @@ export function redactDiagnosticText(value) {
       '$1[redacted]'
     )
     .replace(/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '[redacted authorization]')
-    .replace(/([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi, '$1[redacted]')
+    .replace(
+      /([?&](?:key|api[_-]?key|access[_-]?token|refresh[_-]?token)=)[^&\s]+/gi,
+      '$1[redacted]'
+    )
     .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
     .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted]')
     .replace(/\b(?:rt|at|sess|access|refresh)[-_][A-Za-z0-9._~+/=-]{8,}\b/gi, '[redacted]')
@@ -539,6 +560,10 @@ async function shutdownForIdle() {
     clearInterval(loopTimer);
     loopTimer = null;
   }
+  if (authFailureObserverTimer) {
+    clearInterval(authFailureObserverTimer);
+    authFailureObserverTimer = null;
+  }
   if (idleShutdownTimer) {
     clearTimeout(idleShutdownTimer);
     idleShutdownTimer = null;
@@ -651,12 +676,22 @@ async function saveSecret(secret) {
   if (!trimmed) throw new Error('Management key is empty');
   const blob = await protectSecret(trimmed);
   await writeFile(secretPath, `${blob}\n`, 'utf8');
+  cachedManagementKey = trimmed;
   await updateState({ hasSecret: true, lastError: null });
 }
 
 async function readSecret() {
-  const blob = await readFile(secretPath, 'utf8');
-  return unprotectSecret(blob);
+  if (cachedManagementKey) return cachedManagementKey;
+  try {
+    const blob = await readFile(secretPath, 'utf8');
+    const secret = String(await unprotectSecret(blob)).trim();
+    if (!secret) throw new Error('Management key is empty');
+    cachedManagementKey = secret;
+    return secret;
+  } catch (error) {
+    cachedManagementKey = null;
+    throw error;
+  }
 }
 
 function extractBearer(req) {
@@ -761,12 +796,7 @@ function stringifyForClassification(value) {
   }
 }
 
-function buildQuotaErrorState({
-  error,
-  errorStatus,
-  planType,
-  classificationText = '',
-}) {
+function buildQuotaErrorState({ error, errorStatus, planType, classificationText = '' }) {
   const statusCode = Number(errorStatus);
   const errorKind = classifyUpstreamStatusText(
     [classificationText, error].filter(Boolean).join(' '),
@@ -832,6 +862,48 @@ function normalizeAuthFilesResponse(payload) {
       ? payload.items
       : [];
   return files.filter((item) => item && typeof item === 'object');
+}
+
+function projectAuthFileStatusSnapshots(payload) {
+  return normalizeAuthFilesResponse(payload)
+    .map((file) => {
+      const name = String(file.name ?? '').trim();
+      if (!name) return null;
+      const rawMessage = file.status_message ?? file.statusMessage;
+      const rawRecentRequests = Array.isArray(file.recent_requests)
+        ? file.recent_requests
+        : Array.isArray(file.recentRequests)
+          ? file.recentRequests
+          : [];
+      return {
+        name,
+        status_message: typeof rawMessage === 'string' ? rawMessage.slice(0, 4_096) : '',
+        recent_requests: rawRecentRequests.slice(-20).map((item) => ({
+          ...(typeof item?.time === 'string' ? { time: item.time.slice(0, 32) } : {}),
+          success: Math.max(0, Number(item?.success) || 0),
+          failed: Math.max(0, Number(item?.failed ?? item?.failure) || 0),
+        })),
+        disabled: file.disabled,
+        runtime_only: file.runtime_only ?? file.runtimeOnly,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function readAuthFileStatusSnapshots() {
+  if (!(await hasSecretFile())) {
+    cachedManagementKey = null;
+    return undefined;
+  }
+  try {
+    const key = await readSecret();
+    const payload = await managementJson('/auth-files', key, { timeoutMs: 15_000 });
+    return projectAuthFileStatusSnapshots(payload);
+  } catch (error) {
+    const statusCode = Number(error?.statusCode ?? error?.status);
+    if (statusCode === 401 || statusCode === 403) cachedManagementKey = null;
+    throw error;
+  }
 }
 
 function resolveAuthProvider(file) {
@@ -1143,8 +1215,7 @@ export function analyzeCodexPriorityRotation(
       typeof quota?.errorKind === 'string'
         ? quota.errorKind
         : classifyUpstreamStatusText(quota?.error ?? '', quota?.errorStatus);
-    const quotaRetryable =
-      quota?.retryable === true || isRetryableQuotaErrorKind(quotaErrorKind);
+    const quotaRetryable = quota?.retryable === true || isRetryableQuotaErrorKind(quotaErrorKind);
     if (quotaErrorKind === 'credential_invalid') {
       candidates.push({
         order,
@@ -1282,7 +1353,9 @@ export function analyzeCodexPriorityRotation(
     activeCandidates.length - protectedActiveCount - getActiveDemotionCount();
   if (projectedActiveCount > slotLimit) {
     activeCandidates
-      .filter((candidate) => !demotionMap.has(candidate.file.name) && candidate.quotaRetryable !== true)
+      .filter(
+        (candidate) => !demotionMap.has(candidate.file.name) && candidate.quotaRetryable !== true
+      )
       .sort((a, b) => {
         const remainingCompare = getRemainingSortValue(a) - getRemainingSortValue(b);
         return remainingCompare !== 0 ? remainingCompare : a.file.name.localeCompare(b.file.name);
@@ -1331,7 +1404,8 @@ export function analyzeCodexPriorityRotation(
     ? standbyCandidates.filter(
         (candidate) =>
           !demotionMap.has(candidate.file.name) &&
-          candidate.managed !== false && getRemainingSortValue(candidate) >= effectiveThreshold
+          candidate.managed !== false &&
+          getRemainingSortValue(candidate) >= effectiveThreshold
       )
     : normalHealthyStandbyCandidates;
   const replacementSlots = Math.min(lowRemainingDemotionCount, activeDeficit);
@@ -1371,16 +1445,16 @@ export function analyzeCodexPriorityRotation(
         demotionReason === 'credential_invalid'
           ? 'demote_credential_invalid'
           : demotionReason === 'low_remaining'
-          ? 'demote_low_remaining'
-          : demotionReason === 'over_active_limit'
-            ? 'demote_over_active_limit'
-            : promotionNames.has(candidate.file.name)
-              ? 'promote_standby'
-              : candidate.quotaRetryable
-                ? 'quota_unknown_retryable'
-                : candidate.remainingPercent === null
-                  ? 'quota_unknown'
-              : 'keep';
+            ? 'demote_low_remaining'
+            : demotionReason === 'over_active_limit'
+              ? 'demote_over_active_limit'
+              : promotionNames.has(candidate.file.name)
+                ? 'promote_standby'
+                : candidate.quotaRetryable
+                  ? 'quota_unknown_retryable'
+                  : candidate.remainingPercent === null
+                    ? 'quota_unknown'
+                    : 'keep';
       return {
         order: candidate.order,
         ...buildCandidateDetail({
@@ -1411,10 +1485,10 @@ export function analyzeCodexPriorityRotation(
       retryableUnknownCount > 0
         ? 'quota_unknown'
         : unknownCount > 0 && managedCandidates.length === 0
-        ? 'quota_unknown'
-        : missingAdjacentStandby || missingReplacementStandby
-          ? 'no_standby'
-          : 'no_changes';
+          ? 'quota_unknown'
+          : missingAdjacentStandby || missingReplacementStandby
+            ? 'no_standby'
+            : 'no_changes';
     return {
       thresholdPercent: threshold,
       effectiveThresholdPercent: effectiveThreshold,
@@ -1565,9 +1639,9 @@ async function buildCodexQuotaMap(files, key) {
     try {
       quota[file.name] = await fetchCodexQuotaState(file, key);
     } catch (error) {
-      const message = redactDiagnosticText(
-        error instanceof Error ? error.message : String(error)
-      ) || 'Priority rotation failed';
+      const message =
+        redactDiagnosticText(error instanceof Error ? error.message : String(error)) ||
+        'Priority rotation failed';
       quota[file.name] = buildQuotaErrorState({
         planType: planTypeFromFile,
         error: message,
@@ -1783,9 +1857,9 @@ export async function runPriorityRotation(options = {}) {
       });
       return sanitizeStateForResponse();
     } catch (error) {
-      const message = redactDiagnosticText(
-        error instanceof Error ? error.message : String(error)
-      ) || 'Priority rotation failed';
+      const message =
+        redactDiagnosticText(error instanceof Error ? error.message : String(error)) ||
+        'Priority rotation failed';
       await updateState({
         running: false,
         lastStatus: 'error',
@@ -1830,12 +1904,15 @@ function sendJson(req, res, statusCode, payload) {
 function sendError(req, res, error) {
   const untrustedStatusCode = Number(error?.statusCode ?? error?.status);
   const hasExplicitStatusCode =
-    Number.isInteger(untrustedStatusCode) && untrustedStatusCode >= 400 && untrustedStatusCode <= 599;
-  const statusCode = error instanceof HttpError
-    ? error.statusCode
-    : hasExplicitStatusCode
-      ? untrustedStatusCode
-      : 500;
+    Number.isInteger(untrustedStatusCode) &&
+    untrustedStatusCode >= 400 &&
+    untrustedStatusCode <= 599;
+  const statusCode =
+    error instanceof HttpError
+      ? error.statusCode
+      : hasExplicitStatusCode
+        ? untrustedStatusCode
+        : 500;
   sendJson(req, res, statusCode, {
     error:
       error instanceof HttpError
@@ -1872,6 +1949,17 @@ async function handleRequest(req, res) {
       settings: sanitizeSettingsForResponse(),
       state: sanitizeStateForResponse(),
     });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/auth-failure-history') {
+    res.setHeader('Cache-Control', 'no-store');
+    sendJson(
+      req,
+      res,
+      200,
+      await readAuthFailureHistoryProjection(authFailureHistoryPath, Date.now())
+    );
     return;
   }
 
@@ -1935,6 +2023,54 @@ function startLoop() {
   loopTimer.unref?.();
 }
 
+async function runAuthFailureHistoryObserver() {
+  if (authFailureObserverInFlight) return authFailureObserverInFlight;
+  authFailureObserverInFlight = (async () => {
+    let authFiles;
+    try {
+      authFiles = await readAuthFileStatusSnapshots();
+    } catch (error) {
+      const statusCode = Number(error?.statusCode ?? error?.status);
+      await logLine('warn', 'auth file status snapshot unavailable', {
+        result:
+          Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599
+            ? `HTTP ${statusCode}`
+            : 'Request failed',
+      });
+    }
+    return observeAuthFailureHistory(
+      {
+        installDir,
+        dataDir,
+        logsDir: modelRequestLogsDir,
+        mainLogPath: path.join(modelRequestLogsDir, 'main.log'),
+        statePath: authFailureHistoryPath,
+        authFiles,
+      },
+      { classifySignal: classifyUpstreamStatusText }
+    );
+  })()
+    .catch(async () => {
+      await logLine('error', 'auth failure history observer failed', {
+        result: 'Observer failed',
+      });
+      return null;
+    })
+    .finally(() => {
+      authFailureObserverInFlight = null;
+    });
+  return authFailureObserverInFlight;
+}
+
+function startAuthFailureObserverLoop() {
+  if (authFailureObserverTimer) clearInterval(authFailureObserverTimer);
+  runAuthFailureHistoryObserver().catch(() => {});
+  authFailureObserverTimer = setInterval(() => {
+    runAuthFailureHistoryObserver().catch(() => {});
+  }, AUTH_FAILURE_OBSERVER_INTERVAL_MS);
+  authFailureObserverTimer.unref?.();
+}
+
 async function startServer() {
   await ensureDataDirs();
   await loadRuntimeState();
@@ -1942,6 +2078,7 @@ async function startServer() {
   await refreshModelRequestActivity({ force: true });
   scheduleIdleShutdown();
   startLoop();
+  startAuthFailureObserverLoop();
 
   const server = createServer((req, res) => {
     handleRequest(req, res).catch((error) => sendError(req, res, error));

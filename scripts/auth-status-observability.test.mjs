@@ -19,21 +19,18 @@ const [
   authFilesStylesSource,
   aiProvidersStylesSource,
   ...localeSources
-] =
-  await Promise.all([
-    readSource('src/utils/recentRequests.ts'),
-    readSource('src/components/providers/ProviderStatusBar.tsx'),
-    readSource('src/features/authFiles/components/AuthFileCard.tsx'),
-    readSource('src/pages/AuthFilesPage.tsx'),
-    readSource('src/features/authFiles/hooks/useAuthFilesData.ts'),
-    readSource('src/features/authFiles/statusFailureHistory.ts'),
-    readSource('src/features/authFiles/hooks/useAuthFilesFailureHistory.ts'),
-    readSource('src/pages/AuthFilesPage.module.scss'),
-    readSource('src/pages/AiProvidersPage.module.scss'),
-    ...['zh-CN', 'zh-TW', 'en', 'ru'].map((locale) =>
-      readSource(`src/i18n/locales/${locale}.json`)
-    ),
-  ]);
+] = await Promise.all([
+  readSource('src/utils/recentRequests.ts'),
+  readSource('src/components/providers/ProviderStatusBar.tsx'),
+  readSource('src/features/authFiles/components/AuthFileCard.tsx'),
+  readSource('src/pages/AuthFilesPage.tsx'),
+  readSource('src/features/authFiles/hooks/useAuthFilesData.ts'),
+  readSource('src/features/authFiles/statusFailureHistory.ts'),
+  readSource('src/features/authFiles/hooks/useAuthFilesFailureHistory.ts'),
+  readSource('src/pages/AuthFilesPage.module.scss'),
+  readSource('src/pages/AiProvidersPage.module.scss'),
+  ...['zh-CN', 'zh-TW', 'en', 'ru'].map((locale) => readSource(`src/i18n/locales/${locale}.json`)),
+]);
 
 const transpiledRecentRequests = ts.transpileModule(recentRequestsSource, {
   compilerOptions: {
@@ -187,6 +184,71 @@ assert.match(
   'Cross-tab merging must include the storage-event snapshot even if localStorage was overwritten again.'
 );
 assert.match(
+  authFilesFailureHistoryHookSource,
+  /priorityRotationSidecarApi\.getAuthFailureHistory\(/,
+  'The failure-history hook must load the background observer snapshot when the page opens.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /remoteAbortControllerRef\s*=\s*useRef<AbortController\s*\|\s*null>\(null\)/,
+  'Each remote refresh lifecycle must expose a controller that component cleanup can abort.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /const controller\s*=\s*new AbortController\(\)[\s\S]*?getAuthFailureHistory\(controller\.signal\)/,
+  'Remote history reads must receive the refresh lifecycle abort signal.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /controller\.signal\.aborted[\s\S]*?mergeRemoteHistory\(response\)/,
+  'An aborted refresh must not merge a response after component cleanup.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /remoteAbortControllerRef\.current\?\.abort\(/,
+  'Unmount cleanup must abort any in-flight remote history request.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /parseStatusFailureHistory\(\s*JSON\.stringify\(response\),\s*mergeNow,\s*'observer'\s*\)/,
+  'Remote failure history must be marked as observer evidence before it is merged.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /recordStatusFailure\([\s\S]*?source:\s*'browser'/,
+  'Status clues captured by the open page must be marked as browser evidence.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /launchPriorityRotationSidecar\(\)/,
+  'The failure-history hook must wake the local observer when its read-only API is offline.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /AUTH_FAILURE_HISTORY_REFRESH_INTERVAL_MS\s*=\s*10_000/,
+  'Visible failure reasons must refresh every ten seconds.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /AUTH_FAILURE_HISTORY_WAKE_COOLDOWN_MS\s*=\s*AUTH_FAILURE_HISTORY_REFRESH_INTERVAL_MS/,
+  'A failed sidecar wake must use one short polling-interval cooldown.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /Date\.now\(\)\s*<\s*sidecarWakeRetryAtRef\.current[\s\S]*?sidecarWakeRetryAtRef\.current\s*=\s*Date\.now\(\)\s*\+\s*AUTH_FAILURE_HISTORY_WAKE_COOLDOWN_MS/,
+  'Wake exhaustion must leave a bounded retry time so a later polling cycle can try again.'
+);
+assert.doesNotMatch(
+  authFilesFailureHistoryHookSource,
+  /sidecarWakeAttemptedRef/,
+  'A permanent attempted flag must not suppress all future automatic wake attempts.'
+);
+assert.match(
+  authFilesFailureHistoryHookSource,
+  /document\.addEventListener\('visibilitychange',[\s\S]*?refreshRemoteHistory/,
+  'Returning to the page must immediately merge errors captured while it was hidden.'
+);
+assert.match(
   statusFailureHistorySource,
   /api\[_-\]\?key[\s\S]*?auth[\s\S]*?token[\s\S]*?cookie[\s\S]*?session[\s\S]*?credential[\s\S]*?password[\s\S]*?secret/,
   'Persisted status history sanitization must cover credential, Cookie, and session fields.'
@@ -219,7 +281,10 @@ assert.match(
 
 for (const source of [authFilesStylesSource, aiProvidersStylesSource]) {
   assert.match(source, /\.statusTooltip\s*\{[\s\S]*?width:\s*max-content;/);
-  assert.match(source, /\.statusTooltip\s*\{[\s\S]*?max-width:\s*min\(280px,\s*calc\(100vw - 24px\)\);/);
+  assert.match(
+    source,
+    /\.statusTooltip\s*\{[\s\S]*?max-width:\s*min\(280px,\s*calc\(100vw - 24px\)\);/
+  );
   assert.match(source, /\.tooltipTime\s*\{[\s\S]*?white-space:\s*nowrap;/);
   assert.match(source, /\.tooltipStats\s*\{[\s\S]*?white-space:\s*nowrap;/);
   assert.match(source, /\.tooltipFailureMessage\s*\{[\s\S]*?overflow-wrap:\s*anywhere;/);
@@ -227,10 +292,18 @@ for (const source of [authFilesStylesSource, aiProvidersStylesSource]) {
   assert.match(source, /\.statusTooltipContent\s*\{[\s\S]*?overflow-y:\s*auto;/);
 }
 
-const expectedUnavailableLabels = ['原因未记录', '原因未記錄', 'Reason not recorded', 'Причина не записана'];
+const expectedUnavailableLabels = [
+  '原因未记录',
+  '原因未記錄',
+  'Reason not recorded',
+  'Причина не записана',
+];
 localeSources.forEach((source, index) => {
   const locale = JSON.parse(source);
-  assert.equal(locale.auth_files.status_failure_detail_unavailable, expectedUnavailableLabels[index]);
+  assert.equal(
+    locale.auth_files.status_failure_detail_unavailable,
+    expectedUnavailableLabels[index]
+  );
   assert.equal(locale.status_bar.failure_reason_unavailable, expectedUnavailableLabels[index]);
 });
 assert.match(
@@ -259,7 +332,11 @@ const refreshCallback = authFilesPageSource.match(
   /const refreshAuthFilesStatus = useCallback\(async \(\) => \{([\s\S]*?)\n\s*\}, \[([\s\S]*?)\]\);/
 );
 assert.ok(refreshCallback, 'A dedicated auth-file status refresh callback must exist.');
-assert.match(refreshCallback[1], /loadFiles\s*\(/, 'Status polling must reload auth-file metadata.');
+assert.match(
+  refreshCallback[1],
+  /loadFiles\s*\(/,
+  'Status polling must reload auth-file metadata.'
+);
 assert.doesNotMatch(
   refreshCallback[0],
   /quota|loadCodexQuota|refreshAuthFilesAndCodexQuota/i,

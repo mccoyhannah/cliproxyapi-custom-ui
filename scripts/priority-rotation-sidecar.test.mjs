@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -67,6 +67,37 @@ async function getAvailablePort() {
   return availablePort;
 }
 
+async function protectDpapiText(value) {
+  const script = `
+$ErrorActionPreference = "Stop"
+$plain = [Console]::In.ReadToEnd()
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($plain)
+$protected = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+[Console]::Out.Write([Convert]::ToBase64String($protected))
+`;
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'pwsh.exe',
+      ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', script],
+      { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code === 0) resolve(stdout.trim());
+      else reject(new Error(stderr.trim() || `pwsh exited with ${code}`));
+    });
+    child.stdin.end(value, 'utf8');
+  });
+}
+
 {
   assert.equal(
     classifyUpstreamStatusText(
@@ -82,7 +113,9 @@ async function getAvailablePort() {
   );
   assert.equal(classifyUpstreamStatusText('Post "https://example": EOF'), 'connection_transient');
   assert.equal(
-    classifyUpstreamStatusText('wsarecv: An existing connection was forcibly closed by the remote host.'),
+    classifyUpstreamStatusText(
+      'wsarecv: An existing connection was forcibly closed by the remote host.'
+    ),
     'connection_transient'
   );
   assert.equal(classifyUpstreamStatusText('context canceled'), 'request_interrupted');
@@ -113,15 +146,15 @@ async function getAvailablePort() {
     classifyUpstreamStatusText('dial tcp 104.18.1.1:443: connection refused'),
     'connection_transient'
   );
-  assert.equal(
-    classifyUpstreamStatusText('403 Forbidden invalid_token'),
-    'credential_invalid'
-  );
+  assert.equal(classifyUpstreamStatusText('403 Forbidden invalid_token'), 'credential_invalid');
   assert.equal(
     classifyUpstreamStatusText('wsasend: connection was aborted by the software'),
     'connection_transient'
   );
-  assert.equal(classifyUpstreamStatusText('remote error: tls: handshake failure'), 'tls_certificate_error');
+  assert.equal(
+    classifyUpstreamStatusText('remote error: tls: handshake failure'),
+    'tls_certificate_error'
+  );
   assert.equal(classifyUpstreamStatusText('413 Request Entity Too Large'), 'input_too_large');
   assert.equal(classifyUpstreamStatusText('forbidden by content policy'), 'content_policy');
   assert.equal(classifyUpstreamStatusText('access denied: quota exceeded'), 'rate_limited');
@@ -218,10 +251,7 @@ async function getAvailablePort() {
     );
   } finally {
     if (child.exitCode === null && child.signalCode === null) child.kill();
-    await Promise.race([
-      childClosed,
-      new Promise((resolve) => setTimeout(resolve, 1_000)),
-    ]);
+    await Promise.race([childClosed, new Promise((resolve) => setTimeout(resolve, 1_000))]);
     await rm(root, { recursive: true, force: true });
   }
 }
@@ -302,12 +332,328 @@ async function getAvailablePort() {
     assert.doesNotMatch(JSON.stringify(body), /opaque-private-token|<html>/i);
   } finally {
     if (child.exitCode === null && child.signalCode === null) child.kill();
-    await Promise.race([
-      childClosed,
-      new Promise((resolve) => setTimeout(resolve, 1_000)),
-    ]);
+    await Promise.race([childClosed, new Promise((resolve) => setTimeout(resolve, 1_000))]);
     await new Promise((resolve, reject) => {
       upstream.close((error) => (error ? reject(error) : resolve()));
+    });
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = await mkdtemp(path.join(tmpdir(), 'priority-rotation-failure-history-'));
+  const dataDir = path.join(root, 'priority-rotation');
+  const logsDir = path.join(root, 'logs');
+  const sidecarPort = await getAvailablePort();
+  const sidecarPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'priority-rotation-sidecar.mjs'
+  );
+  await mkdir(dataDir, { recursive: true });
+  await mkdir(logsDir, { recursive: true });
+  await writeFile(path.join(dataDir, 'settings.json'), '{"enabled":false}\n', 'utf8');
+  const fixtureDate = new Date(Date.now() - 60_000);
+  const pad = (value) => String(value).padStart(2, '0');
+  const fixtureMainTimestamp = `${fixtureDate.getFullYear()}-${pad(fixtureDate.getMonth() + 1)}-${pad(fixtureDate.getDate())} ${pad(fixtureDate.getHours())}:${pad(fixtureDate.getMinutes())}:${pad(fixtureDate.getSeconds())}`;
+  const fixtureFileTimestamp = `${fixtureDate.getFullYear()}-${pad(fixtureDate.getMonth() + 1)}-${pad(fixtureDate.getDate())}T${pad(fixtureDate.getHours())}${pad(fixtureDate.getMinutes())}${pad(fixtureDate.getSeconds())}`;
+  await writeFile(
+    path.join(logsDir, 'main.log'),
+    `[${fixtureMainTimestamp}] [deadbeef] [info ] [selector.go:436] session-affinity: cache hit | session=private auth=Observer-A.json provider=mixed model=gpt-test\n`,
+    'utf8'
+  );
+  await writeFile(
+    path.join(logsDir, `v1-responses-${fixtureFileTimestamp}-deadbeef.log`),
+    '=== RESPONSE ===\nStatus: 500\nError: Post "https://private.example?token=secret": EOF\n',
+    'utf8'
+  );
+
+  const child = spawn(
+    process.execPath,
+    [
+      sidecarPath,
+      '--install-dir',
+      root,
+      '--data-dir',
+      dataDir,
+      '--model-request-logs-dir',
+      logsDir,
+      '--port',
+      String(sidecarPort),
+      '--idle-shutdown-minutes',
+      '180',
+    ],
+    { stdio: 'ignore' }
+  );
+  const childClosed = new Promise((resolve) => child.once('close', resolve));
+
+  try {
+    const deadline = Date.now() + 5_000;
+    let payload = null;
+    let cacheControl = null;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${sidecarPort}/auth-failure-history`);
+        if (response.ok) {
+          cacheControl = response.headers.get('cache-control');
+          const candidate = await response.json();
+          if (candidate.files?.['observer-a.json']) {
+            payload = candidate;
+            break;
+          }
+        }
+      } catch {
+        // Sidecar or observer may still be starting.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.ok(
+      payload,
+      'Observer history must become readable while rotation settings are disabled.'
+    );
+    assert.equal(payload.version, 1);
+    assert.equal(cacheControl, 'no-store');
+    assert.deepEqual(payload.active, {});
+    assert.equal(
+      Object.values(payload.files['observer-a.json'])[0].details.connection_transient.message,
+      'EOF'
+    );
+    assert.doesNotMatch(JSON.stringify(payload), /private\.example|token=secret|session=private/i);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await Promise.race([childClosed, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = await mkdtemp(path.join(tmpdir(), 'priority-rotation-auth-status-snapshot-'));
+  const dataDir = path.join(root, 'priority-rotation');
+  const logsDir = path.join(root, 'logs');
+  const sidecarPort = await getAvailablePort();
+  const managementRequests = [];
+  const managementServer = createServer((req, res) => {
+    managementRequests.push({ method: req.method, url: req.url });
+    if (req.method === 'GET' && req.url === '/v0/management/auth-files') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(
+        JSON.stringify({
+          files: [
+            {
+              name: 'Observer-Status.json',
+              status_message: 'context canceled private customer note must not persist',
+              recent_requests: Array.from({ length: 20 }, (_, index) => ({
+                success: 0,
+                failed: index === 19 ? 1 : 0,
+              })),
+              access_token: 'opaque-private-field-must-not-persist',
+              metadata: { private: 'opaque-private-metadata-must-not-persist' },
+            },
+          ],
+        })
+      );
+      return;
+    }
+    res.statusCode = 500;
+    res.end('unexpected management request');
+  });
+  await new Promise((resolve, reject) => {
+    managementServer.once('error', reject);
+    managementServer.listen(0, '127.0.0.1', resolve);
+  });
+  const managementAddress = managementServer.address();
+  assert.ok(managementAddress && typeof managementAddress === 'object');
+
+  const sidecarPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'priority-rotation-sidecar.mjs'
+  );
+  await mkdir(dataDir, { recursive: true });
+  await mkdir(logsDir, { recursive: true });
+  await writeFile(path.join(logsDir, 'main.log'), '', 'utf8');
+  await writeFile(
+    path.join(dataDir, 'settings.json'),
+    `${JSON.stringify({ enabled: false, apiBase: `http://127.0.0.1:${managementAddress.port}` })}\n`,
+    'utf8'
+  );
+  const protectedKey = await protectDpapiText('observer-test-management-key');
+  await writeFile(path.join(dataDir, 'management-key.dpapi'), `${protectedKey}\n`, 'utf8');
+
+  const child = spawn(
+    process.execPath,
+    [
+      sidecarPath,
+      '--install-dir',
+      root,
+      '--data-dir',
+      dataDir,
+      '--model-request-logs-dir',
+      logsDir,
+      '--port',
+      String(sidecarPort),
+      '--idle-shutdown-minutes',
+      '180',
+    ],
+    { stdio: 'ignore' }
+  );
+  const childClosed = new Promise((resolve) => child.once('close', resolve));
+
+  try {
+    const deadline = Date.now() + 8_000;
+    let payload = null;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${sidecarPort}/auth-failure-history`);
+        if (response.ok) {
+          const candidate = await response.json();
+          if (candidate.files?.['observer-status.json']) {
+            payload = candidate;
+            break;
+          }
+        }
+      } catch {
+        // Sidecar or its first observer pass may still be starting.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    assert.ok(payload, 'DPAPI-backed /auth-files status snapshots must reach failure history.');
+    assert.ok(managementRequests.length >= 1);
+    assert.equal(
+      managementRequests.every(
+        (request) => request.method === 'GET' && request.url === '/v0/management/auth-files'
+      ),
+      true,
+      'The observer must not call quota or any mutating management route.'
+    );
+    assert.equal(
+      Object.values(payload.files['observer-status.json'])[0].details.request_interrupted.message,
+      'context canceled'
+    );
+    const historyText = await readFile(path.join(dataDir, 'auth-failure-history.json'), 'utf8');
+    assert.doesNotMatch(
+      historyText,
+      /opaque-private|private customer note|observer-test-management-key/i
+    );
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await Promise.race([childClosed, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+    await new Promise((resolve, reject) => {
+      managementServer.close((error) => (error ? reject(error) : resolve()));
+    });
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+{
+  const root = await mkdtemp(path.join(tmpdir(), 'priority-rotation-auth-status-fallback-'));
+  const dataDir = path.join(root, 'priority-rotation');
+  const logsDir = path.join(root, 'logs');
+  const sidecarPort = await getAvailablePort();
+  const opaqueManagementError = 'opaque-private-management-error-must-not-persist';
+  let authFilesRequestCount = 0;
+  const managementServer = createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/v0/management/auth-files') {
+      authFilesRequestCount += 1;
+      res.statusCode = 503;
+      res.end(opaqueManagementError);
+      return;
+    }
+    res.statusCode = 500;
+    res.end('unexpected management request');
+  });
+  await new Promise((resolve, reject) => {
+    managementServer.once('error', reject);
+    managementServer.listen(0, '127.0.0.1', resolve);
+  });
+  const managementAddress = managementServer.address();
+  assert.ok(managementAddress && typeof managementAddress === 'object');
+
+  const sidecarPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'priority-rotation-sidecar.mjs'
+  );
+  await mkdir(dataDir, { recursive: true });
+  await mkdir(logsDir, { recursive: true });
+  const fixtureDate = new Date(Date.now() - 60_000);
+  const pad = (value) => String(value).padStart(2, '0');
+  const fixtureMainTimestamp = `${fixtureDate.getFullYear()}-${pad(fixtureDate.getMonth() + 1)}-${pad(fixtureDate.getDate())} ${pad(fixtureDate.getHours())}:${pad(fixtureDate.getMinutes())}:${pad(fixtureDate.getSeconds())}`;
+  const fixtureFileTimestamp = `${fixtureDate.getFullYear()}-${pad(fixtureDate.getMonth() + 1)}-${pad(fixtureDate.getDate())}T${pad(fixtureDate.getHours())}${pad(fixtureDate.getMinutes())}${pad(fixtureDate.getSeconds())}`;
+  await writeFile(
+    path.join(logsDir, 'main.log'),
+    `[${fixtureMainTimestamp}] [badc0ffe] [info ] [selector.go:436] session-affinity: cache hit | session=private auth=Fallback-A.json provider=mixed model=gpt-test\n`,
+    'utf8'
+  );
+  await writeFile(
+    path.join(logsDir, `v1-responses-${fixtureFileTimestamp}-badc0ffe.log`),
+    '=== RESPONSE ===\nStatus: 500\nError: EOF\n',
+    'utf8'
+  );
+  await writeFile(
+    path.join(dataDir, 'settings.json'),
+    `${JSON.stringify({ enabled: false, apiBase: `http://127.0.0.1:${managementAddress.port}` })}\n`,
+    'utf8'
+  );
+  const protectedKey = await protectDpapiText('observer-fallback-test-key');
+  await writeFile(path.join(dataDir, 'management-key.dpapi'), `${protectedKey}\n`, 'utf8');
+
+  const child = spawn(
+    process.execPath,
+    [
+      sidecarPath,
+      '--install-dir',
+      root,
+      '--data-dir',
+      dataDir,
+      '--model-request-logs-dir',
+      logsDir,
+      '--port',
+      String(sidecarPort),
+      '--idle-shutdown-minutes',
+      '180',
+    ],
+    { stdio: 'ignore' }
+  );
+  const childClosed = new Promise((resolve) => child.once('close', resolve));
+
+  try {
+    const deadline = Date.now() + 8_000;
+    let payload = null;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${sidecarPort}/auth-failure-history`);
+        if (response.ok) {
+          const candidate = await response.json();
+          if (candidate.files?.['fallback-a.json']) {
+            payload = candidate;
+            break;
+          }
+        }
+      } catch {
+        // Sidecar or its first observer pass may still be starting.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    assert.ok(payload, 'Log observation must continue when /auth-files fails.');
+    assert.ok(authFilesRequestCount >= 1);
+    assert.equal(
+      Object.values(payload.files['fallback-a.json'])[0].details.connection_transient.message,
+      'EOF'
+    );
+    const sidecarLogDir = path.join(dataDir, 'logs');
+    const sidecarLogNames = await readdir(sidecarLogDir);
+    const sidecarLogText = (
+      await Promise.all(
+        sidecarLogNames.map((name) => readFile(path.join(sidecarLogDir, name), 'utf8'))
+      )
+    ).join('\n');
+    assert.doesNotMatch(sidecarLogText, /opaque-private-management-error/i);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill();
+    await Promise.race([childClosed, new Promise((resolve) => setTimeout(resolve, 1_000))]);
+    await new Promise((resolve, reject) => {
+      managementServer.close((error) => (error ? reject(error) : resolve()));
     });
     await rm(root, { recursive: true, force: true });
   }
@@ -538,7 +884,7 @@ async function getAvailablePort() {
         status: 'error',
         planType: 'team',
         windows: [],
-        error: "The model is not supported when using Codex with a ChatGPT account.",
+        error: 'The model is not supported when using Codex with a ChatGPT account.',
         errorStatus: 500,
       },
       'active-unknown.json': {

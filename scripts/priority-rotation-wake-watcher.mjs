@@ -60,7 +60,9 @@ function finiteNumberOrNull(value) {
 export function normalizeWatcherOptions(input = {}) {
   const installDir = String(input.installDir ?? input['install-dir'] ?? DEFAULT_INSTALL_DIR);
   const customUiDir = String(input.customUiDir ?? input['custom-ui-dir'] ?? DEFAULT_CUSTOM_UI_DIR);
-  const dataDir = String(input.dataDir ?? input['data-dir'] ?? path.join(installDir, 'priority-rotation'));
+  const dataDir = String(
+    input.dataDir ?? input['data-dir'] ?? path.join(installDir, 'priority-rotation')
+  );
   const port = normalizePort(input.port ?? DEFAULT_PORT);
   const pollSeconds = clampInteger(
     input.pollSeconds ?? input['poll-seconds'],
@@ -122,13 +124,11 @@ function normalizeWatcherState(input = {}, nowMs = Date.now()) {
     ...base,
     ...input,
     lastSeenRequestAtMs,
-    lastSeenRequestAt: lastSeenRequestAtMs !== null
-      ? toIso(lastSeenRequestAtMs)
-      : input.lastSeenRequestAt ?? null,
+    lastSeenRequestAt:
+      lastSeenRequestAtMs !== null ? toIso(lastSeenRequestAtMs) : (input.lastSeenRequestAt ?? null),
     lastWakeAttemptAtMs,
-    lastWakeAttemptAt: lastWakeAttemptAtMs !== null
-      ? toIso(lastWakeAttemptAtMs)
-      : input.lastWakeAttemptAt ?? null,
+    lastWakeAttemptAt:
+      lastWakeAttemptAtMs !== null ? toIso(lastWakeAttemptAtMs) : (input.lastWakeAttemptAt ?? null),
   };
 }
 
@@ -146,17 +146,20 @@ async function writeJsonAtomic(filePath, value) {
   let lastError = null;
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const tmpPath = `${filePath}.${process.pid}.${Date.now()}.${attempt}.tmp`;
-    await writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
     try {
+      await writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
       await rename(tmpPath, filePath);
       return;
     } catch (error) {
       lastError = error;
+      if (attempt < 5) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
+    } finally {
       await rm(tmpPath, { force: true }).catch(() => {});
-      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
     }
   }
-  throw lastError;
+  throw lastError ?? new Error(`Failed to write ${filePath}`);
 }
 
 async function readSettingsEnabled(settingsPath) {
@@ -199,7 +202,11 @@ export async function isSidecarReachable(options) {
 
 export function launchSidecar(options) {
   const wscriptPath = path.join(process.env.WINDIR ?? 'C:\\Windows', 'System32', 'wscript.exe');
-  const runnerPath = path.join(options.customUiDir, 'scripts', 'run-priority-rotation-sidecar-hidden.vbs');
+  const runnerPath = path.join(
+    options.customUiDir,
+    'scripts',
+    'run-priority-rotation-sidecar-hidden.vbs'
+  );
   const child = spawn(
     wscriptPath,
     [
@@ -253,9 +260,6 @@ export function shouldWakeForActivity({
   if (latest <= lastSeen) {
     return { wake: false, reason: 'no_new_request', nextLastSeenRequestAtMs: lastSeen };
   }
-  if (!settingsEnabled) {
-    return { wake: false, reason: 'disabled', nextLastSeenRequestAtMs: latest };
-  }
   if (sidecarRunning) {
     return { wake: false, reason: 'already_running', nextLastSeenRequestAtMs: latest };
   }
@@ -267,9 +271,13 @@ export function shouldWakeForActivity({
       MAX_COOLDOWN_SECONDS
     ) * 1_000;
   if (lastWakeAttempt !== null && nowMs - lastWakeAttempt < cooldownMs) {
-    return { wake: false, reason: 'cooldown', nextLastSeenRequestAtMs: latest };
+    return { wake: false, reason: 'cooldown', nextLastSeenRequestAtMs: lastSeen };
   }
-  return { wake: true, reason: 'new_request', nextLastSeenRequestAtMs: latest };
+  return {
+    wake: true,
+    reason: settingsEnabled ? 'new_request' : 'new_request_observer',
+    nextLastSeenRequestAtMs: latest,
+  };
 }
 
 export async function runWatcherOnce({
@@ -284,8 +292,10 @@ export async function runWatcherOnce({
     state ?? (await readJson(normalizedOptions.statePath, {})),
     nowMs
   );
-  const latestRequestAtMs = await (dependencies.readLatestRequestAtMs ??
-    (() => readLatestModelRequestAtMs(normalizedOptions.modelRequestLogsDir, null)))();
+  const latestRequestAtMs = await (
+    dependencies.readLatestRequestAtMs ??
+    (() => readLatestModelRequestAtMs(normalizedOptions.modelRequestLogsDir, null))
+  )();
 
   let settingsEnabled = false;
   let sidecarRunning = false;
@@ -304,12 +314,13 @@ export async function runWatcherOnce({
     decision.reason !== 'bootstrap' &&
     decision.reason !== 'no_new_request'
   ) {
-    settingsEnabled = await (dependencies.readSettingsEnabled ??
-      (() => readSettingsEnabled(normalizedOptions.settingsPath)))();
-    if (settingsEnabled) {
-      sidecarRunning = await (dependencies.isSidecarReachable ??
-        (() => isSidecarReachable(normalizedOptions)))();
-    }
+    settingsEnabled = await (
+      dependencies.readSettingsEnabled ??
+      (() => readSettingsEnabled(normalizedOptions.settingsPath))
+    )();
+    sidecarRunning = await (
+      dependencies.isSidecarReachable ?? (() => isSidecarReachable(normalizedOptions))
+    )();
     decision = shouldWakeForActivity({
       latestRequestAtMs,
       lastSeenRequestAtMs: currentState.lastSeenRequestAtMs,
@@ -334,29 +345,35 @@ export async function runWatcherOnce({
     nextState.lastWakeAttemptAt = toIso(nowMs);
     try {
       await (dependencies.launchSidecar ?? (() => launchSidecar(normalizedOptions)))();
-      const reachable = await (dependencies.waitForSidecar ??
-        (() => waitForSidecar(normalizedOptions)))();
+      const reachable = await (
+        dependencies.waitForSidecar ?? (() => waitForSidecar(normalizedOptions))
+      )();
       nextState.lastWakeResult = reachable ? 'started' : 'started_unconfirmed';
+      if (!reachable) {
+        nextState.lastSeenRequestAtMs = currentState.lastSeenRequestAtMs;
+        nextState.lastSeenRequestAt = toIso(currentState.lastSeenRequestAtMs);
+      }
       nextState.wakeCount = Number(nextState.wakeCount ?? 0) + 1;
-      await (dependencies.logLine ?? ((level, message, details) => logLine(normalizedOptions, level, message, details)))(
-        'info',
-        'priority rotation sidecar wake requested',
-        {
-          requestAt: toIso(latestRequestAtMs),
-          result: nextState.lastWakeResult,
-        }
-      );
+      await (
+        dependencies.logLine ??
+        ((level, message, details) => logLine(normalizedOptions, level, message, details))
+      )('info', 'priority rotation sidecar wake requested', {
+        requestAt: toIso(latestRequestAtMs),
+        result: nextState.lastWakeResult,
+      });
     } catch (error) {
       nextState.lastWakeResult = 'failed';
-      nextState.lastError = error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
-      await (dependencies.logLine ?? ((level, message, details) => logLine(normalizedOptions, level, message, details)))(
-        'error',
-        'priority rotation sidecar wake failed',
-        {
-          requestAt: toIso(latestRequestAtMs),
-          message: nextState.lastError,
-        }
-      );
+      nextState.lastSeenRequestAtMs = currentState.lastSeenRequestAtMs;
+      nextState.lastSeenRequestAt = toIso(currentState.lastSeenRequestAtMs);
+      nextState.lastError =
+        error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+      await (
+        dependencies.logLine ??
+        ((level, message, details) => logLine(normalizedOptions, level, message, details))
+      )('error', 'priority rotation sidecar wake failed', {
+        requestAt: toIso(latestRequestAtMs),
+        message: nextState.lastError,
+      });
     }
   }
 
@@ -370,9 +387,9 @@ export async function runWatcherOnce({
 
   if (shouldPersist) {
     nextState.updatedAt = toIso(nowMs);
-    await (dependencies.persistState ?? ((value) => writeJsonAtomic(normalizedOptions.statePath, value)))(
-      nextState
-    );
+    await (
+      dependencies.persistState ?? ((value) => writeJsonAtomic(normalizedOptions.statePath, value))
+    )(nextState);
   }
 
   return {

@@ -1,4 +1,5 @@
 import type { CodexQuotaState } from '@/types';
+import type { StatusFailureHistoryStore } from '@/features/authFiles/statusFailureHistory';
 
 export type PriorityRotationSidecarSettings = {
   enabled: boolean;
@@ -92,8 +93,13 @@ export type PriorityRotationSidecarRequestError = Error & {
   body?: string;
 };
 
+export type AuthFailureHistoryResponse = StatusFailureHistoryStore & {
+  generatedAt?: string | null;
+};
+
 const SIDECAR_BASE_URL = 'http://127.0.0.1:8318';
 const SIDECAR_WAKE_URL = 'cpamc-priority-rotation://start';
+const AUTH_FAILURE_HISTORY_REQUEST_TIMEOUT_MS = 1_000;
 
 export const launchPriorityRotationSidecar = (): boolean => {
   if (typeof document === 'undefined') return false;
@@ -114,17 +120,49 @@ const buildHeaders = (managementKey?: string): HeadersInit => ({
 
 const requestSidecar = async <T>(
   path: string,
-  options: RequestInit & { managementKey?: string } = {}
+  options: RequestInit & { managementKey?: string; timeoutMs?: number } = {}
 ): Promise<T> => {
-  const { managementKey, ...fetchOptions } = options;
-  const response = await fetch(`${SIDECAR_BASE_URL}${path}`, {
-    ...fetchOptions,
-    headers: {
-      ...buildHeaders(managementKey),
-      ...(fetchOptions.headers || {}),
-    },
-  });
-  const text = await response.text();
+  const { managementKey, timeoutMs = 0, signal: callerSignal, ...fetchOptions } = options;
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let didTimeout = false;
+  const abortFromCaller = () =>
+    controller.abort(callerSignal?.reason ?? new DOMException('Aborted', 'AbortError'));
+  if (callerSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  }
+  if (timeoutMs > 0 && !controller.signal.aborted) {
+    timeoutId = globalThis.setTimeout(() => {
+      didTimeout = true;
+      controller.abort(new DOMException('Sidecar request timed out', 'TimeoutError'));
+    }, timeoutMs);
+  }
+
+  let response: Response;
+  let text: string;
+  try {
+    response = await fetch(`${SIDECAR_BASE_URL}${path}`, {
+      ...fetchOptions,
+      headers: {
+        ...buildHeaders(managementKey),
+        ...(fetchOptions.headers || {}),
+      },
+      signal: controller.signal,
+    });
+    text = await response.text();
+  } catch (error) {
+    if (didTimeout) {
+      const timeoutError = new Error(`Sidecar request timed out after ${timeoutMs} ms`);
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    callerSignal?.removeEventListener('abort', abortFromCaller);
+  }
   const trimmedText = text.trim();
   let data: unknown = null;
   let parseFailed = false;
@@ -164,6 +202,12 @@ const requestSidecar = async <T>(
 
 export const priorityRotationSidecarApi = {
   getStatus: () => requestSidecar<PriorityRotationSidecarStatus>('/status'),
+
+  getAuthFailureHistory: (signal?: AbortSignal) =>
+    requestSidecar<AuthFailureHistoryResponse>('/auth-failure-history', {
+      signal,
+      timeoutMs: AUTH_FAILURE_HISTORY_REQUEST_TIMEOUT_MS,
+    }),
 
   updateSettings: (settings: Partial<PriorityRotationSidecarSettings>, managementKey: string) =>
     requestSidecar<{
