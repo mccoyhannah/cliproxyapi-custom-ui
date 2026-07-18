@@ -1,0 +1,37 @@
+{
+  "name": "cpa-token-pulse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A private desktop telemetry widget with guarded local CPA token ledger maintenance.",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:renderer": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "icons": "node scripts/generate-icons.mjs",
+    "type-check": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.electron.json --noEmit && tsc -p tsconfig.preload.json --noEmit",
+    "build:renderer": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "npm run icons && npm run type-check && npm run build:renderer && npm run build:electron",
+    "test": "node --test",
+    "start": "npm run build && electron .",
+    "dist:portable": "npm run build && node scripts/build-portable.mjs",
+    "smoke:maintenance-preview": "electron scripts/maintenance-preview-smoke",
+    "smoke:portable": "node scripts/smoke-portable.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.1",
+    "react-dom": "19.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.1",
+    "typescript": "5.9.3",
+    "vite": "8.1.5"
+  }
+}

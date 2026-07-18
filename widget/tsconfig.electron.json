@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "types": ["node", "electron"]
+  },
+  "include": [
+    "electron/main.ts",
+    "electron/windowState.ts",
+    "electron/ledgerMaintenance.ts",
+    "electron/maintenance/**/*.ts",
+    "electron/collector/**/*.ts",
+    "src/shared/**/*.ts",
+    "../scripts/lib/**/*.mjs"
+  ],
+  "exclude": ["electron/preload.ts", "electron/**/*.test.ts"]
+}

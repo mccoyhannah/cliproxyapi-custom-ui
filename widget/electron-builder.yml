@@ -1,0 +1,31 @@
+appId: com.local.cpa.tokenpulse
+productName: CPA Token Pulse
+copyright: Copyright © 2026
+asar: true
+compression: normal
+directories:
+  output: D:/Tools/Cache/CPA-Token-Pulse/builder-output/current
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - assets/icon.png
+  - package.json
+asarUnpack:
+  - dist-electron/collector/worker.js
+  - dist-electron/collector/package.json
+  - dist-electron/maintenance/worker.js
+  - dist-electron/maintenance/package.json
+win:
+  icon: assets/icon.ico
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: CPA-Token-Pulse-${version}-portable.${ext}
+  signAndEditExecutable: true
+portable:
+  requestExecutionLevel: user
+  # electron-builder 26.15.3 only omits its build-wide temp folder define when
+  # this boolean is true, leaving the portable template on unique $PLUGINSDIR.
+  unpackDirName: true
+publish: null

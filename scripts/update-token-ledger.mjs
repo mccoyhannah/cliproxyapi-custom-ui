@@ -3,40 +3,65 @@
 import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import {
+  LOG_FILE_PATTERN,
+  buildRequestDedupeKey,
+  dedupeLedgerEntries,
+  emptyTokenUsage,
+  extractActualModel,
+  extractConfiguredModel,
+  parseLogFilename,
+} from './lib/token-log-core.mjs';
+import { readTokenResponseLog } from './lib/token-log-reader.mjs';
+import {
+  createTokenLedgerMaintenanceCore,
+  TokenLedgerMaintenanceError,
+  toSafeTokenLedgerMaintenanceError,
+  withTokenLedgerMaintenanceLock,
+} from './lib/token-ledger-maintenance-core.mjs';
 
 const VERSION = 1;
 const DEFAULT_INSTALL_DIR = 'D:\\CLIProxyAPI';
-const LOG_FILE_PATTERN =
-  /^v1-(responses|chat-completions|messages)-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})-([A-Za-z0-9_-]+)\.log$/;
-const HEAD_BYTES = 64 * 1024;
-const TAIL_BYTES = 256 * 1024;
+const DEFAULT_LOG_STABILITY_DELAY_MS = 750;
 const DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES = 5;
 const PRUNE_ERROR_SAMPLE_LIMIT = 10;
 const EMBEDDED_LEDGER_ID = 'cpamc-token-ledger';
 const LOW_SPACE_ERROR_CODE = 'TOKEN_LEDGER_LOW_SPACE';
 const DEFAULT_MIN_FREE_BYTES = 2 * 1024 ** 3;
 const DEFAULT_MIN_FREE_RATIO = 0.02;
-const MODEL_NAME_RULES = JSON.parse(
-  await fs.readFile(
-    new URL('../src/features/usageStatistics/lib/modelNameRules.json', import.meta.url),
-    'utf8'
-  )
+const DEFAULT_CUSTOM_UI_DIR = 'D:\\CLIProxyAPI_Maintenance\\custom-ui';
+const PRODUCTION_LEDGER_PATH = path.join(
+  DEFAULT_INSTALL_DIR,
+  'usage-backups',
+  'token-ledger',
+  'ledger.json'
 );
-const MODEL_VALUE_PATTERN = '[A-Za-z0-9._:/+-]+';
-const BLOCKED_MODEL_WORDS = new Set(MODEL_NAME_RULES.blockedWords.map((item) => item.toLowerCase()));
-const VALID_MODEL_PATTERNS = MODEL_NAME_RULES.validModelPatterns.map(
-  (pattern) => new RegExp(pattern, 'i')
-);
-
-const emptyTokenUsage = (status) => ({
-  input: 0,
-  output: 0,
-  cached: 0,
-  reasoning: 0,
-  total: 0,
-  status,
-});
-
+const PRODUCTION_PROJECTION_PATH = path.join(DEFAULT_INSTALL_DIR, 'static', 'token-ledger.json');
+const PRODUCTION_LOG_ROOTS = [
+  path.join(DEFAULT_INSTALL_DIR, 'logs'),
+  path.join(DEFAULT_INSTALL_DIR, 'auths', 'logs'),
+];
+const PRODUCTION_MAINTENANCE_LOCK_PATH = `${PRODUCTION_LEDGER_PATH}.maintenance.lock`;
+const MAINTENANCE_PATH_ARGUMENTS = new Set([
+  'logs-dir',
+  'ledger-dir',
+  'static-dir',
+  'ledger-path',
+  'projection-path',
+]);
+const MAINTENANCE_INCOMPATIBLE_FLAGS = [
+  'rebuild',
+  'dryRun',
+  'embed',
+  'embed-full',
+  'no-embed',
+  'prune-recorded-logs',
+  'prune-only',
+  'rescue-low-space',
+  'min-free-bytes',
+];
 const parseArgs = (argv) => {
   const result = {
     dryRun: false,
@@ -102,23 +127,46 @@ const pathExists = async (filePath) => {
   }
 };
 
-const directoryExists = async (dirPath) => {
-  try {
-    const stats = await fs.stat(dirPath);
-    return stats.isDirectory();
-  } catch (error) {
-    if (error?.code === 'ENOENT') return false;
-    throw error;
-  }
-};
-
 const normalizeSourceDir = (logsDir) => path.normalize(path.resolve(logsDir));
+const compareSourceDir = (logsDir) => normalizeSourceDir(logsDir).replace(/\\/g, '/').toLowerCase();
 
 const makeSourceKey = (logsDir, fileName) => `${normalizeSourceDir(logsDir)}::${fileName}`;
 
 const resolveLogDirs = (args, installDir) => {
   if (args['logs-dir']) return [args['logs-dir']];
   return [path.join(installDir, 'logs'), path.join(installDir, 'auths', 'logs')];
+};
+
+const resolveSafeLegacyLogRoots = async (logsDirs, fsAdapter = fs) => {
+  const io = fsAdapter;
+  const roots = [];
+  const seen = new Set();
+  for (const rawLogsDir of logsDirs) {
+    const logicalPath = normalizeSourceDir(rawLogsDir);
+    let stats;
+    try {
+      stats = await io.lstat(logicalPath);
+    } catch (error) {
+      if (error?.code === 'ENOENT') continue;
+      throw error;
+    }
+    if (!stats.isDirectory() || stats.isSymbolicLink()) {
+      throw new Error('CLIProxyAPI log root must be an ordinary directory.');
+    }
+    const realPath = normalizeSourceDir(await io.realpath(logicalPath));
+    const realKey = compareSourceDir(realPath);
+    if (realKey !== compareSourceDir(logicalPath) || seen.has(realKey)) {
+      throw new Error('CLIProxyAPI log root must not be a junction, symlink, or duplicate.');
+    }
+    seen.add(realKey);
+    roots.push({ logicalPath, realPath });
+  }
+  if (roots.length === 0) {
+    throw new Error(
+      `No CLIProxyAPI log directories found: ${logsDirs.map(normalizeSourceDir).join(', ')}`
+    );
+  }
+  return roots;
 };
 
 const escapeJsonForHtml = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
@@ -179,49 +227,6 @@ const removeEmbeddedLedgerFromHtml = async (htmlPath) => {
   return true;
 };
 
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const normalizeModelName = (value) => {
-  if (value === undefined || value === null || typeof value === 'boolean') return null;
-  const trimmed = String(value).trim().replace(/^["'`]+|["'`,;}\]]+$/g, '');
-  if (!trimmed || trimmed === '-') return null;
-  if (/\s/.test(trimmed)) return null;
-
-  const lower = trimmed.toLowerCase();
-  if (BLOCKED_MODEL_WORDS.has(lower)) return null;
-  return VALID_MODEL_PATTERNS.some((pattern) => pattern.test(trimmed)) ? trimmed : null;
-};
-
-const buildJsonFieldPatterns = (keys) =>
-  keys.map((key) => new RegExp(`"${escapeRegExp(key)}"\\s*:\\s*"([^"]+)"`, 'i'));
-
-const extractFirstModel = (raw, patterns) => {
-  for (const pattern of patterns) {
-    const match = raw.match(pattern);
-    const value = normalizeModelName(match?.[1]);
-    if (value) return value;
-  }
-  return null;
-};
-
-const CONFIGURED_JSON_PATTERNS = buildJsonFieldPatterns(MODEL_NAME_RULES.configuredModelKeys);
-const ACTUAL_JSON_PATTERNS = buildJsonFieldPatterns(MODEL_NAME_RULES.actualModelKeys);
-const CONFIGURED_TEXT_PATTERNS = [
-  new RegExp(`\\b(?:configured|requested)\\s+model\\s*[:=]\\s*(${MODEL_VALUE_PATTERN})`, 'i'),
-];
-const ACTUAL_TEXT_PATTERNS = [
-  new RegExp(
-    `\\b(?:actual|upstream|routed|selected|target|response)\\s+model\\s*[:=]\\s*(${MODEL_VALUE_PATTERN})`,
-    'i'
-  ),
-];
-
-const extractConfiguredModel = (raw) =>
-  extractFirstModel(raw, [...CONFIGURED_JSON_PATTERNS, ...CONFIGURED_TEXT_PATTERNS]);
-
-const extractActualModel = (raw) =>
-  extractFirstModel(raw, [...ACTUAL_JSON_PATTERNS, ...ACTUAL_TEXT_PATTERNS]);
-
 const numberValue = (value) => {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, Math.floor(value));
   if (typeof value === 'string' && value.trim()) {
@@ -277,7 +282,8 @@ const inspectFreeSpace = async (targetPaths, overrideBytes, writeBytes = 0) => {
     const capacityBytes = blockSize * Number(stats.blocks);
     const availableBytes = blockSize * Number(stats.bavail ?? stats.bfree);
     const reserveBytes =
-      overrideBytes ?? Math.max(DEFAULT_MIN_FREE_BYTES, Math.ceil(capacityBytes * DEFAULT_MIN_FREE_RATIO));
+      overrideBytes ??
+      Math.max(DEFAULT_MIN_FREE_BYTES, Math.ceil(capacityBytes * DEFAULT_MIN_FREE_RATIO));
     const requiredBytes = reserveBytes + Math.max(0, writeBytes);
 
     checks.push({
@@ -295,12 +301,7 @@ const inspectFreeSpace = async (targetPaths, overrideBytes, writeBytes = 0) => {
   return checks;
 };
 
-const assertEnoughFreeSpace = async (
-  targetPaths,
-  overrideBytes,
-  writeBytes = 0,
-  details = {}
-) => {
+const assertEnoughFreeSpace = async (targetPaths, overrideBytes, writeBytes = 0, details = {}) => {
   const checks = await inspectFreeSpace(targetPaths, overrideBytes, writeBytes);
   const failed = checks.find((check) => check.lowSpace);
   if (!failed) return checks;
@@ -324,170 +325,31 @@ const assertEnoughFreeSpace = async (
 
 const fingerprintForStats = (stats) => `${stats.size}:${Math.floor(stats.mtimeMs)}`;
 
-const recordValue = (value) =>
-  value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-
-const firstNumber = (values) => {
-  for (const value of values) {
-    const parsed = numberValue(value);
-    if (parsed !== null) return parsed;
-  }
-  return null;
-};
-
-const extractJsonObjectAt = (text, start) => {
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = start; index < text.length; index += 1) {
-    const char = text[index];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === '\\') {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === '{') depth += 1;
-    if (char === '}') {
-      depth -= 1;
-      if (depth === 0) return text.slice(start, index + 1);
-    }
-  }
-
-  return null;
-};
-
-const extractUsageObjects = (text) => {
-  const results = [];
-  const usagePattern = /"usage"\s*:\s*\{/gi;
-  let match;
-
-  while ((match = usagePattern.exec(text)) !== null) {
-    const objectStart = match.index + match[0].lastIndexOf('{');
-    const rawObject = extractJsonObjectAt(text, objectStart);
-    if (!rawObject) continue;
-
-    try {
-      const parsed = JSON.parse(rawObject);
-      const record = recordValue(parsed);
-      if (record) results.push(record);
-    } catch {
-      // Streaming fragments can be incomplete; keep searching later usage objects.
-    }
-  }
-
-  return results;
-};
-
-const normalizeTokenUsage = (usage) => {
-  const inputDetails = recordValue(usage.input_tokens_details) ?? recordValue(usage.prompt_tokens_details);
-  const outputDetails =
-    recordValue(usage.output_tokens_details) ?? recordValue(usage.completion_tokens_details);
-  const input = firstNumber([usage.input_tokens, usage.prompt_tokens]) ?? 0;
-  const output = firstNumber([usage.output_tokens, usage.completion_tokens]) ?? 0;
-  const cached =
-    firstNumber([
-      usage.cached_tokens,
-      usage.input_cached_tokens,
-      inputDetails?.cached_tokens,
-      inputDetails?.cache_read_input_tokens,
-    ]) ?? 0;
-  const reasoning =
-    firstNumber([
-      usage.reasoning_tokens,
-      usage.output_reasoning_tokens,
-      outputDetails?.reasoning_tokens,
-    ]) ?? 0;
-  const explicitTotal = firstNumber([usage.total_tokens]);
-  const total = explicitTotal ?? input + output;
-
-  return {
-    input,
-    output,
-    cached,
-    reasoning,
-    total,
-    status: total > 0 || input > 0 || output > 0 || cached > 0 || reasoning > 0 ? 'available' : 'unreported',
-  };
-};
-
-const extractTokenUsage = (text) => {
-  const candidates = extractUsageObjects(text).map(normalizeTokenUsage);
-  const usable = candidates.filter((item) => item.status === 'available');
-  return usable.length > 0 ? usable[usable.length - 1] : emptyTokenUsage('unreported');
-};
-
 const parseFilename = (fileName, stats) => {
-  const match = fileName.match(LOG_FILE_PATTERN);
-  if (!match) {
-    return {
-      fileType: 'unknown',
-      timestampMs: Number.isFinite(stats.mtimeMs) ? Math.floor(stats.mtimeMs) : null,
-      requestId: null,
-    };
-  }
-
-  const [, fileType, year, month, day, hour, minute, second, requestId] = match;
-  const timestampMs = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second)
-  ).getTime();
-
-  return {
-    fileType,
-    timestampMs: Number.isFinite(timestampMs) ? timestampMs : Math.floor(stats.mtimeMs),
-    requestId,
-  };
+  return parseLogFilename(fileName, Number.isFinite(stats.mtimeMs) ? stats.mtimeMs : null);
 };
 
-const readLogPreview = async (filePath, stats) => {
-  const fileSize = stats.size;
-  const headBytes = Math.min(HEAD_BYTES, fileSize);
-  const tailBytes = Math.min(TAIL_BYTES, fileSize);
-
-  if (fileSize <= headBytes + tailBytes) {
-    const full = await fs.readFile(filePath, 'utf8');
-    return { head: full, tail: full };
-  }
-
-  const handle = await fs.open(filePath, 'r');
-  try {
-    const headBuffer = Buffer.alloc(headBytes);
-    const tailBuffer = Buffer.alloc(tailBytes);
-    await handle.read(headBuffer, 0, headBytes, 0);
-    await handle.read(tailBuffer, 0, tailBytes, fileSize - tailBytes);
-    return {
-      head: headBuffer.toString('utf8'),
-      tail: tailBuffer.toString('utf8'),
-    };
-  } finally {
-    await handle.close();
-  }
-};
-
-const parseLogFile = async (filePath, fileName, stats, sourceDir) => {
+const parseLogFile = async (
+  filePath,
+  fileName,
+  stats,
+  sourceDir,
+  { stable = true, fsAdapter = fs } = {}
+) => {
   const filenameInfo = parseFilename(fileName, stats);
-  const { head, tail } = await readLogPreview(filePath, stats);
-  const preview = head === tail ? head : `${head}\n${tail}`;
-  const configuredModel = extractConfiguredModel(head) ?? extractConfiguredModel(tail);
-  const actualModel = extractActualModel(tail) ?? extractActualModel(head);
-  const tokenUsage = extractTokenUsage(preview);
+  const { response, parsed: parsedResponse } = await readTokenResponseLog(filePath, stats, {
+    stable,
+    fsAdapter,
+  });
+  const responseText = response.status === 'complete' ? response.text : '';
+  const configuredModel = responseText ? extractConfiguredModel(responseText) : null;
+  const actualModel =
+    parsedResponse.model ?? (responseText ? extractActualModel(responseText) : null);
+  const tokenUsage = ['ambiguous', 'parse-error'].includes(parsedResponse.status)
+    ? emptyTokenUsage('error')
+    : parsedResponse.tokenUsage.status === 'available'
+      ? parsedResponse.tokenUsage
+      : emptyTokenUsage('unreported');
 
   return {
     fileName,
@@ -505,7 +367,45 @@ const parseLogFile = async (filePath, fileName, stats, sourceDir) => {
   };
 };
 
-const errorEntry = (fileName, stats, sourceDir, error) => {
+const sameFileSnapshot = (left, right) =>
+  left.dev === right.dev &&
+  left.ino === right.ino &&
+  left.size === right.size &&
+  left.mtimeMs === right.mtimeMs &&
+  left.ctimeMs === right.ctimeMs;
+
+export const parseProductionLogSnapshot = async ({
+  filePath,
+  fileName,
+  sourceDir,
+  stable = false,
+  firstStats = null,
+  fsAdapter = fs,
+}) => {
+  const io = fsAdapter;
+  const initialStats = firstStats ?? (await io.lstat(filePath));
+  if (!initialStats.isFile() || initialStats.isSymbolicLink()) return { status: 'changed' };
+  const entry = await parseLogFile(filePath, fileName, initialStats, sourceDir, {
+    stable,
+    fsAdapter: io,
+  });
+  const finalStats = await io.lstat(filePath);
+  if (
+    !finalStats.isFile() ||
+    finalStats.isSymbolicLink() ||
+    fingerprintForStats(finalStats) !== fingerprintForStats(initialStats) ||
+    !sameFileSnapshot(initialStats, finalStats)
+  ) {
+    return { status: 'changed' };
+  }
+  return {
+    status: 'parsed',
+    entry,
+    fingerprint: fingerprintForStats(initialStats),
+  };
+};
+
+export const buildSafeLogErrorEntry = (fileName, stats, sourceDir) => {
   const filenameInfo = parseFilename(fileName, stats);
   return {
     fileName,
@@ -520,17 +420,18 @@ const errorEntry = (fileName, stats, sourceDir, error) => {
     tokenUsage: emptyTokenUsage('error'),
     fileSize: stats.size,
     lastModifiedMs: Math.floor(stats.mtimeMs),
-    error: error instanceof Error ? error.message : String(error),
+    errorCode: 'log-parse-failed',
   };
 };
 
-const listLogFiles = async (logsDirs) => {
+const listLogFiles = async (logsDirs, fsAdapter = fs) => {
+  const io = fsAdapter;
   const results = [];
 
   for (const logsDir of logsDirs) {
     let items;
     try {
-      items = await fs.readdir(logsDir, { withFileTypes: true });
+      items = await io.readdir(logsDir, { withFileTypes: true });
     } catch (error) {
       if (error?.code === 'ENOENT') continue;
       throw error;
@@ -559,7 +460,9 @@ const calculateCoverage = (entries) => {
   const totalEntries = entries.length;
   const parsedEntries = entries.filter((entry) => entry.detailStatus !== 'error').length;
   const knownEntries = entries.filter((entry) => entry.tokenUsage?.status === 'available').length;
-  const unreportedEntries = entries.filter((entry) => entry.tokenUsage?.status === 'unreported').length;
+  const unreportedEntries = entries.filter(
+    (entry) => entry.tokenUsage?.status === 'unreported'
+  ).length;
   let earliestTimestampMs = null;
   let latestTimestampMs = null;
 
@@ -586,61 +489,20 @@ const calculateCoverage = (entries) => {
   };
 };
 
-const tokenUsageScore = (entry) => {
-  if (entry.tokenUsage?.status === 'available') return 2;
-  if (entry.tokenUsage?.status === 'unreported') return 1;
-  return 0;
-};
+const dedupeEntries = (entries) => dedupeLedgerEntries(entries);
 
-const detailStatusScore = (entry) => {
-  if (entry.detailStatus === 'ready') return 2;
-  if (entry.detailStatus === 'missing-fields') return 1;
-  return 0;
-};
-
-const sourcePriority = (entry) => {
-  const normalized = (entry.sourceDir ?? '').replace(/\\/g, '/').toLowerCase();
-  return normalized.endsWith('/auths/logs') ? 1 : 0;
-};
-
-const numericScore = (value) =>
-  typeof value === 'number' && Number.isFinite(value) ? value : 0;
-
-const preferredEntry = (left, right) => {
-  const rankers = [
-    tokenUsageScore,
-    detailStatusScore,
-    (entry) => numericScore(entry.timestampMs),
-    sourcePriority,
-    (entry) => numericScore(entry.lastModifiedMs),
-    (entry) => numericScore(entry.fileSize),
-  ];
-
-  for (const ranker of rankers) {
-    const leftScore = ranker(left);
-    const rightScore = ranker(right);
-    if (leftScore !== rightScore) return leftScore > rightScore ? left : right;
-  }
-
-  return String(left.sourceKey ?? left.fileName).localeCompare(String(right.sourceKey ?? right.fileName)) <= 0
-    ? left
-    : right;
-};
-
-const dedupeEntries = (entries) => {
-  const entriesByRequest = new Map();
-
-  entries.forEach((entry) => {
-    const key = entry.requestId ? `request:${entry.requestId}` : `source:${entry.sourceKey ?? entry.fileName}`;
-    const current = entriesByRequest.get(key);
-    entriesByRequest.set(key, current ? preferredEntry(current, entry) : entry);
-  });
-
-  return Array.from(entriesByRequest.values());
-};
-
-const buildProjection = ({ entries, generatedAt, logsDirs, scannedFiles, updatedFiles, skippedFiles, errorFiles }) => ({
+const buildProjection = ({
+  entries,
+  generatedAt,
+  generationId,
+  logsDirs,
+  scannedFiles,
+  updatedFiles,
+  skippedFiles,
+  errorFiles,
+}) => ({
   version: VERSION,
+  ...(generationId ? { generationId } : {}),
   generatedAt,
   source: {
     logsDir: logsDirs[0] ?? null,
@@ -668,7 +530,10 @@ const emptyPruneSummary = ({ enabled, dryRun, logsDirs, activeWindowMinutes }) =
   failedDeletes: 0,
   keptActiveFiles: 0,
   keptUnrecordedFiles: 0,
+  keptNotReadyAvailableFiles: 0,
   keptFingerprintMismatchFiles: 0,
+  keptUnsafeFiles: 0,
+  keptChangedFiles: 0,
   errorSamples: [],
 });
 
@@ -680,6 +545,10 @@ const pruneRecordedLogs = async ({
   nextFingerprints,
   activeWindowMinutes,
 }) => {
+  const safeRoots = await resolveSafeLegacyLogRoots(logsDirs);
+  const rootsByLogicalPath = new Map(
+    safeRoots.map((root) => [compareSourceDir(root.logicalPath), root])
+  );
   const summary = emptyPruneSummary({
     enabled: true,
     dryRun,
@@ -691,20 +560,33 @@ const pruneRecordedLogs = async ({
   const activeCutoffMs = nowMs - activeWindowMs;
   summary.activeCutoffMs = activeCutoffMs;
 
-  for (const { filePath, sourceKey } of logFiles) {
+  for (const { filePath, logsDir, sourceKey } of logFiles) {
+    const root = rootsByLogicalPath.get(compareSourceDir(logsDir));
+    if (!root) {
+      summary.keptUnsafeFiles += 1;
+      continue;
+    }
     let stats;
     try {
-      stats = await fs.stat(filePath);
+      stats = await fs.lstat(filePath);
     } catch (error) {
       if (error?.code === 'ENOENT') continue;
       summary.failedDeletes += 1;
       if (summary.errorSamples.length < PRUNE_ERROR_SAMPLE_LIMIT) {
-        summary.errorSamples.push({ filePath, error: error instanceof Error ? error.message : String(error) });
+        summary.errorSamples.push({
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
       continue;
     }
 
     summary.scannedFiles += 1;
+
+    if (!stats.isFile() || stats.isSymbolicLink()) {
+      summary.keptUnsafeFiles += 1;
+      continue;
+    }
 
     if (activeWindowMs > 0 && stats.mtimeMs >= activeCutoffMs) {
       summary.keptActiveFiles += 1;
@@ -712,8 +594,14 @@ const pruneRecordedLogs = async ({
     }
 
     const ledgerFingerprint = nextFingerprints[sourceKey];
-    if (!ledgerFingerprint || !entriesBySourceKey.has(sourceKey)) {
+    const ledgerEntry = entriesBySourceKey.get(sourceKey);
+    if (!ledgerFingerprint || !ledgerEntry) {
       summary.keptUnrecordedFiles += 1;
+      continue;
+    }
+
+    if (ledgerEntry.detailStatus !== 'ready' || ledgerEntry.tokenUsage?.status !== 'available') {
+      summary.keptNotReadyAvailableFiles += 1;
       continue;
     }
 
@@ -724,11 +612,33 @@ const pruneRecordedLogs = async ({
 
     if (!dryRun) {
       try {
-        await fs.rm(filePath, { force: true });
+        const finalRealPath = normalizeSourceDir(await fs.realpath(filePath));
+        if (
+          compareSourceDir(path.dirname(finalRealPath)) !== compareSourceDir(root.realPath) ||
+          compareSourceDir(finalRealPath) !== compareSourceDir(filePath)
+        ) {
+          summary.keptChangedFiles += 1;
+          continue;
+        }
+        const finalStats = await fs.lstat(filePath);
+        if (
+          !finalStats.isFile() ||
+          finalStats.isSymbolicLink() ||
+          finalStats.mtimeMs >= activeCutoffMs ||
+          fingerprintForStats(finalStats) !== ledgerFingerprint ||
+          !sameFileSnapshot(stats, finalStats)
+        ) {
+          summary.keptChangedFiles += 1;
+          continue;
+        }
+        await fs.unlink(filePath);
       } catch (error) {
         summary.failedDeletes += 1;
         if (summary.errorSamples.length < PRUNE_ERROR_SAMPLE_LIMIT) {
-          summary.errorSamples.push({ filePath, error: error instanceof Error ? error.message : String(error) });
+          summary.errorSamples.push({
+            filePath,
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
         continue;
       }
@@ -752,15 +662,347 @@ const normalizePreviousEntry = (entry, fallbackSourceDir) => {
   };
 };
 
-const main = async () => {
-  const args = parseArgs(process.argv.slice(2));
-  if (args.help) {
-    console.log(
-      'Usage: node scripts/update-token-ledger.mjs [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--embed-full] [--no-embed] [--prune-recorded-logs] [--prune-only] [--rescue-low-space] [--min-free-bytes N] [--active-window-minutes 5]'
-    );
-    return;
+const finalizedIdentityForEntry = (entry) =>
+  buildRequestDedupeKey({
+    fileType: entry?.fileType ?? 'unknown',
+    timestampMs: Number.isFinite(entry?.timestampMs) ? entry.timestampMs : null,
+    requestId: entry?.requestId ?? null,
+    sourceIdentity: entry?.sourceKey ?? entry?.fileName ?? '',
+  });
+
+const availableEntriesMatch = (left, right) =>
+  left?.tokenUsage?.status === 'available' &&
+  right?.tokenUsage?.status === 'available' &&
+  finalizedIdentityForEntry(left) === finalizedIdentityForEntry(right) &&
+  left.configuredModel === right.configuredModel &&
+  left.actualModel === right.actualModel &&
+  ['input', 'output', 'cached', 'reasoning', 'total'].every(
+    (key) => left.tokenUsage[key] === right.tokenUsage[key]
+  );
+
+const waitForDelay = (delayMs) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+
+export const buildProductionMaintenanceCandidate = async ({
+  formalLedger,
+  snapshotTimeMs = Date.now(),
+  logRoots = PRODUCTION_LOG_ROOTS,
+  stabilityDelayMs = DEFAULT_LOG_STABILITY_DELAY_MS,
+  sleep = waitForDelay,
+  fsAdapter = fs,
+} = {}) => {
+  const io = fsAdapter;
+  const requestedLogRoots = Array.isArray(logRoots) ? logRoots : PRODUCTION_LOG_ROOTS;
+  const previous = formalLedger && Object.keys(formalLedger).length > 0 ? formalLedger : {};
+  const fallbackPreviousSourceDir = normalizeSourceDir(requestedLogRoots[0]);
+  const previousEntries = Array.isArray(previous.entries) ? previous.entries : [];
+  const entriesBySourceKey = new Map(
+    previousEntries.map((entry) => {
+      const normalizedEntry = normalizePreviousEntry(entry, fallbackPreviousSourceDir);
+      return [normalizedEntry.sourceKey, normalizedEntry];
+    })
+  );
+  const previousFingerprints = { ...(previous.state?.fileFingerprints ?? {}) };
+  const nextFingerprints = {};
+  for (const [sourceKey, entry] of entriesBySourceKey) {
+    if (entry?.tokenUsage?.status !== 'available') continue;
+    const fingerprint = previousFingerprints[sourceKey] ?? previousFingerprints[entry.fileName];
+    if (typeof fingerprint === 'string') nextFingerprints[sourceKey] = fingerprint;
+  }
+  let productionLogRoots;
+  try {
+    productionLogRoots = await resolveSafeLegacyLogRoots(requestedLogRoots, io);
+  } catch {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_SCHEMA_UNSUPPORTED');
+  }
+  if (productionLogRoots.length !== requestedLogRoots.length || productionLogRoots.length !== 2) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_SCHEMA_UNSUPPORTED');
+  }
+  const productionLogDirs = productionLogRoots.map((root) => root.logicalPath);
+
+  const formalFinalizedIdentities = new Set(
+    previousEntries
+      .filter((entry) => entry?.tokenUsage?.status === 'available')
+      .map(finalizedIdentityForEntry)
+  );
+  const pendingEntries = [];
+  const logFiles = await listLogFiles(productionLogDirs, io);
+  const parseCandidates = [];
+  let updatedFiles = 0;
+  let skippedFiles = 0;
+  let errorFiles = 0;
+
+  for (const { fileName, filePath, logsDir, sourceKey } of logFiles) {
+    let firstStats;
+    try {
+      firstStats = await io.lstat(filePath);
+    } catch {
+      skippedFiles += 1;
+      continue;
+    }
+    if (!firstStats.isFile() || firstStats.isSymbolicLink()) {
+      skippedFiles += 1;
+      continue;
+    }
+    if (Number.isFinite(snapshotTimeMs) && Math.floor(firstStats.mtimeMs) > snapshotTimeMs) {
+      skippedFiles += 1;
+      continue;
+    }
+    const fingerprint = fingerprintForStats(firstStats);
+    const migratedFingerprint = previousFingerprints[sourceKey] ?? previousFingerprints[fileName];
+    const existingEntry = entriesBySourceKey.get(sourceKey);
+    if (migratedFingerprint === fingerprint && existingEntry?.tokenUsage?.status === 'available') {
+      nextFingerprints[sourceKey] = fingerprint;
+      skippedFiles += 1;
+      continue;
+    }
+
+    parseCandidates.push({
+      fileName,
+      filePath,
+      logsDir,
+      sourceKey,
+      firstStats,
+      fingerprint,
+    });
   }
 
+  if (parseCandidates.length > 0) {
+    const normalizedDelayMs = Number.isFinite(stabilityDelayMs)
+      ? Math.max(0, Math.floor(stabilityDelayMs))
+      : DEFAULT_LOG_STABILITY_DELAY_MS;
+    await sleep(normalizedDelayMs);
+  }
+
+  for (const candidate of parseCandidates) {
+    const { fileName, filePath, logsDir, sourceKey, firstStats } = candidate;
+    let stableStats;
+    try {
+      stableStats = await io.lstat(filePath);
+      if (
+        !stableStats.isFile() ||
+        stableStats.isSymbolicLink() ||
+        fingerprintForStats(stableStats) !== candidate.fingerprint ||
+        !sameFileSnapshot(firstStats, stableStats)
+      ) {
+        skippedFiles += 1;
+        continue;
+      }
+
+      const parsedSnapshot = await parseProductionLogSnapshot({
+        filePath,
+        fileName,
+        sourceDir: logsDir,
+        stable: true,
+        firstStats: stableStats,
+        fsAdapter: io,
+      });
+      if (parsedSnapshot.status !== 'parsed') {
+        skippedFiles += 1;
+        continue;
+      }
+      const entry = parsedSnapshot.entry;
+      updatedFiles += 1;
+      const existingEntry = entriesBySourceKey.get(sourceKey);
+      if (entry.tokenUsage?.status === 'available') {
+        if (existingEntry?.tokenUsage?.status === 'available') {
+          if (!availableEntriesMatch(existingEntry, entry)) {
+            errorFiles += 1;
+            continue;
+          }
+        } else {
+          entriesBySourceKey.set(sourceKey, entry);
+        }
+        nextFingerprints[sourceKey] = parsedSnapshot.fingerprint;
+        if (!formalFinalizedIdentities.has(finalizedIdentityForEntry(entry))) {
+          pendingEntries.push(entry);
+        }
+      } else if (existingEntry?.tokenUsage?.status !== 'available') {
+        entriesBySourceKey.set(sourceKey, entry);
+        delete nextFingerprints[sourceKey];
+      }
+    } catch {
+      if (entriesBySourceKey.get(sourceKey)?.tokenUsage?.status !== 'available') {
+        entriesBySourceKey.set(
+          sourceKey,
+          buildSafeLogErrorEntry(fileName, stableStats ?? firstStats, logsDir)
+        );
+        delete nextFingerprints[sourceKey];
+      }
+      errorFiles += 1;
+    }
+  }
+
+  const entries = dedupeEntries(Array.from(entriesBySourceKey.values())).sort((a, b) => {
+    const timestampCompare = (b.timestampMs ?? 0) - (a.timestampMs ?? 0);
+    if (timestampCompare !== 0) return timestampCompare;
+    const nameCompare = a.fileName.localeCompare(b.fileName);
+    if (nameCompare !== 0) return nameCompare;
+    return (a.sourceDir ?? '').localeCompare(b.sourceDir ?? '');
+  });
+  const generatedAt = new Date(snapshotTimeMs).toISOString();
+  const generationId = randomUUID();
+  const projection = buildProjection({
+    entries,
+    generatedAt,
+    generationId,
+    logsDirs: requestedLogRoots.map(normalizeSourceDir),
+    scannedFiles: logFiles.length,
+    updatedFiles,
+    skippedFiles,
+    errorFiles,
+  });
+  const ledger = {
+    ...projection,
+    state: { fileFingerprints: nextFingerprints },
+  };
+
+  return {
+    ledger,
+    projection,
+    pendingEntries: dedupeEntries(pendingEntries),
+    scan: {
+      scannedFiles: logFiles.length,
+      updatedFiles,
+      skippedFiles,
+      errorFiles,
+    },
+  };
+};
+
+export const commitLedgerProjectionPairWithRollback = async ({
+  candidate,
+  ledgerPath,
+  projectionPath,
+  atomicWriter = atomicWriteText,
+  fsAdapter = fs,
+}) => {
+  const ledgerText = `${JSON.stringify(candidate.ledger, null, 2)}\n`;
+  const projectionText = `${JSON.stringify(candidate.projection, null, 2)}\n`;
+  let previousLedgerText = null;
+  let ledgerCommitted = false;
+  try {
+    previousLedgerText = await fsAdapter.readFile(ledgerPath, 'utf8');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+
+  try {
+    await atomicWriter(ledgerPath, ledgerText);
+    ledgerCommitted = true;
+    await atomicWriter(projectionPath, projectionText);
+  } catch (error) {
+    if (ledgerCommitted) {
+      try {
+        if (previousLedgerText === null) {
+          await fsAdapter.rm(ledgerPath, { force: true });
+        } else {
+          await atomicWriter(ledgerPath, previousLedgerText);
+        }
+      } catch {
+        throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_INTERNAL');
+      }
+    }
+    throw error;
+  }
+};
+
+const commitProductionMaintenanceCandidate = async (candidate) => {
+  const ledgerText = `${JSON.stringify(candidate.ledger, null, 2)}\n`;
+  const projectionText = `${JSON.stringify(candidate.projection, null, 2)}\n`;
+  try {
+    await assertEnoughFreeSpace(
+      [PRODUCTION_LEDGER_PATH, PRODUCTION_PROJECTION_PATH],
+      null,
+      Buffer.byteLength(ledgerText, 'utf8') + Buffer.byteLength(projectionText, 'utf8'),
+      { phase: 'maintenance-pre-commit' }
+    );
+  } catch (error) {
+    if (error?.code === LOW_SPACE_ERROR_CODE || error?.code === 'ENOSPC') {
+      throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_LOW_SPACE', undefined, {
+        availableBytes: error?.details?.availableBytes,
+        requiredBytes: error?.details?.requiredBytes,
+        reserveBytes: error?.details?.reserveBytes,
+        writeBytes: error?.details?.writeBytes,
+      });
+    }
+    throw error;
+  }
+  await commitLedgerProjectionPairWithRollback({
+    candidate,
+    ledgerPath: PRODUCTION_LEDGER_PATH,
+    projectionPath: PRODUCTION_PROJECTION_PATH,
+  });
+};
+
+export const createProductionMaintenanceCore = () =>
+  createTokenLedgerMaintenanceCore({
+    policy: {
+      ledgerPath: PRODUCTION_LEDGER_PATH,
+      projectionPath: PRODUCTION_PROJECTION_PATH,
+      lockPath: PRODUCTION_MAINTENANCE_LOCK_PATH,
+      allowedLogRoots: PRODUCTION_LOG_ROOTS,
+      minimumActiveWindowMinutes: DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES,
+      previewTtlMs: 60_000,
+    },
+    buildCandidate: buildProductionMaintenanceCandidate,
+    commitCandidate: commitProductionMaintenanceCandidate,
+  });
+
+let productionMaintenanceCore = null;
+
+export const runProductionTokenLedgerMaintenance = async ({
+  mode,
+  activeWindowMinutes = DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES,
+  previewId,
+  minimumTotals,
+} = {}) => {
+  const normalizedMode = String(mode ?? '')
+    .trim()
+    .toLowerCase();
+  if (!['preview', 'execute'].includes(normalizedMode)) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_SCHEMA_UNSUPPORTED');
+  }
+  productionMaintenanceCore ??= createProductionMaintenanceCore();
+  const core = productionMaintenanceCore;
+  if (normalizedMode === 'preview') return core.preview({ activeWindowMinutes });
+  try {
+    return await core.execute({ activeWindowMinutes, previewId, minimumTotals });
+  } finally {
+    productionMaintenanceCore = null;
+  }
+};
+
+const assertFixedMaintenancePaths = (args) => {
+  const mode = String(args.maintenance ?? '')
+    .trim()
+    .toLowerCase();
+  if (!['preview', 'execute'].includes(mode)) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_SCHEMA_UNSUPPORTED');
+  }
+  if ([...MAINTENANCE_PATH_ARGUMENTS].some((key) => args[key] !== undefined)) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_FIXED_PATHS');
+  }
+  if (MAINTENANCE_INCOMPATIBLE_FLAGS.some((key) => Boolean(args[key]))) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_FIXED_PATHS');
+  }
+  if (
+    args['install-dir'] !== undefined &&
+    normalizeSourceDir(args['install-dir']) !== normalizeSourceDir(DEFAULT_INSTALL_DIR)
+  ) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_FIXED_PATHS');
+  }
+  if (
+    args['custom-ui-dir'] !== undefined &&
+    normalizeSourceDir(args['custom-ui-dir']) !== normalizeSourceDir(DEFAULT_CUSTOM_UI_DIR)
+  ) {
+    throw new TokenLedgerMaintenanceError('TOKEN_LEDGER_FIXED_PATHS');
+  }
+};
+
+const runLegacyMain = async (args) => {
   const installDir = args['install-dir'] ?? DEFAULT_INSTALL_DIR;
   let logsDirs = resolveLogDirs(args, installDir);
   const ledgerDir = args['ledger-dir'] ?? path.join(installDir, 'usage-backups', 'token-ledger');
@@ -780,19 +1022,11 @@ const main = async () => {
   }
 
   const previous = (await readJson(ledgerPath)) ?? {};
-  if (
-    pruneOnly &&
-    !args['logs-dir'] &&
-    Array.isArray(previous.source?.logsDirs) &&
-    previous.source.logsDirs.length > 0
-  ) {
-    logsDirs = previous.source.logsDirs;
-  }
+  const safeLogRoots = await resolveSafeLegacyLogRoots(logsDirs);
+  logsDirs = safeLogRoots.map((root) => root.logicalPath);
   const normalizedLogDirs = logsDirs.map(normalizeSourceDir);
   const previousEntries = Array.isArray(previous.entries) ? previous.entries : [];
-  const fallbackPreviousSourceDir = normalizeSourceDir(
-    previous.source?.logsDir ?? previous.source?.logsDirs?.[0] ?? logsDirs[0]
-  );
+  const fallbackPreviousSourceDir = normalizeSourceDir(logsDirs[0]);
   const entriesBySourceKey = new Map(
     previousEntries.map((entry) => {
       const normalizedEntry = normalizePreviousEntry(entry, fallbackPreviousSourceDir);
@@ -801,17 +1035,6 @@ const main = async () => {
   );
   const previousFingerprints = { ...(previous.state?.fileFingerprints ?? {}) };
   const nextFingerprints = { ...previousFingerprints };
-
-  const existingLogDirs = [];
-  for (const logsDir of logsDirs) {
-    if (await directoryExists(logsDir)) {
-      existingLogDirs.push(logsDir);
-    }
-  }
-
-  if (existingLogDirs.length === 0) {
-    throw new Error(`No CLIProxyAPI log directories found: ${normalizedLogDirs.join(', ')}`);
-  }
 
   let logFiles = await listLogFiles(logsDirs);
   let rescueLowSpace = {
@@ -943,26 +1166,27 @@ const main = async () => {
       entriesBySourceKey.set(sourceKey, entry);
       nextFingerprints[sourceKey] = fingerprint;
       updatedFiles += 1;
-    } catch (error) {
-      entriesBySourceKey.set(sourceKey, errorEntry(fileName, stats, logsDir, error));
+    } catch {
+      entriesBySourceKey.set(sourceKey, buildSafeLogErrorEntry(fileName, stats, logsDir));
       nextFingerprints[sourceKey] = fingerprint;
       errorFiles += 1;
     }
   }
 
-  const entries = dedupeEntries(Array.from(entriesBySourceKey.values()))
-    .sort((a, b) => {
-      const left = b.timestampMs ?? 0;
-      const right = a.timestampMs ?? 0;
-      if (left !== right) return left - right;
-      const nameCompare = a.fileName.localeCompare(b.fileName);
-      if (nameCompare !== 0) return nameCompare;
-      return (a.sourceDir ?? '').localeCompare(b.sourceDir ?? '');
-    });
+  const entries = dedupeEntries(Array.from(entriesBySourceKey.values())).sort((a, b) => {
+    const left = b.timestampMs ?? 0;
+    const right = a.timestampMs ?? 0;
+    if (left !== right) return left - right;
+    const nameCompare = a.fileName.localeCompare(b.fileName);
+    if (nameCompare !== 0) return nameCompare;
+    return (a.sourceDir ?? '').localeCompare(b.sourceDir ?? '');
+  });
   const generatedAt = new Date().toISOString();
+  const generationId = randomUUID();
   const projection = buildProjection({
     entries,
     generatedAt,
+    generationId,
     logsDirs: normalizedLogDirs,
     scannedFiles: logFiles.length,
     updatedFiles,
@@ -995,8 +1219,11 @@ const main = async () => {
       'pre-write',
       Buffer.byteLength(ledgerText, 'utf8') + Buffer.byteLength(projectionText, 'utf8')
     );
-    await atomicWriteText(ledgerPath, ledgerText);
-    await atomicWriteText(projectionPath, projectionText);
+    await commitLedgerProjectionPairWithRollback({
+      candidate: { ledger, projection },
+      ledgerPath,
+      projectionPath,
+    });
 
     const htmlCandidates = [
       path.join(staticDir, 'management.html'),
@@ -1057,7 +1284,45 @@ const main = async () => {
   );
 };
 
-main().catch((error) => {
+const main = async () => {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help) {
+    console.log(
+      'Usage: node scripts/update-token-ledger.mjs [--maintenance preview|execute] [--preview-id ID] [--active-window-minutes 5] [--install-dir D:\\CLIProxyAPI] [--custom-ui-dir D:\\CLIProxyAPI_Maintenance\\custom-ui] [--rebuild] [--dry-run] [--embed] [--embed-full] [--no-embed] [--prune-recorded-logs] [--prune-only] [--rescue-low-space] [--min-free-bytes N]'
+    );
+    return;
+  }
+
+  if (args.maintenance) {
+    assertFixedMaintenancePaths(args);
+    const activeWindowMinutes = nonNegativeInteger(
+      args['active-window-minutes'],
+      DEFAULT_PRUNE_ACTIVE_WINDOW_MINUTES
+    );
+    const result = await runProductionTokenLedgerMaintenance({
+      mode: args.maintenance,
+      activeWindowMinutes,
+      previewId: args['preview-id'],
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  const installDir = args['install-dir'] ?? DEFAULT_INSTALL_DIR;
+  const ledgerDir = args['ledger-dir'] ?? path.join(installDir, 'usage-backups', 'token-ledger');
+  const ledgerPath = args['ledger-path'] ?? path.join(ledgerDir, 'ledger.json');
+  await withTokenLedgerMaintenanceLock(
+    { lockPath: `${path.resolve(ledgerPath)}.maintenance.lock` },
+    () => runLegacyMain(args)
+  );
+};
+
+const handleMainError = (error) => {
+  if (error instanceof TokenLedgerMaintenanceError) {
+    console.error(JSON.stringify(toSafeTokenLedgerMaintenanceError(error)));
+    process.exitCode = 1;
+    return;
+  }
   if (error?.code === LOW_SPACE_ERROR_CODE || error?.code === 'ENOSPC') {
     console.error(
       JSON.stringify({
@@ -1072,4 +1337,12 @@ main().catch((error) => {
   }
   console.error(error);
   process.exitCode = 1;
-});
+};
+
+const isDirectExecution =
+  Boolean(process.argv[1]) && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+const isLibraryMode = globalThis.__CPAMC_TOKEN_LEDGER_LIBRARY_MODE__ === true;
+
+if (isDirectExecution) {
+  if (!isLibraryMode) main().catch(handleMainError);
+}

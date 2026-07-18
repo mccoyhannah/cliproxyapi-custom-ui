@@ -1,4 +1,9 @@
 import type { TokenLedgerEntry, TokenUsage } from '@/types/usageStatistics';
+import {
+  estimateTokenUsageCost as estimateTokenUsageCostCore,
+  isModelPricingOverrideUsable as isModelPricingOverrideUsableCore,
+  sanitizeModelPricingOverrides as sanitizeModelPricingOverridesCore,
+} from '../../../../scripts/lib/token-pricing-core.mjs';
 import { UNPARSED_MODEL_LABEL } from './constants';
 
 export const MODEL_PRICING_OVERRIDES_STORAGE_KEY = 'usageStatistics.modelPricingOverrides.v1';
@@ -26,181 +31,23 @@ export interface TokenLedgerCostSummary {
   unpricedModels: number;
 }
 
-type PricingRule = Required<ModelPricingOverride> & {
-  source: 'builtin' | 'override';
-};
-
 type TokenUsageLike = Pick<TokenUsage, 'input' | 'output' | 'cached' | 'total'>;
 
-const BUILTIN_MODEL_PRICING: PricingRule[] = [
-  {
-    pattern: 'gpt-5.4-mini-*',
-    inputUsdPer1M: 0.75,
-    cachedInputUsdPer1M: 0.075,
-    outputUsdPer1M: 4.5,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-5.4-mini',
-    inputUsdPer1M: 0.75,
-    cachedInputUsdPer1M: 0.075,
-    outputUsdPer1M: 4.5,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-image-2-*',
-    inputUsdPer1M: 5,
-    cachedInputUsdPer1M: 1.25,
-    outputUsdPer1M: 30,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-image-2',
-    inputUsdPer1M: 5,
-    cachedInputUsdPer1M: 1.25,
-    outputUsdPer1M: 30,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-5.5-*',
-    inputUsdPer1M: 5,
-    cachedInputUsdPer1M: 0.5,
-    outputUsdPer1M: 30,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-5.5',
-    inputUsdPer1M: 5,
-    cachedInputUsdPer1M: 0.5,
-    outputUsdPer1M: 30,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-5.4-*',
-    inputUsdPer1M: 2.5,
-    cachedInputUsdPer1M: 0.25,
-    outputUsdPer1M: 15,
-    enabled: true,
-    source: 'builtin',
-  },
-  {
-    pattern: 'gpt-5.4',
-    inputUsdPer1M: 2.5,
-    cachedInputUsdPer1M: 0.25,
-    outputUsdPer1M: 15,
-    enabled: true,
-    source: 'builtin',
-  },
-];
-
-const normalizePattern = (value: string): string => value.trim().toLowerCase();
-
-const toFiniteRate = (value: unknown): number | null => {
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-};
-
 export const isModelPricingOverrideUsable = (
-  rule: Pick<ModelPricingOverride, 'pattern' | 'inputUsdPer1M' | 'cachedInputUsdPer1M' | 'outputUsdPer1M'>
-): boolean =>
-  Boolean(normalizePattern(rule.pattern)) &&
-  rule.inputUsdPer1M >= 0 &&
-  rule.cachedInputUsdPer1M >= 0 &&
-  rule.outputUsdPer1M >= 0 &&
-  (rule.inputUsdPer1M > 0 || rule.cachedInputUsdPer1M > 0 || rule.outputUsdPer1M > 0);
+  rule: Pick<
+    ModelPricingOverride,
+    'pattern' | 'inputUsdPer1M' | 'cachedInputUsdPer1M' | 'outputUsdPer1M'
+  >
+): boolean => isModelPricingOverrideUsableCore(rule);
 
-const patternSpecificity = (pattern: string): number =>
-  normalizePattern(pattern).replace(/\*$/, '').length;
-
-const matchesPattern = (model: string, pattern: string): boolean => {
-  const normalizedModel = normalizePattern(model);
-  const normalizedPattern = normalizePattern(pattern);
-  if (!normalizedModel || !normalizedPattern) return false;
-  if (normalizedPattern.endsWith('*')) {
-    return normalizedModel.startsWith(normalizedPattern.slice(0, -1));
-  }
-  return normalizedModel === normalizedPattern;
-};
-
-export const sanitizeModelPricingOverrides = (value: unknown): ModelPricingOverride[] => {
-  if (!Array.isArray(value)) return [];
-
-  const rows: Array<ModelPricingOverride | null> = value.map((item) => {
-    if (!item || typeof item !== 'object') return null;
-    const raw = item as Record<string, unknown>;
-    const pattern = typeof raw.pattern === 'string' ? raw.pattern : '';
-    const inputUsdPer1M = toFiniteRate(raw.inputUsdPer1M);
-    const cachedInputUsdPer1M = toFiniteRate(raw.cachedInputUsdPer1M);
-    const outputUsdPer1M = toFiniteRate(raw.outputUsdPer1M);
-    if (inputUsdPer1M === null || cachedInputUsdPer1M === null || outputUsdPer1M === null) {
-      return null;
-    }
-    return {
-      pattern,
-      inputUsdPer1M,
-      cachedInputUsdPer1M,
-      outputUsdPer1M,
-      enabled: raw.enabled !== false,
-    } satisfies ModelPricingOverride;
-  });
-
-  return rows.filter((item): item is ModelPricingOverride => item !== null);
-};
-
-const resolvePricingRule = (
-  model: string,
-  overrides: ModelPricingOverride[] = []
-): PricingRule | null => {
-  const overrideRules: PricingRule[] = sanitizeModelPricingOverrides(overrides)
-    .filter((rule) => rule.enabled !== false && isModelPricingOverrideUsable(rule))
-    .map((rule) => ({ ...rule, enabled: true, source: 'override' }));
-
-  const findBest = (rules: PricingRule[]) =>
-    rules
-      .filter((rule) => matchesPattern(model, rule.pattern))
-      .sort((a, b) => patternSpecificity(b.pattern) - patternSpecificity(a.pattern))[0] ?? null;
-
-  return findBest(overrideRules) ?? findBest(BUILTIN_MODEL_PRICING);
-};
+export const sanitizeModelPricingOverrides = (value: unknown): ModelPricingOverride[] =>
+  sanitizeModelPricingOverridesCore(value);
 
 export const estimateTokenUsageCost = (
   model: string,
   usage: TokenUsageLike,
   overrides: ModelPricingOverride[] = []
-): TokenCostEstimate => {
-  const total = Math.max(0, usage.total);
-  const rule = resolvePricingRule(model, overrides);
-  if (!rule) {
-    return {
-      costUsd: 0,
-      pricedTokens: 0,
-      unpricedTokens: total,
-      pricingPattern: null,
-    };
-  }
-
-  const cachedInput = Math.min(Math.max(0, usage.cached), Math.max(0, usage.input));
-  const uncachedInput = Math.max(0, usage.input - cachedInput);
-  const output = Math.max(0, usage.output);
-  const costUsd =
-    (uncachedInput * rule.inputUsdPer1M +
-      cachedInput * rule.cachedInputUsdPer1M +
-      output * rule.outputUsdPer1M) /
-    1_000_000;
-
-  return {
-    costUsd,
-    pricedTokens: total,
-    unpricedTokens: 0,
-    pricingPattern: rule.pattern,
-  };
-};
+): TokenCostEstimate => estimateTokenUsageCostCore(model, usage, overrides);
 
 export const calculateTokenLedgerCostSummary = (
   entries: TokenLedgerEntry[],
