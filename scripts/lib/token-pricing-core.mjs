@@ -1,6 +1,75 @@
-export const TOKEN_PRICING_VERSION = '1.0.0';
+export const TOKEN_PRICING_VERSION = '1.1.0';
+
+const GPT_5_6_LONG_CONTEXT_PRICING = {
+  longContextInputThreshold: 272_000,
+  longContextInputMultiplier: 2,
+  longContextOutputMultiplier: 1.5,
+};
 
 const BUILTIN_MODEL_PRICING = [
+  {
+    pattern: 'gpt-5.6-sol-*',
+    inputUsdPer1M: 5,
+    cachedInputUsdPer1M: 0.5,
+    outputUsdPer1M: 30,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
+  {
+    pattern: 'gpt-5.6-sol',
+    inputUsdPer1M: 5,
+    cachedInputUsdPer1M: 0.5,
+    outputUsdPer1M: 30,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
+  {
+    pattern: 'gpt-5.6-terra-*',
+    inputUsdPer1M: 2.5,
+    cachedInputUsdPer1M: 0.25,
+    outputUsdPer1M: 15,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
+  {
+    pattern: 'gpt-5.6-terra',
+    inputUsdPer1M: 2.5,
+    cachedInputUsdPer1M: 0.25,
+    outputUsdPer1M: 15,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
+  {
+    pattern: 'gpt-5.6-luna-*',
+    inputUsdPer1M: 1,
+    cachedInputUsdPer1M: 0.1,
+    outputUsdPer1M: 6,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
+  {
+    pattern: 'gpt-5.6-luna',
+    inputUsdPer1M: 1,
+    cachedInputUsdPer1M: 0.1,
+    outputUsdPer1M: 6,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
+  {
+    pattern: 'gpt-5.6',
+    inputUsdPer1M: 5,
+    cachedInputUsdPer1M: 0.5,
+    outputUsdPer1M: 30,
+    enabled: true,
+    source: 'builtin',
+    ...GPT_5_6_LONG_CONTEXT_PRICING,
+  },
   {
     pattern: 'gpt-5.4-mini-*',
     inputUsdPer1M: 0.75,
@@ -151,10 +220,13 @@ const estimateWithRule = (usage, rule) => {
   const cachedInput = Math.min(Math.max(0, Number(usage.cached) || 0), input);
   const uncachedInput = Math.max(0, input - cachedInput);
   const output = Math.max(0, Number(usage.output) || 0);
+  const usesLongContextPricing = input > (rule.longContextInputThreshold ?? Number.POSITIVE_INFINITY);
+  const inputMultiplier = usesLongContextPricing ? rule.longContextInputMultiplier : 1;
+  const outputMultiplier = usesLongContextPricing ? rule.longContextOutputMultiplier : 1;
   const costUsd =
-    (uncachedInput * rule.inputUsdPer1M +
-      cachedInput * rule.cachedInputUsdPer1M +
-      output * rule.outputUsdPer1M) /
+    (uncachedInput * rule.inputUsdPer1M * inputMultiplier +
+      cachedInput * rule.cachedInputUsdPer1M * inputMultiplier +
+      output * rule.outputUsdPer1M * outputMultiplier) /
     1_000_000;
 
   return {

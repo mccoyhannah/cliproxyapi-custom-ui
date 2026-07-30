@@ -66,7 +66,7 @@ test('worker IPC emits aggregate snapshots or stable fatal codes only', async ()
           headers: { authorization: 'Bearer synthetic-secret' },
         }),
         '=== RESPONSE ===',
-        '{"model":"gpt-5.6-sol","usage":{"input_tokens":5,"output_tokens":1,"total_tokens":6}}',
+        '{"model":"gpt-6.0-unknown","usage":{"input_tokens":5,"output_tokens":1,"total_tokens":6}}',
         '=== END RESPONSE ===',
         '',
       ].join('\n'),
@@ -103,7 +103,7 @@ test('worker IPC emits aggregate snapshots or stable fatal codes only', async ()
         type: 'update-pricing',
         pricingOverrides: [
           {
-            pattern: 'gpt-5.6-*',
+            pattern: 'gpt-6.0-*',
             inputUsdPer1M: 1,
             cachedInputUsdPer1M: 0.1,
             outputUsdPer1M: 2,

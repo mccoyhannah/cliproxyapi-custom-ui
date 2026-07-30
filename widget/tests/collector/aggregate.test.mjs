@@ -27,7 +27,7 @@ test('snapshot uses local calendar periods, subset token semantics, and explicit
       dedupeKey: 'two',
       timestampMs: new Date(2026, 6, 16, 10, 0, 0).getTime(),
       lastModifiedMs: 2,
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6.0-unknown',
       status: 'available',
       tokenUsage: usage(15, 5, 5, 2),
     },
@@ -95,7 +95,7 @@ test('snapshot uses local calendar periods, subset token semantics, and explicit
   assert.equal(snapshot.latestRequest.status, 'available');
   assert.equal(snapshot.latestRequest.model, 'gpt-5.4');
   assert.equal(snapshot.latestRequest.totalTokens, 10);
-  assert.equal(snapshot.topModels[0].model, 'gpt-5.6-sol');
+  assert.equal(snapshot.topModels[0].model, 'gpt-6.0-unknown');
 });
 
 test('manual pricing overrides recompute previously unpriced visible history', () => {
@@ -105,7 +105,7 @@ test('manual pricing overrides recompute previously unpriced visible history', (
       dedupeKey: 'unpriced',
       timestampMs: nowMs - 1000,
       lastModifiedMs: nowMs,
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6.0-unknown',
       status: 'available',
       tokenUsage: usage(10, 2, 4),
     },
@@ -118,7 +118,7 @@ test('manual pricing overrides recompute previously unpriced visible history', (
     source: { status: 'live' },
     pricingOverrides: [
       {
-        pattern: 'gpt-5.6-*',
+        pattern: 'gpt-6.0-*',
         inputUsdPer1M: 1,
         cachedInputUsdPer1M: 0.1,
         outputUsdPer1M: 2,
@@ -171,7 +171,7 @@ test('recent models keep the latest completed request per model and cap the list
       dedupeKey: 'latest-unpriced',
       timestampMs: nowMs - 2_000,
       lastModifiedMs: nowMs - 2_000,
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6.0-unknown',
       status: 'available',
       tokenUsage: usage(12, 3),
     },
@@ -223,7 +223,7 @@ test('recent models keep the latest completed request per model and cap the list
         estimatedUsd: 0.00009875,
       },
       {
-        model: 'gpt-5.6-sol',
+        model: 'gpt-6.0-unknown',
         timestampMs: nowMs - 2_000,
         totalTokens: 15,
         estimatedUsd: null,

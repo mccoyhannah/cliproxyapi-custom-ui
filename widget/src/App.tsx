@@ -292,7 +292,7 @@ function CostSummary({ usage, compact = false }: { usage: WidgetUsageTotals; com
   return (
     <div className={`cost-summary${compact ? ' cost-summary--compact' : ''}`}>
       <div className="cost-summary__label">
-        <span>{hasUnpricedTokens ? '已计价部分估算' : 'API 标准价估算'}</span>
+        <span>{hasUnpricedTokens ? 'API 标准价部分估算' : 'API 标准价等价估算'}</span>
         {hasUnpricedTokens && !compact && <span className="partial-pill">非完整</span>}
       </div>
       <strong className={hasKnownPrice ? '' : 'is-unpriced'}>
@@ -875,7 +875,7 @@ function ExpandedDashboard({
         usage={usage}
       />
       <p className="estimate-note">
-        美元金额为公开 API 标准价等值估算，不代表 OAuth、订阅或 CPA 实际账单。
+        美元金额为公开 API 标准价的等价估算，不代表 OAuth、订阅或 CPA 实际账单。
       </p>
     </main>
   );

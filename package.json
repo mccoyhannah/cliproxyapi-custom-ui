@@ -20,7 +20,8 @@
     "test:auth-status-classification": "node scripts/auth-status-classification.test.mjs",
     "test:priority-rotation-frontend": "node scripts/priority-rotation-frontend.test.mjs",
     "test:ui-safety": "node scripts/ui-interaction-safety.test.mjs",
-    "test:usage-auto-maintenance": "node scripts/usage-auto-maintenance.test.mjs",
+    "test:usage-ledger-dedupe": "node scripts/usage-statistics-ledger-dedupe.test.mjs",
+    "test:usage-auto-maintenance": "npm run test:usage-ledger-dedupe",
     "test:token-ledger": "node scripts/update-token-ledger.test.mjs",
     "token-ledger": "node scripts/update-token-ledger.mjs",
     "token-ledger:dry": "node scripts/update-token-ledger.mjs --dry-run"

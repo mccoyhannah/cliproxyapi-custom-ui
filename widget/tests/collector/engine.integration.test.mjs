@@ -141,24 +141,24 @@ test('legacy ledger image misattribution is repaired in memory without changing 
       const futureImage = snapshot.topModels.find((entry) => entry.model === 'gpt-image-3');
 
       assert.equal(coverage.totalTokens, 137, 'model repair must not change token totals');
-      assert.equal(coverage.unpricedTokens, 127);
-      assert.equal(coverage.pricedTokens, 10);
-      assert.equal(coverage.unpricedRequests, 2);
-      assert.equal(coverage.pricedRequests, 1);
+      assert.equal(coverage.unpricedTokens, 7);
+      assert.equal(coverage.pricedTokens, 130);
+      assert.equal(coverage.unpricedRequests, 1);
+      assert.equal(coverage.pricedRequests, 2);
       assert.ok(solar);
       assert.equal(solar.totalTokens, 120);
-      assert.equal(solar.estimatedUsd, null);
+      assert.equal(solar.estimatedUsd, 0.0011);
       assert.ok(image);
       assert.equal(image.totalTokens, 10);
       assert.ok(futureImage, 'unconfirmed future image models must not be rewritten');
       assert.equal(futureImage.totalTokens, 7);
-      assert.equal(coverage.estimatedUsd, image.estimatedUsd);
+      assert.equal(coverage.estimatedUsd, solar.estimatedUsd + image.estimatedUsd);
       assert.deepEqual(
         snapshot.recentModels.map((entry) => entry.model),
         ['gpt-5.6-sol', 'gpt-image-2-codex', 'gpt-image-3']
       );
       assert.equal(snapshot.latestRequest?.model, 'gpt-5.6-sol');
-      assert.equal(snapshot.latestRequest?.status, 'unpriced');
+      assert.equal(snapshot.latestRequest?.status, 'available');
       assert.equal(
         await fs.readFile(ledgerPath, 'utf8'),
         ledgerBefore,
