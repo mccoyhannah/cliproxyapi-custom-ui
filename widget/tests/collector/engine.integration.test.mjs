@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { TokenPulseEngine } from '../../electron/collector/engine.mjs';
 import { readBoundedResponseLog } from '../../electron/collector/logReader.mjs';
+import { emptyTokenUsage } from '../../../scripts/lib/token-log-core.mjs';
 
 const makeLog = (model, input, output) =>
   [
@@ -31,13 +32,14 @@ const makeLedgerEntry = ({
   configuredModel = model,
   actualModel = model,
   timestampMs = new Date(2026, 6, 16, 10, 0, 0).getTime(),
+  requestId = fileName.match(/-([A-Za-z0-9_-]+)\.log$/)?.[1] ?? null,
   input,
   output,
 }) => ({
   fileName,
   fileType: 'responses',
   timestampMs,
-  requestId: fileName.match(/-([A-Za-z0-9_-]+)\.log$/)?.[1] ?? null,
+  requestId,
   sourceDir: logsDir,
   sourceKey: `${logsDir}::${fileName}`,
   detailStatus: 'ready',
@@ -379,7 +381,7 @@ test('baseline fingerprint skips parser; stable live fingerprints parse once the
   }
 });
 
-test('reconcile removes completed live entries whose source logs no longer exist', async () => {
+test('reconcile retains completed live entries whose source logs no longer exist', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-pruned-live-entry-'));
   const logsDir = path.join(root, 'logs');
   const ledgerPath = path.join(root, 'static', 'token-ledger.json');
@@ -413,14 +415,415 @@ test('reconcile removes completed live entries whose source logs no longer exist
       await fs.rm(filePath);
       const reconciled = await engine.reconcile();
 
-      assert.equal(reconciled.periods.ledgerCoverage.totalTokens, 0);
-      assert.equal(reconciled.unledgeredView.periods.ledgerCoverage.totalTokens, 0);
-      assert.equal(reconciled.statusCounts.available, 0);
-      assert.equal(engine.liveEntries.size, 0);
-      assert.equal(engine.liveFingerprints.size, 0);
-      assert.equal(engine.observations.size, 0);
+      assert.equal(reconciled.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(reconciled.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(reconciled.statusCounts.available, 1);
+      assert.equal(engine.liveEntries.size, 1);
+      assert.equal(engine.liveFingerprints.size, 1);
+      assert.equal(engine.observations.size, 1);
+      const pendingState = JSON.parse(
+        await fs.readFile(
+          path.join(root, 'usage-backups', 'token-ledger', 'unledgered-v1.json'),
+          'utf8'
+        )
+      );
+      assert.equal(pendingState.version, 1);
+      assert.equal(pendingState.entries.length, 1);
     } finally {
       await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('persisted completed live entries survive an engine restart after source pruning', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-persisted-live-restart-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const fileName = 'v1-responses-2026-07-16T110000-restartLive01.log';
+  const filePath = path.join(logsDir, fileName);
+  const engineOptions = {
+    installDir: root,
+    cacheDir: path.join(root, 'cache'),
+    logsDirs: [logsDir],
+    ledgerPaths: [ledgerPath],
+    awaitInitialReconcile: true,
+    reconcileIntervalMs: 60 * 60 * 1000,
+    stabilityDelayMs: 1,
+    waitForStability: async () => {},
+    watchFactory: inertWatchFactory,
+    now: () => new Date(2026, 6, 16, 12, 0, 0).getTime(),
+  };
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.writeFile(filePath, makeLog('gpt-5.6-sol', 5, 1), 'utf8');
+
+    const firstEngine = new TokenPulseEngine(engineOptions);
+    try {
+      await firstEngine.start();
+      await fs.rm(filePath);
+      const retained = await firstEngine.reconcile();
+      assert.equal(retained.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
+    } finally {
+      await firstEngine.stop();
+    }
+
+    const restartedEngine = new TokenPulseEngine(engineOptions);
+    try {
+      const restarted = await restartedEngine.start();
+      assert.equal(restarted.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(restarted.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(restarted.source.status, 'live');
+    } finally {
+      await restartedEngine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('corrupt persisted live state degrades the collector without pretending coverage is healthy', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-corrupt-live-state-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const pendingStatePath = path.join(root, 'usage-backups', 'token-ledger', 'unledgered-v1.json');
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.mkdir(path.dirname(pendingStatePath), { recursive: true });
+    await fs.writeFile(pendingStatePath, '{"version":1,"entries":[', 'utf8');
+
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+    });
+    try {
+      const snapshot = await engine.start();
+      assert.equal(snapshot.source.status, 'degraded');
+      assert.equal(snapshot.source.messageCode, 'collector-unledgered-state-corrupt');
+      assert.equal(snapshot.source.possibleCoverageGap, true);
+      assert.ok(snapshot.source.parseErrors >= 1);
+    } finally {
+      await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('persisted live state write failures surface a degraded collector state', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-live-state-write-failure-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const fileName = 'v1-responses-2026-07-16T110000-writeFailure01.log';
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.writeFile(path.join(logsDir, fileName), makeLog('gpt-5.6-sol', 5, 1), 'utf8');
+
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+      pendingStateWriter: async () => {
+        throw new Error('synthetic-write-failure');
+      },
+    });
+    try {
+      const snapshot = await engine.start();
+      assert.equal(snapshot.source.status, 'degraded');
+      assert.equal(snapshot.source.messageCode, 'collector-unledgered-state-unavailable');
+      assert.equal(snapshot.source.possibleCoverageGap, true);
+      assert.equal(snapshot.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
+    } finally {
+      await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('unstable live entries without a persisted completed record are purged after source pruning', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-unstable-prune-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const filePath = path.join(
+    logsDir,
+    'v1-responses-2026-07-16T110000-unstablePrune01.log'
+  );
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.writeFile(filePath, makeLog('gpt-5.6-sol', 5, 1), 'utf8');
+
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+      readLog: async () => ({
+        bytesRead: 1,
+        parsed: { status: 'pending', model: null, tokenUsage: { ...emptyTokenUsage('pending') } },
+      }),
+    });
+    try {
+      await engine.start();
+      assert.equal(engine.pendingEntries.size, 0);
+      await fs.rm(filePath);
+      const pruned = await engine.reconcile();
+      assert.equal(pruned.statusCounts.pending, 0);
+      assert.equal(pruned.periods.ledgerCoverage.totalTokens, 0);
+      assert.equal(engine.liveEntries.size, 0);
+    } finally {
+      await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('conflicting ledger content does not consume a matching pending source record', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-pending-conflict-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const fileName = 'v1-responses-2026-07-16T110000-pendingConflict01.log';
+  const filePath = path.join(logsDir, fileName);
+  const timestampMs = new Date(2026, 6, 16, 11, 0, 0).getTime();
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.writeFile(filePath, makeLog('gpt-5.6-sol', 5, 1), 'utf8');
+
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+      now: () => new Date(2026, 6, 16, 12, 0, 0).getTime(),
+    });
+    try {
+      await engine.start();
+      const stats = await fs.stat(filePath);
+      await writeLedger(
+        ledgerPath,
+        [
+          makeLedgerEntry({
+            logsDir,
+            fileName,
+            stats,
+            model: 'gpt-5.6-sol',
+            timestampMs,
+            requestId: 'pendingConflict01',
+            input: 8,
+            output: 2,
+          }),
+        ],
+        '2026-07-16T02:00:00.000Z'
+      );
+      await fs.rm(filePath);
+
+      const conflicted = await engine.reconcile();
+      assert.equal(conflicted.source.status, 'degraded');
+      assert.equal(conflicted.source.messageCode, 'collector-unledgered-conflict');
+      assert.equal(conflicted.statusCounts.ambiguous, 1);
+      assert.equal(engine.liveEntries.size, 1);
+      assert.equal(conflicted.periods.ledgerCoverage.totalTokens, 10);
+      assert.equal(
+        JSON.parse(
+          await fs.readFile(
+            path.join(root, 'usage-backups', 'token-ledger', 'unledgered-v1.json'),
+            'utf8'
+          )
+        ).entries.length,
+        1
+      );
+    } finally {
+      await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('pending state replaces an existing file safely across consecutive flushes', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-state-replace-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    const firstPath = path.join(logsDir, 'v1-responses-2026-07-16T110000-replace01.log');
+    const secondPath = path.join(logsDir, 'v1-responses-2026-07-16T111000-replace02.log');
+    await fs.writeFile(firstPath, makeLog('gpt-5.6-sol', 5, 1), 'utf8');
+
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+    });
+    try {
+      await engine.start();
+      await fs.writeFile(secondPath, makeLog('gpt-5.6-sol', 7, 2), 'utf8');
+      await engine.reconcile();
+      await engine.reconcile();
+      const state = JSON.parse(
+        await fs.readFile(
+          path.join(root, 'usage-backups', 'token-ledger', 'unledgered-v1.json'),
+          'utf8'
+        )
+      );
+      assert.equal(state.entries.length, 2);
+      assert.equal(engine.getSnapshot().unledgeredView.periods.ledgerCoverage.totalTokens, 15);
+    } finally {
+      await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('transient pending state write failures recover to a healthy live source', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-state-recovery-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const fileName = 'v1-responses-2026-07-16T110000-writeRecovery01.log';
+  let failuresRemaining = 1;
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.writeFile(path.join(logsDir, fileName), makeLog('gpt-5.6-sol', 5, 1), 'utf8');
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+      pendingStateWriter: async (filePath, contents) => {
+        if (failuresRemaining > 0) {
+          failuresRemaining -= 1;
+          throw new Error('synthetic-transient-write-failure');
+        }
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        await fs.writeFile(filePath, contents, 'utf8');
+      },
+    });
+    try {
+      const degraded = await engine.start();
+      assert.equal(degraded.source.status, 'degraded');
+      assert.equal(degraded.source.possibleCoverageGap, true);
+      const recovered = await engine.reconcile();
+      assert.equal(recovered.source.status, 'live');
+      assert.equal(recovered.source.possibleCoverageGap, false);
+      assert.equal(recovered.source.messageCode, null);
+      assert.equal(recovered.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
+    } finally {
+      await engine.stop();
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('corrupt state stays as evidence while completed follow-up entries use recovery state', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'token-pulse-corrupt-recovery-'));
+  const logsDir = path.join(root, 'logs');
+  const ledgerPath = path.join(root, 'static', 'token-ledger.json');
+  const statePath = path.join(root, 'usage-backups', 'token-ledger', 'unledgered-v1.json');
+  const recoveryPath = `${statePath}.recovery`;
+  const corruptState = '{"version":1,"entries":';
+
+  try {
+    await fs.mkdir(logsDir, { recursive: true });
+    await writeLedger(ledgerPath, []);
+    await fs.mkdir(path.dirname(statePath), { recursive: true });
+    await fs.writeFile(statePath, corruptState, 'utf8');
+    await fs.writeFile(
+      path.join(logsDir, 'v1-responses-2026-07-16T110000-corruptRecovery01.log'),
+      makeLog('gpt-5.6-sol', 5, 1),
+      'utf8'
+    );
+
+    const engine = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+    });
+    try {
+      const snapshot = await engine.start();
+      assert.equal(snapshot.source.status, 'degraded');
+      assert.equal(snapshot.source.messageCode, 'collector-unledgered-state-corrupt');
+      assert.equal(await fs.readFile(statePath, 'utf8'), corruptState);
+      assert.equal(JSON.parse(await fs.readFile(recoveryPath, 'utf8')).entries.length, 1);
+    } finally {
+      await engine.stop();
+    }
+
+    const restarted = new TokenPulseEngine({
+      installDir: root,
+      cacheDir: path.join(root, 'cache-2'),
+      logsDirs: [logsDir],
+      ledgerPaths: [ledgerPath],
+      awaitInitialReconcile: true,
+      reconcileIntervalMs: 60 * 60 * 1000,
+      stabilityDelayMs: 1,
+      waitForStability: async () => {},
+      watchFactory: inertWatchFactory,
+    });
+    try {
+      const snapshot = await restarted.start();
+      assert.equal(snapshot.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(snapshot.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(snapshot.source.status, 'degraded');
+    } finally {
+      await restarted.stop();
     }
   } finally {
     await fs.rm(root, { recursive: true, force: true });
@@ -471,8 +874,8 @@ test('reconcile retains live entries while any configured log source is unavaila
       const recovered = await engine.reconcile();
 
       assert.equal(recovered.source.status, 'live');
-      assert.equal(recovered.periods.ledgerCoverage.totalTokens, 0);
-      assert.equal(recovered.unledgeredView.periods.ledgerCoverage.totalTokens, 0);
+      assert.equal(recovered.periods.ledgerCoverage.totalTokens, 6);
+      assert.equal(recovered.unledgeredView.periods.ledgerCoverage.totalTokens, 6);
     } finally {
       await engine.stop();
     }
@@ -941,6 +1344,13 @@ test('ledger reload consumes a completed live entry even after its source log wa
       assert.equal(reconciled.periods.ledgerCoverage.totalTokens, 6);
       assert.equal(engine.liveEntries.size, 0, 'formal ledger must consume the matching live entry');
       assert.equal(engine.baselineFingerprints.size, 1, 'fingerprint remains stable after source deletion');
+      const pendingState = JSON.parse(
+        await fs.readFile(
+          path.join(root, 'usage-backups', 'token-ledger', 'unledgered-v1.json'),
+          'utf8'
+        )
+      );
+      assert.equal(pendingState.entries.length, 0, 'ledger consumption must clear persisted live state');
     } finally {
       await engine.stop();
     }

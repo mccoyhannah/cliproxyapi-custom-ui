@@ -34,6 +34,24 @@ export interface WidgetTrendPoint {
   estimatedUsd: number | null;
 }
 
+export type WidgetTrendGranularity = 'hour' | 'day';
+
+export interface WidgetTrendSeries {
+  fromMs: number | null;
+  toMs: number | null;
+  granularity: WidgetTrendGranularity;
+  points: WidgetTrendPoint[];
+}
+
+export type WidgetTrendPeriodKey =
+  | 'today'
+  | 'rolling24h'
+  | 'rolling7d'
+  | 'month'
+  | 'ledgerCoverage';
+
+export type WidgetPeriodTrends = Record<WidgetTrendPeriodKey, WidgetTrendSeries>;
+
 export interface WidgetModelUsage extends WidgetCostSummary {
   model: string;
   requests: number;
@@ -97,6 +115,7 @@ export interface WidgetUsageView {
     ledgerCoverage: WidgetUsageTotals;
   };
   trend60m: WidgetTrendPoint[];
+  trends: WidgetPeriodTrends;
   topModels: WidgetModelUsage[];
   recentModels: WidgetRecentModel[];
   latestRequest: WidgetLatestRequest | null;
@@ -115,6 +134,7 @@ export interface WidgetSnapshotV1 {
     ledgerCoverage: WidgetUsageTotals;
   };
   trend60m: WidgetTrendPoint[];
+  trends: WidgetPeriodTrends;
   topModels: WidgetModelUsage[];
   recentModels: WidgetRecentModel[];
   latestRequest: WidgetLatestRequest | null;
@@ -179,6 +199,7 @@ export interface WidgetPricingOverride {
 export interface WidgetSettings {
   alwaysOnTop: boolean;
   expanded: boolean;
+  dockToBottomRight: boolean;
   pricingOverrides: WidgetPricingOverride[];
 }
 

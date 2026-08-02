@@ -275,17 +275,17 @@ input:focus-visible {
 .compact-dashboard {
   display: grid;
   height: calc(100% - 34px);
-  grid-template-rows: 68px 30px 52px;
-  gap: 5px;
-  padding: 6px 10px 8px;
+  grid-template-rows: 64px 26px 47px;
+  gap: 4px;
+  padding: 5px 8px 6px;
 }
 
 .compact-hero {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) 128px;
+  grid-template-columns: minmax(0, 1fr) 120px;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
 }
 
 .primary-metric {
@@ -334,7 +334,8 @@ input:focus-visible {
 }
 
 .cost-summary--compact {
-  padding: 5px 8px;
+  min-width: 0;
+  padding: 3px 6px;
 }
 
 .cost-summary__label {
@@ -346,6 +347,11 @@ input:focus-visible {
   color: #95a6a3;
   font-size: 8.5px;
   white-space: nowrap;
+}
+
+.cost-summary__label > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .partial-pill {
@@ -462,12 +468,12 @@ input:focus-visible {
 }
 
 .token-mix--compact .token-mix__legend {
-  margin-top: 4px;
+  margin-top: 3px;
   gap: 4px;
 }
 
 .token-mix--compact .mix-legend {
-  height: 18px;
+  height: 19px;
   justify-content: flex-start;
   padding: 0 5px;
   border: 1px solid rgba(20, 89, 81, 0.12);
@@ -558,7 +564,7 @@ input:focus-visible {
   left: 0;
   gap: 6px;
   font-family: var(--mono);
-  font-size: 7.5px;
+  font-size: 10px;
 }
 
 .compact-health-summary {
@@ -642,7 +648,7 @@ input:focus-visible {
 .latest-compact > span {
   color: var(--text-muted);
   font-family: var(--mono);
-  font-size: 7px;
+  font-size: 10px;
   letter-spacing: 0.12em;
 }
 
@@ -651,7 +657,7 @@ input:focus-visible {
   margin: 4px 0 2px;
   color: var(--text-soft);
   font-family: var(--mono);
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -661,7 +667,7 @@ input:focus-visible {
   overflow: hidden;
   color: var(--text-muted);
   font-family: var(--mono);
-  font-size: 8px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -885,7 +891,7 @@ input:focus-visible {
   justify-content: space-between;
   color: rgba(190, 207, 202, 0.68);
   font-family: var(--mono);
-  font-size: 7.5px;
+  font-size: 10px;
 }
 
 .detail-grid {
@@ -2225,7 +2231,7 @@ input:focus-visible {
   bottom: 5px;
   left: 10px;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
 }
 
@@ -2510,27 +2516,37 @@ input:focus-visible {
 
 @media (max-height: 220px) {
   .widget-shell--compact .compact-dashboard {
-    grid-template-rows: 67px 28px minmax(0, 55px);
+    grid-template-rows: 64px 26px 47px;
     gap: 4px;
-    padding: 6px 9px;
+    padding: 5px 8px 6px;
   }
 
   .widget-shell--compact .compact-hero {
-    grid-template-columns: minmax(0, 1fr) 136px;
-    gap: 9px;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    gap: 8px;
+  }
+
+  .widget-shell--compact .eyebrow,
+  .widget-shell--compact .request-count,
+  .widget-shell--compact .partial-pill,
+  .widget-shell--compact .trend-label,
+  .widget-shell--compact .latest-compact > span,
+  .widget-shell--compact .latest-compact > b,
+  .widget-shell--compact .latest-compact > small {
+    font-size: 10px;
   }
 
   .widget-shell--compact .primary-metric > strong {
-    font-size: 31px;
+    font-size: 27px;
   }
 
   .widget-shell--compact .cost-summary--compact {
-    padding: 5px 8px;
+    padding: 3px 6px;
   }
 
   .widget-shell--compact .cost-summary--compact > strong {
-    margin: 3px 0 2px;
-    font-size: 15.5px;
+    margin: 1px 0 1px;
+    font-size: 15px;
   }
 
   .widget-shell--compact .cost-summary__label,
@@ -2542,11 +2558,11 @@ input:focus-visible {
   }
 
   .widget-shell--compact .token-mix__bar {
-    height: 6px;
+    height: 4px;
   }
 
   .widget-shell--compact .token-mix__legend {
-    margin-top: 4px;
+    margin-top: 3px;
   }
 
   .widget-shell--compact .compact-trend {
@@ -2555,7 +2571,8 @@ input:focus-visible {
   }
 
   .widget-shell--compact .trend-plot .sparkline {
-    height: 46px;
+    height: 38px;
+    margin-top: 8px;
   }
 
   .widget-shell--compact .latest-compact {

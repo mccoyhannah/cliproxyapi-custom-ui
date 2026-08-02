@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 
@@ -6,8 +7,9 @@ from playwright.sync_api import sync_playwright
 
 
 BASE_URL = "http://127.0.0.1:5173"
+DEFAULT_OUTPUT_DIR = Path(r"D:\Tools\Cache\CPA-Token-Pulse\visual-qa\current")
 OUTPUT_DIR = Path(
-    r"D:\Tools\Cache\agent-tasks\webapp-testing\cpa-token-pulse-final-20260717"
+    os.environ.get("CPA_TOKEN_PULSE_VISUAL_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))
 )
 
 
@@ -34,6 +36,29 @@ def usage(total=0, requests=0, estimated=0.0, unpriced=0):
     }
 
 
+def trend_series(now, count, step_ms, phase, granularity, total):
+    points = []
+    if total:
+        for index in range(count):
+            wave = ((index + phase) % 7) * 5_800
+            burst = 19_000 if (index + phase) % 5 == 0 else 0
+            tokens = 12_000 + wave + burst + index * 1_100
+            points.append(
+                {
+                    "startMs": now - (count - 1 - index) * step_ms,
+                    "requests": (index % 4) + 1,
+                    "totalTokens": tokens,
+                    "estimatedUsd": round(tokens * 0.0000024, 6),
+                }
+            )
+    return {
+        "fromMs": points[0]["startMs"] if points else None,
+        "toMs": now if points else None,
+        "granularity": granularity,
+        "points": points,
+    }
+
+
 def snapshot(status="live", total=12_846_320, unpriced=0, message_code=None):
     now = int(time.time() * 1000)
     today = usage(total, 184, None if total and total == unpriced else 28.4186, unpriced)
@@ -46,6 +71,13 @@ def snapshot(status="live", total=12_846_320, unpriced=0, message_code=None):
         }
         for index in range(60)
     ]
+    period_trends = {
+        "today": trend_series(now, 13, 60 * 60_000, 0, "hour", total),
+        "rolling24h": trend_series(now, 24, 60 * 60_000, 1, "hour", total),
+        "rolling7d": trend_series(now, 7, 24 * 60 * 60_000, 2, "day", total),
+        "month": trend_series(now, 16, 24 * 60 * 60_000, 3, "day", total),
+        "ledgerCoverage": trend_series(now, 36, 24 * 60 * 60_000, 4, "day", total),
+    }
     return {
         "version": 1,
         "computedAt": "2026-07-16T10:40:00.000Z",
@@ -83,6 +115,7 @@ def snapshot(status="live", total=12_846_320, unpriced=0, message_code=None):
             "ledgerCoverage": usage(total * 84, 13842, 2348.9237, unpriced * 12),
         },
         "trend60m": live_points if total else [],
+        "trends": period_trends,
         "topModels": [
             {
                 "model": "gpt-5.5-codex",
@@ -154,7 +187,12 @@ def snapshot(status="live", total=12_846_320, unpriced=0, message_code=None):
 def api_script(value, expanded=False):
     payload = json.dumps(value, ensure_ascii=False)
     settings = json.dumps(
-        {"alwaysOnTop": True, "expanded": expanded, "pricingOverrides": []},
+        {
+            "alwaysOnTop": True,
+            "expanded": expanded,
+            "dockToBottomRight": False,
+            "pricingOverrides": [],
+        },
         ensure_ascii=False,
     )
     return f"""
@@ -227,6 +265,9 @@ def collect_metrics(page, name, console_errors):
             tinyText,
             coverageText:
               document.querySelector('.coverage-line > span:last-child')?.textContent?.trim() ?? null,
+            selectedView:
+              document.querySelector('.usage-view-tabs [role="tab"][aria-selected="true"]')
+                ?.textContent?.trim() ?? null,
           };
         }
         """
@@ -262,6 +303,89 @@ def capture(browser, name, width, height, value=None, expanded=False, scale=1.0)
     image_path = OUTPUT_DIR / f"{name}.png"
     page.screenshot(path=str(image_path), full_page=False)
     result = collect_metrics(page, name, console_errors)
+    dock_button = page.get_by_role("button", name="固定到右下角")
+    dock_button.focus()
+    dock_accessibility = page.evaluate(
+        """
+        () => {
+          const button = document.querySelector(
+            'button[aria-label="固定到右下角"]'
+          );
+          if (!(button instanceof HTMLButtonElement)) return null;
+          const style = getComputedStyle(button);
+          return {
+            title: button.title,
+            ariaLabel: button.getAttribute("aria-label"),
+            ariaPressed: button.getAttribute("aria-pressed"),
+            focused: document.activeElement === button,
+            outlineStyle: style.outlineStyle,
+          };
+        }
+        """
+    )
+    dock_button.click()
+    dock_on = page.get_by_role("button", name="取消右下角固定")
+    dock_on_pressed = dock_on.get_attribute("aria-pressed")
+    dock_on.click()
+    dock_off = page.get_by_role("button", name="固定到右下角")
+    result["dockToggle"] = {
+        "onPressed": dock_on_pressed,
+        "offPressed": dock_off.get_attribute("aria-pressed"),
+        "passed": dock_on_pressed == "true" and dock_off.get_attribute("aria-pressed") == "false",
+    }
+    result["dockAccessibility"] = {
+        **(dock_accessibility or {}),
+        "passed": dock_accessibility == {
+            "title": "固定到右下角",
+            "ariaLabel": "固定到右下角",
+            "ariaPressed": "false",
+            "focused": True,
+            "outlineStyle": "solid",
+        },
+    }
+    if expanded:
+        period_tabs = page.locator('.period-tabs [role="tab"]')
+        trend_captions = [page.locator(".trend-caption > span").inner_text()]
+        trend_axes = [
+            page.locator(".trend-axis").inner_text().replace("\n", " | ")
+        ]
+        trend_paths = [page.locator(".expanded-trend .sparkline__line").get_attribute("d")]
+        for label in ["24H", "7D", "本月", "账本"]:
+            period_tabs.get_by_text(label, exact=True).click()
+            page.wait_for_timeout(50)
+            trend_captions.append(page.locator(".trend-caption > span").inner_text())
+            trend_axes.append(page.locator(".trend-axis").inner_text().replace("\n", " | "))
+            trend_paths.append(page.locator(".expanded-trend .sparkline__line").get_attribute("d"))
+        period_tabs.get_by_text("今日", exact=True).click()
+        result["periodSwitch"] = {
+            "captions": trend_captions,
+            "axes": trend_axes,
+            "uniqueTrendPaths": len(set(trend_paths)),
+            "passed": len(set(trend_paths)) == len(trend_paths)
+            and trend_captions == [
+                "今天 · 按小时",
+                "最近 24 小时 · 按小时",
+                "最近 7 天 · 按天",
+                "本月 · 按天",
+                "账本覆盖期 · 按天",
+            ],
+            "axesPassed": trend_axes == [
+                "今天 00:00 | 现在",
+                "24 小时前 | 现在",
+                "7 天前 | 现在",
+                "本月 1 日 | 现在",
+                "覆盖开始 | 覆盖结束",
+            ],
+        }
+        result["periodSwitch"]["passed"] = (
+            result["periodSwitch"]["passed"] and result["periodSwitch"]["axesPassed"]
+        )
+    if expanded:
+        ledger_tab = page.get_by_role("tab", name="正式账本")
+        ledger_tab.click()
+        result["manualSelectedView"] = page.locator(
+            '.usage-view-tabs [role="tab"][aria-selected="true"]'
+        ).inner_text()
     result["screenshot"] = str(image_path)
     result["deviceScaleFactor"] = scale
     context.close()
@@ -279,14 +403,14 @@ def main():
     near_complete = snapshot("live", total=12_846_320, unpriced=1)
 
     scenarios = [
-        ("compact-live-100", 380, 220, live, False, 1.0),
-        ("compact-live-125", 380, 220, live, False, 1.25),
-        ("compact-live-150", 380, 220, live, False, 1.5),
-        ("compact-loading", 380, 220, empty, False, 1.0),
-        ("compact-degraded", 380, 220, degraded, False, 1.0),
-        ("compact-unpriced", 380, 220, unpriced, False, 1.0),
-        ("compact-offline", 380, 220, offline, False, 1.0),
-        ("compact-error", 380, 220, error, False, 1.0),
+        ("compact-live-100", 340, 190, live, False, 1.0),
+        ("compact-live-125", 340, 190, live, False, 1.25),
+        ("compact-live-150", 340, 190, live, False, 1.5),
+        ("compact-loading", 340, 190, empty, False, 1.0),
+        ("compact-degraded", 340, 190, degraded, False, 1.0),
+        ("compact-unpriced", 340, 190, unpriced, False, 1.0),
+        ("compact-offline", 340, 190, offline, False, 1.0),
+        ("compact-error", 340, 190, error, False, 1.0),
         ("expanded-live-100", 460, 600, live, True, 1.0),
         ("expanded-live-125", 460, 600, live, True, 1.25),
         ("expanded-live-150", 460, 600, live, True, 1.5),
@@ -309,7 +433,13 @@ def main():
         if item["documentScrollWidth"] > item["innerWidth"]
         or item["documentScrollHeight"] > item["innerHeight"]
         or item["consoleErrors"]
-        or (item["name"].startswith("expanded") and item["tinyText"])
+        or item["overflowing"]
+        or item["tinyText"]
+        or not item["dockToggle"]["passed"]
+        or not item["dockAccessibility"]["passed"]
+        or (item["name"].startswith("expanded") and item["selectedView"] != "当前合计")
+        or (item["name"].startswith("expanded") and item["manualSelectedView"] != "正式账本")
+        or (item["name"].startswith("expanded") and not item["periodSwitch"]["passed"])
         or (item["name"] == "expanded-near-complete" and item["coverageText"].startswith("100%"))
     ]
     print(json.dumps({"screenshots": len(results), "failures": failures}, ensure_ascii=False))

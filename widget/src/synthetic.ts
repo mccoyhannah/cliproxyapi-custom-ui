@@ -5,6 +5,8 @@ import type {
   WidgetRecentModel,
   WidgetSnapshotV1,
   WidgetSourceStatus,
+  WidgetPeriodTrends,
+  WidgetTrendSeries,
   WidgetTrendPoint,
   WidgetUsageView,
   WidgetUsageTotals,
@@ -63,11 +65,26 @@ function usageView({
   statusCounts,
   periods,
   trend60m = [],
+  trends = emptyPeriodTrends(),
   topModels = [],
   recentModels = [],
   latestRequest = null,
-}: WidgetUsageView): WidgetUsageView {
-  return { statusCounts, periods, trend60m, topModels, recentModels, latestRequest };
+}: Omit<WidgetUsageView, 'trends'> & { trends?: WidgetPeriodTrends }): WidgetUsageView {
+  return { statusCounts, periods, trend60m, trends, topModels, recentModels, latestRequest };
+}
+
+function emptyTrendSeries(granularity: 'hour' | 'day'): WidgetTrendSeries {
+  return { fromMs: null, toMs: null, granularity, points: [] };
+}
+
+function emptyPeriodTrends(): WidgetPeriodTrends {
+  return {
+    today: emptyTrendSeries('hour'),
+    rolling24h: emptyTrendSeries('hour'),
+    rolling7d: emptyTrendSeries('day'),
+    month: emptyTrendSeries('day'),
+    ledgerCoverage: emptyTrendSeries('day'),
+  };
 }
 
 function splitTrend(trend: WidgetTrendPoint[]): {
@@ -94,6 +111,47 @@ function splitTrend(trend: WidgetTrendPoint[]): {
         : Math.max(0, point.estimatedUsd - (unledgered[index]?.estimatedUsd ?? 0)),
   }));
   return { ledger, unledgered };
+}
+
+function splitTrendSeries(trends: WidgetPeriodTrends): {
+  ledger: WidgetPeriodTrends;
+  unledgered: WidgetPeriodTrends;
+} {
+  const ledger = emptyPeriodTrends();
+  const unledgered = emptyPeriodTrends();
+  for (const key of Object.keys(trends) as Array<keyof WidgetPeriodTrends>) {
+    const source = trends[key];
+    const split = splitTrend(source.points);
+    ledger[key] = { ...source, points: split.ledger };
+    unledgered[key] = { ...source, points: split.unledgered };
+  }
+  return { ledger, unledgered };
+}
+
+function buildPreviewTrendSeries(
+  now: number,
+  count: number,
+  stepMs: number,
+  granularity: 'hour' | 'day',
+  phase: number
+): WidgetTrendSeries {
+  const points = Array.from({ length: count }, (_, index) => {
+    const wave = Math.sin((index + phase) * 0.8) * 4_100;
+    const burst = (index + phase) % 5 === 0 ? 11_000 : 0;
+    const totalTokens = Math.max(800, Math.round(6_500 + wave + burst + index * 170));
+    return {
+      startMs: now - (count - 1 - index) * stepMs,
+      requests: Math.max(1, Math.round(totalTokens / 5_800)),
+      totalTokens,
+      estimatedUsd: totalTokens * 0.0000024,
+    };
+  });
+  return {
+    fromMs: points[0]?.startMs ?? now,
+    toMs: now,
+    granularity,
+    points,
+  };
 }
 
 export function createEmptySnapshot(status: WidgetSourceStatus): WidgetSnapshotV1 {
@@ -147,6 +205,7 @@ export function createEmptySnapshot(status: WidgetSourceStatus): WidgetSnapshotV
     statusCounts,
     periods,
     trend60m: [],
+    trends: emptyView.trends,
     topModels: [],
     recentModels: [],
     latestRequest: null,
@@ -278,6 +337,14 @@ export function createPreviewSnapshot(): WidgetSnapshotV1 {
     ledgerCoverage: unledgeredCoverage,
   };
   const split = splitTrend(trend);
+  const previewTrends: WidgetPeriodTrends = {
+    today: buildPreviewTrendSeries(now, 13, 60 * minute, 'hour', 0),
+    rolling24h: buildPreviewTrendSeries(now, 24, 60 * minute, 'hour', 1),
+    rolling7d: buildPreviewTrendSeries(now, 7, 24 * 60 * minute, 'day', 2),
+    month: buildPreviewTrendSeries(now, 16, 24 * 60 * minute, 'day', 3),
+    ledgerCoverage: buildPreviewTrendSeries(now, 36, 24 * 60 * minute, 'day', 4),
+  };
+  const splitPeriodTrends = splitTrendSeries(previewTrends);
   const ledgerRecentModels: WidgetRecentModel[] = [
     {
       model: 'gpt-5.4-mini',
@@ -311,6 +378,7 @@ export function createPreviewSnapshot(): WidgetSnapshotV1 {
     },
     periods: ledgerPeriods,
     trend60m: split.ledger,
+    trends: splitPeriodTrends.ledger,
     topModels: [
       {
         model: 'gpt-5.4-codex',
@@ -345,6 +413,7 @@ export function createPreviewSnapshot(): WidgetSnapshotV1 {
     },
     periods: unledgeredPeriods,
     trend60m: split.unledgered,
+    trends: splitPeriodTrends.unledgered,
     topModels: [
       {
         model: 'gpt-5.4-codex',
@@ -396,6 +465,7 @@ export function createPreviewSnapshot(): WidgetSnapshotV1 {
     },
     periods: { today, rolling24h, rolling7d, month, ledgerCoverage: ledger },
     trend60m: trend,
+    trends: previewTrends,
     topModels: [
       {
         model: 'gpt-5.4-codex',

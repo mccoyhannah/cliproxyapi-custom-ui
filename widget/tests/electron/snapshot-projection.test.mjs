@@ -19,6 +19,19 @@ const usage = () => ({
   unpricedRequests: 0,
 });
 
+const trends = () =>
+  Object.fromEntries(
+    ['today', 'rolling24h', 'rolling7d', 'month', 'ledgerCoverage'].map((key) => [
+      key,
+      {
+        fromMs: 1,
+        toMs: 2,
+        granularity: key === 'today' || key === 'rolling24h' ? 'hour' : 'day',
+        points: [{ startMs: 1, requests: 1, totalTokens: 10, estimatedUsd: 0.01 }],
+      },
+    ])
+  );
+
 const view = () => ({
   statusCounts: {
     available: 1,
@@ -36,6 +49,7 @@ const view = () => ({
     ledgerCoverage: usage(),
   },
   trend60m: [{ startMs: 1, requests: 1, totalTokens: 10, estimatedUsd: 0.01 }],
+  trends: trends(),
   topModels: [
     {
       model: 'gpt-5.5-codex',
@@ -96,6 +110,7 @@ const snapshot = () => ({
     ledgerCoverage: usage(),
   },
   trend60m: [{ startMs: 1, requests: 1, totalTokens: 10, estimatedUsd: 0.01 }],
+  trends: trends(),
   topModels: [
     {
       model: 'gpt-5.5-codex',
@@ -144,6 +159,7 @@ test('snapshot projection exposes only WidgetSnapshotV1 aggregate fields', () =>
     'statusCounts',
     'periods',
     'trend60m',
+    'trends',
     'topModels',
     'recentModels',
     'latestRequest',
@@ -187,6 +203,10 @@ test('snapshot projection rejects invalid or unbounded aggregate payloads', () =
   }));
   assert.equal(projectWidgetSnapshotV1(oversizedTrend, 'D:\\CLIProxyAPI'), null);
 
+  const invalidTrendSeries = snapshot();
+  invalidTrendSeries.trends.month.granularity = 'minute';
+  assert.equal(projectWidgetSnapshotV1(invalidTrendSeries, 'D:\\CLIProxyAPI'), null);
+
   const oversizedRecentModels = snapshot();
   oversizedRecentModels.recentModels = Array.from({ length: 4 }, (_, index) => ({
     model: `gpt-${index}`,
@@ -206,4 +226,18 @@ test('snapshot projection keeps legacy V1 snapshots usable when recentModels is 
   assert.ok(projected);
   assert.deepEqual(projected.recentModels, []);
   assert.equal(projected.latestRequest?.model, 'gpt-5.5-codex');
+});
+
+test('legacy V1 snapshots do not reuse the 60-minute series for unrelated periods', () => {
+  const legacy = snapshot();
+  delete legacy.trends;
+
+  const projected = projectWidgetSnapshotV1(legacy, 'D:\\CLIProxyAPI');
+
+  assert.ok(projected);
+  assert.notStrictEqual(projected.trends.today, projected.trends.rolling24h);
+  assert.deepEqual(projected.trends.rolling24h.points, []);
+  assert.deepEqual(projected.trends.rolling7d.points, []);
+  assert.equal(projected.trends.rolling24h.granularity, 'hour');
+  assert.equal(projected.trends.rolling7d.granularity, 'day');
 });

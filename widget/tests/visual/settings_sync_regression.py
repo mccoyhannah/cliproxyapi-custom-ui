@@ -16,6 +16,7 @@ def main():
             window.__emitWidgetSettings({
               alwaysOnTop: false,
               expanded: true,
+              dockToBottomRight: false,
               pricingOverrides: [],
             })
             """

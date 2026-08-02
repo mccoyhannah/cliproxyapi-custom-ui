@@ -52,6 +52,7 @@ function isWidgetSettings(value: unknown): value is WidgetSettings {
   return (
     typeof settings.alwaysOnTop === 'boolean' &&
     typeof settings.expanded === 'boolean' &&
+    typeof settings.dockToBottomRight === 'boolean' &&
     Array.isArray(settings.pricingOverrides)
   );
 }

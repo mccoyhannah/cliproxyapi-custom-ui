@@ -20,8 +20,71 @@ const DEFAULT_RECONCILE_INTERVAL_MS = 30_000;
 const DEFAULT_STABILITY_DELAY_MS = 750;
 const DEFAULT_MAX_CONCURRENT_LOG_READS = 8;
 const WATCH_DEBOUNCE_MS = 250;
+const PENDING_STATE_VERSION = 1;
+const PENDING_STATE_FILE_NAME = 'unledgered-v1.json';
+const PENDING_ENTRY_STATUSES = new Set([
+  'available',
+  'unreported',
+  'ambiguous',
+  'parse-error',
+  'unsupported',
+]);
+const ATOMIC_WRITE_RETRIES = 6;
+const ATOMIC_WRITE_RETRY_CODES = new Set(['EEXIST', 'EPERM', 'EBUSY', 'ENOTEMPTY']);
 
 const fingerprintForStats = (stats) => `${stats.size}:${Math.floor(stats.mtimeMs)}`;
+
+const writeAtomicTextFile = async (filePath, contents) => {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  let lastError = null;
+  for (let attempt = 0; attempt < ATOMIC_WRITE_RETRIES; attempt += 1) {
+    const tempPath = `${filePath}.${process.pid}-${Date.now()}-${attempt}.tmp`;
+    const backupPath = `${filePath}.${process.pid}-${Date.now()}-${attempt}.bak`;
+    let preserveBackup = false;
+    try {
+      await fs.writeFile(tempPath, contents, { encoding: 'utf8', flag: 'wx' });
+      try {
+        await fs.rename(tempPath, filePath);
+        return;
+      } catch (error) {
+        if (!ATOMIC_WRITE_RETRY_CODES.has(error?.code)) throw error;
+
+        let originalMoved = false;
+        try {
+          await fs.rename(filePath, backupPath);
+          originalMoved = true;
+        } catch (backupError) {
+          if (backupError?.code !== 'ENOENT') throw backupError;
+        }
+
+        try {
+          await fs.rename(tempPath, filePath);
+          if (originalMoved) await fs.rm(backupPath, { force: true });
+          return;
+        } catch (replaceError) {
+          if (originalMoved) {
+            await fs.rm(filePath, { force: true }).catch(() => {});
+            try {
+              await fs.rename(backupPath, filePath);
+            } catch {
+              preserveBackup = true;
+            }
+          }
+          throw replaceError;
+        }
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < ATOMIC_WRITE_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      }
+    } finally {
+      await fs.rm(tempPath, { force: true }).catch(() => {});
+      if (!preserveBackup) await fs.rm(backupPath, { force: true }).catch(() => {});
+    }
+  }
+  throw lastError ?? new Error('atomic-write-failed');
+};
 
 const canonicalSourceIdentity = (sourceDir, fileName) =>
   `${path.normalize(path.resolve(sourceDir)).toLowerCase()}::${String(fileName).toLowerCase()}`;
@@ -118,6 +181,85 @@ const normalizeLedgerEntry = (raw, index) => {
   };
 };
 
+const normalizePendingEntry = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  if (
+    typeof raw.sourceHash !== 'string' ||
+    !/^[a-f0-9]{64}$/i.test(raw.sourceHash) ||
+    typeof raw.fingerprint !== 'string' ||
+    !/^\d+:\d+$/.test(raw.fingerprint) ||
+    typeof raw.dedupeKey !== 'string' ||
+    !/^(?:request|source):[a-f0-9]{64}$/i.test(raw.dedupeKey) ||
+    !Number.isFinite(raw.timestampMs) ||
+    !Number.isFinite(raw.lastModifiedMs) ||
+    typeof raw.status !== 'string' ||
+    !PENDING_ENTRY_STATUSES.has(raw.status)
+  ) {
+    return null;
+  }
+
+  const model = raw.model === null ? null : normalizeModelName(raw.model);
+  if (raw.model !== null && model === null) return null;
+
+  const usage = normalizeTokenUsage({
+    input_tokens: raw.tokenUsage?.input,
+    output_tokens: raw.tokenUsage?.output,
+    total_tokens: raw.tokenUsage?.total,
+    input_tokens_details: { cached_tokens: raw.tokenUsage?.cached },
+    output_tokens_details: { reasoning_tokens: raw.tokenUsage?.reasoning },
+  });
+  if (raw.status === 'available' && usage.status !== 'available') return null;
+
+  const tokenUsage =
+    raw.status === 'available' ? usage : emptyTokenUsage(raw.status);
+  const sourceHash = raw.sourceHash.toLowerCase();
+  return {
+    sourceHash,
+    fingerprint: raw.fingerprint,
+    entry: {
+      dedupeKey: raw.dedupeKey,
+      timestampMs: Math.floor(raw.timestampMs),
+      lastModifiedMs: Math.floor(raw.lastModifiedMs),
+      model,
+      status: raw.status,
+      tokenUsage,
+    },
+  };
+};
+
+const serializePendingEntry = ({ sourceHash, fingerprint, entry }) => ({
+  sourceHash,
+  fingerprint,
+  dedupeKey: entry.dedupeKey,
+  timestampMs: entry.timestampMs,
+  lastModifiedMs: entry.lastModifiedMs,
+  model: entry.model,
+  status: entry.status,
+  tokenUsage: {
+    input: entry.tokenUsage.input,
+    output: entry.tokenUsage.output,
+    cached: entry.tokenUsage.cached,
+    reasoning: entry.tokenUsage.reasoning,
+    total: entry.tokenUsage.total,
+  },
+});
+
+const entriesEquivalent = (left, right) => {
+  if (!left || !right || left.status !== right.status || left.model !== right.model) {
+    return false;
+  }
+  const leftUsage = left.tokenUsage ?? emptyTokenUsage();
+  const rightUsage = right.tokenUsage ?? emptyTokenUsage();
+  return (
+    leftUsage.status === rightUsage.status &&
+    leftUsage.input === rightUsage.input &&
+    leftUsage.output === rightUsage.output &&
+    leftUsage.cached === rightUsage.cached &&
+    leftUsage.reasoning === rightUsage.reasoning &&
+    leftUsage.total === rightUsage.total
+  );
+};
+
 const listLogFiles = async (logsDirs) => {
   const files = [];
   const unavailableDirs = [];
@@ -161,6 +303,11 @@ export class TokenPulseEngine {
   constructor(options) {
     this.installDir = path.resolve(options.installDir);
     this.cacheDir = path.resolve(options.cacheDir);
+    this.pendingStatePath = path.resolve(
+      options.pendingStatePath ??
+        path.join(this.installDir, 'usage-backups', 'token-ledger', PENDING_STATE_FILE_NAME)
+    );
+    this.pendingStateRecoveryPath = `${this.pendingStatePath}.recovery`;
     this.logsDirs = options.logsDirs ?? [
       path.join(this.installDir, 'logs'),
       path.join(this.installDir, 'auths', 'logs'),
@@ -178,6 +325,7 @@ export class TokenPulseEngine {
     );
     this.now = options.now ?? Date.now;
     this.readLog = options.readLog ?? readBoundedResponseLog;
+    this.pendingStateWriter = options.pendingStateWriter ?? writeAtomicTextFile;
     this.watchFactory = options.watchFactory ?? watch;
     this.waitForStability =
       options.waitForStability ??
@@ -185,6 +333,8 @@ export class TokenPulseEngine {
     this.pricingOverrides = sanitizeModelPricingOverrides(options.pricingOverrides);
     this.baselineEntries = new Map();
     this.liveEntries = new Map();
+    this.pendingEntries = new Map();
+    this.persistedPendingEntries = new Map();
     this.baselineFingerprints = new Map();
     this.liveFingerprints = new Map();
     this.observations = new Map();
@@ -200,6 +350,8 @@ export class TokenPulseEngine {
     this.lastSuccessfulScanAtMs = null;
     this.lastReconcileAtMs = null;
     this.possibleCoverageGap = false;
+    this.ledgerCoverageGap = false;
+    this.pendingLedgerConflict = false;
     this.unavailableDirs = [];
     this.currentSourceIdentities = new Set();
     this.started = false;
@@ -210,6 +362,14 @@ export class TokenPulseEngine {
     this.watchTimer = null;
     this.pendingTimer = null;
     this.cacheWriteChain = Promise.resolve();
+    this.pendingStateWriteChain = Promise.resolve();
+    this.pendingStateLoaded = false;
+    this.pendingStateDirty = false;
+    this.pendingStateError = false;
+    this.pendingStateErrorCode = null;
+    this.pendingStateErrorCount = 0;
+    this.pendingStateMainError = false;
+    this.pendingStateWritePath = this.pendingStatePath;
     this.initialReconcilePromise = null;
   }
 
@@ -220,6 +380,7 @@ export class TokenPulseEngine {
     this.stopped = false;
     let highWater;
     try {
+      await this.loadPendingState();
       await this.ensureWatchers();
       highWater = await listLogFiles(this.logsDirs);
       this.currentSourceIdentities = new Set(highWater.files.map((file) => file.sourceIdentity));
@@ -265,6 +426,7 @@ export class TokenPulseEngine {
     this.watchers.clear();
     await this.initialReconcilePromise?.catch(() => null);
     await this.cacheWriteChain;
+    await this.pendingStateWriteChain;
   }
 
   getSnapshot() {
@@ -294,15 +456,188 @@ export class TokenPulseEngine {
     await this.ensureWatchers();
     const listing = await listLogFiles(this.logsDirs);
     this.currentSourceIdentities = new Set(listing.files.map((file) => file.sourceIdentity));
-    const ledgerReloadStatus = await this.reloadLedgerIfChanged(false);
-    await this.scanFiles(
-      listing,
-      true,
-      ledgerReloadStatus !== 'failed' && this.ledgerParseErrors === 0
-    );
+    await this.reloadLedgerIfChanged(false);
+    await this.scanFiles(listing, true);
     this.lastReconcileAtMs = this.now();
     this.publishSnapshot();
     return this.snapshot;
+  }
+
+  refreshPossibleCoverageGap() {
+    this.possibleCoverageGap =
+      this.ledgerCoverageGap || this.pendingLedgerConflict || this.pendingStateError;
+  }
+
+  markPendingStateError(code, preserveMainState = false) {
+    this.pendingStateError = true;
+    this.pendingStateErrorCode = code;
+    this.pendingStateErrorCount = 1;
+    if (preserveMainState) {
+      this.pendingStateMainError = true;
+      this.pendingStateWritePath = this.pendingStateRecoveryPath;
+    }
+    this.refreshPossibleCoverageGap();
+  }
+
+  clearPendingStateError() {
+    if (this.pendingStateMainError) return;
+    this.pendingStateError = false;
+    this.pendingStateErrorCode = null;
+    this.pendingStateErrorCount = 0;
+    this.refreshPossibleCoverageGap();
+  }
+
+  applyPendingStateDocument(document, targetEntries) {
+    if (
+      !document ||
+      typeof document !== 'object' ||
+      document.version !== PENDING_STATE_VERSION ||
+      !Array.isArray(document.entries)
+    ) {
+      return false;
+    }
+
+    let semanticErrors = 0;
+    for (const rawEntry of document.entries) {
+      const normalized = normalizePendingEntry(rawEntry);
+      if (!normalized || targetEntries.has(normalized.sourceHash)) {
+        semanticErrors += 1;
+        continue;
+      }
+      targetEntries.set(normalized.sourceHash, normalized);
+    }
+    return semanticErrors === 0;
+  }
+
+  async readPendingStateDocument(filePath) {
+    let text;
+    try {
+      text = await fs.readFile(filePath, 'utf8');
+    } catch (error) {
+      if (error?.code === 'ENOENT') return { status: 'missing', document: null };
+      return { status: 'unavailable', document: null };
+    }
+
+    try {
+      return { status: 'loaded', document: JSON.parse(text) };
+    } catch {
+      return { status: 'corrupt', document: null };
+    }
+  }
+
+  async loadPendingState() {
+    if (this.pendingStateLoaded) return;
+    this.pendingStateLoaded = true;
+
+    const nextEntries = new Map();
+    const mainState = await this.readPendingStateDocument(this.pendingStatePath);
+    if (mainState.status === 'loaded') {
+      if (!this.applyPendingStateDocument(mainState.document, nextEntries)) {
+        this.markPendingStateError('collector-unledgered-state-corrupt', true);
+      }
+    } else if (mainState.status === 'corrupt') {
+      this.markPendingStateError('collector-unledgered-state-corrupt', true);
+    } else if (mainState.status === 'unavailable') {
+      this.markPendingStateError('collector-unledgered-state-unavailable', true);
+    }
+
+    if (mainState.status !== 'loaded' || this.pendingStateMainError) {
+      const recoveryState = await this.readPendingStateDocument(this.pendingStateRecoveryPath);
+      if (recoveryState.status === 'loaded') {
+        if (!this.applyPendingStateDocument(recoveryState.document, nextEntries)) {
+          this.markPendingStateError('collector-unledgered-state-corrupt', true);
+        }
+      } else if (recoveryState.status === 'corrupt') {
+        this.markPendingStateError('collector-unledgered-state-corrupt', true);
+      } else if (recoveryState.status === 'unavailable') {
+        this.markPendingStateError('collector-unledgered-state-unavailable', true);
+      }
+    }
+
+    this.pendingEntries = nextEntries;
+    this.persistedPendingEntries = new Map(nextEntries);
+    for (const [sourceHash, pending] of nextEntries) {
+      this.liveEntries.set(sourceHash, pending.entry);
+      this.liveFingerprints.set(sourceHash, pending.fingerprint);
+    }
+  }
+
+  async flushPendingState() {
+    if (!this.pendingStateDirty) return;
+    const document = {
+      version: PENDING_STATE_VERSION,
+      entries: [...this.pendingEntries.values()].map(serializePendingEntry),
+    };
+    const contents = `${JSON.stringify(document, null, 2)}\n`;
+    this.pendingStateDirty = false;
+    this.pendingStateWriteChain = this.pendingStateWriteChain.then(async () => {
+      try {
+        await this.pendingStateWriter(this.pendingStateWritePath, contents);
+        this.persistedPendingEntries = new Map(this.pendingEntries);
+        this.clearPendingStateError();
+      } catch {
+        this.pendingStateDirty = true;
+        this.markPendingStateError('collector-unledgered-state-unavailable');
+      }
+    });
+    await this.pendingStateWriteChain;
+  }
+
+  markPendingEntryAmbiguous(sourceHash, pending) {
+    this.liveEntries.set(sourceHash, {
+      ...pending.entry,
+      dedupeKey: `conflict:${sourceHash}`,
+      status: 'ambiguous',
+      tokenUsage: emptyTokenUsage('ambiguous'),
+    });
+  }
+
+  consumeLedgerEntries(ledgerEntries, ledgerFingerprints) {
+    this.pendingLedgerConflict = false;
+    if (this.pendingEntries.size === 0) {
+      this.refreshPossibleCoverageGap();
+      return;
+    }
+    const ledgerByDedupeKey = new Map();
+    for (const entry of ledgerEntries.values()) {
+      const candidates = ledgerByDedupeKey.get(entry.dedupeKey) ?? [];
+      candidates.push(entry);
+      ledgerByDedupeKey.set(entry.dedupeKey, candidates);
+    }
+    for (const [sourceHash, pending] of this.pendingEntries) {
+      const ledgerEntry = ledgerEntries.get(sourceHash);
+      const ledgerFingerprint = ledgerFingerprints.get(sourceHash);
+      const sameSourceAndFingerprint =
+        ledgerEntry &&
+        Boolean(ledgerFingerprint) &&
+        pending.fingerprint === ledgerFingerprint &&
+        entriesEquivalent(pending.entry, ledgerEntry);
+      const sameRequestCandidates = ledgerByDedupeKey.get(pending.entry.dedupeKey) ?? [];
+      const sameRequestAndEquivalent =
+        sameRequestCandidates.length > 0 &&
+        sameRequestCandidates.every((entry) => entriesEquivalent(pending.entry, entry));
+      if (!sameSourceAndFingerprint && !sameRequestAndEquivalent) {
+        if (ledgerEntry && ledgerFingerprint && pending.fingerprint === ledgerFingerprint) {
+          this.pendingLedgerConflict = true;
+          this.markPendingEntryAmbiguous(sourceHash, pending);
+        }
+        if (
+          sameRequestCandidates.some((entry) => !entriesEquivalent(pending.entry, entry))
+        ) {
+          this.pendingLedgerConflict = true;
+          this.markPendingEntryAmbiguous(sourceHash, pending);
+        }
+        continue;
+      }
+
+      this.pendingEntries.delete(sourceHash);
+      this.persistedPendingEntries.delete(sourceHash);
+      this.liveEntries.delete(sourceHash);
+      this.liveFingerprints.delete(sourceHash);
+      this.observations.delete(sourceHash);
+      this.pendingStateDirty = true;
+    }
+    this.refreshPossibleCoverageGap();
   }
 
   async reloadLedgerIfChanged(force) {
@@ -320,7 +655,8 @@ export class TokenPulseEngine {
       }
       const identity = `${path.normalize(ledgerPath).toLowerCase()}|${fingerprintForStats(stats)}`;
       if (!force && identity === this.loadedLedgerIdentity) {
-        if (sawCandidateFailure) this.possibleCoverageGap = true;
+        this.ledgerCoverageGap = sawCandidateFailure;
+        this.refreshPossibleCoverageGap();
         return 'unchanged';
       }
 
@@ -353,18 +689,17 @@ export class TokenPulseEngine {
         this.baselineEntries = nextEntries;
         this.baselineFingerprints = nextFingerprints;
         if (totalParseErrors === 0) {
-          for (const sourceHash of nextFingerprints.keys()) {
-            this.liveEntries.delete(sourceHash);
-            this.liveFingerprints.delete(sourceHash);
-            this.observations.delete(sourceHash);
-          }
+          this.pendingLedgerConflict = false;
+          this.consumeLedgerEntries(nextEntries, nextFingerprints);
+          await this.flushPendingState();
         }
         this.loadedLedgerIdentity = identity;
         this.ledgerGeneratedAt = result.generatedAt;
         this.ledgerCoverageStartMs = result.coverageStartMs;
         this.ledgerCoverageEndMs = result.coverageEndMs;
         this.ledgerParseErrors = totalParseErrors;
-        this.possibleCoverageGap = sawCandidateFailure || totalParseErrors > 0;
+        this.ledgerCoverageGap = sawCandidateFailure || totalParseErrors > 0;
+        this.refreshPossibleCoverageGap();
         return 'reloaded';
       } catch {
         sawCandidateFailure = true;
@@ -377,19 +712,20 @@ export class TokenPulseEngine {
       this.baselineFingerprints.clear();
       this.loadedLedgerIdentity = null;
     }
-    if (sawCandidateFailure || hadLoadedLedger) {
-      this.possibleCoverageGap = true;
+    this.ledgerCoverageGap = sawCandidateFailure || hadLoadedLedger;
+    this.refreshPossibleCoverageGap();
+    if (sawCandidateFailure || hadLoadedLedger || this.pendingStateError) {
       return 'failed';
     }
     return 'missing';
   }
 
-  async scanFiles(listing, schedulePending = true, allowMissingLivePurge = true) {
+  async scanFiles(listing, schedulePending = true) {
     this.unavailableDirs = listing.unavailableDirs;
     const presentSourceHashes = new Set(listing.files.map((file) => file.sourceHash));
-    if (allowMissingLivePurge && listing.unavailableDirs.length === 0) {
+    if (listing.unavailableDirs.length === 0) {
       for (const sourceHash of this.liveEntries.keys()) {
-        if (presentSourceHashes.has(sourceHash)) continue;
+        if (presentSourceHashes.has(sourceHash) || this.pendingEntries.has(sourceHash)) continue;
         this.liveEntries.delete(sourceHash);
         this.liveFingerprints.delete(sourceHash);
         this.observations.delete(sourceHash);
@@ -404,6 +740,10 @@ export class TokenPulseEngine {
     }
     this.lastSuccessfulScanAtMs = this.now();
     this.queuedWatchPaths.clear();
+    if (this.ledgerParseErrors === 0) {
+      this.consumeLedgerEntries(this.baselineEntries, this.baselineFingerprints);
+    }
+    await this.flushPendingState();
     if (schedulePending) this.schedulePendingPass();
   }
 
@@ -456,6 +796,12 @@ export class TokenPulseEngine {
 
     if (parsed.status !== 'pending') {
       this.liveFingerprints.set(file.sourceHash, file.fingerprint);
+      this.pendingEntries.set(file.sourceHash, {
+        sourceHash: file.sourceHash,
+        fingerprint: file.fingerprint,
+        entry,
+      });
+      this.pendingStateDirty = true;
     }
   }
 
@@ -463,6 +809,7 @@ export class TokenPulseEngine {
     const watchDirs = [
       ...this.logsDirs,
       ...new Set(this.ledgerPaths.map((ledgerPath) => path.dirname(ledgerPath))),
+      path.dirname(this.pendingStatePath),
     ];
     for (const directory of watchDirs) {
       const normalized = path.normalize(directory).toLowerCase();
@@ -513,7 +860,7 @@ export class TokenPulseEngine {
     const liveEntries = [...this.liveEntries.values()];
     const entries = [...ledgerEntries, ...liveEntries];
     let pendingFiles = 0;
-    let parseErrors = this.ledgerParseErrors;
+    let parseErrors = this.ledgerParseErrors + this.pendingStateErrorCount;
     let unsupportedFiles = 0;
     for (const entry of entries) {
       if (entry.status === 'pending') pendingFiles += 1;
@@ -523,7 +870,13 @@ export class TokenPulseEngine {
     const availableSourceCount = this.logsDirs.length - this.unavailableDirs.length;
     let status = 'live';
     let messageCode = null;
-    if (availableSourceCount === 0 && !this.loadedLedgerIdentity) {
+    if (this.pendingStateError) {
+      status = 'degraded';
+      messageCode = this.pendingStateErrorCode;
+    } else if (this.pendingLedgerConflict) {
+      status = 'degraded';
+      messageCode = 'collector-unledgered-conflict';
+    } else if (availableSourceCount === 0 && !this.loadedLedgerIdentity) {
       status = 'offline';
       messageCode = 'collector-sources-unavailable';
     } else if (!this.loadedLedgerIdentity) {

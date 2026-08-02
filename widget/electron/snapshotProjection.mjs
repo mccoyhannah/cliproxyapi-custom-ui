@@ -2,6 +2,8 @@ const SOURCE_STATUSES = new Set(['loading', 'live', 'degraded', 'offline', 'erro
 const LATEST_STATUSES = new Set(['available', 'unpriced', 'pending']);
 const MAX_SAFE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_TREND_POINTS = 60;
+const TREND_PERIOD_KEYS = ['today', 'rolling24h', 'rolling7d', 'month', 'ledgerCoverage'];
+const TREND_GRANULARITIES = new Set(['hour', 'day']);
 const MAX_TOP_MODELS = 20;
 const MAX_RECENT_MODELS = 3;
 
@@ -203,6 +205,52 @@ const projectTrendPoint = (value) => {
   return { startMs, requests, totalTokens, estimatedUsd };
 };
 
+const projectTrendSeries = (value) => {
+  if (!isRecord(value) || !TREND_GRANULARITIES.has(value.granularity)) return null;
+  const fromMs = asNullableTimestamp(value.fromMs);
+  const toMs = asNullableTimestamp(value.toMs);
+  if (
+    fromMs === undefined ||
+    toMs === undefined ||
+    (fromMs !== null && toMs !== null && fromMs > toMs) ||
+    !Array.isArray(value.points) ||
+    value.points.length > MAX_TREND_POINTS
+  ) {
+    return null;
+  }
+  const points = value.points.map(projectTrendPoint);
+  if (points.some((point) => point === null)) return null;
+  return { fromMs, toMs, granularity: value.granularity, points };
+};
+
+const projectTrends = (value, legacyPoints = []) => {
+  if (value === undefined) {
+    const legacySeries = {
+      fromMs: legacyPoints[0]?.startMs ?? null,
+      toMs: legacyPoints.at(-1)?.startMs ?? null,
+      granularity: 'hour',
+      points: legacyPoints,
+    };
+    const emptyHourSeries = { fromMs: null, toMs: null, granularity: 'hour', points: [] };
+    const emptyDaySeries = { fromMs: null, toMs: null, granularity: 'day', points: [] };
+    return {
+      today: legacySeries,
+      rolling24h: emptyHourSeries,
+      rolling7d: emptyDaySeries,
+      month: emptyDaySeries,
+      ledgerCoverage: emptyDaySeries,
+    };
+  }
+  if (!isRecord(value)) return null;
+  const projected = {};
+  for (const key of TREND_PERIOD_KEYS) {
+    const series = projectTrendSeries(value[key]);
+    if (!series) return null;
+    projected[key] = series;
+  }
+  return projected;
+};
+
 const projectModelUsage = (value) => {
   if (!isRecord(value)) return null;
   const model = asSafeString(value.model, 120);
@@ -280,11 +328,13 @@ const projectUsageView = (value) => {
   }
 
   const trend60m = value.trend60m.map(projectTrendPoint);
+  const trends = projectTrends(value.trends, trend60m);
   const topModels = value.topModels.map(projectModelUsage);
   const recentModels = value.recentModels.map(projectRecentModel);
   const latestRequest = projectLatestRequest(value.latestRequest);
   if (
     trend60m.some((item) => item === null) ||
+    !trends ||
     topModels.some((item) => item === null) ||
     recentModels.some((item) => item === null) ||
     latestRequest === undefined
@@ -292,7 +342,7 @@ const projectUsageView = (value) => {
     return null;
   }
 
-  return { statusCounts, periods, trend60m, topModels, recentModels, latestRequest };
+  return { statusCounts, periods, trend60m, trends, topModels, recentModels, latestRequest };
 };
 
 export const projectWidgetSnapshotV1 = (value, expectedInstallDir) => {
@@ -322,11 +372,13 @@ export const projectWidgetSnapshotV1 = (value, expectedInstallDir) => {
   }
 
   const trend60m = value.trend60m.map(projectTrendPoint);
+  const trends = projectTrends(value.trends, trend60m);
   const topModels = value.topModels.map(projectModelUsage);
   const recentModels = (value.recentModels ?? []).map(projectRecentModel);
   const latestRequest = projectLatestRequest(value.latestRequest);
   if (
     trend60m.some((item) => item === null) ||
+    !trends ||
     topModels.some((item) => item === null) ||
     recentModels.some((item) => item === null)
   ) {
@@ -341,6 +393,7 @@ export const projectWidgetSnapshotV1 = (value, expectedInstallDir) => {
     statusCounts,
     periods,
     trend60m,
+    trends,
     topModels,
     recentModels,
     latestRequest,

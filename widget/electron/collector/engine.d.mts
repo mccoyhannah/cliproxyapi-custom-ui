@@ -7,6 +7,8 @@ export interface TokenPulseEngineOptions {
   pricingOverrides?: WidgetPricingOverride[];
   logsDirs?: string[];
   ledgerPaths?: string[];
+  pendingStatePath?: string;
+  pendingStateWriter?: (filePath: string, contents: string) => Promise<void>;
   reconcileIntervalMs?: number;
   stabilityDelayMs?: number;
   awaitInitialReconcile?: boolean;

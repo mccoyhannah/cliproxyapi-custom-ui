@@ -7,6 +7,7 @@ import {
   CloseIcon,
   CloudOffIcon,
   CollapseIcon,
+  CornerPinIcon,
   ExpandIcon,
   HideIcon,
   PinIcon,
@@ -24,6 +25,8 @@ import type {
   WidgetSettings,
   WidgetSnapshotV1,
   WidgetSourceStatus,
+  WidgetPeriodTrends,
+  WidgetTrendSeries,
   WidgetTrendPoint,
   WidgetUsageView,
   WidgetUsageTotals,
@@ -53,6 +56,7 @@ function createPricingRuleDraft(rule: WidgetPricingOverride): PricingRuleDraft {
 const DEFAULT_SETTINGS: WidgetSettings = {
   alwaysOnTop: true,
   expanded: false,
+  dockToBottomRight: false,
   pricingOverrides: [],
 };
 
@@ -63,6 +67,22 @@ const PERIODS: Array<{ key: PeriodKey; label: string; shortLabel: string }> = [
   { key: 'month', label: '本月', shortLabel: '本月' },
   { key: 'ledgerCoverage', label: '账本覆盖期', shortLabel: '账本' },
 ];
+
+const TREND_COPY: Record<PeriodKey, string> = {
+  today: '今天 · 按小时',
+  rolling24h: '最近 24 小时 · 按小时',
+  rolling7d: '最近 7 天 · 按天',
+  month: '本月 · 按天',
+  ledgerCoverage: '账本覆盖期 · 按天',
+};
+
+const TREND_AXIS_COPY: Record<PeriodKey, { start: string; end: string }> = {
+  today: { start: '今天 00:00', end: '现在' },
+  rolling24h: { start: '24 小时前', end: '现在' },
+  rolling7d: { start: '7 天前', end: '现在' },
+  month: { start: '本月 1 日', end: '现在' },
+  ledgerCoverage: { start: '覆盖开始', end: '覆盖结束' },
+};
 
 const STATUS_COPY: Record<WidgetSourceStatus, { label: string; detail: string }> = {
   loading: { label: '加载中', detail: '正在读取本地汇总' },
@@ -169,11 +189,42 @@ function getRecentModels(
     : [];
 }
 
+function getSnapshotTrends(snapshot: WidgetSnapshotV1): WidgetPeriodTrends {
+  const existing = (snapshot as WidgetSnapshotV1 & { trends?: WidgetPeriodTrends }).trends;
+  if (existing) return existing;
+  const fallback: WidgetTrendSeries = {
+    fromMs: snapshot.trend60m[0]?.startMs ?? null,
+    toMs: snapshot.trend60m.at(-1)?.startMs ?? null,
+    granularity: 'hour',
+    points: snapshot.trend60m,
+  };
+  const emptyHourSeries: WidgetTrendSeries = {
+    fromMs: null,
+    toMs: null,
+    granularity: 'hour',
+    points: [],
+  };
+  const emptyDaySeries: WidgetTrendSeries = {
+    fromMs: null,
+    toMs: null,
+    granularity: 'day',
+    points: [],
+  };
+  return {
+    today: fallback,
+    rolling24h: emptyHourSeries,
+    rolling7d: emptyDaySeries,
+    month: emptyDaySeries,
+    ledgerCoverage: emptyDaySeries,
+  };
+}
+
 function getCombinedView(snapshot: WidgetSnapshotV1): WidgetUsageView {
   return {
     statusCounts: snapshot.statusCounts,
     periods: snapshot.periods,
     trend60m: snapshot.trend60m,
+    trends: getSnapshotTrends(snapshot),
     topModels: snapshot.topModels,
     recentModels: snapshot.recentModels,
     latestRequest: snapshot.latestRequest,
@@ -232,7 +283,7 @@ function IconButton({
   return (
     <button
       aria-label={label}
-      aria-pressed={active || undefined}
+      aria-pressed={active}
       className={`icon-button no-drag${active ? ' icon-button--active' : ''}`}
       onClick={onClick}
       title={label}
@@ -248,6 +299,7 @@ function AppHeader({
   status,
   preview,
   onTogglePin,
+  onToggleDock,
   onToggleExpanded,
   onHide,
 }: {
@@ -255,6 +307,7 @@ function AppHeader({
   status: WidgetSourceStatus;
   preview: boolean;
   onTogglePin: () => void;
+  onToggleDock: () => void;
   onToggleExpanded: () => void;
   onHide: () => void;
 }) {
@@ -270,6 +323,13 @@ function AppHeader({
       <div className="window-actions">
         <IconButton active={settings.alwaysOnTop} label="切换窗口置顶" onClick={onTogglePin}>
           <PinIcon size={14} />
+        </IconButton>
+        <IconButton
+          active={settings.dockToBottomRight}
+          label={settings.dockToBottomRight ? '取消右下角固定' : '固定到右下角'}
+          onClick={onToggleDock}
+        >
+          <CornerPinIcon size={14} />
         </IconButton>
         <IconButton
           label={settings.expanded ? '切换到紧凑模式' : '展开详细信息'}
@@ -348,7 +408,15 @@ function TokenMix({ usage, compact = false }: { usage: WidgetUsageTotals; compac
   );
 }
 
-function Sparkline({ points, compact = false }: { points: WidgetTrendPoint[]; compact?: boolean }) {
+function Sparkline({
+  points,
+  compact = false,
+  ariaLabel = 'Token 趋势',
+}: {
+  points: WidgetTrendPoint[];
+  compact?: boolean;
+  ariaLabel?: string;
+}) {
   const rawId = useId();
   const gradientId = `spark-fill-${rawId.replaceAll(':', '')}`;
   const width = compact ? 220 : 390;
@@ -375,7 +443,7 @@ function Sparkline({ points, compact = false }: { points: WidgetTrendPoint[]; co
 
   return (
     <svg
-      aria-label="最近 60 分钟 Token 趋势"
+      aria-label={ariaLabel}
       className={`sparkline${hasActivity ? '' : ' sparkline--idle'}`}
       preserveAspectRatio="none"
       role="img"
@@ -795,7 +863,7 @@ function ExpandedDashboard({
   maintenanceButtonRef: RefObject<HTMLButtonElement | null>;
 }) {
   const [period, setPeriod] = useState<PeriodKey>('today');
-  const [viewMode, setViewMode] = useState<UsageViewMode>('ledger');
+  const [viewMode, setViewMode] = useState<UsageViewMode>('combined');
   const views = getCompatibleViews(snapshot);
   const activeView = viewMode === 'ledger' ? views.ledger : views.combined;
   const usage = activeView.periods[period];
@@ -803,8 +871,10 @@ function ExpandedDashboard({
   const ledgerUsage = views.ledger.periods[period];
   const unledgeredUsage = views.unledgered.periods[period];
   const periodLabel = PERIODS.find((item) => item.key === period)?.label ?? '今天';
-  const trendTotal = activeView.trend60m.reduce((sum, point) => sum + point.totalTokens, 0);
+  const trendSeries = activeView.trends[period];
+  const trendTotal = trendSeries.points.reduce((sum, point) => sum + point.totalTokens, 0);
   const activeLabel = viewMode === 'ledger' ? '正式账本' : '当前合计';
+  const trendAxis = TREND_AXIS_COPY[period];
 
   return (
     <main className="expanded-dashboard">
@@ -843,15 +913,18 @@ function ExpandedDashboard({
         <TokenMix usage={usage} />
         <div className={`expanded-trend${trendTotal > 0 ? '' : ' expanded-trend--idle'}`}>
           <div className="trend-caption">
-            <span>最近 60 分钟</span>
+            <span>{TREND_COPY[period]}</span>
             <b>{formatTokens(trendTotal)} Token</b>
           </div>
           <div className="expanded-trend__plot">
-            <Sparkline points={activeView.trend60m} />
+            <Sparkline
+              ariaLabel={`${TREND_COPY[period]} Token 趋势`}
+              points={trendSeries.points}
+            />
             {trendTotal === 0 && <span className="trend-empty-state">本时段暂无新增</span>}
             <div className="trend-axis">
-              <span>60 分钟前</span>
-              <span>现在</span>
+              <span>{trendAxis.start}</span>
+              <span>{trendAxis.end}</span>
             </div>
           </div>
         </div>
@@ -1640,6 +1713,11 @@ export default function App() {
     void saveSettings({ ...settings, alwaysOnTop });
   };
 
+  const toggleDockToBottomRight = () => {
+    const dockToBottomRight = !settings.dockToBottomRight;
+    void saveSettings({ ...settings, dockToBottomRight });
+  };
+
   const hideToTray = () => {
     void window.cpaWidget?.hideToTray();
   };
@@ -1658,6 +1736,7 @@ export default function App() {
     >
       <AppHeader
         onHide={hideToTray}
+        onToggleDock={toggleDockToBottomRight}
         onToggleExpanded={toggleExpanded}
         onTogglePin={toggleAlwaysOnTop}
         preview={isPreview}

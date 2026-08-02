@@ -98,6 +98,102 @@ test('snapshot uses local calendar periods, subset token semantics, and explicit
   assert.equal(snapshot.topModels[0].model, 'gpt-6.0-unknown');
 });
 
+test('period trends use their own range, granularity, empty buckets, and preserve totals', () => {
+  const nowMs = new Date(2026, 6, 16, 12, 30, 0).getTime();
+  const todayStart = new Date(2026, 6, 16, 0, 0, 0).getTime();
+  const entries = [
+    {
+      dedupeKey: 'today-first',
+      timestampMs: todayStart + 30 * 60_000,
+      lastModifiedMs: 1,
+      model: 'gpt-5.4',
+      status: 'available',
+      tokenUsage: usage(10, 2),
+    },
+    {
+      dedupeKey: 'today-current-hour',
+      timestampMs: new Date(2026, 6, 16, 12, 5, 0).getTime(),
+      lastModifiedMs: 2,
+      model: 'gpt-5.4',
+      status: 'available',
+      tokenUsage: usage(20, 4),
+    },
+    {
+      dedupeKey: 'rolling24h-first',
+      timestampMs: nowMs - 23 * 60 * 60_000 - 30 * 60_000,
+      lastModifiedMs: 3,
+      model: 'gpt-5.4-mini',
+      status: 'available',
+      tokenUsage: usage(30, 6),
+    },
+    {
+      dedupeKey: 'rolling7d-first',
+      timestampMs: nowMs - 6 * 24 * 60 * 60_000 - 30 * 60 * 1_000,
+      lastModifiedMs: 4,
+      model: 'gpt-5.4-mini',
+      status: 'available',
+      tokenUsage: usage(40, 8),
+    },
+    {
+      dedupeKey: 'month-first',
+      timestampMs: new Date(2026, 6, 1, 1, 0, 0).getTime(),
+      lastModifiedMs: 5,
+      model: 'gpt-5.4-mini',
+      status: 'available',
+      tokenUsage: usage(50, 10),
+    },
+    {
+      dedupeKey: 'coverage-first',
+      timestampMs: nowMs - 75 * 24 * 60 * 60_000,
+      lastModifiedMs: 6,
+      model: 'gpt-5.4-mini',
+      status: 'available',
+      tokenUsage: usage(60, 12),
+    },
+  ];
+
+  const snapshot = buildWidgetSnapshot({
+    entries,
+    nowMs,
+    installDir: 'D:\\CLIProxyAPI',
+    source: {
+      status: 'live',
+      ledgerCoverageStartMs: entries.at(-1).timestampMs,
+      ledgerCoverageEndMs: nowMs,
+    },
+  });
+  const totalTrendTokens = (series) =>
+    series.points.reduce((sum, point) => sum + point.totalTokens, 0);
+
+  assert.equal(snapshot.trends.today.granularity, 'hour');
+  assert.equal(snapshot.trends.today.fromMs, todayStart);
+  assert.equal(
+    snapshot.trends.today.points.at(-1).startMs,
+    new Date(2026, 6, 16, 12, 0, 0).getTime()
+  );
+  assert.equal(snapshot.trends.rolling24h.granularity, 'hour');
+  assert.equal(snapshot.trends.rolling24h.points.length, 24);
+  assert.equal(snapshot.trends.rolling7d.granularity, 'day');
+  assert.equal(snapshot.trends.rolling7d.points.length, 7);
+  assert.equal(snapshot.trends.month.granularity, 'day');
+  assert.equal(snapshot.trends.month.points.length, 16);
+  assert.equal(snapshot.trends.ledgerCoverage.granularity, 'day');
+  assert.ok(snapshot.trends.ledgerCoverage.points.length <= 60);
+  assert.notDeepEqual(snapshot.trends.today.points, snapshot.trends.rolling24h.points);
+  assert.equal(totalTrendTokens(snapshot.trends.today), snapshot.periods.today.totalTokens);
+  assert.equal(
+    totalTrendTokens(snapshot.trends.rolling24h),
+    snapshot.periods.rolling24h.totalTokens
+  );
+  assert.equal(totalTrendTokens(snapshot.trends.rolling7d), snapshot.periods.rolling7d.totalTokens);
+  assert.equal(totalTrendTokens(snapshot.trends.month), snapshot.periods.month.totalTokens);
+  assert.equal(
+    totalTrendTokens(snapshot.trends.ledgerCoverage),
+    snapshot.periods.ledgerCoverage.totalTokens
+  );
+  assert.equal(snapshot.trends.today.points[1].requests, 0, 'empty hour buckets remain visible');
+});
+
 test('manual pricing overrides recompute previously unpriced visible history', () => {
   const nowMs = new Date(2026, 6, 16, 12, 0, 0).getTime();
   const entries = [

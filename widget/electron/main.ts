@@ -43,12 +43,20 @@ import {
   normalizeWidgetSettings,
   WindowStateStore,
 } from './windowState.js';
+import {
+  boundsEqual,
+  DEFAULT_CORNER_MARGIN,
+  getBottomRightBounds,
+  resolveDockDisplay,
+  resolveDockedBounds,
+} from './windowPlacement.mjs';
 
 const CACHE_ROOT = 'D:\\Tools\\Cache\\CPA-Token-Pulse';
 const CPA_INSTALL_DIR = 'D:\\CLIProxyAPI';
 const MAINTENANCE_TEMP_DIR = path.join(CACHE_ROOT, 'maintenance-temp');
 const WINDOW_EDGE_MARGIN = 20;
 const WINDOW_PLACEMENT_DEBOUNCE_MS = 300;
+const DOCK_ENFORCEMENT_DEBOUNCE_MS = 180;
 const WORKER_RESTART_DELAY_MS = 2_000;
 const MAX_WORKER_RESTARTS = 3;
 const COLLECTOR_RECONCILE_TIMEOUT_MS = 20_000;
@@ -83,6 +91,9 @@ let isQuitting = false;
 let isCollectorShuttingDown = false;
 let workerRestartCount = 0;
 let placementTimer: NodeJS.Timeout | null = null;
+let dockEnforcementTimer: NodeJS.Timeout | null = null;
+let dockEnforcementInProgress = false;
+let dockDisplayId: number | null = null;
 let workerRestartTimer: NodeJS.Timeout | null = null;
 const pendingCollectorReconciles = new Map<
   string,
@@ -182,6 +193,9 @@ async function bootstrap(): Promise<void> {
 
   currentSettings = await stateStore.loadSettings();
   mainWindow = await createMainWindow(currentSettings);
+  screen.on('display-metrics-changed', scheduleDockEnforcement);
+  screen.on('display-added', scheduleDockEnforcement);
+  screen.on('display-removed', scheduleDockEnforcement);
   tray = createTray();
   startCollector();
 
@@ -257,20 +271,106 @@ function configureSessionSecurity(): void {
   });
 }
 
+function getDisplayWorkAreas(): {
+  displays: Array<{ id: number; workArea: Rectangle }>;
+  primaryDisplayId: number;
+} {
+  const displays = screen.getAllDisplays().map((display) => ({
+    id: display.id,
+    workArea: display.workArea,
+  }));
+  return {
+    displays,
+    primaryDisplayId: screen.getPrimaryDisplay().id,
+  };
+}
+
+function getWindowSize(expanded = currentSettings.expanded): { width: number; height: number } {
+  return expanded ? EXPANDED_WINDOW_SIZE : COMPACT_WINDOW_SIZE;
+}
+
+function enforceDockedPosition(): void {
+  if (
+    !currentSettings.dockToBottomRight ||
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    dockEnforcementInProgress
+  ) {
+    return;
+  }
+
+  const currentBounds = mainWindow.getBounds();
+  const { displays, primaryDisplayId } = getDisplayWorkAreas();
+  const resolved = resolveDockedBounds({
+    displays,
+    preferredDisplayId: dockDisplayId,
+    currentBounds,
+    primaryDisplayId,
+    size: getWindowSize(),
+    margin: DEFAULT_CORNER_MARGIN,
+  });
+  if (!resolved) return;
+
+  dockDisplayId = resolved.displayId;
+  const nextBounds = clampBoundsToWorkAreas(
+    resolved.bounds,
+    displays.map(({ workArea }) => workArea)
+  );
+
+  dockEnforcementInProgress = true;
+  try {
+    if (!boundsEqual(currentBounds, nextBounds)) {
+      mainWindow.setBounds(nextBounds, true);
+    }
+  } finally {
+    dockEnforcementInProgress = false;
+  }
+  void stateStore.savePlacement(nextBounds, dockDisplayId).catch(() => undefined);
+}
+
+function scheduleDockEnforcement(): void {
+  if (!currentSettings.dockToBottomRight || dockEnforcementInProgress) return;
+  if (dockEnforcementTimer) clearTimeout(dockEnforcementTimer);
+  dockEnforcementTimer = setTimeout(() => {
+    dockEnforcementTimer = null;
+    enforceDockedPosition();
+  }, DOCK_ENFORCEMENT_DEBOUNCE_MS);
+}
+
 async function createMainWindow(settings: WidgetSettings): Promise<BrowserWindow> {
   const size = settings.expanded ? EXPANDED_WINDOW_SIZE : COMPACT_WINDOW_SIZE;
   const placement = await stateStore.loadPlacement();
-  const primaryWorkArea = screen.getPrimaryDisplay().workArea;
-  const desiredBounds: Rectangle = {
-    x: placement?.x ?? primaryWorkArea.x + primaryWorkArea.width - size.width - WINDOW_EDGE_MARGIN,
-    y:
-      placement?.y ?? primaryWorkArea.y + primaryWorkArea.height - size.height - WINDOW_EDGE_MARGIN,
+  const { displays, primaryDisplayId } = getDisplayWorkAreas();
+  const primaryWorkArea = displays.find((display) => display.id === primaryDisplayId)?.workArea;
+  const fallbackWorkArea = primaryWorkArea ?? displays[0]?.workArea ?? {
+    x: 0,
+    y: 0,
+    width: size.width + WINDOW_EDGE_MARGIN * 2,
+    height: size.height + WINDOW_EDGE_MARGIN * 2,
+  };
+  let desiredBounds: Rectangle = {
+    x: placement?.x ?? fallbackWorkArea.x + fallbackWorkArea.width - size.width - WINDOW_EDGE_MARGIN,
+    y: placement?.y ?? fallbackWorkArea.y + fallbackWorkArea.height - size.height - WINDOW_EDGE_MARGIN,
     width: size.width,
     height: size.height,
   };
+  if (settings.dockToBottomRight) {
+    const dockDisplay = resolveDockDisplay(
+      displays,
+      placement?.displayId ?? null,
+      placement ? { ...placement, width: size.width, height: size.height } : null,
+      primaryDisplayId
+    );
+    if (dockDisplay) {
+      dockDisplayId = dockDisplay.id;
+      desiredBounds = getBottomRightBounds(size, dockDisplay.workArea, DEFAULT_CORNER_MARGIN);
+    }
+  } else {
+    dockDisplayId = null;
+  }
   const initialBounds = clampBoundsToWorkAreas(
     desiredBounds,
-    screen.getAllDisplays().map((display) => display.workArea)
+    displays.map(({ workArea }) => workArea)
   );
 
   const window = new BrowserWindow({
@@ -308,7 +408,8 @@ async function createMainWindow(settings: WidgetSettings): Promise<BrowserWindow
     }
   });
 
-  window.on('move', schedulePlacementSave);
+  window.on('move', scheduleWindowPlacement);
+  window.on('resize', scheduleWindowPlacement);
   window.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
@@ -437,6 +538,11 @@ function resizeMainWindow(expanded: boolean): void {
     return;
   }
 
+  if (currentSettings.dockToBottomRight) {
+    enforceDockedPosition();
+    return;
+  }
+
   const currentBounds = mainWindow.getBounds();
   const size = expanded ? EXPANDED_WINDOW_SIZE : COMPACT_WINDOW_SIZE;
   const desiredBounds: Rectangle = {
@@ -454,6 +560,14 @@ function resizeMainWindow(expanded: boolean): void {
   schedulePlacementSave();
 }
 
+function scheduleWindowPlacement(): void {
+  if (currentSettings.dockToBottomRight) {
+    scheduleDockEnforcement();
+    return;
+  }
+  schedulePlacementSave();
+}
+
 function schedulePlacementSave(): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
@@ -466,7 +580,7 @@ function schedulePlacementSave(): void {
   placementTimer = setTimeout(() => {
     placementTimer = null;
     if (mainWindow && !mainWindow.isDestroyed()) {
-      void stateStore.savePlacement(mainWindow.getBounds()).catch(() => undefined);
+      void stateStore.savePlacement(mainWindow.getBounds(), null).catch(() => undefined);
     }
   }, WINDOW_PLACEMENT_DEBOUNCE_MS);
 }
@@ -562,6 +676,15 @@ function enqueueSettingsMutation(
       mainWindow?.setAlwaysOnTop(currentSettings.alwaysOnTop);
       if (previousSettings.expanded !== currentSettings.expanded) {
         resizeMainWindow(currentSettings.expanded);
+      }
+      if (previousSettings.dockToBottomRight !== currentSettings.dockToBottomRight) {
+        if (currentSettings.dockToBottomRight && mainWindow && !mainWindow.isDestroyed()) {
+          dockDisplayId = screen.getDisplayMatching(mainWindow.getBounds()).id;
+          enforceDockedPosition();
+        } else {
+          dockDisplayId = null;
+          schedulePlacementSave();
+        }
       }
       if (!arePricingOverridesEqual(previousSettings, currentSettings)) {
         postCollectorMessage({
@@ -883,6 +1006,16 @@ function createEmptyUsage(): WidgetUsageTotals {
   };
 }
 
+function createEmptyTrends() {
+  return {
+    today: { fromMs: null, toMs: null, granularity: 'hour' as const, points: [] },
+    rolling24h: { fromMs: null, toMs: null, granularity: 'hour' as const, points: [] },
+    rolling7d: { fromMs: null, toMs: null, granularity: 'day' as const, points: [] },
+    month: { fromMs: null, toMs: null, granularity: 'day' as const, points: [] },
+    ledgerCoverage: { fromMs: null, toMs: null, granularity: 'day' as const, points: [] },
+  };
+}
+
 function createEmptyUsageView(): WidgetUsageView {
   return {
     statusCounts: {
@@ -901,6 +1034,7 @@ function createEmptyUsageView(): WidgetUsageView {
       ledgerCoverage: createEmptyUsage(),
     },
     trend60m: [],
+    trends: createEmptyTrends(),
     topModels: [],
     recentModels: [],
     latestRequest: null,
@@ -945,6 +1079,7 @@ function createEmptySnapshot(): WidgetSnapshotV1 {
       ledgerCoverage: createEmptyUsage(),
     },
     trend60m: [],
+    trends: createEmptyTrends(),
     topModels: [],
     recentModels: [],
     latestRequest: null,

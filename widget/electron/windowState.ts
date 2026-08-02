@@ -2,8 +2,10 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { Rectangle } from 'electron';
 import type { WidgetPricingOverride, WidgetSettings } from '../src/shared/contracts.js';
+import { normalizePersistedPlacement, serializePlacement } from './windowPlacement.mjs';
+import type { PersistedPlacement } from './windowPlacement.mjs';
 
-export const COMPACT_WINDOW_SIZE = Object.freeze({ width: 380, height: 220 });
+export const COMPACT_WINDOW_SIZE = Object.freeze({ width: 340, height: 190 });
 export const EXPANDED_WINDOW_SIZE = Object.freeze({ width: 460, height: 600 });
 
 const MAX_PRICING_OVERRIDES = 100;
@@ -13,13 +15,9 @@ const MAX_PRICE_PER_MILLION = 1_000_000;
 const DEFAULT_SETTINGS: WidgetSettings = Object.freeze({
   alwaysOnTop: true,
   expanded: false,
+  dockToBottomRight: false,
   pricingOverrides: [],
 });
-
-interface PersistedWindowPlacement {
-  x: number;
-  y: number;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -84,6 +82,10 @@ export function normalizeWidgetSettings(
   return {
     alwaysOnTop: typeof value.alwaysOnTop === 'boolean' ? value.alwaysOnTop : fallback.alwaysOnTop,
     expanded: typeof value.expanded === 'boolean' ? value.expanded : fallback.expanded,
+    dockToBottomRight:
+      typeof value.dockToBottomRight === 'boolean'
+        ? value.dockToBottomRight
+        : fallback.dockToBottomRight,
     pricingOverrides,
   };
 }
@@ -92,27 +94,8 @@ export function cloneSettings(settings: WidgetSettings): WidgetSettings {
   return {
     alwaysOnTop: settings.alwaysOnTop,
     expanded: settings.expanded,
+    dockToBottomRight: settings.dockToBottomRight,
     pricingOverrides: settings.pricingOverrides.map((override) => ({ ...override })),
-  };
-}
-
-function normalizePlacement(value: unknown): PersistedWindowPlacement | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  if (
-    typeof value.x !== 'number' ||
-    typeof value.y !== 'number' ||
-    !Number.isFinite(value.x) ||
-    !Number.isFinite(value.y)
-  ) {
-    return null;
-  }
-
-  return {
-    x: Math.round(value.x),
-    y: Math.round(value.y),
   };
 }
 
@@ -166,15 +149,12 @@ export class WindowStateStore {
     await writeJsonAtomic(this.settingsPath, normalizeWidgetSettings(settings));
   }
 
-  async loadPlacement(): Promise<PersistedWindowPlacement | null> {
-    return normalizePlacement(await readJson(this.placementPath));
+  async loadPlacement(): Promise<PersistedPlacement | null> {
+    return normalizePersistedPlacement(await readJson(this.placementPath));
   }
 
-  async savePlacement(bounds: Rectangle): Promise<void> {
-    await writeJsonAtomic(this.placementPath, {
-      x: Math.round(bounds.x),
-      y: Math.round(bounds.y),
-    } satisfies PersistedWindowPlacement);
+  async savePlacement(bounds: Rectangle, displayId: number | null = null): Promise<void> {
+    await writeJsonAtomic(this.placementPath, serializePlacement(bounds, displayId));
   }
 }
 

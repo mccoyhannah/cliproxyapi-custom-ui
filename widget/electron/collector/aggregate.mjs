@@ -8,7 +8,9 @@ import {
 } from '../../../scripts/lib/token-pricing-core.mjs';
 
 const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * 60 * MINUTE_MS;
+const MAX_TREND_POINTS = 60;
 const UNRECOGNIZED_MODEL = '未识别模型';
 
 export const TOKEN_COLLECTOR_VERSION = '1.2.0';
@@ -126,6 +128,168 @@ const buildTrend = (entries, nowMs, costForEntry) => {
   return points;
 };
 
+const emptyTrendPoint = (startMs) => ({
+  startMs,
+  requests: 0,
+  totalTokens: 0,
+  estimatedUsd: null,
+});
+
+const addTrendEntry = (point, entry, costForEntry) => {
+  point.requests += 1;
+  point.totalTokens += finiteNumber(entry.tokenUsage.total);
+  const estimate = costForEntry(entry);
+  if (estimate.pricingPattern) {
+    point.estimatedUsd = (point.estimatedUsd ?? 0) + estimate.costUsd;
+  }
+};
+
+const localHourStart = (timestampMs) => {
+  const date = new Date(timestampMs);
+  date.setMinutes(0, 0, 0);
+  return date.getTime();
+};
+
+const localDayStart = (timestampMs) => {
+  const date = new Date(timestampMs);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+};
+
+const nextLocalBucketStart = (timestampMs, granularity) => {
+  const date = new Date(timestampMs);
+  if (granularity === 'hour') {
+    date.setHours(date.getHours() + 1, 0, 0, 0);
+  } else {
+    date.setDate(date.getDate() + 1);
+    date.setHours(0, 0, 0, 0);
+  }
+  return date.getTime();
+};
+
+const calendarBucketStarts = (fromMs, toMs, granularity) => {
+  const starts = [];
+  let cursor = granularity === 'hour' ? localHourStart(fromMs) : localDayStart(fromMs);
+  const end = granularity === 'hour' ? localHourStart(toMs) : localDayStart(toMs);
+  while (cursor <= end) {
+    starts.push(cursor);
+    const next = nextLocalBucketStart(cursor, granularity);
+    if (next <= cursor) break;
+    cursor = next;
+  }
+  return starts;
+};
+
+const downsampleTrendPoints = (points, maxPoints = MAX_TREND_POINTS) => {
+  if (points.length <= maxPoints) return points;
+  const groupSize = Math.ceil(points.length / maxPoints);
+  const sampled = [];
+  for (let index = 0; index < points.length; index += groupSize) {
+    const group = points.slice(index, index + groupSize);
+    const estimatedUsd = group.some((point) => point.estimatedUsd !== null)
+      ? group.reduce((sum, point) => sum + (point.estimatedUsd ?? 0), 0)
+      : null;
+    sampled.push({
+      startMs: group[0].startMs,
+      requests: group.reduce((sum, point) => sum + point.requests, 0),
+      totalTokens: group.reduce((sum, point) => sum + point.totalTokens, 0),
+      estimatedUsd,
+    });
+  }
+  return sampled;
+};
+
+const buildTrendSeries = ({
+  entries,
+  fromMs,
+  toMs,
+  granularity,
+  fixedUnitMs = null,
+  costForEntry,
+}) => {
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs > toMs) {
+    return { fromMs: null, toMs: null, granularity, points: [] };
+  }
+
+  const starts = fixedUnitMs
+    ? Array.from(
+        { length: Math.max(1, Math.ceil((toMs - fromMs) / fixedUnitMs)) },
+        (_, index) => fromMs + index * fixedUnitMs
+      )
+    : calendarBucketStarts(fromMs, toMs, granularity);
+  const points = starts.map(emptyTrendPoint);
+
+  for (const entry of entries) {
+    if (entry.status !== 'available' || !Number.isFinite(entry.timestampMs)) continue;
+    if (entry.timestampMs < fromMs || entry.timestampMs > toMs) continue;
+    let bucket = fixedUnitMs
+      ? Math.floor((entry.timestampMs - fromMs) / fixedUnitMs)
+      : starts.findLastIndex((startMs) => startMs <= entry.timestampMs);
+    bucket = Math.min(points.length - 1, Math.max(0, bucket));
+    addTrendEntry(points[bucket], entry, costForEntry);
+  }
+
+  return {
+    fromMs,
+    toMs,
+    granularity,
+    points: downsampleTrendPoints(points),
+  };
+};
+
+const buildPeriodTrends = ({
+  entries,
+  nowMs,
+  costForEntry,
+  coverageStartMs,
+  coverageEndMs,
+  span,
+}) => {
+  const todayStart = localDayStart(nowMs);
+  const monthStart = new Date(new Date(nowMs).getFullYear(), new Date(nowMs).getMonth(), 1).getTime();
+  const coverageStart = coverageStartMs ?? span.start;
+  const coverageEnd = coverageEndMs ?? span.end;
+  return {
+    today: buildTrendSeries({
+      entries,
+      fromMs: todayStart,
+      toMs: nowMs,
+      granularity: 'hour',
+      costForEntry,
+    }),
+    rolling24h: buildTrendSeries({
+      entries,
+      fromMs: nowMs - DAY_MS,
+      toMs: nowMs,
+      granularity: 'hour',
+      fixedUnitMs: HOUR_MS,
+      costForEntry,
+    }),
+    rolling7d: buildTrendSeries({
+      entries,
+      fromMs: nowMs - 7 * DAY_MS,
+      toMs: nowMs,
+      granularity: 'day',
+      fixedUnitMs: DAY_MS,
+      costForEntry,
+    }),
+    month: buildTrendSeries({
+      entries,
+      fromMs: monthStart,
+      toMs: nowMs,
+      granularity: 'day',
+      costForEntry,
+    }),
+    ledgerCoverage: buildTrendSeries({
+      entries,
+      fromMs: coverageStart,
+      toMs: coverageEnd,
+      granularity: 'day',
+      costForEntry,
+    }),
+  };
+};
+
 const buildTopModels = (entries, costForEntry) => {
   const groups = new Map();
   for (const entry of entries) {
@@ -214,6 +378,14 @@ const buildUsageView = ({
   const span = calculateSpan(deduped);
   const statusCounts = buildStatusCounts(deduped);
   const latestRequest = buildLatestRequest(deduped, costForEntry);
+  const trends = buildPeriodTrends({
+    entries: deduped,
+    nowMs,
+    costForEntry,
+    coverageStartMs,
+    coverageEndMs,
+    span,
+  });
 
   return {
     statusCounts,
@@ -250,6 +422,7 @@ const buildUsageView = ({
       ),
     },
     trend60m: buildTrend(deduped, nowMs, costForEntry),
+    trends,
     topModels: buildTopModels(deduped, costForEntry),
     recentModels: buildRecentModels(deduped, costForEntry),
     latestRequest,

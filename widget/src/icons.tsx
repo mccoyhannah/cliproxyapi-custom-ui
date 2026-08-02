@@ -39,6 +39,21 @@ export function PinIcon(props: IconProps) {
   );
 }
 
+export function CornerPinIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path
+        d="M5 9V5h4M19 15v4h-4M5 5l5 5M19 19l-5-5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+      <path d="M14 10h5v5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+    </IconBase>
+  );
+}
+
 export function ExpandIcon(props: IconProps) {
   return (
     <IconBase {...props}>
