@@ -14257,6 +14257,25 @@ button.subscriptionHeaderBadge {
   font-weight: 760;
 }
 
+.accountMemoLoginWorkspaceOverlay:global(.modal-overlay) {
+  justify-content: flex-start;
+  padding: 12px;
+  background: color-mix(in srgb, var(--bg-body) 18%, transparent);
+  backdrop-filter: blur(2px) saturate(0.96);
+  -webkit-backdrop-filter: blur(2px) saturate(0.96);
+}
+
+.accountMemoLoginWorkspaceModal:global(.modal) {
+  align-self: stretch;
+  width: min(420px, calc(100vw - 24px)) !important;
+  max-height: calc(100vh - 24px);
+
+  :global(.modal-body) {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 .accountMemoFieldActions {
   display: inline-flex;
   align-items: center;

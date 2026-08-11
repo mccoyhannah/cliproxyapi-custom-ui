@@ -101,6 +101,7 @@ import {
   type AuthFileAccountMemoImage,
   type AuthFilesAccountMemoMap,
 } from '@/features/authFiles/accountMemos';
+import { createAccountMemoLoginWorkspaceLayout } from '@/features/authFiles/accountMemoLoginWorkspace';
 import {
   analyzeCodexPriorityRotation,
   normalizePriorityRotationActiveSlotLimit,
@@ -1120,6 +1121,7 @@ export function AuthFilesPage() {
   >({});
   const [codexOAuthOpening, setCodexOAuthOpening] = useState(false);
   const [codexOAuthLastUrl, setCodexOAuthLastUrl] = useState('');
+  const [accountMemoLoginWorkspaceActive, setAccountMemoLoginWorkspaceActive] = useState(false);
   const [codexOAuthAttemptExpiresAt, setCodexOAuthAttemptExpiresAt] = useState<number | null>(
     null
   );
@@ -1149,6 +1151,7 @@ export function AuthFilesPage() {
   const priorityRotationSidecarStatusRequestIdRef = useRef(0);
   const priorityRotationSidecarLastMutationRef = useRef('');
   const codexOAuthPollTimerRef = useRef<number | null>(null);
+  const codexOAuthWindowRef = useRef<Window | null>(null);
   const codexOAuthAttemptIdRef = useRef(0);
   const codexOAuthOpenRequestIdRef = useRef(0);
   const codexOAuthPollRecoverableWarningShownRef = useRef(false);
@@ -1204,9 +1207,11 @@ export function AuthFilesPage() {
   const finishCodexOAuthAttempt = useCallback(() => {
     clearCodexOAuthPollTimer();
     codexOAuthPollRecoverableWarningShownRef.current = false;
+    codexOAuthWindowRef.current = null;
     setCodexOAuthLastUrl('');
     setCodexOAuthAttemptExpiresAt(null);
     setCodexOAuthNowMs(Date.now());
+    setAccountMemoLoginWorkspaceActive(false);
   }, [clearCodexOAuthPollTimer]);
 
   useEffect(() => {
@@ -1418,6 +1423,10 @@ export function AuthFilesPage() {
       clearCodexOAuthPollTimer();
 
       const poll = async () => {
+        if (codexOAuthWindowRef.current?.closed) {
+          setAccountMemoLoginWorkspaceActive(false);
+          codexOAuthWindowRef.current = null;
+        }
         try {
           const result = await oauthApi.getAuthStatus(state);
           if (codexOAuthAttemptIdRef.current !== attemptId) return;
@@ -1782,7 +1791,7 @@ export function AuthFilesPage() {
     t,
   ]);
 
-  const handleOpenCodexOAuth = useCallback(async () => {
+  const handleOpenCodexOAuth = useCallback(async (openInMemoWorkspace = false) => {
     if (disableControls || codexOAuthOpening) return;
 
     const openRequestId = codexOAuthOpenRequestIdRef.current + 1;
@@ -1792,8 +1801,17 @@ export function AuthFilesPage() {
     rememberDisplayNamesForFiles(filesRef.current.filter((file) => CODEX_CONFIG.filterFn(file)));
     let authWindow: Window | null = null;
     if (typeof window !== 'undefined') {
-      authWindow = window.open('about:blank', '_blank');
+      const layout = openInMemoWorkspace
+        ? createAccountMemoLoginWorkspaceLayout(window.screen)
+        : null;
+      authWindow = window.open(
+        'about:blank',
+        openInMemoWorkspace ? 'cpamc-codex-login' : '_blank',
+        layout?.features
+      );
       if (authWindow) {
+        codexOAuthWindowRef.current = authWindow;
+        setAccountMemoLoginWorkspaceActive(Boolean(layout?.tiled));
         authWindow.opener = null;
         writeExternalWaitingPage(
           authWindow,
@@ -1830,6 +1848,7 @@ export function AuthFilesPage() {
         }
         openedAuthPage = true;
       } else {
+        setAccountMemoLoginWorkspaceActive(false);
         const opened = window.open(response.url, '_blank', 'noopener,noreferrer');
         if (!opened) {
           const copied = await copyToClipboard(response.url);
@@ -1868,6 +1887,8 @@ export function AuthFilesPage() {
       if (authWindow && !authWindow.closed) {
         authWindow.close();
       }
+      codexOAuthWindowRef.current = null;
+      setAccountMemoLoginWorkspaceActive(false);
       const message = err instanceof Error ? err.message : typeof err === 'string' ? err : '';
       showNotification(
         t('auth_files.codex_oauth_open_failed', {
@@ -6381,9 +6402,13 @@ export function AuthFilesPage() {
         onCloseRequest={requestCloseAccountMemoEditor}
         onAfterClose={resetAccountMemoEditor}
         closeDisabled={Boolean(accountMemoPreviewImage) || accountMemoClosing || accountMemoSaving}
-        width={720}
-        className={styles.accountMemoModal}
-        overlayClassName={styles.accountMemoOverlay}
+        width={accountMemoLoginWorkspaceActive ? 420 : 720}
+        className={`${styles.accountMemoModal} ${
+          accountMemoLoginWorkspaceActive ? styles.accountMemoLoginWorkspaceModal : ''
+        }`.trim()}
+        overlayClassName={`${styles.accountMemoOverlay} ${
+          accountMemoLoginWorkspaceActive ? styles.accountMemoLoginWorkspaceOverlay : ''
+        }`.trim()}
       >
         <div className={styles.accountMemoEditor}>
           <div className={styles.accountMemoTarget} title={accountMemoEditorFileName}>
@@ -6433,7 +6458,7 @@ export function AuthFilesPage() {
                   size="sm"
                   className={`${styles.fileListCodexLoginButton} ${styles.accountMemoCodexLoginButton}`}
                   leftIcon={<IconExternalLink size={14} />}
-                  onClick={() => void handleOpenCodexOAuth()}
+                  onClick={() => void handleOpenCodexOAuth(true)}
                   disabled={disableControls || codexOAuthOpening}
                   loading={codexOAuthOpening}
                   loadingLabel={t('auth_files.codex_oauth_opening', {
